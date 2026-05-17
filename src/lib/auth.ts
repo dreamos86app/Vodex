@@ -17,13 +17,15 @@ import { createClient } from "@/lib/supabase/client";
 
 /**
  * Returns the canonical app base URL.
- * Priority: NEXT_PUBLIC_APP_URL → window.location.origin → localhost:3000
+ * Priority: NEXT_PUBLIC_APP_URL → window.location.origin → VERCEL_PROJECT_PRODUCTION_URL → dreamos86.com
  */
 export function getAppUrl(): string {
   const env = process.env.NEXT_PUBLIC_APP_URL;
   if (env) return env.replace(/\/$/, "");
   if (typeof window !== "undefined") return window.location.origin;
-  return "http://localhost:3000";
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercel) return `https://${vercel}`;
+  return "https://dreamos86.com";
 }
 
 /**

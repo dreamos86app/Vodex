@@ -5,6 +5,11 @@ import { openai } from "@ai-sdk/openai";
 import { google } from "@ai-sdk/google";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  loadMemory,
+  formatMemoryForPrompt,
+} from "@/lib/creation/memory";
+import { buildOrchestrationSystem } from "@/lib/creation/orchestration";
 
 const MODEL_CREDITS: Record<string, number> = {
   "claude-3-5-sonnet": 3,
@@ -58,6 +63,9 @@ export async function POST(request: Request) {
     messages?: UIMessage[];
     modelId?: string;
     conversationId?: string;
+    mode?: "discuss" | "edit" | "build";
+    scope?: string | null;
+    projectId?: string;
   };
 
   try {
@@ -77,6 +85,13 @@ export async function POST(request: Request) {
   const conversationId =
     typeof raw.conversationId === "string" && raw.conversationId.length > 0
       ? raw.conversationId
+      : undefined;
+  const mode: "discuss" | "edit" | "build" =
+    raw.mode === "edit" ? "edit" : raw.mode === "build" ? "build" : "discuss";
+  const scope = typeof raw.scope === "string" ? raw.scope : null;
+  const projectId =
+    typeof raw.projectId === "string" && raw.projectId.length > 0
+      ? raw.projectId
       : undefined;
 
   let modelMessages;
@@ -135,13 +150,26 @@ export async function POST(request: Request) {
     })
     .then(() => {});
 
+  // ─── Memory injection (real, persistent) ──────────────────────────────────
+  let memoryBlock = "";
+  if (projectId) {
+    const { entries } = await loadMemory(supabase, { projectId, limit: 30 });
+    memoryBlock = formatMemoryForPrompt(entries);
+  }
+
+  const systemPrompt = buildOrchestrationSystem({
+    mode,
+    scope,
+    projectMemoryBlock: memoryBlock,
+    hasProject: !!projectId,
+  });
+
   try {
     const model = getModel(modelId);
     const result = streamText({
       model,
       messages: modelMessages,
-      system:
-        "You are an AI assistant in DreamOS86, an AI-native app creation platform. Be helpful, concise, and professional.",
+      system: systemPrompt,
       onFinish: async (event) => {
         if (!conversationId) return;
         await supabase.from("messages").insert({
@@ -153,6 +181,7 @@ export async function POST(request: Request) {
           finish_reason: event.finishReason,
           tokens_input: event.usage.inputTokens ?? null,
           tokens_output: event.usage.outputTokens ?? null,
+          metadata: { mode, scope, projectId } as never,
         });
       },
     });

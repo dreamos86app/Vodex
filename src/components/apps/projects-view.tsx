@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Plus, Search, Star, LayoutGrid, List,
@@ -30,12 +31,17 @@ function ProjectCard({ project }: { project: Project }) {
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface ring-1 ring-border transition hover:ring-accent/30 hover:shadow-lg cursor-pointer"
+      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface ring-1 ring-border transition hover:ring-accent/30 hover:shadow-lg"
     >
+      <Link
+        href={`/projects/${project.id}`}
+        aria-label={`Open ${project.name}`}
+        className="absolute inset-0 z-0"
+      />
       {/* Gradient header */}
-      <div className={cn("h-24 w-full bg-gradient-to-br", project.gradient, "opacity-80")} />
+      <div className={cn("pointer-events-none relative h-24 w-full bg-gradient-to-br", project.gradient, "opacity-80")} />
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="pointer-events-none relative z-[1] flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
@@ -56,18 +62,23 @@ function ProjectCard({ project }: { project: Project }) {
             <span>{project.framework}</span>
             <span>{new Date(project.updated_at).toLocaleDateString()}</span>
           </div>
-          <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
+          <div className="pointer-events-auto flex gap-1 opacity-0 transition group-hover:opacity-100">
             {project.preview_url && (
               <a
                 href={project.preview_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-background hover:text-foreground"
+                onClick={(e) => e.stopPropagation()}
+                className="relative z-10 flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-background hover:text-foreground"
               >
                 <ArrowUpRight className="size-3.5" strokeWidth={1.75} />
               </a>
             )}
-            <button className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground transition hover:bg-background hover:text-amber-400">
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className="relative z-10 flex items-center justify-center rounded-lg p-1.5 text-muted-foreground transition hover:bg-background hover:text-amber-400"
+            >
               <Star className={cn("size-3.5", project.is_favorite && "fill-amber-400 text-amber-400")} strokeWidth={1.75} />
             </button>
           </div>
@@ -87,7 +98,12 @@ export function ProjectsView() {
   const [showImport, setShowImport] = React.useState(false);
 
   React.useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+      // Don't spin forever — if profile hasn't loaded after mount, clear loading
+      const t = setTimeout(() => setLoading(false), 2000);
+      return () => clearTimeout(t);
+    }
+    setLoading(true);
     supabase
       .from("projects")
       .select("*")
@@ -166,30 +182,74 @@ export function ProjectsView() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <div className="flex items-center justify-center py-24">
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative flex size-12 items-center justify-center">
+              <div className="absolute size-12 animate-ping rounded-full bg-accent/20" />
+              <div className="relative size-6 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
+            </div>
+            <p className="text-[12.5px] text-muted-foreground">Loading your apps…</p>
+          </div>
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Sparkles className="size-8 text-muted-foreground/30" strokeWidth={1.25} />}
-          title={search ? "No matching projects" : "Nothing here yet"}
-          description={
-            search
-              ? "Try a different search term or clear the filter."
-              : "Describe what you want to build and DreamOS86 will generate it — with full UI, database, and auth."
-          }
-          hints={
-            !search
-              ? [
-                  "Describe your app in plain English",
-                  "Choose a stack and orchestration mode",
-                  "AI generates a full working codebase",
-                ]
-              : undefined
-          }
-          action={!search ? { label: "Create your first app", href: "/create" } : undefined}
-          secondaryAction={!search ? { label: "Browse templates", href: "/templates" } : undefined}
-        />
+        !search ? (
+          <motion.div
+            variants={variants.fadeUp}
+            className="flex flex-col items-center gap-8 py-16 text-center"
+          >
+            <div className="relative">
+              <div className="absolute -inset-8 animate-pulse rounded-full bg-accent/5 blur-2xl" />
+              <div className="relative flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-violet-500/20 ring-1 ring-accent/20">
+                <Sparkles className="size-9 text-accent" strokeWidth={1.5} />
+              </div>
+            </div>
+            <div className="max-w-md space-y-2">
+              <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+                Build your first app
+              </h2>
+              <p className="text-[14px] leading-relaxed text-muted-foreground">
+                Describe what you want in plain English. DreamOS86 generates routes, UI, database schema, auth, and APIs — all at once.
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <Link
+                href="/"
+                className="flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-[13.5px] font-semibold text-white transition hover:bg-accent/90"
+              >
+                <Sparkles className="size-4" strokeWidth={2} />
+                Start building
+              </Link>
+              <Link
+                href="/templates"
+                className="flex items-center gap-2 rounded-xl bg-surface px-5 py-2.5 text-[13.5px] font-semibold text-foreground ring-1 ring-border transition hover:ring-accent/30"
+              >
+                Browse templates
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[
+                { label: "SaaS dashboard", desc: "Auth, billing, analytics" },
+                { label: "Mobile app", desc: "React Native + API" },
+                { label: "AI tool", desc: "LLM-powered workflow" },
+              ].map((idea) => (
+                <Link
+                  key={idea.label}
+                  href={`/?prompt=Build a ${idea.label.toLowerCase()}`}
+                  className="rounded-xl bg-surface p-4 text-left ring-1 ring-border transition hover:ring-accent/30 hover:bg-surface/80"
+                >
+                  <p className="text-[13px] font-semibold text-foreground">{idea.label}</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">{idea.desc}</p>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        ) : (
+          <EmptyState
+            icon={<Search className="size-8 text-muted-foreground/30" strokeWidth={1.25} />}
+            title="No matching projects"
+            description="Try a different search term or clear the filter."
+          />
+        )
       ) : (
         <div className={cn(
           view === "grid"

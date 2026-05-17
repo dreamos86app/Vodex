@@ -1,21 +1,58 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-type EmptyStateAction = { label: string; onClick?: () => void; href?: string };
+export type EmptyStateAction = {
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  icon?: React.ReactNode;
+  variant?: "accent" | "secondary" | "ghost";
+};
 
-type EmptyStateProps = {
+export type EmptyStateProps = {
   icon: React.ReactNode;
   title: string;
   description: string;
   action?: EmptyStateAction;
   secondaryAction?: EmptyStateAction;
   hints?: string[];
+  quickActions?: EmptyStateAction[];
+  badge?: string;
   className?: string;
 };
+
+function ActionButton({
+  action,
+  isPrimary = false,
+}: {
+  action: EmptyStateAction;
+  isPrimary?: boolean;
+}) {
+  const variant = action.variant ?? (isPrimary ? "accent" : "secondary");
+  const inner = (
+    <Button variant={variant} size="lg" type="button" onClick={action.onClick} className={action.icon ? "gap-1.5" : undefined}>
+      {action.icon}
+      {action.label}
+    </Button>
+  );
+
+  if (action.href) {
+    return (
+      <Link href={action.href} tabIndex={-1}>
+        <Button variant={variant} size="lg" type="button" className={action.icon ? "gap-1.5" : undefined}>
+          {action.icon}
+          {action.label}
+        </Button>
+      </Link>
+    );
+  }
+  return inner;
+}
 
 export function EmptyState({
   icon,
@@ -24,6 +61,8 @@ export function EmptyState({
   action,
   secondaryAction,
   hints,
+  quickActions,
+  badge,
   className,
 }: EmptyStateProps) {
   return (
@@ -39,12 +78,20 @@ export function EmptyState({
       <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground ring-1 ring-border">
         {icon}
       </div>
-      <h3 className="mt-6 text-[17px] font-semibold tracking-[-0.02em] text-foreground">
+
+      {badge && (
+        <span className="mt-4 inline-flex rounded-full bg-muted/70 px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground ring-1 ring-border">
+          {badge}
+        </span>
+      )}
+
+      <h3 className={cn("text-[17px] font-semibold tracking-[-0.02em] text-foreground", badge ? "mt-3" : "mt-6")}>
         {title}
       </h3>
       <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-muted-foreground">
         {description}
       </p>
+
       {hints && hints.length > 0 && (
         <ul className="mt-4 space-y-1.5 text-left max-w-xs">
           {hints.map((hint) => (
@@ -55,30 +102,19 @@ export function EmptyState({
           ))}
         </ul>
       )}
+
       {(action || secondaryAction) && (
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          {action && (
-            action.href ? (
-              <a href={action.href} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-accent/90">
-                {action.label}
-              </a>
-            ) : (
-              <Button variant="accent" size="lg" type="button" onClick={action.onClick}>
-                {action.label}
-              </Button>
-            )
-          )}
-          {secondaryAction && (
-            secondaryAction.href ? (
-              <a href={secondaryAction.href} className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-4 py-2 text-[13px] font-medium text-foreground transition hover:bg-muted/70">
-                {secondaryAction.label}
-              </a>
-            ) : (
-              <Button variant="secondary" size="lg" type="button" onClick={secondaryAction.onClick}>
-                {secondaryAction.label}
-              </Button>
-            )
-          )}
+          {action && <ActionButton action={action} isPrimary />}
+          {secondaryAction && <ActionButton action={secondaryAction} />}
+        </div>
+      )}
+
+      {quickActions && quickActions.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {quickActions.map((qa) => (
+            <ActionButton key={qa.label} action={qa} />
+          ))}
         </div>
       )}
     </motion.div>

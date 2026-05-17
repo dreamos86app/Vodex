@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, ArrowLeft, Check, Sparkles, Building,
-  Users, Loader2,
+  Users, Loader2, MessageCircle, Pencil, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,31 @@ const MODELS = [
   { id: "gemini-2-0-flash", label: "Gemini Flash", desc: "Fast and efficient" },
 ];
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
+
+const MODES_INTRO = [
+  {
+    id: "discuss",
+    icon: MessageCircle,
+    label: "Discuss",
+    accent: "text-blue-500 bg-blue-500/10 ring-blue-500/25",
+    desc: "Talk with your AI architect. Shape ideas, explore trade-offs, plan architecture — before a single line is written.",
+  },
+  {
+    id: "edit",
+    icon: Pencil,
+    label: "Edit",
+    accent: "text-amber-500 bg-amber-500/10 ring-amber-500/25",
+    desc: "Surgical precision. Target a specific component, route, schema, or flow for a focused AI modification.",
+  },
+  {
+    id: "build",
+    icon: Zap,
+    label: "Build",
+    accent: "text-violet-500 bg-violet-500/10 ring-violet-500/25",
+    desc: "Full system generation. Describe your app and DreamOS86 builds routes, UI, database, auth, and APIs — all at once.",
+  },
+];
 
 export function OnboardingView() {
   const router = useRouter();
@@ -186,6 +210,37 @@ export function OnboardingView() {
               </div>
             </button>
           ))}
+        </div>
+      ),
+    },
+    {
+      title: "Three modes. One OS.",
+      subtitle: "DreamOS86 works in three modes. Each feels completely different.",
+      content: (
+        <div className="space-y-3">
+          {MODES_INTRO.map((mode) => {
+            const Icon = mode.icon;
+            return (
+              <div
+                key={mode.id}
+                className="flex gap-3 rounded-[var(--radius-lg)] bg-surface p-4 ring-1 ring-border"
+              >
+                <div className={cn(
+                  "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ring-1",
+                  mode.accent,
+                )}>
+                  <Icon className="size-4" strokeWidth={1.75} />
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold text-foreground">{mode.label}</p>
+                  <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">{mode.desc}</p>
+                </div>
+              </div>
+            );
+          })}
+          <p className="pt-1 text-[11.5px] text-muted-foreground">
+            Start with <span className="font-semibold text-foreground">Build</span> to generate your first app — you can switch modes at any time.
+          </p>
         </div>
       ),
     },

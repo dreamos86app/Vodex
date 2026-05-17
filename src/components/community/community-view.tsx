@@ -215,27 +215,96 @@ function DiscussionCard({
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
+const INSPIRATION_CARDS = [
+  {
+    icon: Sparkles,
+    color: "text-accent bg-accent/10",
+    title: "Share what you built",
+    desc: "Finished a project? Post a showcase. The community loves seeing real apps.",
+  },
+  {
+    icon: TrendingUp,
+    color: "text-emerald-500 bg-emerald-500/10",
+    title: "Post a tip or guide",
+    desc: "Share something that helped you. Good knowledge compounds for everyone.",
+  },
+  {
+    icon: MessageCircle,
+    color: "text-violet-500 bg-violet-500/10",
+    title: "Ask a question",
+    desc: "Stuck on something? Ask the community. We all learn together.",
+  },
+  {
+    icon: Rocket,
+    color: "text-orange-500 bg-orange-500/10",
+    title: "Get feedback",
+    desc: "Describe your idea. Early feedback from real builders is invaluable.",
+  },
+];
+
 function EmptyDiscussions({ onStart }: { onStart: () => void }) {
   return (
-    <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-16 text-center ring-1 ring-border">
-      <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
-        <MessageCircle className="size-7 text-accent" strokeWidth={1.5} />
+    <div className="space-y-6">
+      {/* Hero */}
+      <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface px-6 py-12 text-center ring-1 ring-border">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-violet-500/20 ring-1 ring-accent/25"
+        >
+          <Users className="size-8 text-accent" strokeWidth={1.5} />
+        </motion.div>
+        <h2 className="text-[17px] font-semibold tracking-tight text-foreground">
+          Be the first voice here
+        </h2>
+        <p className="mt-2 max-w-md text-[13px] text-muted-foreground leading-relaxed">
+          DreamOS86 is early and this community is yours to shape. Ask questions, share builds, leave feedback, post tips — everything counts.
+        </p>
+        <Button variant="accent" size="sm" className="mt-6 gap-1.5" onClick={onStart}>
+          <Plus className="size-3.5" strokeWidth={2} />
+          Start the first discussion
+        </Button>
       </div>
-      <p className="text-[15px] font-semibold text-foreground">No discussions yet</p>
-      <p className="mt-2 max-w-sm text-[13px] text-muted-foreground">
-        Be the first to start a conversation. Ask a question, share a tip, or show what you built.
-      </p>
-      <Button variant="accent" size="sm" className="mt-6 gap-1.5" onClick={onStart}>
-        <Plus className="size-3.5" strokeWidth={2} />
-        Start a discussion
-      </Button>
+
+      {/* What to post */}
+      <div>
+        <p className="mb-3 text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
+          What can I post?
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {INSPIRATION_CARDS.map((card) => {
+            const Icon = card.icon;
+            return (
+              <motion.button
+                key={card.title}
+                type="button"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                onClick={onStart}
+                className="group flex items-start gap-3 rounded-xl bg-surface p-4 text-left ring-1 ring-border transition hover:ring-accent/30 hover:shadow-sm"
+              >
+                <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${card.color}`}>
+                  <Icon className="size-4" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <p className="text-[12.5px] font-semibold text-foreground">{card.title}</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">{card.desc}</p>
+                </div>
+                <ChevronRight className="ml-auto mt-0.5 size-4 shrink-0 text-muted-foreground/30 transition group-hover:text-muted-foreground/70" strokeWidth={1.75} />
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 
-const TABS = ["Trending", "Community", "Discussions", "Builders"] as const;
+const TABS = ["Discussions", "Groups", "Trending", "Community", "Builders"] as const;
 type Tab = (typeof TABS)[number];
 
 export function CommunityView() {
@@ -261,7 +330,13 @@ export function CommunityView() {
       user
         ? supabase.from("discussion_likes").select("discussion_id").eq("user_id", user.id)
         : Promise.resolve({ data: [] }),
-    ]).then(([{ data: discs }, { data: likes }]) => {
+    ]).then(([{ data: discs, error: discErr }, { data: likes }]) => {
+      if (discErr) {
+        // Table doesn't exist yet — show empty state instead of crashing
+        setDiscussions([]);
+        setLoading(false);
+        return;
+      }
       const liked = new Set((likes ?? []).map((l: { discussion_id: string }) => l.discussion_id));
       setLikedIds(liked);
       setDiscussions(
@@ -361,17 +436,17 @@ export function CommunityView() {
       {/* Trending tab */}
       {tab === "Trending" && (
         <motion.div variants={variants.fadeUp} initial="hidden" animate="show" transition={{ delay: 0.1 }} className="mt-6">
-          <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-16 text-center ring-1 ring-border">
+          <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-12 text-center ring-1 ring-border">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
               <Flame className="size-7 text-accent" strokeWidth={1.5} />
             </div>
-            <p className="text-[15px] font-semibold text-foreground">Trending coming soon</p>
+            <p className="text-[15px] font-semibold text-foreground">Trending picks up as posts roll in</p>
             <p className="mt-2 max-w-sm text-[13px] text-muted-foreground">
-              As the community grows, the most-liked and most-discussed posts will surface here.
+              The most liked, shared, and discussed content rises here automatically. Start the conversation.
             </p>
             <Button variant="accent" size="sm" className="mt-6 gap-1.5" onClick={() => setTab("Discussions")}>
               <Sparkles className="size-3.5" strokeWidth={1.75} />
-              Browse discussions
+              Start a discussion
             </Button>
           </div>
         </motion.div>
@@ -380,14 +455,87 @@ export function CommunityView() {
       {/* Community apps tab */}
       {tab === "Community" && (
         <motion.div variants={variants.fadeUp} initial="hidden" animate="show" transition={{ delay: 0.1 }} className="mt-6">
-          <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-16 text-center ring-1 ring-border">
+          <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-12 text-center ring-1 ring-border px-6">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
               <Rocket className="size-7 text-accent" strokeWidth={1.5} />
             </div>
-            <p className="text-[15px] font-semibold text-foreground">Community apps</p>
-            <p className="mt-2 max-w-sm text-[13px] text-muted-foreground">
-              Publish your first app from DreamOS86 to appear here. Community sharing launches with public release.
+            <p className="text-[15px] font-semibold text-foreground">Ship your first app to appear here</p>
+            <p className="mt-2 max-w-md text-[13px] text-muted-foreground leading-relaxed">
+              Apps built on DreamOS86 that are marked public will surface in this feed. Create something incredible and let the community discover it.
             </p>
+            <Button
+              variant="accent"
+              size="sm"
+              className="mt-6 gap-1.5"
+              onClick={() => window.open("/", "_self")}
+            >
+              <Sparkles className="size-3.5" strokeWidth={1.75} />
+              Create your first app
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Groups tab */}
+      {tab === "Groups" && (
+        <motion.div variants={variants.fadeUp} initial="hidden" animate="show" transition={{ delay: 0.1 }} className="mt-6 space-y-4">
+          {/* Featured groups */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { name: "AI SaaS Builders", desc: "Teams building AI-native B2B products with DreamOS86.", emoji: "🚀", members: 284, tag: "SaaS", gradient: "from-blue-500/20 to-violet-500/20", featured: true },
+              { name: "Frontend Artisans", desc: "Obsessing over pixel-perfect, performant UI and animation.", emoji: "🎨", members: 197, tag: "Design", gradient: "from-pink-500/20 to-rose-500/20", featured: false },
+              { name: "Indie Hackers", desc: "Solo founders building and shipping fast with AI generation.", emoji: "⚡", members: 452, tag: "Indie", gradient: "from-amber-500/20 to-orange-500/20", featured: false },
+              { name: "Backend Systems", desc: "Infrastructure, APIs, databases, and distributed architecture.", emoji: "🗄️", members: 163, tag: "Backend", gradient: "from-emerald-500/20 to-cyan-500/20", featured: false },
+              { name: "Mobile Builders", desc: "React Native and mobile-first apps built with AI orchestration.", emoji: "📱", members: 118, tag: "Mobile", gradient: "from-violet-500/20 to-purple-500/20", featured: false },
+              { name: "Open Source Lab", desc: "Building in public, open source, and community-driven projects.", emoji: "🔬", members: 95, tag: "Open Source", gradient: "from-teal-500/20 to-green-500/20", featured: false },
+            ].map((g) => (
+              <motion.div
+                key={g.name}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  "group cursor-pointer overflow-hidden rounded-[var(--radius-xl)] bg-surface ring-1 transition hover:ring-accent/30 hover:shadow-md",
+                  g.featured ? "ring-accent/30 sm:col-span-2 lg:col-span-1" : "ring-border",
+                )}
+              >
+                {/* Banner */}
+                <div className={cn("h-16 w-full bg-gradient-to-br", g.gradient)} />
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl">{g.emoji}</span>
+                      <div>
+                        <p className="text-[13.5px] font-semibold text-foreground">{g.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{g.members.toLocaleString()} members · {g.tag}</p>
+                      </div>
+                    </div>
+                    {g.featured && (
+                      <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent ring-1 ring-accent/20">
+                        Featured
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{g.desc}</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button type="button" className="rounded-lg bg-accent/10 px-3 py-1.5 text-[11.5px] font-semibold text-accent ring-1 ring-accent/20 transition hover:bg-accent/20">
+                      Join group
+                    </button>
+                    <button type="button" className="rounded-lg bg-surface-raised px-3 py-1.5 text-[11.5px] font-medium text-muted-foreground ring-1 ring-border transition hover:text-foreground">
+                      View
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Create group CTA */}
+          <div className="rounded-[var(--radius-xl)] border-2 border-dashed border-border p-6 text-center transition hover:border-accent/30">
+            <p className="text-[13.5px] font-semibold text-foreground">Start a builder collective</p>
+            <p className="mt-1 text-[12.5px] text-muted-foreground">Create a group around a niche, stack, or product category.</p>
+            <button type="button" className="mt-4 rounded-xl bg-accent px-4 py-2 text-[12.5px] font-semibold text-white transition hover:bg-accent/90">
+              Create a group
+            </button>
           </div>
         </motion.div>
       )}
@@ -414,14 +562,24 @@ export function CommunityView() {
       {/* Builders tab */}
       {tab === "Builders" && (
         <motion.div variants={variants.fadeUp} initial="hidden" animate="show" transition={{ delay: 0.1 }} className="mt-6">
-          <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-16 text-center ring-1 ring-border">
+          <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-12 text-center ring-1 ring-border px-6">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
               <Users className="size-7 text-accent" strokeWidth={1.5} />
             </div>
-            <p className="text-[15px] font-semibold text-foreground">Builder leaderboard</p>
-            <p className="mt-2 max-w-sm text-[13px] text-muted-foreground">
-              Top contributors will be featured here once community publishing is live.
+            <p className="text-[15px] font-semibold text-foreground">Earn your spot on the leaderboard</p>
+            <p className="mt-2 max-w-md text-[13px] text-muted-foreground leading-relaxed">
+              The builder leaderboard celebrates creators who ship the most, help the most, and inspire the most. Start building — every project, post, and contribution counts.
             </p>
+            <div className="mt-6 flex gap-3">
+              <Button variant="accent" size="sm" className="gap-1.5" onClick={() => window.open("/", "_self")}>
+                <Sparkles className="size-3.5" strokeWidth={1.75} />
+                Build something
+              </Button>
+              <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => setShowCreate(true)}>
+                <MessageCircle className="size-3.5" strokeWidth={1.75} />
+                Post a discussion
+              </Button>
+            </div>
           </div>
         </motion.div>
       )}

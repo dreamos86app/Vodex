@@ -7,12 +7,12 @@ import {
   Rocket,
   Store,
   BarChart3,
-  ImageIcon,
   Users,
   Settings2,
   HelpCircle,
   ScrollText,
   Shield,
+  Gift,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,7 +37,6 @@ export const mainNav: NavItem[] = [
   { title: "Deploy", href: "/deploy", icon: Rocket },
   { title: "Marketplace", href: "/marketplace", icon: Store },
   { title: "Analytics", href: "/analytics", icon: BarChart3 },
-  { title: "Media", href: "/media", icon: ImageIcon },
   { title: "Community", href: "/community", icon: Users },
   { title: "Settings", href: "/settings", icon: Settings2 },
   { title: "Help", href: "/help", icon: HelpCircle },
@@ -65,13 +64,13 @@ export const navSections: NavSection[] = [
       { title: "Deploy", href: "/deploy", icon: Rocket },
       { title: "Marketplace", href: "/marketplace", icon: Store },
       { title: "Analytics", href: "/analytics", icon: BarChart3 },
-      { title: "Media", href: "/media", icon: ImageIcon },
       { title: "Community", href: "/community", icon: Users },
     ],
   },
   {
     label: "Account",
     items: [
+      { title: "Referrals", href: "/referrals", icon: Gift },
       { title: "Settings", href: "/settings", icon: Settings2 },
       { title: "Help", href: "/help", icon: HelpCircle },
       { title: "Changelog", href: "/changelog", icon: ScrollText },

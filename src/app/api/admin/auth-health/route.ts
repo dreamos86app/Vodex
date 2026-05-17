@@ -45,7 +45,7 @@ async function probeProvider(
     // Use the REST API directly to get an OAuth URL — this does not redirect
     // and tells us immediately if the provider is configured.
     const res = await fetch(
-      `${supabaseUrl}/auth/v1/authorize?provider=${provider}&redirect_to=http://localhost`,
+      `${supabaseUrl}/auth/v1/authorize?provider=${provider}&redirect_to=https://dreamos86.com/auth/callback`,
       {
         method: "GET",
         headers: {

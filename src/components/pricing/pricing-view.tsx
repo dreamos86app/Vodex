@@ -33,17 +33,16 @@ const PLANS: Plan[] = [
     id: "free",
     name: "Free",
     price: 0,
-    tagline: "Start building for free.",
-    models: "Lightweight models (Auto routing)",
+    tagline: "Start building for free. No card required.",
+    models: "Fast models (auto-selected)",
     features: [
-      "100 starter credits",
-      "3 projects",
-      "AI assistant (discuss only)",
+      "Starter orchestration capacity",
+      "3 active projects",
+      "Discuss mode",
       "Public deployments",
-      "Community access",
     ],
-    notIncluded: ["Premium models", "Custom domains", "Team access"],
-    cta: "Get started",
+    notIncluded: ["Premium models", "Custom domains", "Build mode", "Team access"],
+    cta: "Get started free",
   },
   {
     id: "starter",
@@ -52,13 +51,13 @@ const PLANS: Plan[] = [
     tagline: "For individuals shipping real products.",
     models: "Standard + Premium models",
     features: [
-      "500 credits / month",
+      "Full orchestration capacity",
       "Unlimited projects",
-      "Standard & premium AI models",
-      "5 GB storage",
+      "Discuss, Edit & Build modes",
+      "Premium AI models",
       "Custom domains",
-      "AI assistant + code generation",
-      "Export code",
+      "Remove watermark",
+      "Full source code export",
       "Email support",
     ],
     cta: "Get Starter",
@@ -72,60 +71,54 @@ const PLANS: Plan[] = [
     badge: "Most Popular",
     models: "All models including Opus & GPT-5.5",
     features: [
-      "2,000 credits / month",
+      "Advanced orchestration capacity",
       "Unlimited projects",
-      "All premium AI models",
-      "25 GB storage",
+      "All frontier models (Opus 4, GPT-5.5, Gemini Pro)",
+      "Multi-agent orchestration",
+      "Production-scale infrastructure",
       "Unlimited custom domains",
       "5 collaborators",
-      "AI Agent mode",
       "Advanced analytics",
-      "Priority support",
       "API access",
+      "Priority support",
     ],
     cta: "Get Pro",
   },
   {
     id: "infinity",
     name: "Infinity",
-    price: 200,
-    priceSuffix: "/ mo from",
-    tagline: "Orchestration-scale AI infrastructure.",
-    models: "Orchestration + Ultra models",
+    price: 100,
+    priceSuffix: "from",
+    tagline: "Orchestration-scale AI for power users & teams.",
+    models: "All models + Ultra orchestration",
     features: [
-      "Starts at 10,000 credits / month",
+      "Maximum orchestration depth",
       "Unlimited everything",
-      "Ultra models (Opus 4.7, GPT-5.5)",
-      "Orchestration pipelines",
+      "Ultra models + orchestration pipelines",
       "Unlimited collaborators",
-      "Dedicated infrastructure",
+      "Dedicated compute",
       "Custom SLAs",
       "White-label",
       "SSO / SAML",
-      "Volume pricing (5% after $300)",
+      "Volume scaling with progressive discounts",
     ],
     cta: "Get Infinity",
   },
 ];
 
-// Infinity sub-tiers: I–IX
-// I=$200/10k, II=$300/15k, III=$400/20k, then +$150/5k each (with 5% volume discount after $300)
-function buildInfinityTiers() {
-  const romanLabels = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
-  return romanLabels.map((roman, i) => {
-    const baseCredits = 10000 + i * 5000;
-    let basePrice: number;
-    if (i === 0) basePrice = 200;
-    else if (i === 1) basePrice = 300;
-    else if (i === 2) basePrice = 400;
-    else {
-      // From IV onwards: $400 + (i-2)*$150, then 5% volume discount
-      basePrice = Math.round((400 + (i - 2) * 150) * 0.95);
-    }
-    return { label: `Infinity ${roman}`, price: basePrice, credits: baseCredits };
-  });
-}
-const INFINITY_TIERS = buildInfinityTiers();
+// Infinity sub-tiers — perfectly clean $100 / 2.5k intervals.
+// Simple, predictable, enterprise-feeling.
+// Always display compact (2.5k, 5k, 7.5k…) — never raw integers.
+const INFINITY_TIERS = [
+  { label: "Infinity I",    price: 100, credits: 2500,  display: "2.5k" },
+  { label: "Infinity II",   price: 200, credits: 5000,  display: "5k" },
+  { label: "Infinity III",  price: 300, credits: 7500,  display: "7.5k" },
+  { label: "Infinity IV",   price: 400, credits: 10000, display: "10k" },
+  { label: "Infinity V",    price: 500, credits: 12500, display: "12.5k" },
+  { label: "Infinity VI",   price: 600, credits: 15000, display: "15k" },
+  { label: "Infinity VII",  price: 700, credits: 17500, display: "17.5k" },
+  { label: "Infinity VIII", price: 800, credits: 20000, display: "20k" },
+];
 
 // ─── Payments coming soon modal ───────────────────────────────────────────────
 
@@ -255,7 +248,7 @@ function PlanCard({
             <div className="flex items-center gap-1.5">
               <Zap className="size-3.5 text-accent" strokeWidth={1.75} />
               <span className="font-medium text-foreground">{INFINITY_TIERS[selectedTier].label}</span>
-              <span className="text-muted-foreground">— {(INFINITY_TIERS[selectedTier].credits / 1000).toFixed(0)}k credits</span>
+              <span className="text-muted-foreground">— {INFINITY_TIERS[selectedTier].display} orchestration units</span>
             </div>
             <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", tierOpen && "rotate-180")} strokeWidth={1.75} />
           </button>
@@ -280,7 +273,7 @@ function PlanCard({
                   >
                     <span className="font-medium text-foreground">{t.label}</span>
                     <div className="flex items-center gap-3 text-muted-foreground">
-                      <span>{(t.credits / 1000).toFixed(0)}k credits</span>
+                      <span>{t.display} units</span>
                       <span className="font-semibold text-foreground">${t.price}/mo</span>
                     </div>
                   </button>

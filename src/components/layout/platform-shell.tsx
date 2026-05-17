@@ -97,6 +97,43 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   },
 };
 
+// Ambient background orbs — ultra subtle, alive but not distracting
+function AmbientOrbs() {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
+      {/* Primary violet orb — top right */}
+      <motion.div
+        className="absolute -right-64 -top-64 size-[700px] rounded-full bg-violet-600/[0.04] blur-[120px]"
+        animate={{
+          x: [0, 40, -20, 0],
+          y: [0, -30, 20, 0],
+          scale: [1, 1.08, 0.97, 1],
+        }}
+        transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {/* Blue orb — bottom left */}
+      <motion.div
+        className="absolute -bottom-48 -left-48 size-[600px] rounded-full bg-blue-500/[0.04] blur-[100px]"
+        animate={{
+          x: [0, -25, 35, 0],
+          y: [0, 20, -15, 0],
+          scale: [1, 0.95, 1.05, 1],
+        }}
+        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut", delay: 4 }}
+      />
+      {/* Accent orb — center */}
+      <motion.div
+        className="absolute left-1/2 top-1/3 size-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/[0.025] blur-[90px]"
+        animate={{
+          scale: [1, 1.12, 0.94, 1],
+          opacity: [0.6, 1, 0.5, 0.6],
+        }}
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 8 }}
+      />
+    </div>
+  );
+}
+
 export function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -112,14 +149,15 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
   return (
     // h-screen + overflow-hidden ensures only the content area scrolls,
     // not the entire page — sidebar and topbar remain perfectly fixed.
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen overflow-hidden bg-background">
+      <AmbientOrbs />
       <Sidebar
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
       />
 
       {/* Right column: topbar + scrollable content */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar
           mode={isCreateHome ? "create" : "standard"}
           title={meta.title}
@@ -136,13 +174,21 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
           }
           style={{ scrollBehavior: "smooth" }}
         >
-          <AnimatePresence mode="wait" initial={false}>
+          {/*
+            IMPORTANT: do NOT add `mode="wait"` here, and do NOT add a
+            second AnimatePresence inside template.tsx. Two presences keyed
+            by pathname produce intermittent white-screens in production
+            (React 19 scheduler races the framer-motion exit commit).
+            `popLayout` lets the next page mount immediately on top while
+            the previous page fades out — never a blank frame.
+          */}
+          <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={pathname}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               className="min-h-full"
             >
               {children}

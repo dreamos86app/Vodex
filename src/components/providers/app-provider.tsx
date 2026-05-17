@@ -16,6 +16,8 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useCreditsStore } from "@/lib/stores/credits-store";
 import { useNotificationsStore } from "@/lib/stores/notifications-store";
 import type { Notification } from "@/lib/supabase/types";
+import { ReferralCapture } from "@/components/referrals/referral-capture";
+import { CommandCenter } from "@/components/command/command-center";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -24,6 +26,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const { syncFromDB: syncCredits, reset: resetCredits } = useCreditsStore();
   const { setNotifications, addNotification, reset: resetNotifications } =
     useNotificationsStore();
+
+  // Rehydrate persisted Zustand state AFTER mount. The store is created
+  // with `skipHydration: true` so SSR and first client paint match. We
+  // trigger rehydration here, then bootstrap the live session below.
+  React.useEffect(() => {
+    void useAuthStore.persist.rehydrate();
+  }, []);
 
   React.useEffect(() => {
     const supabase = createClient();
@@ -149,5 +158,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <>{children}</>;
+  return (
+    <>
+      <ReferralCapture />
+      <CommandCenter />
+      {children}
+    </>
+  );
 }

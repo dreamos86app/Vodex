@@ -3,10 +3,8 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import {
-  Search, Star, ArrowUpRight, Sparkles,
-  Smartphone, LayoutDashboard, ShoppingCart,
-  MessageSquare, Zap, Globe, Users, Package,
-  ExternalLink,
+  Search, Star, ArrowUpRight, Sparkles, ExternalLink,
+  Smartphone, LayoutDashboard, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { variants } from "@/lib/motion";
@@ -29,143 +27,55 @@ interface Template {
   estimatedMinutes: number;
 }
 
+// Three carefully designed official templates.
+// "Use template" navigates to /create with a structured generation prompt
+// so the AI builds the full application architecture from scratch.
 const OFFICIAL_TEMPLATES: Template[] = [
   {
-    id: "ai-saas-starter",
-    name: "AI SaaS Starter",
+    id: "saas-starter",
+    name: "SaaS Starter",
     description:
-      "Full-stack SaaS with Supabase auth, Stripe subscription billing, credit system, and AI chat powered by any provider.",
-    tags: ["Auth", "Billing", "AI", "Credits"],
-    category: "SaaS Templates",
+      "A complete production-ready SaaS with Supabase auth, Stripe subscription billing, a credit system, usage dashboard, settings, and AI features. Fully deployable from day one.",
+    tags: ["Auth", "Billing", "AI", "Dashboard"],
+    category: "SaaS",
     frameworks: ["Next.js 16", "Supabase", "Stripe"],
-    integrations: ["Supabase", "Stripe", "OpenAI"],
+    integrations: ["Supabase Auth", "Stripe Billing", "AI SDK"],
     gradient: "from-blue-500/20 via-indigo-500/10 to-violet-500/15",
     icon: Sparkles,
     complexity: "Advanced",
     estimatedMinutes: 8,
   },
   {
-    id: "mobile-twa",
-    name: "Mobile TWA Starter",
+    id: "mobile-app-starter",
+    name: "Mobile App Starter",
     description:
-      "Trusted Web Activity wrapper for Android. One codebase → Play Store. Includes Capacitor + TWA manifest + SHA256 setup.",
-    tags: ["Android", "TWA", "Mobile", "Capacitor"],
-    category: "Mobile Templates",
-    frameworks: ["Next.js", "Capacitor", "TWA"],
-    integrations: ["Play Store", "Firebase"],
-    gradient: "from-green-500/20 via-emerald-500/10 to-teal-500/15",
+      "A polished mobile-first application with bottom navigation, native-feeling animations, push notification support, user profiles, onboarding flow, and offline-first data sync.",
+    tags: ["Mobile", "Offline", "Animations", "Profiles"],
+    category: "Mobile",
+    frameworks: ["Next.js", "Capacitor"],
+    integrations: ["Supabase", "Push Notifications"],
+    gradient: "from-emerald-500/20 via-teal-500/10 to-cyan-500/15",
     icon: Smartphone,
     complexity: "Intermediate",
     estimatedMinutes: 5,
   },
   {
-    id: "stripe-subscription",
-    name: "Stripe Subscription App",
+    id: "ai-dashboard-starter",
+    name: "AI Dashboard Starter",
     description:
-      "Complete subscription management: checkout, webhooks, portal, plan upgrades/downgrades, and payment recovery.",
-    tags: ["Payments", "Subscriptions", "Webhooks"],
-    category: "SaaS Templates",
+      "An intelligent analytics dashboard with real-time charts, AI-powered insights, data tables, date range filters, export functionality, and role-based access control.",
+    tags: ["Analytics", "AI Insights", "Real-time", "Charts"],
+    category: "Dashboard",
     frameworks: ["Next.js", "Supabase"],
-    integrations: ["Stripe", "Supabase"],
-    gradient: "from-violet-500/20 via-purple-500/10 to-pink-500/15",
-    icon: ShoppingCart,
-    complexity: "Intermediate",
-    estimatedMinutes: 4,
-  },
-  {
-    id: "ai-chat-app",
-    name: "AI Chat App",
-    description:
-      "Multi-model AI chat with conversation history, streaming responses, model switching, and cost tracking.",
-    tags: ["AI", "Chat", "Streaming", "Multi-model"],
-    category: "AI Starter Kits",
-    frameworks: ["Next.js", "AI SDK"],
-    integrations: ["OpenAI", "Anthropic", "Gemini"],
-    gradient: "from-orange-500/20 via-red-500/10 to-rose-500/15",
-    icon: MessageSquare,
-    complexity: "Beginner",
-    estimatedMinutes: 3,
-  },
-  {
-    id: "dashboard-starter",
-    name: "Dashboard Starter",
-    description:
-      "Analytics dashboard with real-time charts, data tables, export, date range filters, and role-based views.",
-    tags: ["Analytics", "Charts", "Real-time", "RBAC"],
-    category: "SaaS Templates",
-    frameworks: ["Next.js", "Supabase"],
-    integrations: ["Supabase"],
-    gradient: "from-cyan-500/20 via-sky-500/10 to-blue-500/15",
+    integrations: ["Supabase Realtime", "AI SDK"],
+    gradient: "from-orange-500/20 via-amber-500/10 to-yellow-500/15",
     icon: LayoutDashboard,
     complexity: "Intermediate",
-    estimatedMinutes: 4,
-  },
-  {
-    id: "community-platform",
-    name: "Community Platform",
-    description:
-      "Social platform with posts, comments, reactions, user profiles, moderation queue, and real-time notifications.",
-    tags: ["Social", "Real-time", "Notifications", "Moderation"],
-    category: "SaaS Templates",
-    frameworks: ["Next.js", "Supabase Realtime"],
-    integrations: ["Supabase", "Resend"],
-    gradient: "from-pink-500/20 via-rose-500/10 to-fuchsia-500/15",
-    icon: Users,
-    complexity: "Advanced",
-    estimatedMinutes: 10,
-  },
-  {
-    id: "marketplace-starter",
-    name: "Marketplace Template",
-    description:
-      "Multi-vendor marketplace with product listings, seller onboarding, Stripe Connect payouts, and review system.",
-    tags: ["Commerce", "Multi-vendor", "Payments", "Reviews"],
-    category: "Commerce",
-    frameworks: ["Next.js", "Supabase"],
-    integrations: ["Stripe Connect", "Supabase"],
-    gradient: "from-amber-500/20 via-yellow-500/10 to-orange-500/15",
-    icon: Package,
-    complexity: "Advanced",
-    estimatedMinutes: 12,
-  },
-  {
-    id: "landing-waitlist",
-    name: "Landing Page + Waitlist",
-    description:
-      "Conversion-optimised landing page with waitlist signup, email confirmation, referral tracking, and launch countdown.",
-    tags: ["Landing", "Waitlist", "Email", "Referral"],
-    category: "Publishing Templates",
-    frameworks: ["Next.js"],
-    integrations: ["Resend", "Supabase"],
-    gradient: "from-indigo-500/20 via-blue-500/10 to-sky-500/15",
-    icon: Globe,
-    complexity: "Beginner",
-    estimatedMinutes: 2,
-  },
-  {
-    id: "ai-agent-workspace",
-    name: "AI Agent Workspace",
-    description:
-      "Autonomous agent dashboard with task queue, tool registry, execution logs, cost tracking, and approval workflows.",
-    tags: ["Agents", "AI", "Automation", "Logs"],
-    category: "AI Starter Kits",
-    frameworks: ["Next.js", "AI SDK"],
-    integrations: ["OpenAI", "Anthropic", "Supabase"],
-    gradient: "from-slate-500/20 via-zinc-500/10 to-gray-500/15",
-    icon: Zap,
-    complexity: "Advanced",
-    estimatedMinutes: 15,
+    estimatedMinutes: 5,
   },
 ];
 
-const CATEGORIES = [
-  "All",
-  "AI Starter Kits",
-  "SaaS Templates",
-  "Mobile Templates",
-  "Commerce",
-  "Publishing Templates",
-];
+const CATEGORIES = ["All", "SaaS", "Mobile", "Dashboard"];
 
 const COMPLEXITY_COLORS: Record<Template["complexity"], string> = {
   Beginner: "text-positive bg-positive/10 ring-positive/20",
@@ -254,30 +164,24 @@ function CommunityEmptyState() {
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 
-type MarketplaceTab = "Official Templates" | "Community Apps" | "AI Starter Kits";
-const TABS: MarketplaceTab[] = ["Official Templates", "Community Apps", "AI Starter Kits"];
+type MarketplaceTab = "Official Templates" | "Community Apps";
+const TABS: MarketplaceTab[] = ["Official Templates", "Community Apps"];
 
 export function MarketplaceView() {
   const [activeTab, setActiveTab] = React.useState<MarketplaceTab>("Official Templates");
   const [category, setCategory] = React.useState("All");
   const [search, setSearch] = React.useState("");
 
-  const aiKits = OFFICIAL_TEMPLATES.filter((t) => t.category === "AI Starter Kits");
-  const mainTemplates = OFFICIAL_TEMPLATES.filter((t) => t.category !== "AI Starter Kits");
-
-  const source =
-    activeTab === "AI Starter Kits" ? aiKits : mainTemplates;
-
-  const filtered = source.filter((t) => {
+  const filtered = OFFICIAL_TEMPLATES.filter((t) => {
     const matchCat = category === "All" || t.category === category;
     const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
 
   function handleUse(template: Template) {
-    // Route user to Create home with template pre-selected
-    const prompt = `Create a ${template.name}: ${template.description}. Use these integrations: ${template.integrations.join(", ")}.`;
-    window.location.href = `/?template=${template.id}&prompt=${encodeURIComponent(prompt)}`;
+    // Navigate to /create with a structured generation prompt so the AI builds the full app.
+    const prompt = `BUILD: ${template.name}\n\n${template.description}\n\nStack: ${template.frameworks.join(", ")}\nIntegrations: ${template.integrations.join(", ")}\n\nGenerate the complete application with all routes, components, database schema, API handlers, and styling. Make it production-ready, beautiful, and fully functional.`;
+    window.location.href = `/create?prompt=${encodeURIComponent(prompt)}`;
   }
 
   return (

@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, Bell } from "lucide-react";
+import { Menu, Bell, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { IconButton } from "@/components/ui/icon-button";
 import { UserMenu } from "@/components/layout/user-menu";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useNotificationsStore } from "@/lib/stores/notifications-store";
+import { useCommandCenter } from "@/components/command/command-center";
 
 type TopBarProps = {
   mode: "create" | "standard";
@@ -20,6 +21,7 @@ export function TopBar({ mode, title, subtitle, onMenuClick }: TopBarProps) {
   const isCreate = mode === "create";
   useAuthStore(); // profile available via UserMenu
   const { unreadCount } = useNotificationsStore();
+  const { openCommandCenter } = useCommandCenter();
 
   return (
     <header
@@ -54,6 +56,18 @@ export function TopBar({ mode, title, subtitle, onMenuClick }: TopBarProps) {
       )}
 
       <div className="ml-auto flex items-center gap-1.5">
+        {/* Cmd+K command center trigger */}
+        <button
+          type="button"
+          onClick={openCommandCenter}
+          className="hidden items-center gap-2 rounded-lg bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground ring-1 ring-border transition hover:bg-surface-raised hover:text-foreground md:flex"
+          aria-label="Open command center"
+        >
+          <Search className="size-3.5" strokeWidth={1.75} />
+          <span>Search…</span>
+          <kbd className="rounded bg-background/60 px-1 py-0.5 text-[10px] font-mono ring-1 ring-border/60">⌘K</kbd>
+        </button>
+
         <ThemeToggle />
 
         {/* Notifications — real unread count */}

@@ -14,13 +14,19 @@ export async function GET() {
 
   const { data: assets, error } = await supabase
     .from("media_assets")
-    .select("*")
+    .select(
+      "id, created_at, filename, public_url, mime_type, size_bytes, asset_type, project_id",
+    )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(100);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ assets });
+  if (error) {
+    // Graceful: table or bucket not yet provisioned on this instance.
+    console.warn("[api/media] GET failed:", error.message);
+    return NextResponse.json({ assets: [] });
+  }
+  return NextResponse.json({ assets: assets ?? [] });
 }
 
 export async function POST(request: Request) {
@@ -30,6 +36,7 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
+  const projectId = (formData.get("project_id") as string | null) ?? undefined;
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
   if (!ALLOWED_MIME.includes(file.type)) {
@@ -66,6 +73,7 @@ export async function POST(request: Request) {
     .from("media_assets")
     .insert({
       user_id: user.id,
+      project_id: projectId ?? null,
       filename: file.name,
       storage_path: storagePath,
       public_url: publicUrl,

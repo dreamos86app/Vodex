@@ -14,52 +14,11 @@ import {
   Trash2,
   Mail,
   Clock,
+  Users,
 } from "lucide-react";
-
-const initialMembers = [
-  {
-    id: "u1",
-    name: "Alex Chen",
-    email: "alex@dreamos86.ai",
-    role: "owner" as const,
-    avatar: "AC",
-    color: "from-blue-400 to-indigo-600",
-    joined: "Jan 12, 2026",
-  },
-  {
-    id: "u2",
-    name: "Sarah Kim",
-    email: "sarah@company.io",
-    role: "admin" as const,
-    avatar: "SK",
-    color: "from-violet-400 to-purple-600",
-    joined: "Feb 3, 2026",
-  },
-  {
-    id: "u3",
-    name: "Marcus Rodriguez",
-    email: "marcus@design.co",
-    role: "member" as const,
-    avatar: "MR",
-    color: "from-emerald-400 to-teal-600",
-    joined: "Mar 18, 2026",
-  },
-];
-
-const pendingInvites = [
-  {
-    id: "pi1",
-    email: "taylor@startup.ai",
-    role: "member",
-    sentAt: "2 days ago",
-  },
-  {
-    id: "pi2",
-    email: "jordan@agency.design",
-    role: "admin",
-    sentAt: "5 days ago",
-  },
-];
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { useHydrated } from "@/lib/hooks/use-hydrated";
+import { toast } from "@/lib/toast";
 
 type RoleKey = "owner" | "admin" | "member";
 
@@ -92,12 +51,30 @@ const roleInfo: Record<
   },
 };
 
+interface PendingInvite {
+  id: string;
+  email: string;
+  role: string;
+  sentAt: string;
+}
+
 export default function TeamSettingsPage() {
+  const { profile } = useAuthStore();
+  const hydrated = useHydrated();
   const [inviteEmail, setInviteEmail] = React.useState("");
   const [inviteRole, setInviteRole] = React.useState("member");
-  const [members, setMembers] = React.useState(initialMembers);
-  const [invites, setInvites] = React.useState(pendingInvites);
+  const [invites, setInvites] = React.useState<PendingInvite[]>([]);
   const [inviteSent, setInviteSent] = React.useState(false);
+
+  const displayName = profile?.full_name ?? profile?.email?.split("@")[0] ?? "You";
+  const displayEmail = profile?.email ?? "";
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const handleInvite = () => {
     if (!inviteEmail.includes("@")) return;
@@ -112,6 +89,7 @@ export default function TeamSettingsPage() {
     ]);
     setInviteEmail("");
     setInviteSent(true);
+    toast.success(`Invitation sent to ${inviteEmail}`);
     setTimeout(() => setInviteSent(false), 3000);
   };
 
@@ -151,74 +129,52 @@ export default function TeamSettingsPage() {
             {inviteSent ? "Sent!" : "Send invite"}
           </Button>
         </div>
-        {inviteSent && (
-          <p className="mt-3 text-[13px] text-positive flex items-center gap-1.5">
-            <span className="inline-flex size-4 rounded-full bg-positive/20 items-center justify-center text-[10px]">
-              ✓
-            </span>
-            Invitation sent successfully.
-          </p>
-        )}
       </SectionCard>
 
-      {/* Members */}
+      {/* Current members — only real user */}
       <SectionCard
         title="Team Members"
-        description={`${members.length} member${members.length !== 1 ? "s" : ""} in this workspace.`}
+        description="1 member in this workspace."
         noPadding
       >
         <div className="divide-y divide-border">
-          {members.map((member) => {
-            const role = roleInfo[member.role];
-            const RoleIcon = role.icon;
-            return (
-              <div
-                key={member.id}
-                className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors duration-100"
-              >
-                <div
-                  className={cn(
-                    "flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-[13px] font-bold text-white shadow-[var(--shadow-xs)]",
-                    member.color,
-                  )}
-                >
-                  {member.avatar}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-foreground truncate">
-                    {member.name}
-                  </p>
-                  <p className="text-[12px] text-muted-foreground truncate">
-                    {member.email}
-                  </p>
-                </div>
-                <div className="hidden sm:flex items-center gap-1.5 shrink-0">
-                  <RoleIcon
-                    className="size-3.5 text-muted-foreground"
-                    strokeWidth={1.6}
-                  />
-                  <Badge variant={role.badge}>{role.label}</Badge>
-                </div>
-                <p className="hidden md:block text-[12px] text-muted-foreground shrink-0">
-                  Joined {member.joined}
-                </p>
-                {member.role !== "owner" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setMembers((prev) =>
-                        prev.filter((m) => m.id !== member.id),
-                      )
-                    }
-                    className="text-muted-foreground hover:text-red-500 shrink-0"
-                  >
-                    <Trash2 className="size-3.5" strokeWidth={1.6} />
-                  </Button>
-                )}
+          {hydrated && profile ? (
+            <div className="flex items-center gap-4 px-6 py-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-purple-600 text-[13px] font-bold text-white shadow-[var(--shadow-xs)]">
+                {initials || "?"}
               </div>
-            );
-          })}
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-foreground truncate">
+                  {displayName}
+                  <span className="ml-2 text-[11px] text-muted-foreground font-normal">(you)</span>
+                </p>
+                <p className="text-[12px] text-muted-foreground truncate">{displayEmail}</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+                <Crown className="size-3.5 text-muted-foreground" strokeWidth={1.6} />
+                <Badge variant="warning">Owner</Badge>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 px-6 py-4">
+              <div className="size-10 rounded-full bg-muted animate-pulse" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-32 rounded bg-muted animate-pulse" />
+                <div className="h-2.5 w-48 rounded bg-muted animate-pulse" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Empty state for additional members */}
+        <div className="px-6 py-8 text-center border-t border-border">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 ring-1 ring-border mx-auto mb-3">
+            <Users className="size-4.5 text-muted-foreground/60" strokeWidth={1.4} />
+          </div>
+          <p className="text-[13px] font-medium text-foreground">No teammates yet</p>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Invite collaborators above to start building together.
+          </p>
         </div>
       </SectionCard>
 
@@ -236,20 +192,14 @@ export default function TeamSettingsPage() {
                 className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors duration-100"
               >
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted ring-1 ring-border">
-                  <Mail
-                    className="size-4 text-muted-foreground"
-                    strokeWidth={1.6}
-                  />
+                  <Mail className="size-4 text-muted-foreground" strokeWidth={1.6} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-foreground truncate">
                     {invite.email}
                   </p>
                   <div className="flex items-center gap-1 mt-0.5">
-                    <Clock
-                      className="size-3 text-muted-foreground"
-                      strokeWidth={1.6}
-                    />
+                    <Clock className="size-3 text-muted-foreground" strokeWidth={1.6} />
                     <span className="text-[12px] text-muted-foreground">
                       Invited {invite.sentAt}
                     </span>
@@ -261,14 +211,13 @@ export default function TeamSettingsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() =>
-                    setInvites((prev) =>
-                      prev.filter((i) => i.id !== invite.id),
-                    )
-                  }
+                  onClick={() => {
+                    setInvites((prev) => prev.filter((i) => i.id !== invite.id));
+                    toast.info("Invite revoked");
+                  }}
                   className="text-muted-foreground hover:text-red-500 shrink-0"
                 >
-                  Revoke
+                  <Trash2 className="size-3.5" strokeWidth={1.6} />
                 </Button>
               </div>
             ))}
@@ -289,16 +238,11 @@ export default function TeamSettingsPage() {
               return (
                 <div key={key} className="flex items-start gap-4 px-6 py-4">
                   <div className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-muted ring-1 ring-border mt-0.5">
-                    <Icon
-                      className="size-4 text-muted-foreground"
-                      strokeWidth={1.6}
-                    />
+                    <Icon className="size-4 text-muted-foreground" strokeWidth={1.6} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-[13px] font-medium text-foreground">
-                        {role.label}
-                      </p>
+                      <p className="text-[13px] font-medium text-foreground">{role.label}</p>
                       <Badge variant={role.badge}>{role.label}</Badge>
                     </div>
                     <p className="mt-0.5 text-[13px] text-muted-foreground">

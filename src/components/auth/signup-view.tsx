@@ -206,7 +206,7 @@ export function SignupView() {
               </label>
               <Input
                 id="name"
-                placeholder="Alex Chen"
+                placeholder="Your full name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoComplete="name"

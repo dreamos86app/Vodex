@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { aiModels } from "@/lib/data";
+import { useTheme } from "next-themes";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -14,34 +14,34 @@ import {
   textareaCls,
 } from "@/components/settings/shared";
 import { cn } from "@/lib/utils";
-import { Sun, Moon, Monitor, ImagePlus, Trash2, AlertTriangle, Droplets } from "lucide-react";
+import { Sun, Moon, Monitor, ImagePlus, Trash2, AlertTriangle } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth-store";
-
-type Theme = "light" | "dark" | "system";
+import { useHydrated } from "@/lib/hooks/use-hydrated";
+import { toast } from "@/lib/toast";
 
 export default function SettingsGeneralPage() {
   const { profile } = useAuthStore();
-  const [theme, setTheme] = React.useState<Theme>("system");
+  const { theme, setTheme } = useTheme();
+  const hydrated = useHydrated();
+
   const [sidebarStyle, setSidebarStyle] = React.useState(true);
   const [fontSize, setFontSize] = React.useState("15");
   const [workspaceName, setWorkspaceName] = React.useState("My Workspace");
   const [description, setDescription] = React.useState(
     "Building the next generation of AI-native apps.",
   );
-  const [defaultModel, setDefaultModel] = React.useState("claude-sonnet");
-  const [autoSave, setAutoSave] = React.useState(true);
-  const [streaming, setStreaming] = React.useState(true);
   const [showBranding, setShowBranding] = React.useState(true);
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
   const [deleteInput, setDeleteInput] = React.useState("");
   const isPaidPlan = profile && profile.plan_id !== "free";
 
-  const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] =
-    [
-      { value: "light", label: "Light", icon: <Sun className="size-4" strokeWidth={1.6} /> },
-      { value: "dark", label: "Dark", icon: <Moon className="size-4" strokeWidth={1.6} /> },
-      { value: "system", label: "System", icon: <Monitor className="size-4" strokeWidth={1.6} /> },
-    ];
+  const themeOptions: { value: string; label: string; icon: React.ReactNode }[] = [
+    { value: "light", label: "Light", icon: <Sun className="size-4" strokeWidth={1.6} /> },
+    { value: "dark", label: "Dark", icon: <Moon className="size-4" strokeWidth={1.6} /> },
+    { value: "system", label: "System", icon: <Monitor className="size-4" strokeWidth={1.6} /> },
+  ];
+
+  const activeTheme = hydrated ? (theme ?? "system") : "system";
 
   return (
     <div className="space-y-5">
@@ -58,10 +58,14 @@ export default function SettingsGeneralPage() {
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setTheme(opt.value)}
+                  disabled={!hydrated}
+                  onClick={() => {
+                    setTheme(opt.value);
+                    toast.success(`Theme set to ${opt.label}`);
+                  }}
                   className={cn(
-                    "flex flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 py-2.5 text-[13px] font-medium ring-1 transition-all duration-150",
-                    theme === opt.value
+                    "flex flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 py-2.5 text-[13px] font-medium ring-1 transition-all duration-150 disabled:opacity-50",
+                    activeTheme === opt.value
                       ? "bg-foreground/[0.07] ring-border-strong text-foreground"
                       : "bg-surface ring-border text-muted-foreground hover:text-foreground hover:bg-muted/60",
                   )}
@@ -147,64 +151,17 @@ export default function SettingsGeneralPage() {
         </div>
         <SectionFooter>
           <Button variant="ghost" size="md">Discard</Button>
-          <Button variant="accent" size="md">Save changes</Button>
+          <Button
+            variant="accent"
+            size="md"
+            onClick={() => toast.success("Workspace settings saved")}
+          >
+            Save changes
+          </Button>
         </SectionFooter>
       </SectionCard>
 
-      {/* Generation */}
-      <SectionCard
-        title="Generation"
-        description="Default behavior when generating new apps and components."
-      >
-        <div className="space-y-1">
-          <div className="pb-4 border-b border-border">
-            <FieldLabel>Default model</FieldLabel>
-            <select
-              value={defaultModel}
-              onChange={(e) => setDefaultModel(e.target.value)}
-              className={cn(selectCls, "max-w-xs")}
-            >
-              {aiModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} — {m.creditsPerGeneration} credit
-                  {m.creditsPerGeneration !== 1 ? "s" : ""}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1.5 text-[12px] text-muted-foreground">
-              Used for new generations unless overridden per project.
-            </p>
-          </div>
-
-          <SettingRow
-            title="Auto-save drafts"
-            description="Automatically save generation drafts every 30 seconds."
-          >
-            <Switch
-              checked={autoSave}
-              onCheckedChange={setAutoSave}
-              aria-label="Auto-save drafts"
-            />
-          </SettingRow>
-
-          <SettingRow
-            title="Streaming output"
-            description="Show token-by-token output as the model generates."
-          >
-            <Switch
-              checked={streaming}
-              onCheckedChange={setStreaming}
-              aria-label="Streaming output"
-            />
-          </SettingRow>
-        </div>
-        <SectionFooter>
-          <Button variant="ghost" size="md">Discard</Button>
-          <Button variant="accent" size="md">Save changes</Button>
-        </SectionFooter>
-      </SectionCard>
-
-      {/* Branding */}
+      {/* App Branding */}
       <SectionCard
         title="App Branding"
         description="Control how DreamOS86 branding appears on your generated apps."
@@ -227,7 +184,10 @@ export default function SettingsGeneralPage() {
           </SettingRow>
           {!isPaidPlan && (
             <p className="pl-1 text-[11.5px] text-muted-foreground">
-              <a href="/pricing" className="text-accent hover:underline underline-offset-2">Upgrade to Starter</a> to remove the watermark from your apps.
+              <a href="/pricing" className="text-accent hover:underline underline-offset-2">
+                Upgrade to Starter
+              </a>{" "}
+              to remove the watermark from your apps.
             </p>
           )}
         </div>
@@ -246,8 +206,8 @@ export default function SettingsGeneralPage() {
                 Delete workspace
               </p>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
-                Permanently delete this workspace, all projects, and data.
-                This cannot be undone.
+                Permanently delete this workspace, all projects, and data. This cannot be
+                undone.
               </p>
             </div>
             <Button
@@ -263,7 +223,10 @@ export default function SettingsGeneralPage() {
         ) : (
           <div className="space-y-4">
             <div className="flex items-start gap-3 rounded-[var(--radius-md)] bg-red-100/60 dark:bg-red-950/30 px-4 py-3 ring-1 ring-red-200/60 dark:ring-red-800/40">
-              <AlertTriangle className="size-4 shrink-0 mt-0.5 text-red-600 dark:text-red-400" strokeWidth={1.6} />
+              <AlertTriangle
+                className="size-4 shrink-0 mt-0.5 text-red-600 dark:text-red-400"
+                strokeWidth={1.6}
+              />
               <p className="text-[13px] text-red-700 dark:text-red-300">
                 Type <strong>delete workspace</strong> below to confirm.
               </p>
@@ -278,7 +241,10 @@ export default function SettingsGeneralPage() {
               <Button
                 variant="ghost"
                 size="md"
-                onClick={() => { setDeleteConfirm(false); setDeleteInput(""); }}
+                onClick={() => {
+                  setDeleteConfirm(false);
+                  setDeleteInput("");
+                }}
               >
                 Cancel
               </Button>

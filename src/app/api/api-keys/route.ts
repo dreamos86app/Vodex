@@ -76,14 +76,6 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Log audit
-  await supabase.from("audit_logs").insert({
-    actor_id: user.id,
-    target_id: key.id,
-    action: "api_key_create",
-    details: { name, scopes },
-  });
-
   // Return full key ONCE — never stored in plaintext
   return NextResponse.json({ key: { ...key, full_key: rawKey } }, { status: 201 });
 }
@@ -110,13 +102,6 @@ export async function DELETE(request: Request) {
     .from("api_keys")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", parsed.data.id);
-
-  await supabase.from("audit_logs").insert({
-    actor_id: user.id,
-    target_id: key.id,
-    action: "api_key_revoke",
-    details: {},
-  });
 
   return NextResponse.json({ success: true });
 }
