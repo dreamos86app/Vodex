@@ -86,7 +86,7 @@ function PublicAuthModal({
   );
 }
 
-function PublicHighlights() {
+function CapabilityCards() {
   const items = [
     {
       icon: Layers,
@@ -115,10 +115,7 @@ function PublicHighlights() {
       transition={{ delay: 0.14, duration: 0.4 }}
       className="mx-auto mt-16 max-w-5xl"
     >
-      <h2 className="text-center text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Why teams stay in DreamOS86
-      </h2>
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <motion.div className="grid gap-4 sm:grid-cols-3">
         {items.map((it, i) => (
           <motion.div
             key={it.title}
@@ -138,7 +135,89 @@ function PublicHighlights() {
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{it.desc}</p>
           </motion.div>
         ))}
+      </motion.div>
+    </motion.section>
+  );
+}
+
+function ShipFasterSection() {
+  const cards = [
+    {
+      title: "Build apps in minutes",
+      desc: "Describe what you want. DreamOS86 writes real files into a saved project you can open, edit, and ship.",
+      accent: "from-accent/20 via-accent/5 to-transparent",
+    },
+    {
+      title: "One workspace, three modes",
+      desc: "Discuss architecture, edit surgically, or run full builds — each mode uses tokens only after successful AI steps.",
+      accent: "from-violet-500/15 via-sky-500/5 to-transparent",
+    },
+    {
+      title: "Production-ready by default",
+      desc: "Supabase auth, Stripe billing hooks, and publish readiness checks — no fake deploy buttons.",
+      accent: "from-emerald-500/12 via-cyan-500/5 to-transparent",
+    },
+  ];
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.18, duration: 0.45 }}
+      className="mx-auto mt-20 max-w-5xl text-center"
+    >
+      <h2 className="text-balance text-[26px] font-semibold tracking-tight text-foreground sm:text-[32px]">
+        Now you can ship software within minutes — not months
+      </h2>
+      <p className="mx-auto mt-3 max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
+        DreamOS86 is an AI-native workspace: one prompt becomes a hosted preview, saved files, and a path to publish when you are ready.
+      </p>
+      <div className="mt-10 grid gap-4 sm:grid-cols-3">
+        {cards.map((card, i) => (
+          <motion.div
+            key={card.title}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.06 }}
+            whileHover={{ y: -4 }}
+            className={cn(
+              "rounded-2xl border border-border/70 bg-gradient-to-br p-6 text-left shadow-sm ring-1 ring-border/50",
+              card.accent,
+            )}
+          >
+            <p className="text-[15px] font-semibold text-foreground">{card.title}</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{card.desc}</p>
+          </motion.div>
+        ))}
       </div>
+    </motion.section>
+  );
+}
+
+function BottomCta() {
+  return (
+    <motion.section
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.22, duration: 0.4 }}
+      className="mx-auto mt-16 flex max-w-lg flex-col items-center gap-4 text-center"
+    >
+      <p className="text-[15px] font-semibold text-foreground">Ready to build?</p>
+      <motion.div className="flex flex-wrap justify-center gap-3">
+        <Link
+          href="/auth/signup"
+          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-md transition hover:bg-accent/90"
+        >
+          Start building
+          <ArrowRight className="size-3.5" strokeWidth={2} />
+        </Link>
+        <Link
+          href="/auth/login?next=/chat"
+          className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-5 py-2.5 text-[13px] font-semibold text-foreground transition hover:bg-surface"
+        >
+          Try AI Chat
+        </Link>
+      </motion.div>
     </motion.section>
   );
 }
@@ -184,6 +263,12 @@ export function PublicLanding() {
       </header>
 
       <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-10 sm:px-6 sm:pt-14">
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,hsl(var(--accent)/0.22),transparent_70%)]"
+          animate={{ opacity: [0.7, 1, 0.7] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
         <motion.section
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -248,7 +333,9 @@ export function PublicLanding() {
           </div>
         </motion.section>
 
-        <PublicHighlights />
+        <CapabilityCards />
+
+        <ShipFasterSection />
 
         <motion.div
           initial={{ opacity: 0 }}
@@ -274,19 +361,14 @@ export function PublicLanding() {
           </p>
         </motion.section>
 
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.35 }}
-          className="mx-auto mt-16 max-w-lg text-center"
-        >
-          <p className="text-[14px] text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/auth/login" className="font-semibold text-accent hover:underline underline-offset-2">
-              Log in
-            </Link>
-          </p>
-        </motion.section>
+        <BottomCta />
+
+        <p className="mx-auto mt-10 max-w-lg text-center text-[14px] text-muted-foreground">
+          Already have an account?{" "}
+          <Link href="/auth/login" className="font-semibold text-accent hover:underline underline-offset-2">
+            Log in
+          </Link>
+        </p>
       </main>
     </div>
   );

@@ -1,5 +1,5 @@
 /**
- * DreamOS86 platform owner — admin APIs and /admin route must enforce this server-side.
+ * DreamOS86 platform owner — safe for client and server imports.
  */
 export const DREAMOS_OWNER_EMAIL = "dreamos86app@gmail.com";
 

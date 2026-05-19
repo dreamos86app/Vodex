@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { isDreamosOwnerEmail } from "@/lib/admin-owner";
+import { requireDreamosOwner } from "@/lib/admin/require-owner";
+import { logAdminAudit } from "@/lib/admin/audit-log";
 
 const schema = z.object({
   userId: z.string().uuid(),
@@ -10,13 +11,10 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const gate = await requireDreamosOwner();
+  if (gate.error) return gate.error;
+  const { user } = gate;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email || !isDreamosOwnerEmail(user.email)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const body = await request.json();
   const parsed = schema.safeParse(body);
@@ -41,6 +39,12 @@ export async function POST(request: Request) {
     title: `${amount} tokens added`,
     body: `An admin has granted you ${amount} tokens. Reason: ${reason}`,
     action_url: "/credits",
+  });
+
+  await logAdminAudit(user, "grant_tokens", {
+    targetUserId: userId,
+    amount,
+    reason,
   });
 
   return NextResponse.json({ success: true });

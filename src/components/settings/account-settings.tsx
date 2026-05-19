@@ -18,6 +18,8 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useCreditsStore } from "@/lib/stores/credits-store";
 import { createClient } from "@/lib/supabase/client";
 import { resolveDisplayName } from "@/lib/profile-display";
+import { hasActiveSession, resolveAccountEmail } from "@/lib/auth/client-identity";
+import { resolveClientUserId } from "@/lib/chat/resolve-client-user";
 import { cn } from "@/lib/utils";
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -494,17 +496,18 @@ function ConnectedAccountsSection() {
 // ─── Profile section ──────────────────────────────────────────────────────────
 
 function ProfileSection() {
-  const { profile, user, setProfile, setUser, setSession } = useAuthStore();
+  const { profile, user, session, setProfile, setUser, setSession } = useAuthStore();
+  const supabase = React.useMemo(() => createClient(), []);
   const router = useRouter();
-  const authEmail = user?.email ?? user?.user_metadata?.email ?? "";
+  const signedIn = hasActiveSession(session, user);
   const displayName = resolveDisplayName(profile, user);
+  const displayEmail = resolveAccountEmail(user, profile);
 
   const [name, setName] = React.useState(profile?.full_name ?? "");
   React.useEffect(() => {
     setName(profile?.full_name ?? "");
   }, [profile?.full_name, profile?.id]);
 
-  const displayEmail = profile?.email ?? authEmail;
   const nameDirty = name.trim() !== (profile?.full_name ?? "").trim();
   const [saving, setSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
@@ -513,7 +516,8 @@ function ProfileSection() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!user?.id) {
+    const uid = await resolveClientUserId(supabase, user, profile);
+    if (!uid) {
       toast.error("Sign in to save your profile.");
       return;
     }
@@ -533,7 +537,6 @@ function ProfileSection() {
       }
       if (payload.profile) {
         setProfile(payload.profile);
-        const supabase = createClient();
         const trimmed = name.trim();
         await supabase.auth.updateUser({
           data: { full_name: trimmed, name: trimmed },
@@ -558,7 +561,8 @@ function ProfileSection() {
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!user?.id) {
+    const uid = await resolveClientUserId(supabase, user, profile);
+    if (!uid) {
       toast.error("Sign in to update your avatar.");
       return;
     }
@@ -689,7 +693,7 @@ function ProfileSection() {
           )}
 
           <div className="flex items-center justify-end gap-2">
-            <Button variant="accent" size="sm" type="submit" disabled={saving || !nameDirty || !user?.id} className="gap-1.5">
+            <Button variant="accent" size="sm" type="submit" disabled={saving || !nameDirty || !signedIn} className="gap-1.5">
               {saving && <Loader2 className="size-3.5 animate-spin" />}
               Save profile
             </Button>

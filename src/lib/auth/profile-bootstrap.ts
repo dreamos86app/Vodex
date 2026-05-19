@@ -159,8 +159,9 @@ export async function bootstrapProfileFromOAuth(
   if (!existing.plan_id) {
     updates.plan_id = "free";
   }
-  if (!existing.email && user.email) {
-    updates.email = user.email;
+  const authEmail = user.email?.trim() ?? "";
+  if (authEmail && (existing.email ?? "").trim().toLowerCase() !== authEmail.toLowerCase()) {
+    updates.email = authEmail;
   }
 
   if (Object.keys(updates).length > 0) {

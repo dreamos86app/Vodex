@@ -38,11 +38,12 @@ type AdminUserRow = {
 function GrantTokensForm({ userId, userName }: { userId: string; userName: string }) {
   const [amount, setAmount] = React.useState("");
   const [reason, setReason] = React.useState("");
+  const [confirmOwner, setConfirmOwner] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState<"success" | "error" | null>(null);
 
   async function grant() {
-    if (!amount || !reason) return;
+    if (!amount || !reason || !confirmOwner) return;
     setLoading(true);
     const res = await fetch("/api/admin/credits", {
       method: "POST",
@@ -76,10 +77,27 @@ function GrantTokensForm({ userId, userName }: { userId: string; userName: strin
           onChange={(e) => setReason(e.target.value)}
           className="flex-1"
         />
-        <Button variant="accent" size="sm" onClick={grant} disabled={loading || !amount || !reason}>
+        <Button
+          variant="accent"
+          size="sm"
+          onClick={grant}
+          disabled={loading || !amount || !reason || !confirmOwner}
+        >
           {loading ? <Loader2 className="size-3.5 animate-spin" /> : "Grant"}
         </Button>
       </div>
+      <label className="flex items-start gap-2 text-[11.5px] text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={confirmOwner}
+          onChange={(e) => setConfirmOwner(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          Confirm as <strong className="text-foreground">dreamos86app@gmail.com</strong> — this
+          changes live token balance.
+        </span>
+      </label>
       {result === "success" && (
         <p className="flex items-center gap-1 text-[12px] text-positive">
           <Check className="size-3.5" /> Tokens granted successfully
@@ -94,8 +112,14 @@ function GrantTokensForm({ userId, userName }: { userId: string; userName: strin
   );
 }
 
-export function AdminView() {
-  const [activeTab, setActiveTab] = React.useState<Tab>("users");
+export type AdminTab = Tab;
+
+export function AdminView({ initialTab = "users" }: { initialTab?: AdminTab }) {
+  const [activeTab, setActiveTab] = React.useState<Tab>(initialTab);
+
+  React.useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   const [users, setUsers] = React.useState<AdminUserRow[]>([]);
   const [contacts, setContacts] = React.useState<Record<string, unknown>[]>([]);
   const [aiEvents, setAiEvents] = React.useState<

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -16,6 +17,13 @@ import { cn } from "@/lib/utils";
 import { Sun, Moon, Monitor, ImagePlus, Trash2, AlertTriangle, Loader2, Zap, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
+import { createClient } from "@/lib/supabase/client";
+import { resolveClientUserId } from "@/lib/chat/resolve-client-user";
+import {
+  hasActiveSession,
+  isStalePersistedProfile,
+  resolveAccountEmail,
+} from "@/lib/auth/client-identity";
 import { useCreditsStore, getMonthlyTokenQuotaForPlan } from "@/lib/stores/credits-store";
 import { DreamSpaceGlyph, resolveDreamSpaceLabel } from "@/lib/dream-space";
 import { toast } from "@/lib/toast";
@@ -24,10 +32,21 @@ import Link from "next/link";
 
 export default function SettingsGeneralPage() {
   const router = useRouter();
-  const { profile, user, setProfile } = useAuthStore();
+  const { profile, user, session, loading: authLoading, setProfile } = useAuthStore();
   const { remaining } = useCreditsStore();
   const { theme, setTheme } = useTheme();
   const hydrated = useHydrated();
+
+  const sessionReady = hydrated && !authLoading;
+  const signedIn = hasActiveSession(session, user);
+  const staleProfile = isStalePersistedProfile(session, profile);
+  const accountEmail = resolveAccountEmail(user, profile);
+
+  async function requireUserId(): Promise<string | null> {
+    if (!signedIn) return null;
+    const supabase = createClient();
+    return resolveClientUserId(supabase, user, profile);
+  }
 
   const [sidebarStyle, setSidebarStyle] = React.useState(true);
   const [fontSize, setFontSize] = React.useState("15");
@@ -51,6 +70,16 @@ export default function SettingsGeneralPage() {
       : profile.plan_id.charAt(0).toUpperCase() + profile.plan_id.slice(1));
 
   // Sync workspace fields from profile whenever the profile ID changes
+  React.useEffect(() => {
+    if (!signedIn || !accountEmail || profile?.email?.trim()) return;
+    void fetch("/api/profile/ensure", { method: "POST", credentials: "include" }).then(async (res) => {
+      if (!res.ok) return;
+      const payload = (await res.json()) as { profile?: typeof profile };
+      if (payload.profile) setProfile(payload.profile);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- backfill once when email missing
+  }, [signedIn, accountEmail, profile?.id]);
+
   const profileId = profile?.id;
   React.useEffect(() => {
     if (!profile) return;
@@ -82,8 +111,13 @@ export default function SettingsGeneralPage() {
   async function handleIconChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!user?.id) {
-      toast.error("Sign in to upload a workspace icon.");
+    const uid = await requireUserId();
+    if (!uid) {
+      toast.error(
+        staleProfile
+          ? "Session expired — sign in again to upload a workspace icon."
+          : "Sign in to upload a workspace icon.",
+      );
       return;
     }
 
@@ -137,8 +171,13 @@ export default function SettingsGeneralPage() {
   }
 
   async function handleSaveWorkspace() {
-    if (!user?.id) {
-      toast.error("Sign in to save workspace settings.");
+    const uid = await requireUserId();
+    if (!uid) {
+      toast.error(
+        staleProfile
+          ? "Session expired — sign in again to save workspace settings."
+          : "Sign in to save workspace settings.",
+      );
       return;
     }
     setSaving(true);
@@ -179,7 +218,20 @@ export default function SettingsGeneralPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div className="space-y-6">
+      {sessionReady && staleProfile ? (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[13px] text-amber-900 dark:text-amber-200"
+        >
+          Your session expired.{" "}
+          <Link href="/auth/login" className="font-semibold underline underline-offset-2">
+            Sign in again
+          </Link>{" "}
+          to sync your profile and Dream Space.
+        </motion.div>
+      ) : null}
       {/* Dream Space — primary identity */}
       <div className="overflow-hidden rounded-[var(--radius-xl)] bg-gradient-to-br from-accent/[0.09] via-background to-violet-500/[0.06] p-px shadow-[var(--shadow-card)] ring-1 ring-border/80">
         <div className="rounded-[calc(var(--radius-xl)-1px)] bg-background/95 px-4 py-5 backdrop-blur-sm sm:px-5 sm:py-5">
@@ -283,7 +335,7 @@ export default function SettingsGeneralPage() {
                   Owner (account email)
                 </p>
                 <p className="truncate text-[13px] font-medium text-foreground">
-                  {profile?.email || user?.email || "—"}
+                  {accountEmail || (sessionReady && !signedIn ? "Sign in to view email" : "—")}
                 </p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   This is your DreamOS86 login. Space name above is only a display label.
@@ -319,7 +371,7 @@ export default function SettingsGeneralPage() {
               variant="accent"
               size="md"
               onClick={handleSaveWorkspace}
-              disabled={saving || !workspaceDirty || !user?.id}
+              disabled={saving || !workspaceDirty || !signedIn}
             >
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               Save changes
@@ -452,6 +504,6 @@ export default function SettingsGeneralPage() {
           </div>
         )}
       </SectionCard>
-    </div>
+    </motion.div>
   );
 }

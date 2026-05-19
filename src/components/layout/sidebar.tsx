@@ -10,6 +10,7 @@ import { X, ChevronRight } from "lucide-react";
 import { navSections } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { useCreditsStore } from "@/lib/stores/credits-store";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { Zap } from "lucide-react";
@@ -95,13 +96,13 @@ function NavSection({
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = React.useState(true);
-  const { profile } = useAuthStore();
+  const { profile, user, session } = useAuthStore();
   const remaining = useCreditsStore((s) => s.remaining);
   const hydrated = useHydrated();
   const MONTHLY_QUOTA = 100;
 
-  const OWNER_EMAIL = "dreamos86app@gmail.com";
-  const isOwner = profile?.email === OWNER_EMAIL || profile?.is_admin === true;
+  const ownerEmail = user?.email ?? profile?.email;
+  const isOwner = Boolean(ownerEmail && isDreamosOwnerEmail(ownerEmail));
 
   // Filter out admin section for non-admins
   const visibleSections = navSections.filter(

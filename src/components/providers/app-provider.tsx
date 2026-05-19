@@ -18,6 +18,7 @@ import { useNotificationsStore } from "@/lib/stores/notifications-store";
 import type { Notification } from "@/lib/supabase/types";
 import { ReferralCapture } from "@/components/referrals/referral-capture";
 import { CommandCenter } from "@/components/command/command-center";
+import { AuthStateDebug } from "@/components/dev/auth-state-debug";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -171,10 +172,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        // Bootstrap profile + credits BEFORE clearing the loading state so the
-        // UI never flashes a "logged out" or "0 credits" state on a refresh.
+        const persisted = useAuthStore.getState().profile;
+        if (persisted && persisted.id !== session.user.id) {
+          setProfile(null);
+        }
         const dispose = await bootstrapUser(session.user.id);
         disposeRealtime = dispose;
+      } else {
+        setProfile(null);
+        try {
+          await useAuthStore.persist.clearStorage();
+        } catch {
+          /* ignore */
+        }
       }
 
       setLoading(false);
@@ -222,6 +232,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (event === "TOKEN_REFRESHED" && session?.user) {
         syncCredits(session.user.id);
       }
+
+      if (
+        (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") &&
+        !session?.user
+      ) {
+        setProfile(null);
+        try {
+          void useAuthStore.persist.clearStorage();
+        } catch {
+          /* ignore */
+        }
+      }
     });
 
     return () => {
@@ -235,6 +257,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <>
       <ReferralCapture />
       <CommandCenter />
+      <AuthStateDebug />
       {children}
     </>
   );
