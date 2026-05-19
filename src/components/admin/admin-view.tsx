@@ -22,6 +22,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { variants } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { AuthHealthPanel } from "@/components/admin/auth-health-panel";
+import { DeploymentStatusPanel } from "@/components/admin/deployment-status-panel";
 
 type Tab = "users" | "contacts" | "ai" | "storage" | "audit" | "auth";
 
@@ -475,7 +476,8 @@ export function AdminView({ initialTab = "users" }: { initialTab?: AdminTab }) {
       )}
 
       {activeTab === "auth" && (
-        <div className="max-w-2xl">
+        <div className="max-w-2xl space-y-6">
+          <DeploymentStatusPanel />
           <AuthHealthPanel />
         </div>
       )}

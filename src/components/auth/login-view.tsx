@@ -291,11 +291,11 @@ export function LoginView() {
         </p>
 
         <p className="mt-4 text-center text-[11px] text-muted-foreground">
-          By signing in, you agree to our{" "}
+          By continuing, you agree to the{" "}
           <Link href="/terms" className="hover:underline underline-offset-4">
             Terms
           </Link>{" "}
-          and{" "}
+          and acknowledge the{" "}
           <Link href="/privacy" className="hover:underline underline-offset-4">
             Privacy Policy
           </Link>

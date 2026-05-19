@@ -4,8 +4,11 @@ import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Sparkles, Shield, Zap, Rocket, X, Layers, Cpu, Gauge } from "lucide-react";
-import { LogoIcon } from "@/components/ui/logo-icon";
 import { IntegrationShowcaseSection } from "@/components/marketing/integrations-showcase";
+import {
+  PublicMarketingFooter,
+  PublicMarketingHeader,
+} from "@/components/marketing/public-marketing-shell";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -226,41 +229,11 @@ export function PublicLanding() {
   const [draft, setDraft] = React.useState("");
   const [authOpen, setAuthOpen] = React.useState(false);
 
-  const signupNext =
-    draft.trim().length > 0
-      ? `/auth/signup?next=${encodeURIComponent(`/create?prompt=${encodeURIComponent(draft.trim())}`)}`
-      : "/auth/signup";
-  const loginNext =
-    draft.trim().length > 0
-      ? `/auth/login?next=${encodeURIComponent(`/create?prompt=${encodeURIComponent(draft.trim())}`)}`
-      : "/auth/login";
-
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <PublicAuthModal open={authOpen} onClose={() => setAuthOpen(false)} draft={draft} onDraftChange={setDraft} />
 
-      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="DreamOS86 home">
-            <LogoIcon size={36} />
-            <span className="text-[14px] font-semibold tracking-tight text-foreground">DreamOS86</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <Link
-              href={loginNext}
-              className="rounded-lg px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground transition hover:bg-surface hover:text-foreground"
-            >
-              Log in
-            </Link>
-            <Link
-              href={signupNext}
-              className="rounded-lg bg-accent px-3.5 py-1.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-accent/90"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicMarketingHeader />
 
       <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-10 sm:px-6 sm:pt-14">
         <motion.div
@@ -369,7 +342,19 @@ export function PublicLanding() {
             Log in
           </Link>
         </p>
+        <p className="mx-auto mt-6 max-w-lg text-center text-[11px] text-muted-foreground">
+          By continuing, you agree to our{" "}
+          <Link href="/terms" className="hover:underline underline-offset-4">
+            Terms
+          </Link>{" "}
+          and acknowledge our{" "}
+          <Link href="/privacy" className="hover:underline underline-offset-4">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </main>
+      <PublicMarketingFooter />
     </div>
   );
 }

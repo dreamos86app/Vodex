@@ -387,6 +387,18 @@ export function SignupView() {
             Sign in
           </Link>
         </p>
+
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+          By continuing, you agree to the{" "}
+          <Link href="/terms" className="hover:underline underline-offset-4">
+            Terms
+          </Link>{" "}
+          and acknowledge the{" "}
+          <Link href="/privacy" className="hover:underline underline-offset-4">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </motion.div>
     </div>
   );

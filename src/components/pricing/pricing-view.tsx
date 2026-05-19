@@ -945,6 +945,16 @@ export function PricingView() {
         </div>
       </motion.div>
 
+      <p className="mt-10 text-center text-[11px] text-muted-foreground">
+        <Link href="/terms" className="hover:underline underline-offset-4">
+          Terms
+        </Link>
+        {" · "}
+        <Link href="/privacy" className="hover:underline underline-offset-4">
+          Privacy
+        </Link>
+      </p>
+
     </div>
 
     <SubscriptionsLockedModal open={paidLockedOpen} onClose={() => setPaidLockedOpen(false)} />
