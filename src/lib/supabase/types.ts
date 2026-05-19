@@ -13,7 +13,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type PlanId = "free" | "pro" | "business" | "enterprise";
+export type PlanId = "free" | "starter" | "pro" | "business" | "infinity" | "enterprise";
 
 export interface Database {
   public: {
@@ -56,6 +56,7 @@ export interface Database {
           signup_wizard_completed: boolean;
           signup_heard_about: string | null;
           signup_referral_code: string | null;
+          last_active_at: string | null;
         };
         Insert: Omit<
           Database["public"]["Tables"]["profiles"]["Row"],
@@ -189,6 +190,7 @@ export interface Database {
           cancel_at_period_end: boolean;
           canceled_at: string | null;
           trial_end: string | null;
+          pending_downgrade_plan: PlanId | null;
         };
         Insert: Omit<Database["public"]["Tables"]["subscriptions"]["Row"], "id" | "created_at" | "updated_at">;
         Update: Partial<Database["public"]["Tables"]["subscriptions"]["Row"]>;
@@ -915,6 +917,40 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["admin_actions"]["Row"]>;
         Relationships: [];
       };
+
+      admin_audit_logs: {
+        Row: {
+          id: string;
+          created_at: string;
+          admin_user_id: string;
+          action: string;
+          target_user_id: string | null;
+          before_state: Json | null;
+          after_state: Json | null;
+          ip_address: string | null;
+          user_agent: string | null;
+          metadata: Json;
+        };
+        Insert: Omit<Database["public"]["Tables"]["admin_audit_logs"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["admin_audit_logs"]["Row"]>;
+        Relationships: [];
+      };
+
+      token_ledger: {
+        Row: {
+          id: string;
+          created_at: string;
+          user_id: string;
+          amount: number;
+          reason: string | null;
+          source: string;
+          admin_user_id: string | null;
+          metadata: Json;
+        };
+        Insert: Omit<Database["public"]["Tables"]["token_ledger"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["token_ledger"]["Row"]>;
+        Relationships: [];
+      };
     };
 
     Views: {
@@ -941,6 +977,47 @@ export interface Database {
           p_reason: string;
         };
         Returns: { success: boolean; error: string | null };
+      };
+      admin_add_tokens: {
+        Args: { p_admin_id: string; p_user_id: string; p_amount: number; p_reason: string };
+        Returns: { success: boolean; error?: string };
+      };
+      admin_set_token_balance: {
+        Args: { p_admin_id: string; p_user_id: string; p_balance: number; p_reason: string };
+        Returns: { success: boolean; error?: string; before?: number; after?: number };
+      };
+      admin_reset_monthly_tokens: {
+        Args: { p_admin_id: string; p_user_id: string; p_reason: string };
+        Returns: { success: boolean; error?: string; quota?: number };
+      };
+      admin_set_plan: {
+        Args: {
+          p_admin_id: string;
+          p_user_id: string;
+          p_plan: PlanId;
+          p_reason: string;
+        };
+        Returns: { success: boolean; error?: string };
+      };
+      admin_set_suspended: {
+        Args: {
+          p_admin_id: string;
+          p_user_id: string;
+          p_suspended: boolean;
+          p_reason?: string;
+        };
+        Returns: { success: boolean; error?: string; suspended?: boolean };
+      };
+      record_token_ledger: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_source: string;
+          p_reason?: string;
+          p_admin_user_id?: string;
+          p_metadata?: Json;
+        };
+        Returns: void;
       };
       get_user_credit_summary: {
         Args: { p_user_id: string };

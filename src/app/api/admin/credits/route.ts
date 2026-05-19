@@ -45,6 +45,7 @@ export async function POST(request: Request) {
     targetUserId: userId,
     amount,
     reason,
+    request,
   });
 
   return NextResponse.json({ success: true });

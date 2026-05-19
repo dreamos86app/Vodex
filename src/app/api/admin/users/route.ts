@@ -1,42 +1,31 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import { isDreamosOwnerEmail } from "@/lib/admin-owner";
+import { requireDreamosOwner } from "@/lib/admin/require-owner";
+import { listAdminUsers } from "@/lib/admin/list-users";
 
 export async function GET(req: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email || !isDreamosOwnerEmail(user.email)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const gate = await requireDreamosOwner();
+  if (gate.error) return gate.error;
 
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q")?.trim();
+  const plan = searchParams.get("plan")?.trim();
+  const status = searchParams.get("status")?.trim();
 
-  let admin;
   try {
-    admin = createSupabaseAdmin();
+    const { users, error } = await listAdminUsers({
+      q: q || undefined,
+      plan: plan || undefined,
+      status: status || undefined,
+    });
+
+    if (error) {
+      return NextResponse.json({ error, users: [] }, { status: 500 });
+    }
+
+    return NextResponse.json({ users, total: users.length });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Server misconfigured";
-    return NextResponse.json({ error: msg }, { status: 503 });
+    const status = msg.includes("not configured") ? 503 : 500;
+    return NextResponse.json({ error: msg, users: [] }, { status });
   }
-
-  let query = admin
-    .from("profiles")
-    .select("id,email,full_name,plan_id,credits_remaining,created_at,avatar_url")
-    .order("created_at", { ascending: false })
-    .limit(200);
-
-  if (q) {
-    query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ users: data ?? [] });
 }
