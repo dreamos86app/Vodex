@@ -3,15 +3,16 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Sparkles, Shield, Zap, Rocket, X, Layers, Cpu, Gauge } from "lucide-react";
+import { ArrowRight, Sparkles, Shield, Zap, Rocket, X } from "lucide-react";
 import { IntegrationShowcaseSection } from "@/components/marketing/integrations-showcase";
 import {
   PublicMarketingFooter,
   PublicMarketingHeader,
 } from "@/components/marketing/public-marketing-shell";
 import { PublicShipSection } from "@/components/marketing/public-ship-section";
+import { PublicSignupSection } from "@/components/marketing/public-signup-section";
+import { DreamOsStatsSection } from "@/components/os-home/dreamos-stats-section";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 function PublicAuthModal({
   open,
@@ -61,7 +62,10 @@ function PublicAuthModal({
             <p className="mt-1 text-[12.5px] text-muted-foreground">
               Save projects, chat with models, and publish — same home page, unlocked after you sign in.
             </p>
-            <label htmlFor="auth-gate-prompt" className="mt-4 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="auth-gate-prompt"
+              className="mt-4 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
               Your idea (optional)
             </label>
             <textarea
@@ -73,102 +77,24 @@ function PublicAuthModal({
               className="mt-1.5 w-full resize-none rounded-xl border border-border/80 bg-surface/60 px-3 py-2 text-[13px] text-foreground outline-none transition focus-visible:border-accent/40 focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-inset"
             />
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button variant="secondary" size="md" asChild>
-                <Link href={loginHref}>Log in</Link>
-              </Button>
-              <Button variant="accent" size="md" asChild>
-                <Link href={signupHref} className="gap-2">
-                  Get Started
-                  <ArrowRight className="size-3.5" strokeWidth={2} />
-                </Link>
-              </Button>
+              <Link
+                href={loginHref}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-surface px-4 text-[13px] font-semibold text-foreground transition hover:bg-surface/80"
+              >
+                Log in
+              </Link>
+              <Link
+                href={signupHref}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[13px] font-semibold text-white transition hover:bg-accent/90"
+              >
+                Get Started
+                <ArrowRight className="size-3.5" strokeWidth={2} />
+              </Link>
             </div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-function CapabilityCards() {
-  const items = [
-    {
-      icon: Layers,
-      title: "Real project files",
-      desc: "Routes, components, and schemas land in a saved app — not a disposable demo.",
-      hue: "from-accent/15 to-violet-500/10",
-    },
-    {
-      icon: Cpu,
-      title: "Multi-model workspace",
-      desc: "Discuss, edit surgically, or run full builds with clear token costs.",
-      hue: "from-sky-500/12 to-accent/10",
-    },
-    {
-      icon: Gauge,
-      title: "Honest publish paths",
-      desc: "Web hosting on your subdomain first; mobile queues only when your plan and builder allow it.",
-      hue: "from-emerald-500/10 to-cyan-500/8",
-    },
-  ];
-
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.14, duration: 0.4 }}
-      className="mx-auto mt-16 max-w-5xl"
-    >
-      <motion.div className="grid gap-4 sm:grid-cols-3">
-        {items.map((it, i) => (
-          <motion.div
-            key={it.title}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 + i * 0.06 }}
-            whileHover={{ y: -3 }}
-            className={cn(
-              "relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br p-5 text-left shadow-sm ring-1 ring-border/50",
-              it.hue,
-            )}
-          >
-            <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-background/80 ring-1 ring-border/60">
-              <it.icon className="size-4 text-accent" strokeWidth={1.65} />
-            </div>
-            <p className="text-[14px] font-semibold text-foreground">{it.title}</p>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{it.desc}</p>
-          </motion.div>
-        ))}
-      </motion.div>
-    </motion.section>
-  );
-}
-
-function BottomCta() {
-  return (
-    <motion.section
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 0.22, duration: 0.4 }}
-      className="mx-auto mt-16 flex max-w-lg flex-col items-center gap-4 text-center"
-    >
-      <p className="text-[15px] font-semibold text-foreground">Ready to build?</p>
-      <motion.div className="flex flex-wrap justify-center gap-3">
-        <Link
-          href="/auth/signup"
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-md transition hover:bg-accent/90"
-        >
-          Start building
-          <ArrowRight className="size-3.5" strokeWidth={2} />
-        </Link>
-        <Link
-          href="/auth/login?next=/chat"
-          className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-5 py-2.5 text-[13px] font-semibold text-foreground transition hover:bg-surface"
-        >
-          Try AI Chat
-        </Link>
-      </motion.div>
-    </motion.section>
   );
 }
 
@@ -182,13 +108,15 @@ export function PublicLanding() {
 
       <PublicMarketingHeader />
 
-      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-10 sm:px-6 sm:pt-14">
+      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-10 sm:px-6 sm:pt-14">
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,hsl(var(--accent)/0.22),transparent_70%)]"
           animate={{ opacity: [0.7, 1, 0.7] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
+
+        {/* Hero */}
         <motion.section
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -253,54 +181,31 @@ export function PublicLanding() {
           </div>
         </motion.section>
 
-        <CapabilityCards />
-
-        <PublicShipSection />
-
+        {/* Integrations — directly under hero */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.35 }}
-          className="mx-auto mt-12 max-w-5xl"
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={{ duration: 0.4 }}
+          className="mx-auto mt-14 max-w-5xl"
         >
           <IntegrationShowcaseSection variant="premium" />
         </motion.div>
 
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.14, duration: 0.35 }}
-          className="mx-auto mt-12 max-w-4xl rounded-2xl border border-border/70 bg-gradient-to-br from-accent/[0.06] via-background to-violet-500/[0.05] p-6 text-center ring-1 ring-border/60 sm:p-8"
-        >
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-accent">Flow</p>
-          <p className="mt-2 text-balance text-[18px] font-semibold text-foreground sm:text-[22px]">
-            Idea → saved app → hosted preview → publish when you&apos;re ready
-          </p>
-          <p className="mx-auto mt-3 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-            Every step writes to your workspace. Nothing pretends to deploy — you always see what actually happened.
-          </p>
-        </motion.section>
+        {/* Ship section — "Now you can ship software within minutes — not months" */}
+        <div className="mx-auto mt-14 max-w-5xl">
+          <PublicShipSection />
+        </div>
 
-        <BottomCta />
+        {/* DreamOS86 in numbers */}
+        <div className="mx-auto mt-14 max-w-5xl">
+          <DreamOsStatsSection />
+        </div>
 
-        <p className="mx-auto mt-8 max-w-lg text-center text-[11px] text-muted-foreground">
-          By continuing, you agree to our{" "}
-          <Link href="/terms" className="hover:underline underline-offset-4">
-            Terms
-          </Link>{" "}
-          and acknowledge our{" "}
-          <Link href="/privacy" className="hover:underline underline-offset-4">
-            Privacy Policy
-          </Link>
-          .
-        </p>
-        <p className="mx-auto mt-4 max-w-lg text-center text-[13px] text-muted-foreground">
-          Already have an account?{" "}
-          <Link href="/auth/login" className="font-semibold text-accent hover:underline underline-offset-2">
-            Log in
-          </Link>
-        </p>
+        {/* Bottom signup CTA */}
+        <PublicSignupSection />
       </main>
+
       <PublicMarketingFooter />
     </div>
   );

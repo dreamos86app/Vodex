@@ -19,6 +19,7 @@ import type { Notification } from "@/lib/supabase/types";
 import { ReferralCapture } from "@/components/referrals/referral-capture";
 import { CommandCenter } from "@/components/command/command-center";
 import { AuthStateDebug } from "@/components/dev/auth-state-debug";
+import { hasActiveSession } from "@/lib/auth/client-identity";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -37,20 +38,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const profile = useAuthStore((s) => s.profile);
+  const session = useAuthStore((s) => s.session);
+  const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
 
   React.useEffect(() => {
     if (loading) return;
+    if (!hasActiveSession(session, user)) return;
     if (!profile?.id) return;
     if (!pathname) return;
     if (pathname.startsWith("/auth")) return;
     if (pathname.startsWith("/onboarding")) return;
     if (pathname.startsWith("/api")) return;
+    if (pathname === "/" || pathname === "/terms" || pathname === "/privacy" || pathname === "/contact") {
+      return;
+    }
 
     if (profile.onboarding_completed !== true) {
       router.replace("/onboarding");
     }
-  }, [loading, profile?.id, profile?.onboarding_completed, pathname, router]);
+  }, [loading, session, user, profile?.id, profile?.onboarding_completed, pathname, router]);
 
   React.useEffect(() => {
     const supabase = createClient();

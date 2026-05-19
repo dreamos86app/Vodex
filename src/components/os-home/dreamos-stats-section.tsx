@@ -48,7 +48,7 @@ function StatCard({
   return (
     <motion.div
       className={cn(
-        "flex min-h-[168px] flex-col justify-between rounded-[1.35rem] border border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-blue-50/90 p-6 shadow-sm ring-1 ring-sky-100/80 dark:border-accent/20 dark:from-accent/10 dark:via-background dark:to-indigo-950/30",
+        "flex min-h-[168px] flex-col justify-between rounded-[1.35rem] border border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-blue-50/90 p-6 shadow-[0_0_40px_-12px_rgba(59,130,246,0.35)] ring-1 ring-sky-100/80 dark:border-accent/25 dark:from-accent/10 dark:via-background dark:to-indigo-950/30 dark:shadow-[0_0_48px_-16px_hsl(var(--accent)/0.35)]",
         className,
       )}
       initial={{ opacity: 0, y: 12 }}
