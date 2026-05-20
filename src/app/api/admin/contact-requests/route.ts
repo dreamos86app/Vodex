@@ -16,6 +16,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const reason = searchParams.get("reason");
+  const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 1), 200);
+  const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10) || 0, 0);
 
   let admin;
   try {
@@ -25,7 +27,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: msg }, { status: 503 });
   }
 
-  let query = admin.from("contact_requests").select("*").order("created_at", { ascending: false }).limit(200);
+  let query = admin
+    .from("contact_requests")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (status && ["new", "read", "resolved"].includes(status)) {
     query = query.eq("status", status);
@@ -39,7 +45,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message, requests: [] }, { status: 200 });
   }
 
-  return NextResponse.json({ requests: data ?? [] });
+  return NextResponse.json({ requests: data ?? [], limit, offset });
 }
 
 export async function PATCH(request: Request) {

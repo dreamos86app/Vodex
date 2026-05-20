@@ -25,10 +25,11 @@ import { calculateTokens } from "@/lib/credits/cost-engine";
 import { resolveDisplayName } from "@/lib/profile-display";
 import { toast } from "@/lib/toast";
 import { createDreamChatTransport } from "@/lib/chat/create-chat-transport";
-import { runAiPreflight } from "@/lib/ai/run-preflight";
+import { runAiPreflightDeduped } from "@/lib/ai/preflight-inflight";
 import { isAiPreflightSuccess, preflightBlockedLabel } from "@/lib/ai/preflight-types";
 import { applyComposerPaste } from "@/lib/composer/textarea-handlers";
 import { composerTextareaClass } from "@/components/ui/composer-shell";
+import { LogoIcon } from "@/components/ui/logo-icon";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { submitDebug, uiSubmitLog } from "@/lib/dev/submit-debug";
 import { useComposerClickCapture } from "@/lib/dev/composer-click-capture";
@@ -273,9 +274,9 @@ function MessageBubble({ msg, displayName, avatarUrl, attachments = [] }: {
             <Avatar src={avatarUrl} name={displayName} size="sm" />
           </div>
         ) : (
-          <div className="flex size-8 items-center justify-center rounded-2xl bg-gradient-to-br from-accent via-accent to-blue-600 text-white shadow-[0_6px_20px_-6px_color-mix(in_oklab,var(--accent)_55%,transparent)] ring-2 ring-white/40">
-            <Sparkles className="size-4" strokeWidth={1.85} />
-          </div>
+          <motion.div className="flex size-8 shrink-0 items-center justify-center">
+            <LogoIcon size={28} />
+          </motion.div>
         )}
       </div>
       <div className={cn("flex max-w-[min(100%,560px)] flex-col gap-1.5", isUser && "items-end")}>
@@ -353,7 +354,7 @@ export function ChatView() {
   const supabase = createClient();
   const { profile, user, session, loading: authLoading } = useAuthStore();
   const hydrated = useHydrated();
-  const { remaining, syncFromDB, isConfirmed, deductOptimistic } = useCreditsStore();
+  const { remaining, syncFromDB, isConfirmed } = useCreditsStore();
   const debugEnabled = isSubmitDebugEnabled(
     searchParams,
     profile?.email ?? user?.email ?? null,
@@ -457,17 +458,10 @@ export function ChatView() {
     },
     onFinish: () => {
       pendingAttachmentIdsRef.current = [];
-      deductOptimistic(discussTokens);
       if (userId) void syncFromDB(userId, { force: true });
     },
   });
   const isBusy = status === "submitted" || status === "streaming";
-
-  React.useEffect(() => {
-    submitDebug("chat", "composer mounted");
-    if (!userId) return;
-    void syncFromDB(userId);
-  }, [userId, syncFromDB]);
 
   const trimmedInput = input.trim();
   const submitDisabledReason = !trimmedInput ? "empty" : isBusy ? "busy" : null;
@@ -588,7 +582,7 @@ export function ChatView() {
     uiSubmitLog("chat", "preflight fetch start");
     submitDebug("chat", "preflight start");
 
-    const pre = await runAiPreflight({
+    const pre = await runAiPreflightDeduped({
       mode: "discuss",
       prompt: text,
       conversationId: activeConvId,
@@ -638,6 +632,8 @@ export function ChatView() {
           user_id: pre.userId,
           title: text.slice(0, 60) || "New conversation",
           model_id: effectiveDiscussModel,
+          project_id: null,
+          mode: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           pinned: false,
@@ -846,7 +842,7 @@ export function ChatView() {
             href="/"
             className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12px] font-medium text-white transition hover:bg-accent/90 active:scale-[0.98]"
           >
-            <Sparkles className="size-3.5" strokeWidth={1.75} />
+            <LogoIcon size={14} />
             Create a new app
           </Link>
         </div>
@@ -868,7 +864,7 @@ export function ChatView() {
         {/* Chat label bar */}
         <div className="flex h-10 shrink-0 flex-wrap items-center gap-2 border-b border-border px-4">
           <div className="flex items-center gap-1.5 rounded-full bg-muted/50 px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground ring-1 ring-border/60">
-            <Sparkles className="size-3 text-accent" strokeWidth={1.75} />
+            <LogoIcon size={14} />
             {freePlan ? "Discuss · automatic model" : "Discuss · choose model"}
           </div>
           {!freePlan && (
@@ -901,7 +897,7 @@ export function ChatView() {
                 className="flex flex-col items-center py-8 text-center sm:py-10"
               >
                 <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/25 via-accent/15 to-violet-500/20 ring-1 ring-accent/25 shadow-[0_8px_28px_-12px_rgba(37,99,235,0.22)]">
-                  <Bot className="size-8 text-accent" strokeWidth={1.35} />
+                  <LogoIcon size={40} />
                 </div>
                 <h2 className="text-[20px] font-semibold tracking-tight text-foreground">
                   How can I help?
@@ -955,8 +951,8 @@ export function ChatView() {
 
             {isBusy && (
               <div className="flex gap-3">
-                <div className="flex size-7 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
-                  <Sparkles className="size-3.5 text-accent" strokeWidth={1.75} />
+                <div className="flex size-7 shrink-0 items-center justify-center">
+                  <LogoIcon size={14} />
                 </div>
                 <div className="rounded-2xl rounded-tl-sm bg-surface px-4 py-3 ring-1 ring-border">
                   <div className="flex gap-1">

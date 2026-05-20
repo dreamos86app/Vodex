@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireDreamosOwner } from "@/lib/admin/require-owner";
+import { fetchAiUsageSummaryRows } from "@/lib/admin/admin-query-compat";
 import {
   estimateOwnerMarginUsd,
   estimateOwnerRevenueUsd,
   estimateProviderCostUsd,
 } from "@/lib/credits/usage-cost";
-
-type UsageRow = {
-  model_id: string;
-  mode: string;
-  tokens_charged: number;
-  tokens_input: number | null;
-  tokens_output: number | null;
-  status: string;
-  conversation_id: string | null;
-  project_id?: string | null;
-};
 
 export async function GET() {
   const gate = await requireDreamosOwner();
@@ -30,19 +20,18 @@ export async function GET() {
     return NextResponse.json({ error: msg }, { status: 503 });
   }
 
-  const { data, error } = await admin
-    .from("ai_usage_logs")
-    .select(
-      "model_id,mode,tokens_charged,tokens_input,tokens_output,status,conversation_id",
-    )
-    .eq("status", "success")
-    .gte("created_at", new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString());
+  const sinceIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const { rows, error } = await fetchAiUsageSummaryRows(admin, sinceIso);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error,
+        hint: "Run scripts/admin-column-compat.sql then NOTIFY pgrst, 'reload schema';",
+      },
+      { status: 500 },
+    );
   }
-
-  const rows = (data ?? []) as UsageRow[];
 
   type Bucket = {
     requests: number;
@@ -92,8 +81,7 @@ export async function GET() {
     const mmKey = `${row.model_id}::${row.mode}`;
     add(byModelMode[mmKey] ?? (byModelMode[mmKey] = empty()));
 
-    const isChatDiscuss = row.mode === "discuss";
-    if (isChatDiscuss) add(chatOnly);
+    if (row.mode === "discuss") add(chatOnly);
     else add(createModes);
   }
 

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, AlertCircle, CreditCard } from "lucide-react";
+import { AlertCircle, CreditCard } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 type SubRow = {
@@ -61,8 +62,10 @@ export function AdminBillingPanel() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      <div className="space-y-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-xl" />
+        ))}
       </div>
     );
   }

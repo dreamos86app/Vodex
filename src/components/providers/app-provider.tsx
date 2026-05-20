@@ -20,6 +20,11 @@ import { ReferralCapture } from "@/components/referrals/referral-capture";
 import { CommandCenter } from "@/components/command/command-center";
 import { AuthStateDebug } from "@/components/dev/auth-state-debug";
 import { hasActiveSession, isStalePersistedProfile } from "@/lib/auth/client-identity";
+import {
+  getCachedBootstrap,
+  invalidateBootstrapCache,
+  setCachedBootstrap,
+} from "@/lib/cache/session-bootstrap-cache";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -63,6 +68,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
 
     async function bootstrapUser(userId: string): Promise<() => void> {
+      const cached = getCachedBootstrap(userId);
+      if (cached?.profile) {
+        setProfile(cached.profile);
+        const creditsValue =
+          typeof cached.profile.credits_remaining === "number"
+            ? cached.profile.credits_remaining
+            : null;
+        if (creditsValue !== null) {
+          const planId = cached.profile.plan_id ?? "free";
+          const capped =
+            planId === "free"
+              ? Math.min(creditsValue, FREE_MONTHLY_QUOTA)
+              : creditsValue;
+          useCreditsStore.getState().setCredits(capped, cached.profile.credits_reset_at ?? null);
+        }
+        if (cached.notifications.length > 0) {
+          setNotifications(cached.notifications);
+        }
+      }
+
       let { data: profile } = await supabase
         .from("profiles")
         .select("*")
@@ -122,6 +147,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (notifications) {
         setNotifications(notifications as Notification[]);
+      }
+
+      if (profile) {
+        setCachedBootstrap(userId, {
+          profile,
+          notifications: (notifications ?? []) as Notification[],
+        });
       }
 
       const notificationsChannel = supabase
@@ -215,6 +247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === "SIGNED_OUT") {
+        invalidateBootstrapCache();
         disposeRealtime?.();
         disposeRealtime = undefined;
         try {

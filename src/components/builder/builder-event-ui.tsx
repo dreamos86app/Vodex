@@ -5,16 +5,54 @@ import { motion } from "framer-motion";
 import {
   CheckCircle2,
   Circle,
+  Clock,
   FilePlus,
   FilePen,
   Loader2,
   ListChecks,
-  Sparkles,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildPlanCard } from "@/lib/creation/parse-build-plan";
 import type { BuilderOutputContract } from "@/lib/creation/parse-builder-metadata";
-import { AgentPhases } from "@/components/create/workspace/agent-phases";
+import { stripMarkdownNoise } from "@/lib/projects/project-context";
+import { DreamOS86BrandIcon } from "@/components/brand/dreamos86-brand-icon";
+
+export function QueuedPromptCard({
+  text,
+  onCancel,
+  className,
+}: {
+  text: string;
+  onCancel?: () => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2.5 rounded-xl bg-accent/[0.06] px-3 py-2.5 ring-1 ring-accent/20",
+        className,
+      )}
+    >
+      <Clock className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold text-accent">Queued</p>
+        <p className="mt-0.5 line-clamp-2 text-[12px] text-foreground">{text}</p>
+        <p className="mt-1 text-[10.5px] text-muted-foreground">Runs when the current build finishes</p>
+      </div>
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition hover:bg-background hover:text-foreground"
+          aria-label="Cancel queued prompt"
+        >
+          <X className="size-3.5" strokeWidth={2} />
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function BuilderPlanCard({
   plan,
@@ -106,12 +144,13 @@ export function BuilderProgressTimeline({
   className?: string;
 }) {
   const descriptions = [
-    "Mapping routes, data, and screens",
-    "Colors, typography, and components",
+    "Architecture, routes, and scope",
+    "Name, icon, and brand direction",
+    "Layouts, navigation, and UI",
     "Tables, fields, and relationships",
     "API routes and server actions",
-    "Pages, layouts, and interactions",
-    "Preview and polish",
+    "Preview compile and packaging",
+    "Final polish and handoff",
   ];
   return (
     <motion.div className={cn("space-y-1.5", className)} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -182,6 +221,7 @@ export function BuilderResultSummary({
   className?: string;
 }) {
   if (!meta?.app?.name && !meta?.summary) return null;
+  const appName = meta.app?.name ? stripMarkdownNoise(meta.app.name) : null;
   return (
     <div
       className={cn(
@@ -195,15 +235,15 @@ export function BuilderResultSummary({
         className="flex items-start gap-3 px-3 py-3"
       >
         <motion.div
-          className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 ring-1 ring-accent/25"
+          className="flex size-9 shrink-0 items-center justify-center"
           animate={{ scale: [1, 1.04, 1] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Sparkles className="size-4 text-accent" strokeWidth={1.75} />
+          <DreamOS86BrandIcon size={28} alt="" />
         </motion.div>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-foreground">
-            Done — {meta.app?.name ? `I created ${meta.app.name}` : "Build complete"}
+            Done — {appName ? `I created ${appName}` : "Build complete"}
           </p>
           {meta.summary ? (
             <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{meta.summary}</p>
@@ -256,12 +296,20 @@ export function BuilderAssistantMessage({
 
   return (
     <div className="space-y-2.5">
-      {showPlan && !streaming && <BuilderPlanCard plan={plan} />}
+      {(showPlan || streaming) && <BuilderPlanCard plan={plan} />}
       {showTimeline && (
         <BuilderProgressTimeline labels={plan.taskLabels} activeIndex={progressIndex} />
       )}
       {fileRows.length > 0 && !streaming && <BuilderFileChangeList files={fileRows} />}
-      <AgentPhases text={text} streaming={streaming} suppressCode />
+      {!streaming && plan.phases.length > 0 && (
+        <ul className="space-y-1 rounded-xl bg-surface/60 px-3 py-2 ring-1 ring-border/50">
+          {plan.phases.map((phase) => (
+            <li key={phase} className="text-[11.5px] text-muted-foreground">
+              ✓ {phase}
+            </li>
+          ))}
+        </ul>
+      )}
       {!streaming && <BuilderResultSummary meta={meta} creditsUsed={creditsUsed} />}
     </div>
   );

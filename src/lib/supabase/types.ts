@@ -251,6 +251,8 @@ export interface Database {
           user_id: string;
           title: string;
           model_id: string;
+          project_id: string | null;
+          mode: string | null;
           pinned: boolean;
           archived: boolean;
           message_count: number;
@@ -394,6 +396,12 @@ export interface Database {
           remix_count: number;
           launch_count: number;
           metadata: Json;
+          app_name: string | null;
+          icon_svg: string | null;
+          build_status: string | null;
+          last_build_id: string | null;
+          last_build_at: string | null;
+          short_description: string | null;
         };
         Insert: Omit<Database["public"]["Tables"]["projects"]["Row"], "id" | "created_at" | "updated_at">;
         Update: Partial<Database["public"]["Tables"]["projects"]["Row"]>;
@@ -560,6 +568,7 @@ export interface Database {
           provider: string | null;
           key_name: string;
           ciphertext: string;
+          encrypted_value: string | null;
           masked_value: string | null;
         };
         Insert: Omit<
@@ -623,6 +632,8 @@ export interface Database {
           result_summary: string | null;
           error_message: string | null;
           meta: Json;
+          completed_at: string | null;
+          credits_charged: number | null;
         };
         Insert: Omit<
           Database["public"]["Tables"]["build_jobs"]["Row"],
@@ -668,6 +679,42 @@ export interface Database {
           "id" | "created_at" | "updated_at" | "meta"
         > & { meta?: Json };
         Update: Partial<Database["public"]["Tables"]["wrap_jobs"]["Row"]>;
+        Relationships: [];
+      };
+
+      preview_errors: {
+        Row: {
+          id: string;
+          created_at: string;
+          project_id: string;
+          file_path: string | null;
+          line_number: number | null;
+          error_message: string;
+          metadata: Json;
+        };
+        Insert: Omit<Database["public"]["Tables"]["preview_errors"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["preview_errors"]["Row"]>;
+        Relationships: [];
+      };
+
+      publish_records: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          project_id: string;
+          user_id: string;
+          status: string;
+          published_url: string | null;
+          subdomain: string | null;
+          platform: string | null;
+          metadata: Json;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["publish_records"]["Row"],
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<Database["public"]["Tables"]["publish_records"]["Row"]>;
         Relationships: [];
       };
 

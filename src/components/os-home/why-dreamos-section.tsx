@@ -4,6 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { IntegrationIconWell } from "@/components/brand/integration-icons";
+import { DreamOS86BrandIcon } from "@/components/brand/dreamos86-brand-icon";
 import {
   ArrowRight,
   Clock,
@@ -96,13 +97,7 @@ function IntegrationsVisual() {
             {item.slug ? (
               <IntegrationIconWell provider={item.slug} size="sm" title={item.label} />
             ) : (
-              <Image
-                src="/dreamos86-platform-logo.png"
-                alt=""
-                width={28}
-                height={28}
-                className="size-7 object-contain"
-              />
+              <DreamOS86BrandIcon size={28} alt="" />
             )}
           </div>
           <span className="text-[10.5px] font-semibold text-muted-foreground">{item.label}</span>

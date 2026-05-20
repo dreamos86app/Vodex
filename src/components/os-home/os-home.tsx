@@ -23,6 +23,7 @@ import { DreamOsStatsSection } from "@/components/os-home/dreamos-stats-section"
 import { WhyDreamOsSection } from "@/components/os-home/why-dreamos-section";
 import { YourAppsSection } from "@/components/os-home/your-apps-section";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { storeAutostartHandoff } from "@/lib/create/autostart-handoff";
 import { useCreditsStore } from "@/lib/stores/credits-store";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { resolveDisplayName } from "@/lib/profile-display";
@@ -140,6 +141,7 @@ function QuickCreateBar({
       console.info("[home] launch", { source, chars: q.length });
     }
     if (!q) return;
+    storeAutostartHandoff(q, mode);
     router.push(
       `/create?prompt=${encodeURIComponent(q)}&mode=${mode}&autostart=1`,
     );

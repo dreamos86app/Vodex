@@ -1,30 +1,39 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireDreamosOwner } from "@/lib/admin/require-owner";
+import { fetchAiUsageLogs, parseAdminPagination } from "@/lib/admin/admin-query-compat";
 
-export async function GET() {
+export async function GET(req: Request) {
   const gate = await requireDreamosOwner();
   if (gate.error) return gate.error;
+
+  const { limit, offset } = parseAdminPagination(new URL(req.url).searchParams);
 
   let admin;
   try {
     admin = createSupabaseAdmin();
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Server misconfigured";
-    return NextResponse.json({ error: msg }, { status: 503 });
+    return NextResponse.json({ error: msg, events: [] }, { status: 503 });
   }
 
-  const { data, error } = await admin
-    .from("ai_usage_logs")
-    .select(
-      "id,created_at,user_id,user_email,model_id,mode,tokens_charged,tokens_input,tokens_output,status,error_message,conversation_id,operation_id",
-    )
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const { rows, error, columnHint } = await fetchAiUsageLogs(admin, { limit, offset });
 
   if (error) {
-    return NextResponse.json({ error: error.message, events: [] }, { status: 200 });
+    return NextResponse.json(
+      {
+        error,
+        events: [],
+        hint: "Run scripts/admin-column-compat.sql then NOTIFY pgrst, 'reload schema';",
+      },
+      { status: 200 },
+    );
   }
 
-  return NextResponse.json({ events: data ?? [] });
+  return NextResponse.json({
+    events: rows,
+    limit,
+    offset,
+    ...(columnHint ? { warning: columnHint } : {}),
+  });
 }

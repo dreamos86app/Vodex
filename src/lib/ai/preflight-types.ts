@@ -6,6 +6,11 @@ export type AiPreflightSuccess = {
   projectId: string | null;
   conversationId: string | null;
   tokensRemaining: number;
+  creditsEstimate?: number;
+  creditsEstimateMax?: number;
+  modelId?: string;
+  provider?: string;
+  routeReason?: string;
 };
 
 export type AiPreflightFailure = {

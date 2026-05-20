@@ -43,7 +43,7 @@ const geistMono = Geist_Mono({
 
 const SITE_URL = getSiteUrl();
 
-const ICON_V = "2";
+const ICON_V = "5";
 
 
 
@@ -92,21 +92,16 @@ export const metadata: Metadata = {
   manifest: `/manifest.webmanifest?v=${ICON_V}`,
 
   icons: {
-
     icon: [
-
-      { url: `/favicon.png?v=${ICON_V}`, type: "image/png", sizes: "32x32" },
-
-      { url: `/icon-192.png?v=${ICON_V}`, type: "image/png", sizes: "192x192" },
-
-      { url: `/icon-512.png?v=${ICON_V}`, type: "image/png", sizes: "512x512" },
-
+      { url: `/favicon.ico?v=${ICON_V}` },
+      { url: `/favicon-32x32.png?v=${ICON_V}`, sizes: "32x32", type: "image/png" },
+      { url: `/favicon-192x192.png?v=${ICON_V}`, sizes: "192x192", type: "image/png" },
+      { url: `/icon.png?v=${ICON_V}`, sizes: "32x32", type: "image/png" },
     ],
-
-    apple: [{ url: `/apple-touch-icon.png?v=${ICON_V}`, sizes: "180x180", type: "image/png" }],
-
-    shortcut: [{ url: `/favicon.png?v=${ICON_V}`, type: "image/png" }],
-
+    apple: [
+      { url: `/apple-touch-icon.png?v=${ICON_V}`, sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: [`/favicon.ico?v=${ICON_V}`],
   },
 
   formatDetection: { telephone: false, email: false, address: false },

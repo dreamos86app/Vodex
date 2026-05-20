@@ -2,12 +2,18 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Loader2, LayoutDashboard, Palette, Database, Plug, Monitor, Sparkles } from "lucide-react";
+import { CheckCircle2, Loader2, LayoutDashboard, Palette, Database, Plug, Monitor, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DreamOS86BrandIcon } from "@/components/brand/dreamos86-brand-icon";
 
-const STEPS = [
+const STEPS: Array<{
+  label: string;
+  description: string;
+  icon?: LucideIcon;
+  brandIcon?: boolean;
+}> = [
   { label: "Planning your app", description: "Architecture and screens", icon: LayoutDashboard },
-  { label: "Creating app identity", description: "Name, theme, and icon", icon: Sparkles },
+  { label: "Creating app identity", description: "Name, theme, and icon", brandIcon: true },
   { label: "Designing dashboard", description: "Layout and components", icon: Palette },
   { label: "Creating data model", description: "Tables and relationships", icon: Database },
   { label: "Wiring actions", description: "API and business logic", icon: Plug },
@@ -19,9 +25,16 @@ interface Props {
   className?: string;
   /** 0-based active step while streaming */
   activeStep?: number;
+  /** Server is running post-build quality repair */
+  qualityRepairing?: boolean;
 }
 
-export function BuildStatusNarrator({ isStreaming, className, activeStep = 0 }: Props) {
+export function BuildStatusNarrator({
+  isStreaming,
+  className,
+  activeStep = 0,
+  qualityRepairing = false,
+}: Props) {
   const [tick, setTick] = React.useState(0);
   const [visible, setVisible] = React.useState(false);
 
@@ -46,6 +59,15 @@ export function BuildStatusNarrator({ isStreaming, className, activeStep = 0 }: 
           exit={{ opacity: 0, y: -4 }}
           className={cn("space-y-1.5 px-2", className)}
         >
+          {qualityRepairing && (
+            <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-2.5 py-2 ring-1 ring-amber-500/25">
+              <Loader2 className="size-3.5 shrink-0 animate-spin text-amber-600" strokeWidth={2} />
+              <div className="min-w-0">
+                <p className="text-[11.5px] font-semibold text-foreground">Fixing errors automatically…</p>
+                <p className="text-[10.5px] text-muted-foreground">Running a quality repair pass on your preview</p>
+              </div>
+            </div>
+          )}
           {STEPS.map((step, i) => {
             const Icon = step.icon;
             const status = i < index ? "done" : i === index ? "active" : "pending";
@@ -64,9 +86,11 @@ export function BuildStatusNarrator({ isStreaming, className, activeStep = 0 }: 
                   <CheckCircle2 className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} />
                 ) : status === "active" ? (
                   <Loader2 className="size-3.5 shrink-0 animate-spin text-accent" strokeWidth={2} />
-                ) : (
+                ) : step.brandIcon ? (
+                  <DreamOS86BrandIcon size={14} className="shrink-0 opacity-80" alt="" />
+                ) : Icon ? (
                   <Icon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-                )}
+                ) : null}
                 <div className="min-w-0">
                   <p className="text-[11.5px] font-semibold text-foreground">{step.label}</p>
                   {status === "active" && (

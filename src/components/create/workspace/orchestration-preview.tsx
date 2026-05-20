@@ -3,6 +3,7 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { DreamOS86BrandIcon } from "@/components/brand/dreamos86-brand-icon";
 
 /**
  * Live orchestration animation shown in the right preview panel before
@@ -75,14 +76,7 @@ export function OrchestrationPreview({
           className="relative flex size-24 items-center justify-center rounded-3xl"
         >
           <div className="flex size-full items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/dreamos86-platform-logo.png"
-              alt="DreamOS86"
-              width={80}
-              height={80}
-              className="object-contain"
-            />
+            <DreamOS86BrandIcon size={80} alt="DreamOS86" />
           </div>
 
           {/* Sweeping highlight */}

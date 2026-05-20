@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Bucket = {
   requests: number;
@@ -89,23 +89,28 @@ export function AdminAiUsagePanel() {
   const [events, setEvents] = React.useState<Event[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [warning, setWarning] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
+    setWarning(null);
     void Promise.all([
       fetch("/api/admin/ai-usage/summary"),
-      fetch("/api/admin/ai-usage"),
+      fetch("/api/admin/ai-usage?limit=50"),
     ])
       .then(async ([sumRes, evRes]) => {
-        const sum = (await sumRes.json()) as Summary & { error?: string };
-        const ev = (await evRes.json()) as { events?: Event[] };
+        const sum = (await sumRes.json()) as Summary & { error?: string; hint?: string };
+        const ev = (await evRes.json()) as { events?: Event[]; error?: string; warning?: string };
         if (cancelled) return;
         if (!sumRes.ok) {
-          setError(sum.error ?? "Could not load summary");
+          setError([sum.error, sum.hint].filter(Boolean).join(" — ") || "Could not load summary");
           return;
         }
         setSummary(sum);
+        if (ev.error) setWarning(ev.error);
+        else if (ev.warning) setWarning(ev.warning);
         if (evRes.ok) setEvents(ev.events ?? []);
       })
       .catch(() => {
@@ -121,8 +126,14 @@ export function AdminAiUsagePanel() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-48 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
   }
@@ -140,6 +151,11 @@ export function AdminAiUsagePanel() {
 
   return (
     <div className="space-y-6">
+      {warning && (
+        <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-200">
+          {warning}
+        </p>
+      )}
       <p className="text-[12px] text-muted-foreground">{summary.marginTarget}</p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

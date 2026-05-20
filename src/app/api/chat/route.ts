@@ -1,4 +1,4 @@
-import { streamText, convertToModelMessages, type ModelMessage } from "ai";
+import { streamText, generateText, convertToModelMessages, type ModelMessage } from "ai";
 import type { UIMessage } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
@@ -17,15 +17,19 @@ import {
   slugifyAppName,
 } from "@/lib/creation/parse-builder-metadata";
 import { validateGeneratedBuild } from "@/lib/creation/validate-build-quality";
+import { validateBuilderOutput } from "@/lib/builder/validate-builder-output";
 import { appIconSvgDataUrl } from "@/lib/creation/app-icon-svg";
 import { getAppUrl } from "@/lib/app-url";
 import { allocatePublishedSubdomain } from "@/lib/publish/subdomain";
 import { googleGenerativeApiKey, hasAnyLlmProviderKey } from "@/lib/llm/env-keys";
-import {
-  isAutomaticModelId,
-  resolveAutomaticModelId,
-} from "@/lib/ai/resolve-automatic-model";
-import { estimateProviderCostUsd } from "@/lib/credits/usage-cost";
+import { isAutomaticModelId } from "@/lib/ai/resolve-automatic-model";
+import { routeModel, mapChatModeToTask } from "@/lib/ai/model-router";
+import { chargeAiOperation } from "@/lib/credits/charge-ai-operation";
+import { calculateCreditsToCharge } from "@/lib/credits/calculate-charge";
+import { finalizeBuildSuccess, finalizeBuildFailed } from "@/lib/build/finalize-build";
+import { runBuildQualityRepair } from "@/lib/build/quality-repair";
+import { ensureProjectConversation } from "@/lib/projects/project-conversation";
+import { loadProjectContextBlock, refineAppName } from "@/lib/projects/project-context";
 
 const MODEL_ID_MAP: Record<string, string> = {
   "claude-opus-4-7": "claude-opus-4-5",
@@ -195,6 +199,7 @@ export async function POST(request: Request) {
     conversationId?: string;
     mode?: "discuss" | "edit" | "build";
     scope?: string | null;
+    editTarget?: string | null;
     projectId?: string;
     attachmentIds?: unknown;
   };
@@ -228,7 +233,12 @@ export async function POST(request: Request) {
 
   const mode: "discuss" | "edit" | "build" =
     raw.mode === "edit" ? "edit" : raw.mode === "build" ? "build" : "discuss";
-  const scope = typeof raw.scope === "string" ? raw.scope : null;
+  const scope =
+    typeof raw.editTarget === "string" && raw.editTarget.trim()
+      ? raw.editTarget.trim()
+      : typeof raw.scope === "string"
+        ? raw.scope
+        : null;
   const projectId =
     typeof raw.projectId === "string" && raw.projectId.length > 0 ? raw.projectId : undefined;
 
@@ -250,12 +260,34 @@ export async function POST(request: Request) {
   const freePlan = planIsFree(profileRow.plan_id as string | undefined);
   const requestedModel =
     typeof raw.modelId === "string" && raw.modelId.length > 0 ? raw.modelId : undefined;
-  const modelId = freePlan
-    ? pickFreeDiscussModelId()
-    : isAutomaticModelId(requestedModel)
-      ? resolveAutomaticModelId(mode)
-      : requestedModel ?? resolveAutomaticModelId(mode);
+  const taskMode = mapChatModeToTask(mode);
+  const routed = routeModel(taskMode, requestedModel);
+  const modelId =
+    freePlan && taskMode === "discuss"
+      ? pickFreeDiscussModelId()
+      : routed.modelId;
   const billedModelId = modelId;
+
+  if (routed.missingEnv.length > 0 && !hasAnyLlmProviderKey()) {
+    return NextResponse.json(
+      {
+        error: LLM_SETUP_ERROR,
+        hint: LLM_SETUP_HINT,
+        missingEnv: routed.missingEnv,
+      },
+      { status: 503 },
+    );
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[ai-route]", {
+      mode: taskMode,
+      provider: routed.provider,
+      modelId: billedModelId,
+      isFallback: routed.isFallback,
+      tier: routed.estimatedTier,
+    });
+  }
 
   let modelMessages: ModelMessage[];
   try {
@@ -321,26 +353,31 @@ export async function POST(request: Request) {
   })) as unknown as Json;
 
   if (userText && !conversationId) {
-    const title = userText.slice(0, 60) || "New conversation";
-    const { data: conv, error: convErr } = await writer
-      .from("conversations")
-      .insert({
-        user_id: user.id,
-        title,
-        model_id: modelId,
-      })
-      .select("id")
-      .single();
-    if (convErr || !conv?.id) {
+    const conv = await ensureProjectConversation({
+      writer,
+      user,
+      projectId,
+      title: userText.slice(0, 60) || "New conversation",
+      modelId,
+      mode,
+    });
+    if ("error" in conv) {
       return NextResponse.json(
-        {
-          error: "Could not create conversation",
-          hint: convErr?.message ?? "Check Supabase migrations and RLS for conversations.",
-        },
-        { status: 500 },
+        { error: conv.error, hint: conv.hint ?? "Check Supabase migrations for conversations." },
+        { status: conv.status },
       );
     }
     conversationId = conv.id;
+  } else if (conversationId && projectId) {
+    await ensureProjectConversation({
+      writer,
+      user,
+      conversationId,
+      projectId,
+      title: userText?.slice(0, 60) ?? "Project",
+      modelId,
+      mode,
+    });
   }
 
   let buildJobId: string | null = null;
@@ -398,6 +435,12 @@ export async function POST(request: Request) {
   if (projectId) {
     const { entries } = await loadMemory(supabase, { projectId, limit: 30 });
     memoryBlock = formatMemoryForPrompt(entries);
+    const projectCtx = await loadProjectContextBlock(writer, projectId, user.id);
+    if (projectCtx) {
+      memoryBlock = memoryBlock
+        ? `${memoryBlock}\n\n---\nCurrent project state:\n${projectCtx}\n---`
+        : `---\nCurrent project state:\n${projectCtx}\n---`;
+    }
   }
 
   const systemPrompt = buildSystemPrompt({
@@ -407,7 +450,11 @@ export async function POST(request: Request) {
     hasProject: !!projectId,
   });
 
-  const opId = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const opId = buildJobId
+    ? `build:${user.id}:${projectId}:${buildJobId}`
+    : conversationId
+      ? `ai:${user.id}:${conversationId}:${userMessageId ?? Date.now()}`
+      : `chat_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
   let model;
   try {
@@ -483,63 +530,9 @@ export async function POST(request: Request) {
           return;
         }
 
-        const providerCostUsd = estimateProviderCostUsd(
-          billedModelId,
-          mode,
-          event.usage?.inputTokens ?? null,
-          event.usage?.outputTokens ?? null,
-        );
-
-        const { data: creditResultRaw } = await writer.rpc("charge_tokens", {
-          p_user_id: user.id,
-          p_amount: tokensNeeded,
-          p_reason: `AI ${mode}`,
-          p_idempotency_key: opId,
-          p_metadata: {
-            model_id: billedModelId,
-            mode,
-            conversation_id: conversationId,
-            operation_id: opId,
-            provider_cost_usd: providerCostUsd,
-            automatic: isAutomaticModelId(requestedModel),
-          },
-        });
-        const creditResult = creditResultRaw as
-          | { success?: boolean; error?: string | null; idempotent?: boolean }
-          | null
-          | undefined;
-        const charged = Boolean(creditResult?.success);
         let buildQualityOk = true;
-
-        if (creditResult && !creditResult.success && process.env.NODE_ENV !== "production") {
-          console.warn("[chat] charge_tokens after stream:", creditResult.error);
-        }
-
-        await writer.from("ai_usage_logs").insert({
-          user_id: user.id,
-          user_email: userEmail,
-          model_id: billedModelId,
-          mode,
-          tokens_charged: charged ? tokensNeeded : 0,
-          tokens_input: event.usage?.inputTokens ?? null,
-          tokens_output: event.usage?.outputTokens ?? null,
-          status: charged ? "success" : "error",
-          error_message: charged ? null : (creditResult?.error ?? "Token charge failed"),
-          conversation_id: conversationId ?? null,
-          operation_id: opId,
-        });
-
-        if (!charged && buildJobId) {
-          await writer
-            .from("build_jobs")
-            .update({
-              status: "failed",
-              error_message:
-                creditResult?.error ??
-                "Token charge failed — generated files were not saved.",
-            })
-            .eq("id", buildJobId);
-        }
+        let outputSaved = true;
+        let buildFailureReason: string | null = null;
 
         if (conversationId && event.text) {
           const { error: asstErr } = await writer.from("messages").insert({
@@ -548,127 +541,269 @@ export async function POST(request: Request) {
             role: "assistant",
             content: event.text,
             model_id: modelId,
-            credits_used: charged ? tokensNeeded : 0,
+            credits_used: 0,
             finish_reason: event.finishReason,
             tokens_input: event.usage?.inputTokens ?? null,
             tokens_output: event.usage?.outputTokens ?? null,
-            metadata: { mode, scope, projectId, billing: charged ? "charged" : "failed" } as never,
+            metadata: { mode, scope, projectId, billing: "pending" } as never,
           });
-          if (asstErr && process.env.NODE_ENV !== "production") {
-            console.warn("[chat] assistant message insert:", asstErr.message);
+          if (asstErr) {
+            outputSaved = false;
+            buildFailureReason = asstErr.message;
+            if (process.env.NODE_ENV !== "production") {
+              console.warn("[chat] assistant message insert:", asstErr.message);
+            }
           }
         }
 
-        if (charged && mode === "build" && projectId && event.text) {
+        let savedFileCount = 0;
+        let savedAppName: string | null = null;
+        let savedMeta: ReturnType<typeof extractBuilderMetadata> = null;
+        let savedIconSvg: string | null = null;
+
+        if (mode === "build" && projectId && event.text) {
           const files = parseFencedFiles(event.text);
-          const quality = validateGeneratedBuild(files);
-          buildQualityOk = quality.ok;
           const meta = extractBuilderMetadata(event.text);
-          const appName =
+          savedMeta = meta;
+          let appName =
             meta?.app?.name?.trim() ||
             event.text.match(/##\s*\[planning\][^\n]*\n+([^\n#][^\n]{0,80})/i)?.[1]?.trim() ||
             null;
-          const appSlug = meta?.app?.slug?.trim() || (appName ? slugifyAppName(appName) : null);
-          const appDescription = meta?.app?.description?.trim() ?? null;
 
-          if (files.length > 0) {
-            const rows = files.map((f) => ({
-              project_id: projectId,
-              path: f.path,
-              content: f.content,
-              mime_type: "text/plain",
-              size_bytes: Buffer.byteLength(f.content, "utf8"),
-            }));
-            const { error: afErr } = await writer.from("app_files").upsert(rows, {
-              onConflict: "project_id,path",
-            });
-            if (afErr && process.env.NODE_ENV !== "production") {
-              console.warn("[chat] app_files upsert:", afErr.message);
-            }
-            if (!afErr) {
-              const iconApiUrl = `${getAppUrl().replace(/\/$/, "")}/api/projects/${projectId}/icon`;
-              const svgIcon = appName ? appIconSvgDataUrl(appName, meta?.app?.category) : null;
-              const { data: curProj } = await writer
-                .from("projects")
-                .select("name, slug, metadata")
-                .eq("id", projectId)
-                .maybeSingle();
-              const curName = curProj?.name?.trim() ?? "";
-              const shouldRename =
-                Boolean(appName) && (!curName || /^new app$/i.test(curName) || /^new build$/i.test(curName));
-              const prevMeta =
-                curProj?.metadata && typeof curProj.metadata === "object" && !Array.isArray(curProj.metadata)
-                  ? (curProj.metadata as Record<string, unknown>)
-                  : {};
-              const buildMeta = {
-                ...prevMeta,
-                builder: {
-                  pages: meta?.pages ?? [],
-                  entities: meta?.entities ?? [],
-                  quality,
-                  summary: meta?.summary ?? null,
-                  updated_at: new Date().toISOString(),
-                },
-              };
-              await writer
-                .from("projects")
-                .update(
-                  {
-                    icon_url: iconApiUrl,
-                    app_icon_url: svgIcon,
-                    status: quality.ok ? "draft" : "building",
-                    build_status: quality.ok ? "ready" : "failed",
-                    ...(shouldRename && appName ? { name: appName.slice(0, 80) } : {}),
-                    ...(appSlug && shouldRename ? { slug: appSlug.slice(0, 48) } : {}),
-                    ...(appDescription ? { description: appDescription.slice(0, 500) } : {}),
-                    metadata: buildMeta as Json,
-                  } as never,
-                )
-                .eq("id", projectId)
-                .eq("owner_id", user.id);
-              await allocatePublishedSubdomain(writer, projectId, user.id);
-
-              if (!quality.ok && buildJobId) {
-                await writer
-                  .from("build_jobs")
-                  .update({
-                    status: "failed",
-                    error_message: `Quality check: ${quality.reasons.join("; ")}`,
-                  })
-                  .eq("id", buildJobId);
-              }
-            }
+          if (!appName && userText) {
+            appName = userText
+              .replace(/^(create|build|make)\s+(me\s+)?(a\s+)?/i, "")
+              .split(/[.!?]/)[0]
+              ?.trim()
+              .slice(0, 48) || null;
+          }
+          if (!appName && files.length > 0) {
+            appName = slugifyAppName(userText || "app").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+          }
+          if (appName) {
+            appName = refineAppName(appName, userText || "");
           }
 
-          if (charged && opId) {
-            const { error: ceErr } = await writer.from("credit_events").insert({
-              user_id: user.id,
-              operation_id: opId,
-              model_id: modelId,
-              credits_consumed: tokensNeeded,
-              event_type: "generation",
-              conversation_id: conversationId ?? null,
-            } as never);
-            if (ceErr && process.env.NODE_ENV !== "production") {
-              console.warn("[chat] credit_events insert:", ceErr.message);
+          if (files.length === 0) {
+            buildQualityOk = false;
+            buildFailureReason = "No project files generated";
+          } else {
+            if (!appName) {
+              appName = refineAppName(userText || "Dream App", userText || "");
+            }
+            const quality = validateBuilderOutput(meta, files);
+            const fileQuality = validateGeneratedBuild(files);
+            const hasPreviewHtml = files.some(
+              (f) => /preview\/index\.html$/i.test(f.path) && f.content.length > 150,
+            );
+            if (!quality.ok && process.env.NODE_ENV !== "production") {
+              console.warn("[chat] builder meta quality:", quality.reasons);
+            }
+            if (!fileQuality.ok && !hasPreviewHtml && process.env.NODE_ENV !== "production") {
+              console.warn("[chat] file quality:", fileQuality.reasons);
+            }
+            {
+              const appSlug = meta?.app?.slug?.trim() || slugifyAppName(appName);
+              const appDescription = meta?.app?.description?.trim() ?? null;
+              const rows = files.map((f) => ({
+                project_id: projectId,
+                path: f.path,
+                content: f.content,
+                mime_type: "text/plain",
+                size_bytes: Buffer.byteLength(f.content, "utf8"),
+              }));
+              const { error: afErr } = await writer.from("app_files").upsert(rows, {
+                onConflict: "project_id,path",
+              });
+              if (afErr) {
+                buildQualityOk = false;
+                outputSaved = false;
+                buildFailureReason = afErr.message;
+                if (process.env.NODE_ENV !== "production") {
+                  console.warn("[chat] app_files upsert:", afErr.message);
+                }
+              } else {
+                savedFileCount = files.length;
+                buildQualityOk = true;
+                savedAppName = appName;
+                const svgIcon = appIconSvgDataUrl(appName, meta?.app?.category);
+                savedIconSvg = svgIcon;
+                const iconApiUrl = `${getAppUrl().replace(/\/$/, "")}/api/projects/${projectId}/icon`;
+                await writer
+                  .from("projects")
+                  .update({ icon_url: iconApiUrl, app_icon_url: svgIcon } as never)
+                  .eq("id", projectId)
+                  .eq("owner_id", user.id);
+                await finalizeBuildSuccess({
+                  writer,
+                  userId: user.id,
+                  projectId,
+                  buildJobId,
+                  appName,
+                  appSlug,
+                  appDescription,
+                  iconSvg: svgIcon,
+                  meta,
+                  fileCount: savedFileCount,
+                  creditsCharged: 0,
+                  charged: false,
+                });
+                await allocatePublishedSubdomain(writer, projectId, user.id);
+
+                if (!fileQuality.ok && buildJobId) {
+                  const repair = await runBuildQualityRepair({
+                    writer,
+                    projectId,
+                    buildJobId,
+                    userId: user.id,
+                    files: files.map((f) => ({ path: f.path, content: f.content })),
+                    userPrompt: userText,
+                    generate: async (repairPrompt) => {
+                      const { text } = await generateText({
+                        model: resolveModel(billedModelId),
+                        system: `${systemPrompt}\n\nRepair pass: fix quality issues only. Return fenced files.`,
+                        prompt: repairPrompt,
+                      });
+                      return text;
+                    },
+                  });
+                  if (repair.repaired) {
+                    savedFileCount = repair.fileCount;
+                    buildQualityOk = true;
+                    buildFailureReason = null;
+                  } else if (repair.attempts > 0) {
+                    buildQualityOk = false;
+                    buildFailureReason =
+                      repair.reasons.join("; ") || "Quality repair could not fix all issues";
+                  }
+                }
+              }
             }
           }
         }
 
-        if (buildJobId && charged && buildQualityOk) {
-          await writer
-            .from("build_jobs")
-            .update({
-              status: "succeeded",
-              result_summary: event.text.slice(0, 600),
-              error_message: null,
-            })
-            .eq("id", buildJobId);
+        const shouldCharge =
+          outputSaved &&
+          Boolean(event.text?.trim()) &&
+          (mode !== "build" || savedFileCount > 0);
+
+        let charged = false;
+        let chargeError: string | null = null;
+
+        if (shouldCharge) {
+          const chargeCalc = calculateCreditsToCharge({
+            modelId: billedModelId,
+            mode,
+            inputTokens: event.usage?.inputTokens ?? null,
+            outputTokens: event.usage?.outputTokens ?? null,
+            fileCount: savedFileCount,
+          });
+          const creditsToCharge = chargeCalc.creditsToCharge;
+
+          if (process.env.NODE_ENV !== "production") {
+            console.info("[credits] operation_id", opId);
+            console.info("[credits] provider", routed.provider);
+            console.info("[credits] model", billedModelId);
+            console.info("[credits] mode", mode);
+            console.info("[credits] estimated_provider_cost", chargeCalc.estimatedProviderCostUsd);
+            console.info("[credits] charged_credits", creditsToCharge);
+          }
+
+          const charge = await chargeAiOperation(writer, {
+            userId: user.id,
+            userEmail,
+            amount: creditsToCharge,
+            modelId: billedModelId,
+            mode,
+            operationId: opId,
+            conversationId,
+            projectId,
+            buildJobId,
+            providerCostUsd: chargeCalc.estimatedProviderCostUsd,
+            tokensInput: event.usage?.inputTokens ?? null,
+            tokensOutput: event.usage?.outputTokens ?? null,
+          });
+          charged = charge.charged;
+          chargeError = charge.error ?? null;
+
+          if (charged && mode === "build" && buildJobId && projectId && savedFileCount > 0) {
+            await writer
+              .from("build_jobs")
+              .update({ credits_charged: creditsToCharge } as never)
+              .eq("id", buildJobId);
+            if (savedAppName) {
+              await finalizeBuildSuccess({
+                writer,
+                userId: user.id,
+                projectId,
+                buildJobId,
+                appName: savedAppName,
+                appSlug: savedMeta?.app?.slug?.trim() ?? null,
+                appDescription: savedMeta?.app?.description?.trim() ?? null,
+                iconSvg: savedIconSvg,
+                meta: savedMeta,
+                fileCount: savedFileCount,
+                creditsCharged: creditsToCharge,
+                charged: true,
+              });
+            }
+          }
+
+          if (charged && conversationId) {
+            const { data: lastAsst } = await writer
+              .from("messages")
+              .select("id")
+              .eq("conversation_id", conversationId)
+              .eq("role", "assistant")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (lastAsst?.id) {
+              await writer.from("messages").update({ credits_used: creditsToCharge }).eq("id", lastAsst.id);
+            }
+          } else if (!charged && process.env.NODE_ENV !== "production") {
+            console.warn("[chat] charge after save:", chargeError);
+          }
+        } else {
+          await writer.from("ai_usage_logs").insert({
+            user_id: user.id,
+            user_email: userEmail,
+            model_id: billedModelId,
+            mode,
+            tokens_charged: 0,
+            status: "error",
+            error_message:
+              buildFailureReason ??
+              (mode === "build" ? "Build output not saved — no credits charged" : "No charge — output not saved"),
+            conversation_id: conversationId ?? null,
+            operation_id: opId,
+            project_id: projectId ?? null,
+          } as never);
+        }
+
+        if (buildJobId && mode === "build" && !buildQualityOk) {
+          await finalizeBuildFailed({
+            writer,
+            buildJobId,
+            projectId: projectId ?? undefined,
+            userId: user.id,
+            errorMessage:
+              buildFailureReason ??
+              chargeError ??
+              "Build did not meet quality requirements.",
+          });
         }
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    const response = result.toUIMessageStreamResponse();
+    if (process.env.NODE_ENV !== "production") {
+      response.headers.set("X-DreamOS-Mode", taskMode);
+      response.headers.set("X-DreamOS-Model", billedModelId);
+      response.headers.set("X-DreamOS-Provider", routed.provider);
+      response.headers.set("X-DreamOS-Credits-Estimate", String(tokensNeeded));
+    }
+    return response;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Model unavailable";
     await writer.from("ai_usage_logs").insert({

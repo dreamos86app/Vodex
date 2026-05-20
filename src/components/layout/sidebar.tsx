@@ -167,11 +167,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         >
           <Link
             href="/"
-            className="flex items-center gap-2.5 focus-visible:outline-none"
+            className="flex items-center gap-1.5 focus-visible:outline-none"
             onClick={onMobileClose}
             title="DreamOS86"
           >
-            <LogoIcon size={30} />
+            <LogoIcon size={26} />
             {!collapsed && (
               <span className="truncate text-[13.5px] font-semibold tracking-[-0.03em] text-foreground">
                 DreamOS86

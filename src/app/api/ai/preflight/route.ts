@@ -41,5 +41,9 @@ export async function POST(request: Request) {
     projectId: result.projectId,
     conversationId: result.conversationId,
     tokensRemaining: result.tokensRemaining,
+    creditsEstimate: result.creditsEstimate,
+    creditsEstimateMax: result.creditsEstimateMax,
+    modelId: result.modelId,
+    provider: result.provider,
   });
 }

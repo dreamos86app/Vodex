@@ -8,6 +8,7 @@ export type ChatTransportBody = {
   modelId: string;
   mode: "discuss" | "edit" | "build";
   scope?: string | null;
+  editTarget?: string | null;
   projectId?: string;
   conversationId?: string;
   attachmentIds?: string[];
@@ -50,6 +51,7 @@ export function createDreamChatTransport({
           modelId: extra.modelId,
           mode: extra.mode,
           scope: extra.scope ?? undefined,
+          editTarget: extra.editTarget ?? undefined,
           projectId: extra.projectId,
           conversationId: extra.conversationId,
           attachmentIds: extra.attachmentIds,

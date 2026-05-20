@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import type { AdminUserListRow } from "@/lib/admin/list-users";
@@ -361,8 +362,10 @@ export function AdminUsersPanel() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          ))}
         </div>
       ) : users.length === 0 && !error ? (
         <div className="rounded-xl border border-dashed border-border py-12 text-center text-[13px] text-muted-foreground">

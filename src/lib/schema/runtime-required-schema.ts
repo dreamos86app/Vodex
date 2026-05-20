@@ -1,0 +1,135 @@
+/**
+ * Canonical runtime schema map — keep in sync with
+ * supabase/migrations/20260529120000_full_runtime_schema_repair.sql
+ */
+
+export const RUNTIME_MIGRATION_FILE =
+  "supabase/migrations/20260529120000_full_runtime_schema_repair.sql";
+
+export const RUNTIME_SQL_FALLBACK = "scripts/full-runtime-schema-repair.sql";
+
+export const REQUIRED_TABLES = [
+  "profiles",
+  "onboarding",
+  "projects",
+  "conversations",
+  "messages",
+  "message_attachments",
+  "app_files",
+  "build_jobs",
+  "publish_jobs",
+  "wrap_jobs",
+  "ai_usage_logs",
+  "credit_events",
+  "token_ledger",
+  "admin_actions",
+  "admin_audit_logs",
+  "subscriptions",
+  "contact_requests",
+  "referral_codes",
+  "referrals",
+  "referral_rewards",
+  "project_integrations",
+  "project_secrets",
+  "project_connection_audit",
+] as const;
+
+export type RequiredTable = (typeof REQUIRED_TABLES)[number];
+
+/** table.column probes used by admin schema-health routes */
+export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
+  profiles: [
+    "id",
+    "email",
+    "display_name",
+    "full_name",
+    "username",
+    "avatar_url",
+    "workspace_icon_url",
+    "workspace_name",
+    "plan_id",
+    "subscription_status",
+    "credits_remaining",
+    "monthly_credit_limit",
+    "onboarding_completed",
+    "onboarding_step",
+    "onboarding_answers",
+    "referral_code",
+    "referred_by",
+    "role",
+    "is_admin",
+    "created_at",
+    "updated_at",
+  ],
+  onboarding: [
+    "id",
+    "user_id",
+    "completed",
+    "onboarding_completed",
+    "answers",
+    "created_at",
+    "updated_at",
+  ],
+  projects: [
+    "id",
+    "owner_id",
+    "name",
+    "slug",
+    "description",
+    "icon_url",
+    "app_icon_url",
+    "preview_url",
+    "published_subdomain",
+    "metadata",
+    "status",
+    "build_status",
+    "publish_status",
+  ],
+  conversations: ["id", "user_id", "title", "mode", "model_id", "last_message_at"],
+  messages: ["id", "conversation_id", "user_id", "role", "content", "credits_used"],
+  message_attachments: ["id", "message_id", "user_id", "file_url", "file_name"],
+  app_files: ["id", "project_id", "path", "content"],
+  build_jobs: ["id", "user_id", "project_id", "status", "prompt"],
+  publish_jobs: ["id", "user_id", "project_id", "status", "target"],
+  wrap_jobs: ["id", "user_id", "project_id", "status", "artifact_url"],
+  ai_usage_logs: [
+    "id",
+    "user_id",
+    "user_email",
+    "model_id",
+    "mode",
+    "tokens_charged",
+    "status",
+    "conversation_id",
+    "operation_id",
+  ],
+  credit_events: [
+    "id",
+    "user_id",
+    "operation_id",
+    "model_id",
+    "credits_consumed",
+    "event_type",
+  ],
+  token_ledger: ["id", "user_id", "amount", "source"],
+  admin_actions: ["id", "admin_id", "target_id", "action_type", "created_at"],
+  admin_audit_logs: ["id", "admin_user_id", "action", "created_at"],
+  subscriptions: ["id", "user_id", "plan_id", "status", "stripe_subscription_id"],
+  contact_requests: ["id", "email", "status", "created_at"],
+  referral_codes: ["id", "user_id", "code"],
+  referrals: ["id", "referrer_id", "referred_id", "status"],
+  referral_rewards: ["id", "referral_id", "user_id"],
+  project_integrations: ["id", "project_id", "provider", "status"],
+  project_secrets: ["id", "project_id", "key"],
+  project_connection_audit: ["id", "project_id", "provider", "action"],
+};
+
+export const REQUIRED_RPCS = [
+  "charge_tokens",
+  "charge_credits",
+  "grant_tokens",
+  "grant_credits",
+  "grant_credits_admin",
+  "complete_user_onboarding",
+  "claim_referral_reward",
+] as const;

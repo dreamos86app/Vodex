@@ -28,6 +28,23 @@ const STATUS_CONFIG: Record<Project["status"], { label: string; dot: string; tex
 
 function ProjectCard({ project }: { project: Project }) {
   const cfg = STATUS_CONFIG[project.status];
+  const meta =
+    project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
+      ? (project.metadata as Record<string, unknown>)
+      : {};
+  const appName =
+    (typeof (project as Project & { app_name?: string }).app_name === "string"
+      ? (project as Project & { app_name: string }).app_name
+      : null) ||
+    (typeof meta.app_name === "string" ? meta.app_name : null) ||
+    project.name;
+  const shortDesc =
+    (project as Project & { short_description?: string }).short_description ||
+    project.description;
+  const iconSrc = project.icon_url ?? `/api/projects/${project.id}/icon`;
+  const buildStatus =
+    typeof meta.build_status === "string" ? meta.build_status : project.status;
+
   return (
     <motion.div
       layout
@@ -40,18 +57,26 @@ function ProjectCard({ project }: { project: Project }) {
         aria-label={`Open ${project.name}`}
         className="absolute inset-0 z-0"
       />
-      {/* Gradient header */}
-      <div className={cn("pointer-events-none relative h-24 w-full bg-gradient-to-br", project.gradient, "opacity-80")} />
+      <div className={cn("pointer-events-none relative h-20 w-full bg-gradient-to-br", project.gradient, "opacity-80")} />
 
       <div className="pointer-events-none relative z-[1] flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className="relative size-10 shrink-0 overflow-hidden rounded-xl ring-1 ring-border bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={iconSrc} alt="" className="size-full object-cover" />
+            </div>
+            <div className="min-w-0">
             <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
-              {project.name}
+              {appName}
             </p>
-            {project.description && (
-              <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{project.description}</p>
+            {shortDesc && (
+              <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{shortDesc}</p>
             )}
+            {buildStatus === "completed" && (
+              <p className="mt-1 text-[10px] font-medium text-positive">Ready to preview</p>
+            )}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 rounded-full bg-background px-2 py-0.5">
             <span className={cn("size-1.5 rounded-full", cfg.dot)} />

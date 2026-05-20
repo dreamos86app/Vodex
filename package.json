@@ -10,7 +10,9 @@
     "start": "next start",
     "clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){process.exit(0)}\"",
     "dev:fresh": "npm run clean && npm run dev",
-    "lint": "eslint"
+    "lint": "eslint",
+    "icons:generate": "node scripts/generate-brand-icons.mjs",
+    "icons:check": "node scripts/check-brand-icon-alpha.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.77",
@@ -46,6 +48,8 @@
     "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

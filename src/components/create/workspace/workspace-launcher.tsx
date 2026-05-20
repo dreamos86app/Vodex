@@ -424,7 +424,31 @@ export function WorkspaceLauncher({
 
   const appTitle = project?.name ?? "New build";
   const showAppMenu = Boolean(project?.id);
-  const publishReady = Boolean(project?.id && (project.icon_url || project.preview_url));
+  const [publishReady, setPublishReady] = React.useState(false);
+
+  React.useEffect(() => {
+    const id = project?.id;
+    if (!id) {
+      setPublishReady(false);
+      return;
+    }
+    if (isBusy) return;
+    let cancelled = false;
+    void fetch(`/api/projects/${id}/publish/readiness`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { artifactsReady?: boolean; canPublishWeb?: boolean } | null) => {
+        if (!cancelled && data) {
+          setPublishReady(Boolean(data.artifactsReady ?? data.canPublishWeb));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPublishReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id, isBusy, project?.name]);
+
   const appInitial = (project?.name ?? "A").charAt(0).toUpperCase();
 
   const appSections: Array<{ id: string; label: string; icon: React.ElementType; tab?: WorkspaceRightTab }> = [

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireDreamosOwner } from "@/lib/admin/require-owner";
 import { missingStripeEnvVars } from "@/lib/billing/plans";
+import { fetchSubscriptions, parseAdminPagination } from "@/lib/admin/admin-query-compat";
 
 function maskId(id: string | null): string | null {
   if (!id) return null;
@@ -9,26 +10,29 @@ function maskId(id: string | null): string | null {
   return `${id.slice(0, 6)}…${id.slice(-4)}`;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const gate = await requireDreamosOwner();
   if (gate.error) return gate.error;
+
+  const { limit, offset } = parseAdminPagination(new URL(req.url).searchParams);
 
   try {
     const admin = createSupabaseAdmin();
 
-    const { data: subscriptions, error } = await admin
-      .from("subscriptions")
-      .select(
-        "id,user_id,plan_id,status,current_period_start,current_period_end,cancel_at_period_end,pending_downgrade_plan,stripe_subscription_id,stripe_customer_id,stripe_price_id,created_at",
-      )
-      .order("created_at", { ascending: false })
-      .limit(200);
+    const { rows: subscriptions, error } = await fetchSubscriptions(admin, { limit, offset });
 
     if (error) {
-      return NextResponse.json({ error: error.message, subscriptions: [] }, { status: 500 });
+      return NextResponse.json(
+        {
+          error,
+          subscriptions: [],
+          hint: "Run scripts/admin-column-compat.sql then NOTIFY pgrst, 'reload schema';",
+        },
+        { status: 500 },
+      );
     }
 
-    const userIds = [...new Set((subscriptions ?? []).map((s) => s.user_id))];
+    const userIds = [...new Set(subscriptions.map((s) => s.user_id))];
     const { data: profiles } = userIds.length
       ? await admin.from("profiles").select("id,email,plan_id").in("id", userIds)
       : { data: [] };
@@ -38,11 +42,11 @@ export async function GET() {
     const { data: failedEvents } = await admin
       .from("billing_events")
       .select("id,user_id,event_type,amount_usd,created_at,stripe_event_id")
-      .in("event_type", ["invoice.payment_failed", "invoice.payment_failed"])
+      .eq("event_type", "invoice.payment_failed")
       .order("created_at", { ascending: false })
       .limit(50);
 
-    const rows = (subscriptions ?? []).map((s) => ({
+    const rows = subscriptions.map((s) => ({
       ...s,
       user_email: emailById.get(s.user_id) ?? null,
       stripe_subscription_id_masked: maskId(s.stripe_subscription_id),
@@ -51,6 +55,8 @@ export async function GET() {
 
     return NextResponse.json({
       subscriptions: rows,
+      limit,
+      offset,
       failedPayments: failedEvents ?? [],
       stripe: {
         configured: missingStripeEnvVars().length === 0,

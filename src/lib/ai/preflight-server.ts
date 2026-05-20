@@ -1,7 +1,9 @@
 import type { User } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bootstrapProfileFromOAuth } from "@/lib/auth/profile-bootstrap";
-import { calculateTokens } from "@/lib/credits/cost-engine";
+import { estimateCreditsForOperation } from "@/lib/credits/credit-pricing";
+import { routeModel, mapChatModeToTask } from "@/lib/ai/model-router";
+import { ensureProjectConversation } from "@/lib/projects/project-conversation";
 import { hasAnyLlmProviderKey } from "@/lib/llm/env-keys";
 import { loadProfileBillingRow } from "@/lib/supabase/load-profile-billing";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +20,11 @@ export type PreflightServerResult =
       projectId: string | null;
       conversationId: string | null;
       tokensRemaining: number;
+      creditsEstimate?: number;
+      creditsEstimateMax?: number;
+      modelId?: string;
+      provider?: string;
+      routeReason?: string;
     }
   | {
       ok: false;
@@ -51,47 +58,6 @@ function dbErrorPayload(
     hint: `${msg} — run Supabase migrations for public.${table} and reload the schema cache.`,
     status: schema ? 503 : 500,
   };
-}
-
-async function ensureConversation(
-  writer: SupabaseClient,
-  user: User,
-  conversationId: string | undefined,
-  title: string,
-  modelId: string,
-): Promise<{ id: string } | Extract<PreflightServerResult, { ok: false }>> {
-  if (conversationId) {
-    const { data, error } = await writer
-      .from("conversations")
-      .select("id")
-      .eq("id", conversationId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (error) return dbErrorPayload("conversations", error);
-    if (!data?.id) {
-      return {
-        ok: false,
-        status: 404,
-        error: "Conversation not found",
-        code: "conversation_error",
-        hint: "Start a new thread or pick an existing conversation.",
-      };
-    }
-    return { id: data.id };
-  }
-
-  const { data, error } = await writer
-    .from("conversations")
-    .insert({
-      user_id: user.id,
-      title: title.slice(0, 80) || "New conversation",
-      model_id: modelId,
-    })
-    .select("id")
-    .single();
-
-  if (error || !data?.id) return dbErrorPayload("conversations", error);
-  return { id: data.id };
 }
 
 async function ensureProject(
@@ -233,7 +199,15 @@ export async function runAiPreflightServer(request: Request): Promise<PreflightS
     };
   }
 
-  const tokensNeeded = calculateTokens(modelId, mode);
+  const routedEarly = routeModel(mapChatModeToTask(mode), modelId);
+  const creditEst = estimateCreditsForOperation({
+    mode,
+    modelId: routedEarly.modelId,
+    provider: routedEarly.provider,
+    promptLength: prompt.length,
+    expectedFiles: mode === "build" ? 12 : mode === "edit" ? 4 : 1,
+  });
+  const tokensNeeded = creditEst.creditsMin;
   const balance = billingRow.credits_remaining;
   if (balance < tokensNeeded) {
     return {
@@ -261,15 +235,28 @@ export async function runAiPreflightServer(request: Request): Promise<PreflightS
     projectId = proj.id;
   }
 
-  const conv = await ensureConversation(
+  const conv = await ensureProjectConversation({
     writer,
     user,
-    conversationId ?? undefined,
-    prompt,
+    conversationId: conversationId ?? undefined,
+    projectId: projectId ?? undefined,
+    title: prompt,
     modelId,
-  );
-  if ("ok" in conv) return conv;
+    mode,
+  });
+  if ("error" in conv) {
+    return {
+      ok: false,
+      status: conv.status,
+      error: conv.error,
+      code: conv.code,
+      hint: conv.hint,
+    };
+  }
   conversationId = conv.id;
+
+  const routed = routeModel(mapChatModeToTask(mode), modelId);
+  const billedModel = routed.modelId;
 
   return {
     ok: true,
@@ -277,5 +264,10 @@ export async function runAiPreflightServer(request: Request): Promise<PreflightS
     projectId,
     conversationId,
     tokensRemaining: balance,
+    creditsEstimate: creditEst.creditsMin,
+    creditsEstimateMax: creditEst.creditsMax,
+    modelId: billedModel,
+    provider: routed.provider,
+    routeReason: routed.routeReason,
   };
 }

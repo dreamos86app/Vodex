@@ -17,12 +17,22 @@ export function hasFencedCode(text: string): boolean {
   return /```[\w]*\n?[\s\S]*?```/.test(text);
 }
 
-/** Replace fenced blocks with a short hint for the chat stream. */
+/** Strip fenced code from chat stream; show compact file list instead of raw source. */
 export function stripFencedCodeForChat(text: string): string {
   if (!text.trim()) return text;
-  return text
-    .replace(/```[\w]*\n?[\s\S]*?```/g, "\n\n(Source excerpt moved to the Code tab.)\n\n")
+  const files = parseFencedFiles(text);
+  const stripped = text
+    .replace(/```dreamos-app-meta[\s\S]*?```/gi, "")
+    .replace(/```json[\s\S]*?```/gi, "")
+    .replace(/```[\w-]*\n?[\s\S]*?```/g, "")
+    .replace(/\{[\s\S]*?"app"\s*:[\s\S]*?\}/g, "")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
+  if (files.length === 0) return stripped;
+  const lines = files.slice(0, 14).map((f) => `• ${f.path}`);
+  if (files.length > 14) lines.push(`• …and ${files.length - 14} more files`);
+  const block = ["", "Files (see Code tab for source):", ...lines].join("\n");
+  return (stripped + block).trim();
 }
 
 /** Parsed file path + body from markdown fences (build mode persistence). */

@@ -10,12 +10,15 @@ export type BuilderAppMeta = {
 
 export type BuilderOutputContract = {
   app?: BuilderAppMeta;
+  build_plan?: Array<{ id?: string; title?: string; summary?: string }>;
   plan?: string[];
   steps?: string[];
-  pages?: string[];
-  entities?: string[];
+  pages?: string[] | Array<Record<string, unknown>>;
+  entities?: string[] | Array<Record<string, unknown>>;
   files?: Array<{ path: string; action?: string }>;
   preview?: Record<string, unknown>;
+  dashboard?: Record<string, unknown>;
+  publish?: Record<string, unknown>;
   summary?: string;
 };
 

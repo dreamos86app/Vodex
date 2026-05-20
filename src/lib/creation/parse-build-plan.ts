@@ -1,12 +1,14 @@
 import { stripFencedCodeForChat } from "@/lib/creation/extract-fenced-code";
+import { stripMarkdownNoise } from "@/lib/projects/project-context";
 
 const DEFAULT_TASK_LABELS = [
-  "Planning app",
-  "Designing interface",
-  "Creating screens",
-  "Connecting data",
+  "Planning",
+  "Creating identity",
+  "Designing screens",
+  "Creating data model",
+  "Wiring actions",
   "Preparing preview",
-  "Finalizing",
+  "Final polish",
 ] as const;
 
 /** Phase headers from assistant `## [phase]` blocks (build mode). */
@@ -51,12 +53,18 @@ export type BuildPlanCard = {
   taskLabels: string[];
 };
 
+function cleanPlanLine(line: string | null): string | null {
+  if (!line) return null;
+  const cleaned = stripMarkdownNoise(line);
+  return cleaned || null;
+}
+
 export function parseBuildPlanCard(rawAssistantText: string): BuildPlanCard {
   const text = stripFencedCodeForChat(rawAssistantText);
-  const phases = extractPhaseLabels(rawAssistantText);
-  const summary = extractPlanningSummary(rawAssistantText);
-  const architecture = extractArchitectureSummary(rawAssistantText);
-  const iconConcept = extractIconConcept(text);
+  const phases = extractPhaseLabels(rawAssistantText).map((p) => stripMarkdownNoise(p));
+  const summary = cleanPlanLine(extractPlanningSummary(rawAssistantText));
+  const architecture = cleanPlanLine(extractArchitectureSummary(rawAssistantText));
+  const iconConcept = cleanPlanLine(extractIconConcept(text));
   const taskLabels =
     phases.length >= 3 ? phases : [...DEFAULT_TASK_LABELS];
   return {

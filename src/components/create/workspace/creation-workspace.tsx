@@ -50,6 +50,7 @@ import { AgentPhases } from "@/components/create/workspace/agent-phases";
 import { BuildTimeline } from "@/components/create/workspace/build-timeline";
 import { BuildStatusNarrator } from "@/components/create/workspace/build-status-narrator";
 import { AppDashboardPanel } from "@/components/create/workspace/app-dashboard-panel";
+import { DreamOS86BrandIcon } from "@/components/brand/dreamos86-brand-icon";
 import { extractFencedCode } from "@/lib/creation/extract-fenced-code";
 import { toast } from "@/lib/toast";
 
@@ -468,7 +469,7 @@ export function CreationWorkspace({
     const title = firstMessage.slice(0, 80) || "New conversation";
     const { data, error: insertErr } = await supabase
       .from("conversations")
-      .insert({ user_id: profile.id, title, model_id: modelId })
+      .insert({ user_id: profile.id, title, model_id: modelId, project_id: null, mode: null })
       .select("id")
       .single();
     if (insertErr || !data) return null;
@@ -992,14 +993,7 @@ function EmptyHero({
       className="mx-auto max-w-2xl py-10 text-center"
     >
       <div className="mx-auto mb-5 flex size-14 items-center justify-center">
-        <Image
-          src="/logo.png"
-          alt=""
-          width={56}
-          height={56}
-          className="object-contain"
-          priority
-        />
+        <DreamOS86BrandIcon size={56} priority />
       </div>
       <h1 className="text-[26px] font-semibold tracking-[-0.04em] text-foreground">
         {mode === "discuss"

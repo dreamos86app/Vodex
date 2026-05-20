@@ -117,7 +117,7 @@ export async function listAdminUsers(options: {
   limit?: number;
 }): Promise<{ users: AdminUserListRow[]; error?: string; warning?: string }> {
   const admin = createSupabaseAdmin();
-  const limit = Math.min(options.limit ?? 500, 500);
+  const limit = Math.min(options.limit ?? 50, 200);
   const q = options.q?.trim().toLowerCase();
 
   const authUsers: Array<{

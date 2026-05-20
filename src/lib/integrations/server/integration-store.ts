@@ -15,6 +15,15 @@ export type IntegrationProvider =
 
 export type IntegrationStatus = "disconnected" | "needs_config" | "connected" | "error";
 
+export type IntegrationRow = {
+  provider: string;
+  status: string;
+  display_name: string | null;
+  metadata: Record<string, unknown>;
+  last_tested_at: string | null;
+  updated_at: string;
+};
+
 export async function writeConnectionAudit(opts: {
   projectId: string;
   ownerId: string;
@@ -77,6 +86,7 @@ export async function saveProjectSecret(opts: {
       provider: opts.provider,
       key_name: opts.keyName,
       ciphertext: sealed,
+      encrypted_value: sealed,
       masked_value: masked,
       updated_at: new Date().toISOString(),
     } as never,
@@ -97,12 +107,41 @@ export async function deleteProviderSecrets(opts: {
     .eq("provider", opts.provider);
 }
 
-export async function listProjectIntegrations(projectId: string) {
+export async function listProjectIntegrations(projectId: string): Promise<IntegrationRow[]> {
   const admin = getIntegrationAdmin();
-  const { data, error } = await admin
+  const primary = await admin
     .from("project_integrations")
     .select("provider, status, display_name, metadata, last_tested_at, updated_at")
     .eq("project_id", projectId);
-  if (error) throw new Error(error.message);
-  return data ?? [];
+
+  if (!primary.error) {
+    return (primary.data ?? []).map((r) => ({
+      provider: r.provider,
+      status: r.status,
+      display_name: r.display_name,
+      metadata: (r.metadata ?? {}) as Record<string, unknown>,
+      last_tested_at: r.last_tested_at,
+      updated_at: r.updated_at,
+    }));
+  }
+
+  if (!primary.error.message.includes("display_name")) {
+    throw new Error(primary.error.message);
+  }
+
+  const fallback = await admin
+    .from("project_integrations")
+    .select("provider, status, metadata, last_tested_at, updated_at")
+    .eq("project_id", projectId);
+
+  if (fallback.error) throw new Error(fallback.error.message);
+
+  return (fallback.data ?? []).map((r) => ({
+    provider: r.provider,
+    status: r.status,
+    display_name: (r.metadata as Record<string, unknown> | null)?.display_name as string | null ?? r.provider,
+    metadata: (r.metadata ?? {}) as Record<string, unknown>,
+    last_tested_at: r.last_tested_at,
+    updated_at: r.updated_at,
+  }));
 }

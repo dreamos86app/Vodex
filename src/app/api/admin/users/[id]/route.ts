@@ -59,13 +59,24 @@ export async function GET(
 
   const admin = createSupabaseAdmin();
 
-  const [usageRes, jobsRes, ledgerRes] = await Promise.all([
-    admin
-      .from("ai_usage_logs")
-      .select("id,created_at,model_id,tokens_charged,status")
-      .eq("user_id", id)
-      .order("created_at", { ascending: false })
-      .limit(25),
+  const usagePrimary = await admin
+    .from("ai_usage_logs")
+    .select("id,created_at,model_id,tokens_charged,status")
+    .eq("user_id", id)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  const usageRes =
+    usagePrimary.error?.message?.includes("tokens_charged")
+      ? await admin
+          .from("ai_usage_logs")
+          .select("id,created_at,model_id,credits_charged,status")
+          .eq("user_id", id)
+          .order("created_at", { ascending: false })
+          .limit(25)
+      : usagePrimary;
+
+  const [jobsRes, ledgerRes] = await Promise.all([
     admin
       .from("build_jobs")
       .select("id,created_at,status,project_id")

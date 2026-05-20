@@ -43,8 +43,14 @@ type PublishApiPayload = {
 };
 
 type ReadinessPayload = {
-  issues: Array<{ severity: string; code: string; message: string }>;
+  issues?: Array<{ severity: string; title?: string; detail?: string; code?: string; message?: string }>;
   fileCount: number;
+  canPublishWeb?: boolean;
+  artifactsReady?: boolean;
+  blockers?: string[];
+  buildStatus?: string | null;
+  buildCompleted?: boolean;
+  appName?: string | null;
   error?: string;
 };
 
@@ -224,7 +230,15 @@ export function PublishModal({
   const androidLocked = !proOrHigher(planId);
   const publicUrl = publishInfo?.publicWebUrl ?? null;
   const customAllowed = publishInfo?.customDomainAllowed ?? false;
-  const webPublishLocked = !projectId || !artifactsReady;
+  const canPublish = Boolean(readiness?.canPublishWeb ?? readiness?.artifactsReady);
+  const webPublishLocked = !projectId || (!canPublish && !artifactsReady);
+  const publishBlockerLabel =
+    readiness?.blockers?.[0] ??
+    (readiness?.fileCount === 0 && readiness?.buildStatus === "completed"
+      ? "Build saved no files — check build logs"
+      : !readiness?.buildCompleted
+        ? "Finish a successful build first"
+        : "Complete build requirements to publish");
 
   if (!open || typeof document === "undefined") return null;
 
@@ -268,9 +282,19 @@ export function PublishModal({
           {!artifactsReady && (
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-900 dark:text-amber-100">
               <Lock className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
-              <p>
-                Web publish needs generated app files or a working preview. Finish a build, then return here.
-              </p>
+              <div>
+                <p>Web publish is not ready yet. Finish a successful build first.</p>
+                {readiness?.blockers && readiness.blockers.length > 0 && (
+                  <ul className="mt-1.5 list-inside list-disc text-[11px]">
+                    {readiness.blockers.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+                {readiness?.fileCount != null && (
+                  <p className="mt-1 text-[11px] opacity-80">{readiness.fileCount} generated file(s)</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -340,7 +364,7 @@ export function PublishModal({
                   disabled={posting}
                   onClick={() => {
                     if (webPublishLocked) {
-                      toast.info("Generate a preview or app icon first — then you can publish to the web.");
+                      toast.info(publishBlockerLabel);
                       return;
                     }
                     void ensureWebPublish();
@@ -353,12 +377,16 @@ export function PublishModal({
                 >
                   {posting ? (
                     <Loader2 className="size-4 animate-spin" />
+                  ) : webPublishLocked ? (
+                    <Lock className="size-4 shrink-0" />
                   ) : (
-                    <span className="text-lg leading-none" aria-hidden>
-                      {webPublishLocked ? "—" : "🚀"}
-                    </span>
+                    <Rocket className="size-4 shrink-0" />
                   )}
-                  {publicUrl ? "Refresh live URL" : "Publish to web"}
+                  {publicUrl
+                    ? "Refresh live URL"
+                    : webPublishLocked
+                      ? "Publish to web (not ready)"
+                      : "Publish to web"}
                 </motion.button>
 
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -500,9 +528,9 @@ export function PublishModal({
                       No blockers detected — run a build that saves files first if this stays empty.
                     </li>
                   )}
-                  {readiness?.issues.map((issue, i) => (
+                  {(readiness?.issues ?? []).map((issue, i) => (
                     <li
-                      key={`${issue.code}-${i}`}
+                      key={`${issue.code ?? issue.title ?? i}-${i}`}
                       className="flex gap-2 rounded-lg bg-background/80 px-2 py-1.5 text-[11.5px] ring-1 ring-border/60"
                     >
                       <AlertTriangle
@@ -512,7 +540,7 @@ export function PublishModal({
                         )}
                         strokeWidth={1.75}
                       />
-                      <span>{issue.message}</span>
+                      <span>{issue.message ?? issue.detail ?? issue.title}</span>
                     </li>
                   ))}
                 </ul>

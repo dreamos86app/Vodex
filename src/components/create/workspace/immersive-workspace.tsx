@@ -35,7 +35,7 @@ import {
 import { calculateTokens } from "@/lib/credits/cost-engine";
 import { toast } from "@/lib/toast";
 import { createDreamChatTransport } from "@/lib/chat/create-chat-transport";
-import { runAiPreflight } from "@/lib/ai/run-preflight";
+import { runAiPreflightDeduped } from "@/lib/ai/preflight-inflight";
 import { isAiPreflightSuccess, preflightBlockedLabel } from "@/lib/ai/preflight-types";
 import { applyComposerPaste } from "@/lib/composer/textarea-handlers";
 import { composerTextareaClass } from "@/components/ui/composer-shell";
@@ -44,7 +44,8 @@ import { ModeSwitch, type EditScope } from "@/components/create/workspace/mode-s
 import { AttachmentRail, DropZone, type Attachment } from "@/components/create/workspace/attachment-rail";
 import { PreviewPanel } from "@/components/create/workspace/preview-panel";
 import { BuildStatusNarrator } from "@/components/create/workspace/build-status-narrator";
-import { BuilderAssistantMessage } from "@/components/builder/builder-event-ui";
+import { BuilderAssistantMessage, QueuedPromptCard } from "@/components/builder/builder-event-ui";
+import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
 import {
   parseBuildPlanCard,
   taskProgressIndex,
@@ -55,6 +56,10 @@ import { IntegrationSecretsPanel } from "@/components/create/workspace/integrati
 import { detectRequiredSecretNames } from "@/lib/integrations/detect-required-secrets";
 import { WorkspaceLauncher, type WorkspaceRightTab } from "@/components/create/workspace/workspace-launcher";
 import { AppDashboardPanel } from "@/components/create/workspace/app-dashboard-panel";
+import { CodeExplorerPanel, type CodeExplorerFile } from "@/components/create/workspace/code-explorer-panel";
+import { findProjectConversationId } from "@/lib/projects/project-conversation";
+import { consumeAutostartHandoff } from "@/lib/create/autostart-handoff";
+import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build";
 import { resolveDisplayName } from "@/lib/profile-display";
 import { extractFencedCode, stripFencedCodeForChat, parseFencedFiles } from "@/lib/creation/extract-fenced-code";
 import { submitDebug, uiSubmitLog } from "@/lib/dev/submit-debug";
@@ -101,78 +106,6 @@ const PLAN_NEXT_LABEL: Record<string, string> = {
   enterprise: "Infinity",
 };
 
-function CodeRightPanel({
-  files,
-  fallbackText,
-}: {
-  files: Array<{ path: string; content: string }>;
-  fallbackText: string;
-}) {
-  const [activePath, setActivePath] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (files.length > 0) {
-      setActivePath((prev) => {
-        if (prev && files.some((f) => f.path === prev)) return prev;
-        return files[0]!.path;
-      });
-    } else {
-      setActivePath(null);
-    }
-  }, [files]);
-
-  if (files.length === 0 && !fallbackText.trim()) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <Code2 className="size-8 text-muted-foreground/40" strokeWidth={1.25} />
-        <p className="text-[13px] font-medium text-foreground">No code blocks yet</p>
-        <p className="max-w-sm text-[12px] leading-relaxed text-muted-foreground">
-          When the assistant returns fenced ``` source, it will show here. Plain chat stays in the left panel.
-        </p>
-      </div>
-    );
-  }
-
-  const active = files.find((f) => f.path === activePath);
-
-  if (files.length === 0) {
-    return (
-      <pre className="h-full overflow-auto p-4 text-[11px] leading-relaxed text-foreground [scrollbar-gutter:stable]">
-        {fallbackText}
-      </pre>
-    );
-  }
-
-  return (
-    <div className="flex h-full min-h-0 overflow-hidden">
-      <div className="w-[min(40%,220px)] shrink-0 overflow-y-auto border-r border-border bg-surface/50 py-2 text-[11px]">
-        <p className="sticky top-0 z-10 bg-surface/95 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Files ({files.length})
-        </p>
-        <ul className="space-y-px px-1">
-          {files.map((f) => (
-            <li key={f.path}>
-              <button
-                type="button"
-                onClick={() => setActivePath(f.path)}
-                className={cn(
-                  "w-full cursor-pointer truncate rounded-md px-2 py-1.5 text-left transition",
-                  f.path === activePath ? "bg-accent/15 font-medium text-foreground" : "text-muted-foreground hover:bg-surface",
-                )}
-              >
-                {f.path}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <pre className="min-w-0 flex-1 overflow-auto p-4 text-[11px] leading-relaxed text-foreground [scrollbar-gutter:stable]">
-        {active?.content ?? ""}
-      </pre>
-    </div>
-  );
-}
-
 function MessageBubble({
   message,
   userAvatar,
@@ -190,63 +123,85 @@ function MessageBubble({
 }) {
   const isUser = message.role === "user";
   const raw = messageText(message);
-  const text =
-    !isUser && mode === "build" ? stripFencedCodeForChat(raw) : raw;
-  const buildMeta = !isUser && mode === "build" ? extractBuilderMetadata(raw) : null;
-  const buildPlan = !isUser && mode === "build" ? parseBuildPlanCard(raw) : null;
+  const text = !isUser ? stripFencedCodeForChat(raw) : raw;
+  const buildMeta = !isUser ? extractBuilderMetadata(raw) : null;
+  const buildPlan = !isUser ? parseBuildPlanCard(raw) : null;
+  const useCards =
+    !isUser &&
+    (mode === "build" ||
+      Boolean(buildMeta) ||
+      Boolean(buildPlan) ||
+      /##\s*\[(planning|design|frontend|polish)\]/i.test(raw) ||
+      raw.includes("dreamos-app-meta"));
   const progressIndex =
     buildPlan && mode === "build"
       ? taskProgressIndex(raw.length, buildPlan.taskLabels.length)
       : 0;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-      className={cn("group flex gap-2.5", isUser && "flex-row-reverse")}
-    >
-      <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-border">
-        {isUser ? (
-          userAvatar ? (
+  if (isUser) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={cn("group flex gap-2.5 flex-row-reverse")}
+      >
+        <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-border">
+          {userAvatar ? (
             <Image src={userAvatar} alt={userName} width={24} height={24} className="size-full object-cover" unoptimized />
           ) : (
             <span className="text-[9px] font-semibold text-foreground">{userName.slice(0, 1).toUpperCase()}</span>
-          )
-        ) : (
-          <div className="flex size-full items-center justify-center bg-gradient-to-br from-accent/30 to-accent/10">
-            <Sparkles className="size-3 text-accent" strokeWidth={1.75} />
-          </div>
-        )}
-      </div>
-
-      {isUser ? (
+          )}
+        </div>
         <div className="min-w-0 max-w-[82%] rounded-xl bg-accent px-3 py-2 text-[13px] leading-relaxed text-white">
           {text}
         </div>
-      ) : (
-        <div className="min-w-0 flex-1">
-          {!text ? (
-            <div className="rounded-xl bg-surface px-3 py-2 text-[13px] text-muted-foreground ring-1 ring-border">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="size-1.5 animate-pulse rounded-full bg-accent" />
-                Working on your app…
-              </span>
-            </div>
-          ) : mode === "build" && buildPlan ? (
-            <BuilderAssistantMessage
-              text={text}
-              streaming={streaming}
-              meta={buildMeta}
-              plan={buildPlan}
-              progressIndex={progressIndex}
-              creditsUsed={creditsUsed}
-            />
-          ) : (
-            <div className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{text}</div>
-          )}
-        </div>
-      )}
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="group">
+      <DreamOSMessageShell
+        mode={mode}
+        status={streaming ? "thinking" : text ? "done" : "thinking"}
+      >
+        {!text && streaming ? (
+          <div className="rounded-xl bg-surface/80 px-3 py-2.5 text-[13px] text-muted-foreground ring-1 ring-border/60">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-1.5 animate-pulse rounded-full bg-accent" />
+              Planning your build…
+            </span>
+          </div>
+        ) : useCards && (buildPlan || buildMeta || streaming) ? (
+          <BuilderAssistantMessage
+            text={raw}
+            streaming={streaming}
+            meta={buildMeta}
+            plan={
+              buildPlan ?? {
+                summary: buildMeta?.summary ?? "Building your app",
+                architecture: null,
+                iconConcept: null,
+                phases: [],
+                taskLabels: [
+                  "Planning",
+                  "App identity",
+                  "Data model",
+                  "Screens",
+                  "Actions",
+                  "Preview polish",
+                ],
+              }
+            }
+            progressIndex={progressIndex}
+            creditsUsed={creditsUsed}
+          />
+        ) : (
+          <div className="rounded-xl bg-surface/80 px-3 py-2.5 text-[13.5px] leading-relaxed text-foreground ring-1 ring-border/50">
+            {text}
+          </div>
+        )}
+      </DreamOSMessageShell>
     </motion.div>
   );
 }
@@ -306,12 +261,14 @@ export function ImmersiveWorkspace({
   const [mode, setMode] = React.useState<CreationMode>(initialMode);
   const [modelId, setModelId] = React.useState(DEFAULT_MODEL_ID);
   const [scope, setScope] = React.useState<EditScope | null>(null);
+  const [editTarget, setEditTarget] = React.useState<string | null>(null);
   const [attachments, setAttachments] = React.useState<Attachment[]>([]);
   const [creditError, setCreditError] = React.useState(false);
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [localProjectId, setLocalProjectId] = React.useState<string | null>(null);
   const [autoStartFailed, setAutoStartFailed] = React.useState<string | null>(null);
   const autoStartedRef = React.useRef(false);
+  const autostartConsumedRef = React.useRef(false);
   const userPinnedScrollRef = React.useRef(false);
   const [showJumpToLatest, setShowJumpToLatest] = React.useState(false);
   const [rightTab, setRightTab] = React.useState<WorkspaceRightTab>("preview");
@@ -373,8 +330,10 @@ export function ImmersiveWorkspace({
   }, [project?.id]);
   const modeRef = React.useRef(mode);
   const scopeRef = React.useRef<EditScope | null>(scope);
+  const editTargetRef = React.useRef<string | null>(null);
   modeRef.current = mode;
   scopeRef.current = scope;
+  editTargetRef.current = editTarget;
 
   const modelIdRef = React.useRef(modelId);
   modelIdRef.current = modelId;
@@ -389,7 +348,8 @@ export function ImmersiveWorkspace({
         getBody: () => ({
           modelId: modelIdRef.current,
           mode: modeRef.current,
-          scope: scopeRef.current,
+          scope: scopeRef.current ?? undefined,
+          editTarget: editTargetRef.current ?? undefined,
           projectId: projectIdRef.current ?? undefined,
           conversationId: conversationIdRef.current ?? undefined,
         }),
@@ -405,6 +365,9 @@ export function ImmersiveWorkspace({
           const label = String(status);
           setLastApiStatus(label);
           setChatState(label.startsWith("blocked") ? "error" : "ok");
+          if (typeof status === "number" && status >= 400) {
+            unlockStream();
+          }
           uiSubmitLog("create", `chat status ${status}`);
           submitDebug("create", "response status", { status });
         },
@@ -412,48 +375,211 @@ export function ImmersiveWorkspace({
     [],
   );
 
-  const { messages, sendMessage, status, error, clearError, regenerate } = useChat({
+  const streamActiveRef = React.useRef(false);
+  const [streamActive, setStreamActive] = React.useState(false);
+  const promptQueueRef = React.useRef<Array<{ id: string; text: string }>>([]);
+  const [queueCount, setQueueCount] = React.useState(0);
+  const [queuedPrompts, setQueuedPrompts] = React.useState<Array<{ id: string; text: string }>>([]);
+  const [buildStarting, setBuildStarting] = React.useState(false);
+  const [preflightEstimate, setPreflightEstimate] = React.useState<{
+    credits: number;
+    creditsMax: number;
+    modelId: string;
+    provider: string;
+  } | null>(null);
+  const [projectFiles, setProjectFiles] = React.useState<CodeExplorerFile[]>([]);
+  const [projectFilesLoading, setProjectFilesLoading] = React.useState(false);
+  const [projectDataRefresh, setProjectDataRefresh] = React.useState(0);
+  const [histLoading, setHistLoading] = React.useState(false);
+  const [postBuildActive, setPostBuildActive] = React.useState(false);
+  const [qualityRepairing, setQualityRepairing] = React.useState(false);
+
+  const unlockStream = React.useCallback(() => {
+    streamActiveRef.current = false;
+    setStreamActive(false);
+  }, []);
+
+  const drainPromptQueueRef = React.useRef<() => void>(() => {});
+
+  const { messages, sendMessage, status, error, clearError, regenerate, setMessages } = useChat({
     id: `dream-create-${createSessionId}`,
     transport,
     onError: (err) => {
+      unlockStream();
       if (process.env.NODE_ENV !== "production") {
         console.error("[create-workspace] stream error", err);
       }
       toast.error(err.message ?? "Generation failed — try again.");
+      setTimeout(() => drainPromptQueueRef.current(), 300);
     },
     onFinish: () => {
-      const cost = calculateTokens(modelIdRef.current, modeRef.current);
-      deductOptimistic(cost);
-      if (uid) void syncFromDB(uid, { force: true });
+      if (mode === "build") setPostBuildActive(true);
+      unlockStream();
+      setSubmitStatusLabel("Done");
+      const beforeCredits = useCreditsStore.getState().remaining;
+      if (uid) {
+        void syncFromDB(uid, { force: true }).then(() => {
+          const after = useCreditsStore.getState().remaining;
+          if (after < beforeCredits) {
+            toast.success(`Charged ${beforeCredits - after} credits`);
+          }
+          if (process.env.NODE_ENV !== "production") {
+            submitDebug("create", "stream done", {
+              creditsBefore: beforeCredits,
+              creditsAfter: after,
+            });
+          }
+          setTimeout(() => drainPromptQueueRef.current(), 400);
+        });
+      } else {
+        setTimeout(() => drainPromptQueueRef.current(), 400);
+      }
+      setProjectDataRefresh((n) => n + 1);
+      const pid = projectIdRef.current;
+      if (uid && pid) {
+        void reconcileProjectBuildState(supabase, pid, uid).then(() => {
+          setProjectDataRefresh((n) => n + 1);
+        });
+      }
     },
   });
-  const isBusy = status === "submitted" || status === "streaming";
+
+  React.useEffect(() => {
+    if (status === "ready" || status === "error") unlockStream();
+  }, [status, unlockStream]);
+
+  React.useEffect(() => {
+    if (!streamActive) return;
+    const t = setTimeout(() => {
+      unlockStream();
+      submitDebug("create", "stream safety unlock");
+    }, 300_000);
+    return () => clearTimeout(t);
+  }, [streamActive, unlockStream]);
+
+  const isStreaming = streamActive || status === "submitted" || status === "streaming";
+  const isBusy =
+    isStreaming || buildStarting || preflightState === "pending" || postBuildActive;
+
+  React.useEffect(() => {
+    const pid = effectiveProjectId;
+    if (!pid || !postBuildActive) return;
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      const { data: job } = await supabase
+        .from("build_jobs")
+        .select("status, error_message")
+        .eq("project_id", pid)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      const st = job?.status ?? null;
+      setQualityRepairing(st === "repairing");
+      if (
+        st === "completed" ||
+        st === "failed" ||
+        st === "completed_with_errors" ||
+        st === "succeeded" ||
+        attempts >= 20
+      ) {
+        setPostBuildActive(false);
+        setQualityRepairing(false);
+        setProjectDataRefresh((n) => n + 1);
+        return;
+      }
+    };
+    void poll();
+    const id = setInterval(() => void poll(), 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [postBuildActive, effectiveProjectId, supabase]);
+
+  const loadProjectFiles = React.useCallback(async (projectId: string) => {
+    setProjectFilesLoading(true);
+    const { data, error: fErr } = await supabase
+      .from("app_files")
+      .select("path, content")
+      .eq("project_id", projectId)
+      .order("path");
+    if (!fErr && data) {
+      setProjectFiles(data.map((r) => ({ path: r.path, content: r.content ?? "" })));
+    }
+    setProjectFilesLoading(false);
+  }, [supabase]);
 
   React.useEffect(() => {
     const id = effectiveProjectId;
-    if (!id || isBusy) return;
+    if (!id) return;
     let cancelled = false;
-    void supabase
-      .from("projects")
-      .select(
-        "id, name, preview_url, icon_url, gradient, status, framework, custom_domain, is_public, metadata, published_subdomain",
-      )
-      .eq("id", id)
-      .maybeSingle()
-      .then(({ data, error: qErr }) => {
-        if (cancelled || qErr || !data) return;
-        setRemoteProjectPatch(data as CreateWorkspaceProject);
-      });
+    void (async () => {
+      if (!isBusy) {
+        const { data, error: qErr } = await supabase
+          .from("projects")
+          .select(
+            "id, name, preview_url, icon_url, gradient, status, framework, custom_domain, is_public, metadata, published_subdomain, app_name, build_status, short_description, category, icon_svg",
+          )
+          .eq("id", id)
+          .maybeSingle();
+        if (!cancelled && !qErr && data) {
+          const patch = data as CreateWorkspaceProject & { app_name?: string | null };
+          setRemoteProjectPatch({
+            ...patch,
+            name: patch.app_name?.trim() || patch.name,
+          });
+        }
+        await loadProjectFiles(id);
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [effectiveProjectId, isBusy, supabase]);
+  }, [effectiveProjectId, supabase, projectDataRefresh, loadProjectFiles]);
+
+  const convHydratedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const id = effectiveProjectId;
+    if (!id || !uid || autostartConsumedRef.current) return;
+    const key = `${id}:${uid}`;
+    if (convHydratedRef.current === key) return;
+    let cancelled = false;
+    setHistLoading(true);
+    void (async () => {
+      const convId = await findProjectConversationId(supabase, uid, id);
+      if (cancelled) return;
+      convHydratedRef.current = key;
+      if (convId) {
+        setConversationId(convId);
+        const { data: rows } = await supabase
+          .from("messages")
+          .select("id, role, content")
+          .eq("conversation_id", convId)
+          .order("created_at", { ascending: true });
+        if (!cancelled && rows && rows.length > 0) {
+          setMessages(
+            rows.map((m) => ({
+              id: m.id,
+              role: m.role as "user" | "assistant",
+              parts: [{ type: "text" as const, text: m.content }],
+            })),
+          );
+        }
+      }
+      if (!cancelled) setHistLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveProjectId, uid, supabase, setMessages]);
 
   React.useEffect(() => {
     submitDebug("create", "mounted");
     pushSubmitTrace("create", "ImmersiveWorkspace loaded — submit pipeline active", { level: "ok" });
-    if (uid) void syncFromDB(uid);
-  }, [uid, syncFromDB]);
+  }, []);
 
   React.useEffect(() => {
     submitDebug("create", "mode changed", { mode });
@@ -462,7 +588,7 @@ export function ImmersiveWorkspace({
 
   const trimmedInput = input.trim();
   const tokenBlocked = isConfirmed && remaining <= 0;
-  const submitDisabledReason = !trimmedInput ? "empty" : isBusy ? "busy" : null;
+  const submitDisabledReason = !trimmedInput ? "empty" : tokenBlocked ? "credits" : null;
 
   const tokensStatus = !isConfirmed ? "loading" : tokenBlocked ? "blocked" : `${remaining}`;
   const planId = profile?.plan_id ?? "free";
@@ -537,25 +663,47 @@ export function ImmersiveWorkspace({
     setDebugBlocked(reason);
     if (reason === "empty") {
       failSubmit("blocked:empty", "Type a message before sending.");
-    } else if (reason === "busy") {
-      failSubmit("blocked:busy", "Please wait for the current generation to finish.");
     }
   }
 
-  const runSubmit = React.useCallback(async (source: "button" | "enter" | "form" | "url-auto" = "button") => {
+  function enqueuePrompt(text: string) {
+    const item = { id: crypto.randomUUID(), text };
+    promptQueueRef.current.push(item);
+    setQueuedPrompts((prev) => [...prev, item]);
+    setQueueCount(promptQueueRef.current.length);
+    setInput("");
+    toast.info("Queued — will run after the current build.");
+  }
+
+  function cancelQueuedPrompt(id: string) {
+    promptQueueRef.current = promptQueueRef.current.filter((q) => q.id !== id);
+    setQueuedPrompts((prev) => prev.filter((q) => q.id !== id));
+    setQueueCount(promptQueueRef.current.length);
+  }
+
+  const runSubmit = React.useCallback(async (
+    source: "button" | "enter" | "form" | "url-auto" = "button",
+    overrideText?: string,
+  ) => {
     setDebugClicked(true);
     setSubmitStatusLabel("Submit started");
+    const text = (overrideText ?? input).trim();
 
+    if (streamActiveRef.current) {
+      if (!text) {
+        notifySubmitBlocked("empty");
+        return;
+      }
+      enqueuePrompt(text);
+      return;
+    }
     if (submitInFlightRef.current) {
-      setDebugBlocked("busy");
-      notifySubmitBlocked("busy");
-      setSubmitStatusLabel("Failed: A request is already in progress");
+      setSubmitStatusLabel("Submit already in progress");
       return;
     }
     setDebugSubmitted(true);
     uiSubmitLog("create", "handleSubmit start", { source });
     submitDebug("create", "handleSubmit start", { source });
-    const text = input.trim();
     submitDebug("create", "submit guard check", { empty: !text, busy: isBusy, mode });
 
     if (!text) {
@@ -564,14 +712,18 @@ export function ImmersiveWorkspace({
       setSubmitStatusLabel("Failed: Type a message before building");
       return;
     }
-    if (isBusy) {
-      setDebugBlocked("busy");
-      notifySubmitBlocked("busy");
-      setSubmitStatusLabel("Failed: Wait for the current generation to finish");
-      return;
+
+    if (source !== "url-auto" && messages.length === 0) {
+      const userMsg: UIMessage = {
+        id: `pending-user-${Date.now()}`,
+        role: "user",
+        parts: [{ type: "text", text }],
+      };
+      setMessages([userMsg]);
     }
 
     submitInFlightRef.current = true;
+    setBuildStarting(true);
     const draft = input;
     setLastSubmitAt(Date.now());
     setSubmitBlocker(null);
@@ -589,7 +741,7 @@ export function ImmersiveWorkspace({
       uiSubmitLog("create", "preflight fetch start");
       submitDebug("create", "preflight start");
 
-      const pre = await runAiPreflight({
+      const pre = await runAiPreflightDeduped({
         mode,
         prompt: text,
         projectId: effectiveProjectId,
@@ -607,6 +759,7 @@ export function ImmersiveWorkspace({
       });
 
       if (!isAiPreflightSuccess(pre)) {
+        setBuildStarting(false);
         setPreflightState("error");
         const blocked = preflightBlockedLabel(pre.code, pre.status);
         if (pre.code === "edit_no_app") setEditNeedsApp(true);
@@ -626,6 +779,14 @@ export function ImmersiveWorkspace({
       }
 
       setPreflightState("ok");
+      if (pre.creditsEstimate != null) {
+        setPreflightEstimate({
+          credits: pre.creditsEstimate,
+          creditsMax: pre.creditsEstimateMax ?? pre.creditsEstimate,
+          modelId: pre.modelId ?? modelId,
+          provider: pre.provider ?? "auto",
+        });
+      }
       pushSubmitTrace("create", "Preflight OK — starting chat", { level: "ok", preflight: "ok" });
 
       if (pre.projectId) {
@@ -651,12 +812,16 @@ export function ImmersiveWorkspace({
       setLastApiUrl("/api/chat");
       setLastApiStatus("pending");
       setChatState("pending");
+      streamActiveRef.current = true;
+      setStreamActive(true);
+      setBuildStarting(false);
       await sendMessage({ text });
       setLastApiStatus((s) => (s === "pending" ? "ok" : s));
       setChatState("ok");
       submitDebug("create", "ui updated");
       setSubmitStatusLabel("Chat started (stream active)");
     } catch (err) {
+      setBuildStarting(false);
       setLastApiStatus("error");
       setChatState("error");
       const msg = err instanceof Error ? err.message : "Could not send message";
@@ -669,6 +834,7 @@ export function ImmersiveWorkspace({
       if (source !== "url-auto") setInput(draft);
     } finally {
       submitInFlightRef.current = false;
+      if (!streamActiveRef.current) setBuildStarting(false);
     }
   }, [
     input,
@@ -683,6 +849,17 @@ export function ImmersiveWorkspace({
 
   const runSubmitRef = React.useRef(runSubmit);
   runSubmitRef.current = runSubmit;
+
+  const drainPromptQueue = React.useCallback(() => {
+    if (streamActiveRef.current || promptQueueRef.current.length === 0) return;
+    const next = promptQueueRef.current.shift();
+    setQueueCount(promptQueueRef.current.length);
+    setQueuedPrompts((prev) => prev.slice(1));
+    if (!next) return;
+    toast.info("Starting queued prompt…");
+    void runSubmitRef.current("button", next.text);
+  }, []);
+  drainPromptQueueRef.current = drainPromptQueue;
 
   const handleFormSubmit = React.useCallback((e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -708,26 +885,30 @@ export function ImmersiveWorkspace({
 
   React.useEffect(() => {
     if (!hydrated || !initialAutoStart || !initialPrompt.trim()) return;
-    if (autoStartedRef.current) return;
-    const storageKey = `dreamos_autostart:${initialPrompt.slice(0, 120)}`;
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(storageKey) === "done") {
-      return;
-    }
+    if (autostartConsumedRef.current || autoStartedRef.current) return;
+
+    const handoff = consumeAutostartHandoff(initialPrompt, mode);
+    if (!handoff) return;
+
+    autostartConsumedRef.current = true;
     autoStartedRef.current = true;
-    const timer = setTimeout(() => {
-      cleanAutostartUrl();
-      if (typeof sessionStorage !== "undefined") {
-        sessionStorage.setItem(storageKey, "done");
-      }
-      void runSubmitRef.current("url-auto").catch(() => {
-        autoStartedRef.current = false;
-        if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(storageKey);
-        setAutoStartFailed("Could not start the build automatically. Check your connection and try again.");
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot URL bootstrap
-  }, [hydrated, initialAutoStart, initialPrompt, cleanAutostartUrl]);
+
+    const userMsg: UIMessage = {
+      id: `autostart-user-${handoff.idempotencyKey}`,
+      role: "user",
+      parts: [{ type: "text", text: handoff.prompt }],
+    };
+    setMessages([userMsg]);
+    setInput("");
+    cleanAutostartUrl();
+
+    void runSubmitRef.current("url-auto", handoff.prompt).catch(() => {
+      autoStartedRef.current = false;
+      autostartConsumedRef.current = false;
+      setAutoStartFailed("Could not start the build automatically. Check your connection and try again.");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot autostart
+  }, [hydrated, initialAutoStart, initialPrompt, mode, cleanAutostartUrl, setMessages]);
 
   React.useEffect(() => {
     if (!hydrated) return;
@@ -779,18 +960,39 @@ export function ImmersiveWorkspace({
     () => parseFencedFiles(lastAssistantText),
     [lastAssistantText],
   );
+  const codeFiles = React.useMemo((): CodeExplorerFile[] => {
+    if (projectFiles.length > 0) return projectFiles;
+    return parsedSourceFiles;
+  }, [projectFiles, parsedSourceFiles]);
   const previewSrcDoc = React.useMemo(() => {
     const hit =
-      parsedSourceFiles.find((f) => f.path === "preview/index.html") ??
-      parsedSourceFiles.find((f) => /\.html?$/i.test(f.path));
+      codeFiles.find((f) => f.path === "preview/index.html") ??
+      codeFiles.find((f) => /\.html?$/i.test(f.path));
     return hit?.content.trim() ? hit.content : null;
-  }, [parsedSourceFiles]);
+  }, [codeFiles]);
   const extractedCode = React.useMemo(() => extractFencedCode(lastAssistantText), [lastAssistantText]);
   const integrationSecretKeys = React.useMemo(
     () => (mode === "build" ? detectRequiredSecretNames(lastAssistantText) : []),
     [mode, lastAssistantText],
   );
-  const tokensForPreview = mode === "build" ? calculateTokens(modelId, mode) : null;
+  const tokensForPreview = preflightEstimate?.credits ?? (mode === "build" ? calculateTokens(modelId, mode) : null);
+  const buildPlanForStep = React.useMemo(
+    () => (mode === "build" && lastAssistantText ? parseBuildPlanCard(lastAssistantText) : null),
+    [mode, lastAssistantText],
+  );
+  const buildStepIndex = buildPlanForStep
+    ? taskProgressIndex(lastAssistantText.length, buildPlanForStep.taskLabels.length)
+    : 0;
+  const buildStepLabel = buildPlanForStep?.taskLabels[buildStepIndex] ?? null;
+  const previewShellState = previewSrcDoc
+    ? "idle"
+    : isBusy
+      ? "building"
+      : "idle";
+  const modelLabel =
+    preflightEstimate?.provider && preflightEstimate?.modelId
+      ? `${preflightEstimate.provider} · ${preflightEstimate.modelId}`
+      : null;
   const plan = profile?.plan_id ?? "free";
   const showFreeWatermark = plan === "free";
   const generationActive = messages.length > 0 || isBusy;
@@ -892,6 +1094,14 @@ export function ImmersiveWorkspace({
                 ))}
               </AnimatePresence>
 
+              {queuedPrompts.map((q) => (
+                <motion.div key={q.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
+                  <DreamOSMessageShell mode={mode}>
+                    <QueuedPromptCard text={q.text} onCancel={() => cancelQueuedPrompt(q.id)} />
+                  </DreamOSMessageShell>
+                </motion.div>
+              ))}
+
               {isBusy && messages[messages.length - 1]?.role === "user" && (
                 <MessageBubble
                   message={{ id: "pending", role: "assistant", parts: [{ type: "text", text: "" }] } satisfies UIMessage}
@@ -904,6 +1114,7 @@ export function ImmersiveWorkspace({
               {isBusy && (
                 <BuildStatusNarrator
                   isStreaming={isBusy}
+                  qualityRepairing={qualityRepairing}
                   activeStep={taskProgressIndex(
                     lastAssistantText.length,
                     parseBuildPlanCard(lastAssistantText).taskLabels.length || 6,
@@ -1004,6 +1215,23 @@ export function ImmersiveWorkspace({
                 )}
               </div>
             )}
+            {editTarget && mode === "edit" && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-100">
+                <span>
+                  Targeting: <strong>{editTarget}</strong>
+                </span>
+                <button
+                  type="button"
+                  className="font-semibold hover:underline"
+                  onClick={() => {
+                    setEditTarget(null);
+                    setScope(null);
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            )}
             {editNeedsApp && mode === "edit" && (
               <motion.div
                 initial={{ opacity: 0, y: 4 }}
@@ -1046,7 +1274,6 @@ export function ImmersiveWorkspace({
                       ? "Ask anything…"
                       : "Describe the change…"
                 }
-                disabled={isBusy}
                 spellCheck
                 className={cn(
                   composerTextareaClass,
@@ -1057,7 +1284,6 @@ export function ImmersiveWorkspace({
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  disabled={isBusy}
                   className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-background hover:text-foreground disabled:opacity-40"
                 >
                   <Paperclip className="size-3.5" strokeWidth={1.75} />
@@ -1106,10 +1332,44 @@ export function ImmersiveWorkspace({
                   ) : (
                     <ArrowUp className="size-3.5" strokeWidth={2.25} />
                   )}
-                  {isBusy ? "…" : mode === "build" ? "Build" : "Send"}
+                  {isBusy ? (queueCount > 0 ? `Queue (${queueCount})` : "Queue") : mode === "build" ? "Build" : "Send"}
                 </button>
               </div>
             </form>
+            {preflightEstimate && mode === "build" && (
+              <p className="mt-1.5 px-1 text-[10.5px] text-muted-foreground">
+                Estimated credits:{" "}
+                <span className="font-semibold tabular-nums text-foreground">
+                  {preflightEstimate.credits}
+                  {preflightEstimate.creditsMax > preflightEstimate.credits
+                    ? `–${preflightEstimate.creditsMax}`
+                    : ""}
+                </span>
+                {" · "}
+                {preflightEstimate.provider}/{preflightEstimate.modelId}
+                {" · "}
+                Charged only after successful generation.
+              </p>
+            )}
+            {queueCount > 0 && (
+              <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-[10.5px] text-muted-foreground">
+                <span>
+                  {queueCount} prompt{queueCount === 1 ? "" : "s"} queued — runs after current build
+                </span>
+                <button
+                  type="button"
+                  className="shrink-0 font-semibold text-foreground hover:underline"
+                  onClick={() => {
+                    promptQueueRef.current = [];
+                    setQueuedPrompts([]);
+                    setQueueCount(0);
+                    toast.info("Queue cleared");
+                  }}
+                >
+                  Clear queue
+                </button>
+              </div>
+            )}
             {debugEnabled && (
               <>
                 <p
@@ -1166,22 +1426,35 @@ export function ImmersiveWorkspace({
                 hasGenerated={
                   !!effectiveProject?.preview_url ||
                   !!previewSrcDoc ||
-                  parsedSourceFiles.length > 0
+                  codeFiles.length > 0
                 }
-                buildAssistantText={lastAssistantText}
+                previewState={previewShellState}
+                buildStepIndex={buildStepIndex}
+                buildStepLabel={buildStepLabel}
                 tokensEstimate={tokensForPreview}
+                modelLabel={modelLabel}
                 onEditTarget={(info) => {
-                  setInput(`[Targeting: ${info.section}] `);
-                  const el = document.querySelector("textarea");
-                  el?.focus();
+                  setEditTarget(info.section);
+                  setScope(info.section.toLowerCase().replace(/\s+/g, "_") as EditScope);
+                  setInput(`Update the ${info.section}: `);
+                  formRef.current?.querySelector("textarea")?.focus();
                 }}
               />
             )}
             {rightTab === "dashboard" && effectiveProject?.id && (
-              <AppDashboardPanel project={effectiveProject} isBusy={isBusy} />
+              <AppDashboardPanel
+                project={effectiveProject}
+                isBusy={isBusy}
+                refreshKey={projectDataRefresh}
+              />
             )}
             {rightTab === "code" && (
-              <CodeRightPanel files={parsedSourceFiles} fallbackText={extractedCode} />
+              <CodeExplorerPanel
+                files={codeFiles}
+                loading={projectFilesLoading && codeFiles.length === 0}
+                projectId={effectiveProjectId}
+                fallbackText={extractedCode}
+              />
             )}
           </div>
         </div>

@@ -16,8 +16,8 @@ export async function GET() {
       {
         ok: false,
         error: msg,
-        migration_file: "supabase/migrations/20260528120000_builder_runtime_quality_and_credits.sql",
-        fallback_script: "scripts/builder-runtime-quality-and-credits.sql",
+        migration_file: "supabase/migrations/20260529120000_full_runtime_schema_repair.sql",
+        fallback_script: "scripts/full-runtime-schema-repair.sql",
       },
       { status: 503 },
     );

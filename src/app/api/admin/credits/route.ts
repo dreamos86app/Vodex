@@ -36,8 +36,8 @@ export async function POST(request: Request) {
   await supabase.from("notifications").insert({
     user_id: userId,
     type: "credit",
-    title: `${amount} tokens added`,
-    body: `An admin has granted you ${amount} tokens. Reason: ${reason}`,
+    title: `${amount} credits added`,
+    body: `An admin has granted you ${amount} credits. Reason: ${reason}`,
     action_url: "/credits",
   });
 

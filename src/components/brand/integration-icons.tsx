@@ -35,8 +35,13 @@ const PROVIDER_ALIASES: Record<string, IntegrationProvider> = {
   googlegemini: "gemini",
 };
 
-/** Monochrome marks — use `currentColor` + light/dark text classes for contrast. */
-const MONOCHROME_PROVIDERS = new Set<IntegrationProvider>(["github", "vercel", "resend"]);
+/** Marks that use `currentColor` for light/dark contrast (not brand hex on dark UI). */
+const MONOCHROME_PROVIDERS = new Set<IntegrationProvider>([
+  "github",
+  "vercel",
+  "resend",
+  "openai",
+]);
 
 export const INTEGRATION_BRANDS: Record<
   IntegrationProvider,
@@ -77,12 +82,14 @@ export const INTEGRATION_BRANDS: Record<
   },
   openai: {
     title: "OpenAI",
-    wellClassName: "bg-[#10A37F]/12 ring-[#10A37F]/25",
+    wellClassName:
+      "bg-[#10A37F]/10 ring-[#10A37F]/22 dark:bg-accent/12 dark:ring-accent/30",
     simpleIcon: siOpenai,
   },
   gemini: {
     title: "Gemini",
-    wellClassName: "bg-gradient-to-br from-[#4285F4]/12 via-[#9B72CB]/10 to-[#D96570]/10 ring-[#4285F4]/20",
+    wellClassName:
+      "bg-gradient-to-br from-[#4285F4]/14 via-[#9B72CB]/12 to-[#D96570]/12 ring-[#4285F4]/25 dark:from-[#4285F4]/20 dark:via-[#9B72CB]/15 dark:to-[#D96570]/15",
     simpleIcon: siGooglegemini,
   },
 };
@@ -130,31 +137,41 @@ function SlackMark({ size, className }: { size: number; className?: string }) {
   );
 }
 
-/** Google Gemini four-point star (brand colors). */
-function GeminiMark({ size, className }: { size: number; className?: string }) {
+/** OpenAI blossom — green in light mode, white on dark cards. */
+function OpenAIMark({ size, className }: { size: number; className?: string }) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
+      className={cn("shrink-0 text-[#10A37F] dark:text-white", className)}
+      aria-hidden
+    >
+      <path fill="currentColor" d={siOpenai.path} />
+    </svg>
+  );
+}
+
+/** Google Gemini sparkle — gradient star, scaled for visual balance with other marks. */
+function GeminiMark({ size, className }: { size: number; className?: string }) {
+  const gradId = React.useId().replace(/:/g, "");
+  const dim = Math.round(size * 1.18);
+  return (
+    <svg
+      width={dim}
+      height={dim}
+      viewBox="0 0 24 24"
       className={cn("shrink-0", className)}
       aria-hidden
     >
-      <path
-        fill="#4285F4"
-        d="M12 2.25 9.82 9.04 3.25 11.25l6.57 2.21L12 20.25l2.18-6.79 6.57-2.21-6.57-2.21L12 2.25z"
-      />
-      <path
-        fill="#9B72CB"
-        d="M12 6.1 10.95 9.35 7.7 10.4l3.25 1.05L12 14.75l1.05-3.3 3.25-1.05-3.25-1.05L12 6.1z"
-        opacity={0.95}
-      />
-      <path fill="#D96570" d="M12 8.4 11.45 10.2 9.65 10.75 11.45 11.3 12 13.1l.55-1.8 1.8-.55-1.8-.55L12 8.4z" />
-      <path
-        fill="#F4B400"
-        d="M18.2 12.1c-1.35.5-2.5 1.35-3.35 2.45.85 1.1 2 1.95 3.35 2.45-.5-1.35-1.35-2.5-2.45-3.35 1.1-.85 1.95-2 2.45-3.35z"
-        opacity={0.85}
-      />
+      <defs>
+        <linearGradient id={gradId} x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#4285F4" />
+          <stop offset="48%" stopColor="#9B72CB" />
+          <stop offset="100%" stopColor="#D96570" />
+        </linearGradient>
+      </defs>
+      <path fill={`url(#${gradId})`} d={siGooglegemini.path} />
     </svg>
   );
 }
@@ -173,7 +190,12 @@ function SimpleIconMark({
   className?: string;
 }) {
   const mono = MONOCHROME_PROVIDERS.has(provider);
-  const useBrandColor = !mono || variant === "brand";
+  const forceMono =
+    mono &&
+    (variant === "mono-light" ||
+      variant === "mono-dark" ||
+      variant === "brand");
+  const useBrandColor = !forceMono;
 
   return (
     <svg
@@ -184,7 +206,7 @@ function SimpleIconMark({
       aria-hidden
       className={cn(
         "shrink-0",
-        mono && variant !== "brand" && "text-[#181717] dark:text-white",
+        forceMono && "text-zinc-900 dark:text-white",
         className,
       )}
     >
@@ -241,6 +263,10 @@ export function IntegrationIcon({
     return <SlackMark size={px} className={className} />;
   }
 
+  if (provider === "openai") {
+    return <OpenAIMark size={px} className={className} />;
+  }
+
   if (provider === "gemini") {
     return <GeminiMark size={px} className={className} />;
   }
@@ -271,6 +297,37 @@ export interface IntegrationIconWellProps {
 }
 
 /** Circular icon well — consistent size and centering across cards. */
+export function SupabaseIcon(props: Omit<IntegrationIconProps, "provider">) {
+  return <IntegrationIcon provider="supabase" {...props} />;
+}
+export function StripeIcon(props: Omit<IntegrationIconProps, "provider">) {
+  return <IntegrationIcon provider="stripe" {...props} />;
+}
+export function GitHubIcon(props: Omit<IntegrationIconProps, "provider">) {
+  return <IntegrationIcon provider="github" variant="mono-light" {...props} />;
+}
+export function VercelIcon(props: Omit<IntegrationIconProps, "provider">) {
+  return <IntegrationIcon provider="vercel" variant="mono-light" {...props} />;
+}
+export function ResendIcon(props: Omit<IntegrationIconProps, "provider">) {
+  return <IntegrationIcon provider="resend" variant="mono-light" {...props} />;
+}
+export function SlackIcon(props: Omit<IntegrationIconProps, "provider">) {
+  return <IntegrationIcon provider="slack" {...props} />;
+}
+export function OpenAIIcon(props: Omit<IntegrationIconProps, "provider">) {
+  return (
+    <IntegrationIcon
+      provider="openai"
+      className={cn("text-[#10A37F] dark:text-white", props.className)}
+      {...props}
+    />
+  );
+}
+export function GeminiIcon(props: Omit<IntegrationIconProps, "provider">) {
+  return <IntegrationIcon provider="gemini" {...props} />;
+}
+
 export function IntegrationIconWell({
   provider: providerProp,
   size = "md",
@@ -302,6 +359,13 @@ export function IntegrationIconWell({
         provider={provider ?? "supabase"}
         size={iconSize}
         title={title ?? brand?.title}
+        className={
+          provider === "openai"
+            ? "text-[#10A37F] dark:text-white"
+            : provider && MONOCHROME_PROVIDERS.has(provider)
+              ? "text-zinc-900 dark:text-white"
+              : undefined
+        }
       />
     </span>
   );

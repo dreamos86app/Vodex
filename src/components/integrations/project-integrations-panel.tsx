@@ -151,41 +151,48 @@ function GitHubConnectForm({
         </button>
       ) : (
         <p className="text-[11px] text-muted-foreground">
-          GitHub OAuth not configured on the server. Use a manual token below or add{" "}
-          <span className="font-mono text-[10px]">GITHUB_CLIENT_ID</span> /{" "}
+          GitHub connection is being configured on DreamOS86. Ask your workspace admin to add{" "}
+          <span className="font-mono text-[10px]">GITHUB_CLIENT_ID</span> and{" "}
           <span className="font-mono text-[10px]">GITHUB_CLIENT_SECRET</span>.
         </p>
       )}
-      <label className="block text-[11px] font-medium text-foreground">
-        Personal access token
-        <input
-          type="password"
-          autoComplete="off"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="ghp_…"
-          className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
-        />
-      </label>
-      <label className="block text-[11px] font-medium text-foreground">
-        Repository (optional)
-        <input
-          type="text"
-          value={repo}
-          onChange={(e) => setRepo(e.target.value)}
-          placeholder="owner/repo or GitHub URL"
-          className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
-        />
-      </label>
-      <button
-        type="button"
-        disabled={busy || !token.trim()}
-        onClick={() => void connect()}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-foreground py-2 text-[12px] font-semibold text-background disabled:opacity-50"
-      >
-        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <GitBranch className="size-3.5" />}
-        Connect GitHub to this app
-      </button>
+      <details className="rounded-lg border border-dashed border-border/80 bg-background/60 px-2.5 py-2">
+        <summary className="cursor-pointer text-[11px] font-semibold text-muted-foreground">
+          Advanced — manual token
+        </summary>
+        <div className="mt-2 space-y-2">
+          <label className="block text-[11px] font-medium text-foreground">
+            Personal access token
+            <input
+              type="password"
+              autoComplete="off"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="ghp_…"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
+            />
+          </label>
+          <label className="block text-[11px] font-medium text-foreground">
+            Repository (optional)
+            <input
+              type="text"
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              placeholder="owner/repo or GitHub URL"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy || !token.trim()}
+            onClick={() => void connect()}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-foreground py-2 text-[12px] font-semibold text-background disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <GitBranch className="size-3.5" />}
+            Connect with token
+          </button>
+        </div>
+      </details>
     </div>
   );
 }
@@ -227,49 +234,68 @@ function SupabaseConnectForm({
   }
 
   return (
-    <div className="mt-3 space-y-2 rounded-lg border border-border bg-surface/50 p-3">
-      <p className="text-[11px] text-muted-foreground">
-        This is your <strong>app&apos;s</strong> Supabase — separate from DreamOS86 platform auth.
-        Find values in Supabase → Project Settings → API.
+    <div className="mt-3 space-y-3 rounded-lg border border-border bg-surface/50 p-3">
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Connect <strong>your app&apos;s</strong> Supabase project (separate from DreamOS86 login).
+        DreamOS86 will store keys encrypted and generate SQL migrations for your generated app.
       </p>
-      <label className="block text-[11px] font-medium">
-        Project URL
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://xxxx.supabase.co"
-          className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
-        />
-      </label>
-      <label className="block text-[11px] font-medium">
-        Anon / public key
-        <input
-          type="password"
-          value={anonKey}
-          onChange={(e) => setAnonKey(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
-        />
-      </label>
-      <label className="block text-[11px] font-medium">
-        Service role key (optional, server-only)
-        <input
-          type="password"
-          value={serviceKey}
-          onChange={(e) => setServiceKey(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
-        />
-      </label>
+      <ol className="list-decimal space-y-1.5 pl-4 text-[11px] text-foreground">
+        <li>
+          <a
+            href="https://supabase.com/dashboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-accent underline-offset-2 hover:underline"
+          >
+            Create a Supabase project
+          </a>{" "}
+          (free tier is fine).
+        </li>
+        <li>Open Project Settings → API and copy the project URL and anon key.</li>
+        <li>Paste them below — DreamOS86 links this app only.</li>
+      </ol>
       <button
         type="button"
         disabled={busy || !url.trim() || !anonKey.trim()}
         onClick={() => void connect()}
-        className="w-full rounded-lg bg-accent py-2 text-[12px] font-semibold text-white disabled:opacity-50"
+        className="w-full rounded-xl bg-accent py-2.5 text-[12px] font-semibold text-white shadow-sm disabled:opacity-50"
       >
         {busy ? "Connecting…" : "Connect Supabase to this app"}
       </button>
-      <p className="text-[10px] text-muted-foreground">
-        DreamOS managed Supabase: not available yet — connect your own project.
-      </p>
+      <details className="rounded-lg border border-dashed border-border/80 bg-background/60 px-2.5 py-2">
+        <summary className="cursor-pointer text-[11px] font-semibold text-muted-foreground">
+          Advanced — paste keys manually
+        </summary>
+        <div className="mt-2 space-y-2">
+          <label className="block text-[11px] font-medium">
+            Project URL
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://xxxx.supabase.co"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
+            />
+          </label>
+          <label className="block text-[11px] font-medium">
+            Anon / public key
+            <input
+              type="password"
+              value={anonKey}
+              onChange={(e) => setAnonKey(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
+            />
+          </label>
+          <label className="block text-[11px] font-medium">
+            Service role key (server-only, optional)
+            <input
+              type="password"
+              value={serviceKey}
+              onChange={(e) => setServiceKey(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px]"
+            />
+          </label>
+        </div>
+      </details>
     </div>
   );
 }

@@ -45,9 +45,11 @@ export interface PreviewPanelProps {
   /** Whether any generation has completed. Edit targeting only activates when true. */
   hasGenerated?: boolean;
   onEditTarget?: (info: { x: number; y: number; section: string }) => void;
-  /** Build-mode assistant excerpt — powers plan/progress surface (not full code). */
-  buildAssistantText?: string;
+  previewState?: "idle" | "building" | "compiling";
+  buildStepIndex?: number;
+  buildStepLabel?: string | null;
   tokensEstimate?: number | null;
+  modelLabel?: string | null;
 }
 
 export function PreviewPanel({
@@ -59,8 +61,11 @@ export function PreviewPanel({
   editMode = false,
   hasGenerated = false,
   onEditTarget,
-  buildAssistantText = "",
+  previewState = "idle",
+  buildStepIndex = 0,
+  buildStepLabel = null,
   tokensEstimate = null,
+  modelLabel = null,
 }: PreviewPanelProps) {
   const [viewport, setViewport] = React.useState<Viewport>("desktop");
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -74,10 +79,16 @@ export function PreviewPanel({
   }, [url, srcDoc, reloadKey]);
 
   const hasInline = !!srcDoc?.trim();
-  const hasUrl = !!url || hasInline;
+  const hasPreviewArtifact = !!url || hasInline;
+  const showArtifact = hasPreviewArtifact && !thinking;
+  const shellState = thinking
+    ? previewState === "compiling"
+      ? "compiling"
+      : "building"
+    : "idle";
   const displayHost = hasInline
     ? "live preview (generated)"
-    : hasUrl && url
+    : hasPreviewArtifact && url
       ? (() => {
           try { return new URL(url).host; }
           catch { return url; }
@@ -106,10 +117,10 @@ export function PreviewPanel({
           <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">
             {displayHost}
           </span>
-          {(hasUrl && iframeLoading) && (
+          {(hasPreviewArtifact && iframeLoading) && (
             <Wifi className="size-3 shrink-0 animate-pulse text-accent/60" strokeWidth={1.75} />
           )}
-          {(hasUrl && !iframeLoading && !iframeError) && (
+          {(hasPreviewArtifact && !iframeLoading && !iframeError) && (
             <span className="size-1.5 shrink-0 rounded-full bg-green-400" />
           )}
         </div>
@@ -143,7 +154,7 @@ export function PreviewPanel({
         <button
           type="button"
           aria-label="Reload preview"
-          disabled={!hasUrl}
+          disabled={!hasPreviewArtifact}
           onClick={() => setReloadKey((k) => k + 1)}
           className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-surface hover:text-foreground disabled:opacity-40"
         >
@@ -151,7 +162,7 @@ export function PreviewPanel({
         </button>
 
         {/* Open in new tab */}
-        {hasUrl && (
+        {hasPreviewArtifact && (
           <a
             href={url!}
             target="_blank"
@@ -224,22 +235,24 @@ export function PreviewPanel({
           </div>
         )}
 
-        {!hasUrl && (
+        {!showArtifact && (
           <BuildPreviewSurface
-            thinking={thinking}
-            assistantText={buildAssistantText}
-            tokensEstimate={tokensEstimate}
+            state={shellState}
             appName={appName}
+            currentStep={buildStepLabel}
+            stepIndex={buildStepIndex}
+            tokensEstimate={tokensEstimate}
+            modelLabel={modelLabel}
           />
         )}
 
-        {hasUrl && (
-          <div className="absolute inset-0 flex items-center justify-center p-3">
-            {/* Mobile black pillars */}
-            {viewport === "mobile" && (
-              <div className="absolute inset-0 bg-black/90" />
+        {showArtifact && (
+          <div
+            className={cn(
+              "absolute inset-0 flex items-center justify-center overflow-auto p-3",
+              viewport !== "desktop" && "bg-black/85",
             )}
-
+          >
             <AnimatePresence mode="wait">
               <motion.div
                 key={`${viewport}-${reloadKey}`}
@@ -248,21 +261,15 @@ export function PreviewPanel({
                 exit={{ opacity: 0, scale: 0.97 }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  "relative flex flex-col overflow-hidden rounded-[var(--radius-lg)] bg-white shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border",
-                  // Desktop: full width, natural 16:9-ish height
-                  viewport === "desktop" && "h-full w-full",
-                  // Tablet: 768px wide, full height
-                  viewport === "tablet" && "h-full w-[768px] max-w-full",
-                  // Mobile: phone form factor (9:19.5), centered
-                  viewport === "mobile" && "relative z-10 w-[390px] max-w-full shadow-[0_0_40px_rgba(0,0,0,0.5)]",
+                  "relative flex max-h-full flex-col overflow-hidden rounded-[var(--radius-lg)] bg-white shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border",
+                  viewport === "desktop" && "h-full min-h-[480px] w-full max-w-[1280px]",
+                  viewport === "tablet" && "h-[min(100%,900px)] w-[768px] max-w-[calc(100%-24px)]",
+                  viewport === "mobile" &&
+                    "z-10 h-[min(100%,844px)] max-h-[90vh] w-[390px] max-w-[calc(100%-24px)] shadow-[0_0_40px_rgba(0,0,0,0.5)]",
                 )}
               >
-                {/* Mobile notch decoration */}
                 {viewport === "mobile" && (
-                  <>
-                    <div className="absolute top-0 left-1/2 z-10 h-5 w-24 -translate-x-1/2 rounded-b-xl bg-black/90" />
-                    <style>{`.mobile-iframe { height: calc(100vh - 80px); max-height: 844px; }`}</style>
-                  </>
+                  <div className="absolute top-0 left-1/2 z-10 h-5 w-24 -translate-x-1/2 rounded-b-xl bg-black/90" />
                 )}
 
                 {/* Loading overlay */}
@@ -326,7 +333,7 @@ export function PreviewPanel({
 
         {/* AI streaming overlay */}
         <AnimatePresence>
-          {hasUrl && thinking && (
+          {showArtifact && thinking && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
