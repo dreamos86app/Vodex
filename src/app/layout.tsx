@@ -43,7 +43,7 @@ const geistMono = Geist_Mono({
 
 const SITE_URL = getSiteUrl();
 
-const ICON_V = "5";
+const ICON_V = "6";
 
 
 
@@ -94,6 +94,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: `/favicon.ico?v=${ICON_V}` },
+      { url: `/brand/dreamos86-icon.png?v=${ICON_V}`, sizes: "512x512", type: "image/png" },
       { url: `/favicon-32x32.png?v=${ICON_V}`, sizes: "32x32", type: "image/png" },
       { url: `/favicon-192x192.png?v=${ICON_V}`, sizes: "192x192", type: "image/png" },
       { url: `/icon.png?v=${ICON_V}`, sizes: "32x32", type: "image/png" },

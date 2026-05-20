@@ -1,29 +1,29 @@
-{
-  "name": "DreamOS86",
-  "short_name": "DreamOS86",
-  "description": "AI-native operating system for software creation.",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#f4f7fd",
-  "theme_color": "#2563eb",
-  "icons": [
-    {
-      "src": "/brand/dreamos86-icon-192.png?v=5",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/brand/dreamos86-icon-512.png?v=5",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/brand/dreamos86-icon-maskable.png?v=5",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
-  ]
-}
+{
+  "name": "DreamOS86",
+  "short_name": "DreamOS86",
+  "description": "AI-native operating system for software creation.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fd",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/brand/dreamos86-icon-192.png?v=6",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/dreamos86-icon-512.png?v=6",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/dreamos86-icon-maskable.png?v=6",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

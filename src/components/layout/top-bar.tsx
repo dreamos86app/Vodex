@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, Search } from "lucide-react";
+import { DreamOS86BrandLockup } from "@/components/brand/dreamos86-brand-lockup";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { IconButton } from "@/components/ui/icon-button";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -32,14 +33,20 @@ export function TopBar({ mode, title, subtitle, onMenuClick }: TopBarProps) {
     >
       <IconButton
         label="Open navigation"
-        className="lg:hidden"
+        className="shrink-0 lg:hidden"
         onClick={onMenuClick}
       >
         <Menu className="size-[18px]" strokeWidth={1.65} />
       </IconButton>
 
+      <DreamOS86BrandLockup
+        variant="header"
+        className="min-w-0 max-w-[52%] shrink lg:hidden"
+        priority
+      />
+
       {!isCreate ? (
-        <div className="min-w-0 flex-1 lg:flex-none">
+        <div className="min-w-0 hidden flex-1 lg:block">
           <h1 className="truncate text-[15px] font-semibold tracking-[-0.03em] text-foreground sm:text-[16px]">
             {title}
           </h1>
@@ -50,7 +57,7 @@ export function TopBar({ mode, title, subtitle, onMenuClick }: TopBarProps) {
           )}
         </div>
       ) : (
-        <div className="hidden flex-1 lg:block" />
+        <div className="hidden min-w-0 flex-1 lg:block" />
       )}
 
       <div className="ml-auto flex items-center gap-1.5">

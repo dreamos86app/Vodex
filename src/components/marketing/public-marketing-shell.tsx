@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { LogoIcon } from "@/components/ui/logo-icon";
+import { DreamOS86BrandLockup } from "@/components/brand/dreamos86-brand-lockup";
 import { PublicThemeToggle } from "@/components/marketing/public-theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -25,17 +25,11 @@ export function PublicMarketingHeader({ className }: { className?: string }) {
     >
       <div className="mx-auto w-full max-w-6xl px-3 py-2.5 sm:px-6 sm:py-3">
         <div className="flex items-center justify-between gap-2">
-          <Link
-            href="/"
-            className="flex min-w-0 shrink items-center gap-1"
-            aria-label="DreamOS86 home"
-          >
-            <LogoIcon size={26} className="sm:hidden" />
-            <LogoIcon size={30} className="hidden sm:block" />
-            <span className="truncate text-[13px] font-semibold tracking-tight text-foreground sm:text-[14px]">
-              DreamOS86
-            </span>
-          </Link>
+          <DreamOS86BrandLockup
+            variant="header"
+            className="min-w-0 shrink"
+            priority
+          />
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <PublicThemeToggle className="size-8 sm:size-9" />
@@ -109,10 +103,7 @@ export function PublicMarketingFooter({ className }: { className?: string }) {
     <footer className={cn("border-t border-border/60 bg-background/90", className)}>
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row sm:px-6">
         <div className="flex flex-col items-center gap-2 sm:items-start">
-          <Link href="/" className="flex items-center gap-1">
-            <LogoIcon size={24} />
-            <span className="text-[13px] font-semibold text-foreground">DreamOS86</span>
-          </Link>
+          <DreamOS86BrandLockup variant="footer" />
           <p className="text-center text-[11px] text-muted-foreground sm:text-left">
             © {new Date().getFullYear()} DreamOS86. All rights reserved.
           </p>

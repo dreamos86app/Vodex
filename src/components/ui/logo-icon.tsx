@@ -1,7 +1,7 @@
 import { DreamOS86BrandIcon } from "@/components/brand/dreamos86-brand-icon";
 
 /**
- * @deprecated Prefer `DreamOS86BrandIcon` — kept for existing imports.
+ * @deprecated Prefer `DreamOS86BrandIcon` or `DreamOS86BrandLockup` — kept for existing imports.
  * DreamOS86 platform logo only (not user or generated app icons).
  */
 export function LogoIcon({

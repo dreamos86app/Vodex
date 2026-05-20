@@ -68,6 +68,8 @@ async function findNewestAssetUpload() {
     .map((n) => {
       const lower = n.toLowerCase();
       let score = 0;
+      if (lower.includes("for_app_transperent") || lower.includes("for_app_transparent"))
+        score += 120;
       if (lower.includes("untitled_design")) score += 100;
       if (lower.includes("dreamos86_trans")) score += 80;
       if (lower.includes("2026-05-20")) score += 20;

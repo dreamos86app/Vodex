@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getAppUrl, getCallbackUrl } from "@/lib/auth";
+import { getSupabaseProjectRefFromUrl } from "@/lib/supabase/auth-domain";
 import type { AuthHealthResult, ProviderStatus } from "@/app/api/admin/auth-health/route";
 
 // ─── Status atoms ─────────────────────────────────────────────────────────────
@@ -201,7 +202,7 @@ export function AuthHealthPanel() {
   const [testingProvider, setTestingProvider] = React.useState<"google" | "github" | null>(null);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const projectRef = supabaseUrl.replace("https://", "").replace(".supabase.co", "") || "_";
+  const projectRef = getSupabaseProjectRefFromUrl(supabaseUrl) ?? "_";
   const dashboardBase = `https://supabase.com/dashboard/project/${projectRef}`;
 
   // Client-side URL validation
@@ -273,6 +274,20 @@ export function AuthHealthPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {data?.oauthBranding?.usesDefaultSupabaseHost && data.oauthBranding.hint && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-950 dark:text-amber-100">
+          <p className="font-semibold">OAuth branding uses Supabase project URL</p>
+          <p className="mt-1 text-[11px] opacity-90">
+            Google may show <span className="font-mono">{data.oauthBranding.supabaseUrlHost}</span> until you
+            configure a Supabase custom domain (e.g. auth.dreamos86.com). See{" "}
+            <code className="rounded bg-background/60 px-1 py-0.5 text-[10px]">
+              docs/supabase-custom-auth-domain.md
+            </code>
+            .
+          </p>
+        </div>
+      )}
 
       {/* Infrastructure */}
       <Section title="Infrastructure">

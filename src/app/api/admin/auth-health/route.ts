@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireDreamosOwner } from "@/lib/admin/require-owner";
+import { getAppUrl } from "@/lib/app-url";
+import { getCallbackUrl } from "@/lib/auth/oauth-redirect";
+import { usesDefaultSupabaseProjectHost, getSupabasePublicUrl } from "@/lib/supabase/auth-domain";
 
 export type ProviderStatus = "enabled" | "disabled" | "unknown";
 
@@ -27,6 +30,11 @@ export interface AuthHealthResult {
   };
   middleware: boolean;
   checkedAt: string;
+  oauthBranding?: {
+    usesDefaultSupabaseHost: boolean;
+    supabaseUrlHost: string | null;
+    hint: string | null;
+  };
 }
 
 /**
@@ -41,12 +49,13 @@ async function probeProvider(
   supabaseUrl: string,
   supabaseKey: string,
   provider: "google" | "github",
+  redirectTo: string,
 ): Promise<ProviderStatus> {
   try {
     // Use the REST API directly to get an OAuth URL — this does not redirect
     // and tells us immediately if the provider is configured.
     const res = await fetch(
-      `${supabaseUrl}/auth/v1/authorize?provider=${provider}&redirect_to=https://dreamos86.com/auth/callback`,
+      `${supabaseUrl}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectTo)}`,
       {
         method: "GET",
         headers: {
@@ -84,7 +93,8 @@ export async function GET(request: Request) {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-  const appUrlEnv = process.env.NEXT_PUBLIC_APP_URL ?? null;
+  const appUrlEnv = process.env.NEXT_PUBLIC_APP_URL ?? getAppUrl();
+  const callbackUrl = getCallbackUrl();
 
   // ?probe=google|github — re-check just one provider for the test button
   const url = new URL(request.url);
@@ -99,18 +109,26 @@ export async function GET(request: Request) {
   let githubStatus: ProviderStatus;
 
   if (probe === "google") {
-    googleStatus = await probeProvider(supabaseUrl, supabaseKey, "google");
+    googleStatus = await probeProvider(supabaseUrl, supabaseKey, "google", callbackUrl);
     githubStatus = "unknown";
   } else if (probe === "github") {
     googleStatus = "unknown";
-    githubStatus = await probeProvider(supabaseUrl, supabaseKey, "github");
+    githubStatus = await probeProvider(supabaseUrl, supabaseKey, "github", callbackUrl);
   } else {
     // Full check — run both in parallel
     [googleStatus, githubStatus] = await Promise.all([
-      probeProvider(supabaseUrl, supabaseKey, "google"),
-      probeProvider(supabaseUrl, supabaseKey, "github"),
+      probeProvider(supabaseUrl, supabaseKey, "google", callbackUrl),
+      probeProvider(supabaseUrl, supabaseKey, "github", callbackUrl),
     ]);
   }
+
+  let supabaseUrlHost: string | null = null;
+  try {
+    supabaseUrlHost = getSupabasePublicUrl() ? new URL(getSupabasePublicUrl()!).hostname : null;
+  } catch {
+    supabaseUrlHost = null;
+  }
+  const usesDefaultHost = usesDefaultSupabaseProjectHost();
 
   const result: AuthHealthResult = {
     env: {
@@ -135,6 +153,13 @@ export async function GET(request: Request) {
     },
     middleware: true,
     checkedAt: new Date().toISOString(),
+    oauthBranding: {
+      usesDefaultSupabaseHost: usesDefaultHost,
+      supabaseUrlHost,
+      hint: usesDefaultHost
+        ? "OAuth branding still uses the Supabase project URL. Configure a Supabase custom domain (e.g. auth.dreamos86.com) and set NEXT_PUBLIC_SUPABASE_URL — see docs/supabase-custom-auth-domain.md."
+        : null,
+    },
   };
 
   return NextResponse.json(result);

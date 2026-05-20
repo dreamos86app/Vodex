@@ -311,8 +311,8 @@ export function PlatformShell({
         </main>
       </div>
 
-      {/* Mobile bottom navigation — only on small screens */}
-      <MobileBottomNav />
+      {/* Mobile bottom navigation — hide while drawer is open */}
+      {!mobileOpen && <MobileBottomNav />}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { LogoIcon } from "@/components/ui/logo-icon";
+import { DreamOS86BrandLockup } from "@/components/brand/dreamos86-brand-lockup";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight } from "lucide-react";
@@ -109,6 +109,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     (s) => s.label !== "Admin" || isOwner,
   );
 
+  const showBrandWordmark = !collapsed || mobileOpen;
+
   const nav = (
     <nav
       className={cn(
@@ -154,7 +156,9 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           "supports-[backdrop-filter]:bg-sidebar/75 supports-[backdrop-filter]:backdrop-blur-xl",
           // Desktop: static in flex row, fills full viewport height
           "lg:static lg:h-full lg:shrink-0",
-          mobileOpen ? "translate-x-0 w-[220px]" : "-translate-x-full lg:translate-x-0",
+          mobileOpen
+            ? "translate-x-0 w-[min(82vw,20rem)]"
+            : "-translate-x-full lg:translate-x-0",
           collapsed ? "lg:w-[60px]" : "lg:w-[200px]",
         )}
       >
@@ -162,31 +166,24 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div
           className={cn(
             "flex h-14 shrink-0 items-center border-b border-border",
-            collapsed ? "justify-center px-2" : "justify-between px-3",
+            showBrandWordmark ? "justify-between gap-2 px-3" : "justify-center px-2",
           )}
         >
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 focus-visible:outline-none"
+          <DreamOS86BrandLockup
+            variant={mobileOpen ? "drawer" : "sidebar"}
+            showText={showBrandWordmark}
             onClick={onMobileClose}
-            title="DreamOS86"
-          >
-            <LogoIcon size={26} />
-            {!collapsed && (
-              <span className="truncate text-[13.5px] font-semibold tracking-[-0.03em] text-foreground">
-                DreamOS86
-              </span>
-            )}
-          </Link>
+            className="min-w-0 flex-1"
+          />
           <button
             type="button"
-            className="lg:hidden inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+            className="lg:hidden inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"
             onClick={onMobileClose}
             aria-label="Close navigation"
           >
             <X className="size-4" strokeWidth={1.75} />
           </button>
-          {!collapsed && (
+          {showBrandWordmark && !mobileOpen && (
             <button
               type="button"
               className="hidden lg:flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-surface hover:text-foreground"
