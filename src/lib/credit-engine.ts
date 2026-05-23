@@ -153,8 +153,8 @@ export function estimateCredits(
  */
 export function formatCredits(credits: number): string {
   if (credits >= 1000) return `${(credits / 1000).toFixed(1)}k`;
-  // Only show decimal if it's a half-step (x.5)
-  return credits % 1 === 0 ? credits.toString() : credits.toFixed(1);
+  const rounded = Math.round(credits * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
 /**

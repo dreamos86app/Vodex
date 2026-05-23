@@ -1,0 +1,316 @@
+{
+  "category": "benchmark_50",
+  "description": "Full 50-prompt competitive benchmark",
+  "sources": [
+    "benchmarks/prompts/simple.json",
+    "benchmarks/prompts/standard.json",
+    "benchmarks/prompts/saas.json",
+    "benchmarks/prompts/advanced.json",
+    "benchmarks/prompts/mobile.json",
+    "benchmarks/prompts/mobile-first.json",
+    "benchmarks/prompts/admin.json"
+  ],
+  "promptCount": 50,
+  "prompts": [
+    {
+      "id": "lp-01",
+      "appType": "landing",
+      "text": "Landing page for a meditation app with calm gradients and signup CTA",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-02",
+      "appType": "landing",
+      "text": "Marketing site for an AI writing assistant with hero, features, pricing",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-03",
+      "appType": "landing",
+      "text": "Product launch page for a smart home device with video placeholder section",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-04",
+      "appType": "landing",
+      "text": "Waitlist landing for a fintech startup with email capture",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-05",
+      "appType": "landing",
+      "text": "Portfolio landing for a freelance designer with project grid",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-06",
+      "appType": "landing",
+      "text": "Event landing page for a tech conference with schedule preview",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-07",
+      "appType": "landing",
+      "text": "Nonprofit donation landing with impact stats and donate button",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-08",
+      "appType": "landing",
+      "text": "Restaurant landing with menu highlights and reservation link",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-09",
+      "appType": "landing",
+      "text": "Fitness app landing with before/after testimonials section",
+      "source": "simple.json"
+    },
+    {
+      "id": "lp-10",
+      "appType": "landing",
+      "text": "B2B SaaS landing for inventory management with demo request form",
+      "source": "simple.json"
+    },
+    {
+      "id": "dash-01",
+      "appType": "dashboard",
+      "text": "Analytics dashboard for e-commerce with revenue, orders, and top products",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-02",
+      "appType": "dashboard",
+      "text": "Admin dashboard for user management with table, filters, and roles",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-03",
+      "appType": "dashboard",
+      "text": "Project management dashboard with kanban board and team avatars",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-04",
+      "appType": "dashboard",
+      "text": "Healthcare clinic dashboard with appointments and patient queue",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-05",
+      "appType": "dashboard",
+      "text": "Marketing campaign dashboard with channel performance charts",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-06",
+      "appType": "dashboard",
+      "text": "DevOps status dashboard with uptime monitors and incident log",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-07",
+      "appType": "dashboard",
+      "text": "HR dashboard with hiring pipeline and offer tracking",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-08",
+      "appType": "dashboard",
+      "text": "Support ticket dashboard with SLA timers and agent workload",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-09",
+      "appType": "dashboard",
+      "text": "Inventory dashboard with low-stock alerts and supplier list",
+      "source": "standard.json"
+    },
+    {
+      "id": "dash-10",
+      "appType": "dashboard",
+      "text": "Education admin dashboard with courses, enrollments, and grades",
+      "source": "standard.json"
+    },
+    {
+      "id": "saas-01",
+      "appType": "saas",
+      "text": "Multi-tenant SaaS for invoice billing with Stripe and team settings",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-02",
+      "appType": "saas",
+      "text": "Subscription analytics SaaS with MRR chart and churn table",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-03",
+      "appType": "saas",
+      "text": "Customer feedback SaaS with NPS surveys and response inbox",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-04",
+      "appType": "saas",
+      "text": "API keys management SaaS with usage meters and rate limits",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-05",
+      "appType": "saas",
+      "text": "Documentation SaaS with sidebar nav and full-text search",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-06",
+      "appType": "saas",
+      "text": "Onboarding checklist SaaS for new hires with progress tracking",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-07",
+      "appType": "saas",
+      "text": "Compliance audit SaaS with evidence uploads and reviewer workflow",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-08",
+      "appType": "saas",
+      "text": "Email campaign SaaS with template editor and send analytics",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-09",
+      "appType": "saas",
+      "text": "Feature flag SaaS with environments and rollout percentage",
+      "source": "saas.json"
+    },
+    {
+      "id": "saas-10",
+      "appType": "saas",
+      "text": "Warehouse ops SaaS with pick lists and shipment labels",
+      "source": "saas.json"
+    },
+    {
+      "id": "crm-01",
+      "appType": "crm",
+      "text": "CRM for real estate agents with leads, listings, and follow-up tasks",
+      "source": "advanced.json"
+    },
+    {
+      "id": "crm-02",
+      "appType": "crm",
+      "text": "CRM for dentists with patient records and appointment scheduling",
+      "source": "advanced.json"
+    },
+    {
+      "id": "crm-03",
+      "appType": "crm",
+      "text": "CRM for B2B sales with pipeline stages and contact enrichment",
+      "source": "advanced.json"
+    },
+    {
+      "id": "crm-04",
+      "appType": "crm",
+      "text": "CRM for nonprofits with donor tiers and campaign tracking",
+      "source": "advanced.json"
+    },
+    {
+      "id": "crm-05",
+      "appType": "crm",
+      "text": "CRM for recruiters with candidates, jobs, and interview notes",
+      "source": "advanced.json"
+    },
+    {
+      "id": "book-01",
+      "appType": "booking",
+      "text": "Salon booking app with stylist calendar and SMS reminders",
+      "source": "mobile.json"
+    },
+    {
+      "id": "book-02",
+      "appType": "booking",
+      "text": "Restaurant table booking with party size and time slots",
+      "source": "mobile.json"
+    },
+    {
+      "id": "book-03",
+      "appType": "booking",
+      "text": "Fitness class booking with capacity and waitlist",
+      "source": "mobile.json"
+    },
+    {
+      "id": "book-04",
+      "appType": "booking",
+      "text": "Medical appointment booking with insurance info form",
+      "source": "mobile.json"
+    },
+    {
+      "id": "book-05",
+      "appType": "booking",
+      "text": "Consulting booking with video call link and intake questionnaire",
+      "source": "mobile.json"
+    },
+    {
+      "id": "mob-01",
+      "appType": "mobile_first",
+      "text": "Mobile-first food delivery app with cart bottom sheet and map stub",
+      "source": "mobile-first.json"
+    },
+    {
+      "id": "mob-02",
+      "appType": "mobile_first",
+      "text": "Mobile-first habit tracker with streaks and daily check-in",
+      "source": "mobile-first.json"
+    },
+    {
+      "id": "mob-03",
+      "appType": "mobile_first",
+      "text": "Mobile-first banking UI with balance card and recent transactions list",
+      "source": "mobile-first.json"
+    },
+    {
+      "id": "mob-04",
+      "appType": "mobile_first",
+      "text": "Mobile-first ride share passenger app with trip status stepper",
+      "source": "mobile-first.json"
+    },
+    {
+      "id": "mob-05",
+      "appType": "mobile_first",
+      "text": "Mobile-first language learning app with lesson cards and progress ring",
+      "source": "mobile-first.json"
+    },
+    {
+      "id": "ai-01",
+      "appType": "ai_tool",
+      "text": "AI chat tool for summarizing PDFs with upload and citation panel",
+      "source": "admin.json"
+    },
+    {
+      "id": "ai-02",
+      "appType": "ai_tool",
+      "text": "AI image prompt studio with history and favorite presets",
+      "source": "admin.json"
+    },
+    {
+      "id": "ai-03",
+      "appType": "ai_tool",
+      "text": "AI code review assistant with diff viewer and severity tags",
+      "source": "admin.json"
+    },
+    {
+      "id": "ai-04",
+      "appType": "ai_tool",
+      "text": "AI meeting notes tool with action items and share link",
+      "source": "admin.json"
+    },
+    {
+      "id": "ai-05",
+      "appType": "ai_tool",
+      "text": "AI support copilot with ticket context and suggested replies",
+      "source": "admin.json"
+    }
+  ]
+}

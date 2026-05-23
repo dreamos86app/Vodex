@@ -1,10 +1,25 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { planIncludesAnalytics } from "@/lib/pricing";
 
 export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plan_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const planId = profile?.plan_id ?? "free";
+  if (!planIncludesAnalytics(planId)) {
+    return NextResponse.json(
+      { error: "Analytics requires Starter or above", code: "plan_upgrade_required", requiredPlan: "starter" },
+      { status: 403 },
+    );
+  }
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 

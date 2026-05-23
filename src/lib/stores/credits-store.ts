@@ -7,18 +7,14 @@ import { create } from "zustand";
 
 interface CreditsState {
   remaining: number;
+  planAllowance: number;
   resetAt: string | null;
   totalUsedThisPeriod: number;
   loading: boolean;
   lastSyncedAt: number | null;
-  /**
-   * True once the server has responded at least once.
-   * We never block generation on credits until this is true —
-   * prevents false positives while the store is still hydrating.
-   */
   isConfirmed: boolean;
 
-  setCredits: (remaining: number, resetAt?: string | null) => void;
+  setCredits: (remaining: number, resetAt?: string | null, planAllowance?: number) => void;
   setUsed: (used: number) => void;
   deductOptimistic: (amount: number) => void;
   setLoading: (loading: boolean) => void;
@@ -26,29 +22,33 @@ interface CreditsState {
   reset: () => void;
 }
 
+import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
+
 /** Monthly quota for the free plan — used as default before first DB sync. */
-export const FREE_MONTHLY_QUOTA = 100;
+export const FREE_MONTHLY_QUOTA = 30;
 
 /** Monthly token allowance shown in UI for each plan tier. */
 export function getMonthlyTokenQuotaForPlan(planId: string | undefined): number {
-  const p = planId ?? "free";
-  if (p === "free") return FREE_MONTHLY_QUOTA;
-  if (p === "pro") return 25_000;
-  if (p === "business") return 100_000;
-  return 10_000;
+  return monthlyTokensForPlan(normalizePlanId(planId ?? "free"));
 }
 
 export const useCreditsStore = create<CreditsState>()((set, get) => ({
-  // Default to free plan quota so the UI never shows "0 / 0" before first sync.
   remaining: FREE_MONTHLY_QUOTA,
+  planAllowance: FREE_MONTHLY_QUOTA,
   resetAt: null,
   totalUsedThisPeriod: 0,
   loading: false,
   lastSyncedAt: null,
   isConfirmed: false,
 
-  setCredits: (remaining, resetAt) =>
-    set({ remaining, resetAt: resetAt ?? get().resetAt, lastSyncedAt: Date.now(), isConfirmed: true }),
+  setCredits: (remaining, resetAt, planAllowance) =>
+    set({
+      remaining,
+      resetAt: resetAt ?? get().resetAt,
+      planAllowance: planAllowance ?? get().planAllowance,
+      lastSyncedAt: Date.now(),
+      isConfirmed: true,
+    }),
 
   setUsed: (totalUsedThisPeriod) => set({ totalUsedThisPeriod }),
 
@@ -73,18 +73,24 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
       // Only treat as 0 if the server explicitly returned a confirmed 0.
       // If data.remaining is undefined/null the wallet may not be initialized yet
       // — fall back to the free plan quota so we don't block generation.
-      const serverValue = data.remaining;
+      const serverValue = data.balance ?? data.remaining;
       const remaining = typeof serverValue === "number"
         ? Math.max(0, serverValue)
         : FREE_MONTHLY_QUOTA;
+      const planAllowance =
+        typeof data.plan_allowance === "number"
+          ? data.plan_allowance
+          : typeof data.quota === "number"
+            ? data.quota
+            : FREE_MONTHLY_QUOTA;
 
       set({
         remaining,
+        planAllowance,
         resetAt: data.reset_at ?? null,
-        totalUsedThisPeriod: data.total_used ?? 0,
+        totalUsedThisPeriod: data.used_this_period ?? data.total_used ?? 0,
         loading: false,
         lastSyncedAt: Date.now(),
-        // Mark confirmed only if the server returned a definitive value
         isConfirmed: typeof serverValue === "number",
       });
     } catch {
@@ -96,6 +102,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
   reset: () =>
     set({
       remaining: FREE_MONTHLY_QUOTA,
+      planAllowance: FREE_MONTHLY_QUOTA,
       resetAt: null,
       totalUsedThisPeriod: 0,
       loading: false,

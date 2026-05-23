@@ -1453,7 +1453,7 @@ export function ProjectDashboard({
 
           {/* Open in workspace */}
           <Link
-            href={`/create?projectId=${project.id}`}
+            href={`/apps/${project.id}/builder`}
             className="flex items-center gap-1.5 rounded-xl bg-surface px-3 py-2 text-[12.5px] font-medium text-foreground ring-1 ring-border transition hover:bg-surface-raised"
           >
             <ArrowUpRight className="size-3.5" strokeWidth={1.75} />

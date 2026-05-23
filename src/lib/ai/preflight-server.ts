@@ -1,7 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bootstrapProfileFromOAuth } from "@/lib/auth/profile-bootstrap";
-import { estimateCreditsForOperation } from "@/lib/credits/credit-pricing";
+import { planGenerationBudget } from "@/lib/ai/generation-budget-planner";
 import { routeModel, mapChatModeToTask } from "@/lib/ai/model-router";
 import { ensureProjectConversation } from "@/lib/projects/project-conversation";
 import { hasAnyLlmProviderKey } from "@/lib/llm/env-keys";
@@ -14,6 +14,8 @@ import {
 } from "@/lib/supabase/schema-errors";
 import type { AiPreflightMode } from "@/lib/ai/preflight-types";
 import { getChargeTokensProbeCached } from "@/lib/db/charge-probe-cache";
+import { classifyCreateIntent } from "@/lib/intent/create-intent-classifier";
+import { lifecyclePatch } from "@/lib/projects/project-lifecycle";
 
 const DEFAULT_MODEL_ID = "automatic";
 
@@ -92,14 +94,22 @@ async function ensureProject(
 
   const name = prompt.slice(0, 80) || "New app";
   const slug = `${slugFromTitle(name)}-${Date.now().toString(36)}`;
+  const intent = classifyCreateIntent(prompt, false);
+  const lifecycle = intent.shouldFullBuild ? "blueprint_generating" : "intent_review";
   const { data, error } = await writer
     .from("projects")
     .insert({
       owner_id: user.id,
       name,
       slug,
-      status: "building",
+      status: "draft",
       framework: "nextjs",
+      metadata: lifecyclePatch(lifecycle, {
+        initial_prompt: prompt,
+        source: "prompt",
+        workflow_step: "intent_review",
+        last_intent: intent.intent,
+      }),
     } as never)
     .select("id")
     .single();
@@ -175,6 +185,26 @@ export async function runAiPreflightServer(request: Request): Promise<PreflightS
     };
   }
 
+  const intentCheck = classifyCreateIntent(prompt, Boolean(projectIdIn));
+  if (mode === "build" && intentCheck.intent === "question_only") {
+    return {
+      ok: false,
+      status: 400,
+      error: intentCheck.userMessage,
+      code: "question_only",
+      hint: "Use Discuss mode to ask questions without reserving build credits.",
+    };
+  }
+  if (mode === "build" && intentCheck.needsClarification && !intentCheck.shouldFullBuild) {
+    return {
+      ok: false,
+      status: 400,
+      error: intentCheck.clarificationPrompt ?? intentCheck.userMessage,
+      code: "needs_clarification",
+      hint: intentCheck.userMessage,
+    };
+  }
+
   try {
     await bootstrapProfileFromOAuth(user, null);
   } catch (e) {
@@ -223,14 +253,17 @@ export async function runAiPreflightServer(request: Request): Promise<PreflightS
   console.info("[credits] preflight ok — charge_tokens callable");
 
   const routedEarly = routeModel(mapChatModeToTask(mode), modelId);
-  const creditEst = estimateCreditsForOperation({
-    mode,
-    modelId: routedEarly.modelId,
-    provider: routedEarly.provider,
-    promptLength: prompt.length,
-    expectedFiles: mode === "build" ? 12 : mode === "edit" ? 4 : 1,
+  const budgetPlan = planGenerationBudget({
+    prompt,
+    mode: mode === "build" ? "full_build" : mode,
+    selectedModel: routedEarly.modelId,
+    fileCount: mode === "build" ? 12 : mode === "edit" ? 4 : 1,
   });
-  const tokensNeeded = creditEst.creditsMin;
+  const tokensNeeded = budgetPlan.creditQuote.userCreditsReserved;
+  const creditEst = {
+    creditsMin: budgetPlan.creditQuote.userCreditsRequired,
+    creditsMax: budgetPlan.creditQuote.userCreditsReserved,
+  };
   const balance = billingRow.credits_remaining;
   if (balance < tokensNeeded) {
     return {

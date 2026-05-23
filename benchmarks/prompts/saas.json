@@ -1,0 +1,15 @@
+{
+  "category": "saas",
+  "prompts": [
+    { "id": "saas-01", "text": "Multi-tenant SaaS for invoice billing with Stripe and team settings" },
+    { "id": "saas-02", "text": "Subscription analytics SaaS with MRR chart and churn table" },
+    { "id": "saas-03", "text": "Customer feedback SaaS with NPS surveys and response inbox" },
+    { "id": "saas-04", "text": "API keys management SaaS with usage meters and rate limits" },
+    { "id": "saas-05", "text": "Documentation SaaS with sidebar nav and full-text search" },
+    { "id": "saas-06", "text": "Onboarding checklist SaaS for new hires with progress tracking" },
+    { "id": "saas-07", "text": "Compliance audit SaaS with evidence uploads and reviewer workflow" },
+    { "id": "saas-08", "text": "Email campaign SaaS with template editor and send analytics" },
+    { "id": "saas-09", "text": "Feature flag SaaS with environments and rollout percentage" },
+    { "id": "saas-10", "text": "Warehouse ops SaaS with pick lists and shipment labels" }
+  ]
+}

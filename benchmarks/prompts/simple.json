@@ -1,0 +1,15 @@
+{
+  "category": "landing",
+  "prompts": [
+    { "id": "lp-01", "text": "Landing page for a meditation app with calm gradients and signup CTA" },
+    { "id": "lp-02", "text": "Marketing site for an AI writing assistant with hero, features, pricing" },
+    { "id": "lp-03", "text": "Product launch page for a smart home device with video placeholder section" },
+    { "id": "lp-04", "text": "Waitlist landing for a fintech startup with email capture" },
+    { "id": "lp-05", "text": "Portfolio landing for a freelance designer with project grid" },
+    { "id": "lp-06", "text": "Event landing page for a tech conference with schedule preview" },
+    { "id": "lp-07", "text": "Nonprofit donation landing with impact stats and donate button" },
+    { "id": "lp-08", "text": "Restaurant landing with menu highlights and reservation link" },
+    { "id": "lp-09", "text": "Fitness app landing with before/after testimonials section" },
+    { "id": "lp-10", "text": "B2B SaaS landing for inventory management with demo request form" }
+  ]
+}

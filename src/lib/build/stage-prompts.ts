@@ -1,7 +1,32 @@
 /** Compact JSON-only prompts for staged build pipeline. */
 
+import { appTypePromptBlock, resolveAppTypeFromPrompt } from "@/lib/generation/app-type-ui-requirements";
+import { buildFullUiGenerationBlock } from "@/lib/generation/ui-quality-spec";
+
 export const JSON_ONLY_RULE =
   "Return ONLY valid JSON. No markdown, no code fences, no prose outside JSON.";
+
+export const FILE_PAYLOAD_RULE = [
+  JSON_ONLY_RULE,
+  `Return exactly:`,
+  `{ "files": [{ "path": "app/page.tsx", "language": "tsx", "content": "..." }],`,
+  `  "events": [{ "type": "wrote", "path": "", "summary": "" }],`,
+  `  "metadata": { "app_name": "" } }`,
+  "No markdown fences. No TODO, coming soon, or lorem ipsum placeholders.",
+  "Each page must include loading, empty, and error UI states (skeleton/spinner + empty message + error retry).",
+  "Use Tailwind className on all layout elements — mobile-first responsive (sm:/md: breakpoints).",
+  "Generate app-specific sections (CRM: contacts/deals/tasks; dashboard: metrics/chart/filters; booking: calendar/summary).",
+  "Include 3–8 route files under app/ matching the blueprint routeMap.",
+].join("\n");
+
+function uiQualityBlock(userPrompt: string): string {
+  const req = resolveAppTypeFromPrompt(userPrompt);
+  const appType = req?.id ?? null;
+  return [
+    appTypePromptBlock(appType),
+    buildFullUiGenerationBlock({ appType, buildTier: "standard", stylePresetId: "minimal" }),
+  ].join("\n");
+}
 
 export function buildPlanPrompt(userPrompt: string, scopeNote: string): string {
   return [
@@ -39,24 +64,15 @@ export function schemaPrompt(planJson: string): string {
   ].join("\n");
 }
 
-export function uiPlanPrompt(planJson: string, schemaJson: string): string {
+export function uiPlanPrompt(planJson: string, schemaJson: string, userPrompt?: string): string {
   return [
     JSON_ONLY_RULE,
     `Plan: ${planJson.slice(0, 1200)}`,
     `Schema: ${schemaJson.slice(0, 1200)}`,
+    userPrompt ? uiQualityBlock(userPrompt) : "",
     `Return: { "navigation": "", "screens": [{ "id": "", "title": "", "components": [] }], "design_tokens": {} }`,
   ].join("\n");
 }
-
-export const FILE_PAYLOAD_RULE = [
-  JSON_ONLY_RULE,
-  `Return exactly:`,
-  `{ "files": [{ "path": "preview/index.html", "language": "html", "content": "..." }],`,
-  `  "events": [{ "type": "wrote", "path": "", "summary": "" }],`,
-  `  "metadata": { "app_name": "" } }`,
-  "No markdown fences. No explanations. preview/index.html must be full responsive UI with embedded CSS.",
-  "Include 4-8 screens for normal apps. Premium SaaS styling.",
-].join("\n");
 
 export function frontendPrompt(
   userPrompt: string,
@@ -66,10 +82,26 @@ export function frontendPrompt(
 ): string {
   return [
     FILE_PAYLOAD_RULE,
-    `Max ${maxFiles} files. Prioritize preview/index.html and key src/ files.`,
+    uiQualityBlock(userPrompt),
+    `Max ${maxFiles} files. REQUIRED: app/page.tsx and at least 2 feature routes under app/ matching the plan.`,
+    "Do NOT return preview-only output — route files under app/ are mandatory.",
     `User: ${userPrompt.slice(0, 1000)}`,
     `Plan: ${planJson.slice(0, 1000)}`,
     `UI: ${uiJson.slice(0, 1000)}`,
+  ].join("\n");
+}
+
+export function minimalFrontendPrompt(userPrompt: string, planJson: string): string {
+  return [
+    FILE_PAYLOAD_RULE,
+    "Return EXACTLY 4 files with complete JSX (keep each file concise):",
+    "1) package.json — next/react deps with dev/build/start scripts",
+    "2) app/layout.tsx — root layout with Tailwind",
+    "3) app/page.tsx — hero + primary CTA + app-specific sections",
+    "4) app/dashboard/page.tsx OR app/features/page.tsx — secondary screen with list/cards",
+    uiQualityBlock(userPrompt),
+    `User: ${userPrompt.slice(0, 800)}`,
+    `Plan: ${planJson.slice(0, 800)}`,
   ].join("\n");
 }
 

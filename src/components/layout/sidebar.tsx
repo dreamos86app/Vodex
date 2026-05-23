@@ -3,14 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { DreamOS86BrandLockup } from "@/components/brand/dreamos86-brand-lockup";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight } from "lucide-react";
 import { navSections } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
-import { useCreditsStore } from "@/lib/stores/credits-store";
+import { formatCreditAmount } from "@/lib/credits/credit-summary";
+import { useCreditsStore, getMonthlyTokenQuotaForPlan } from "@/lib/stores/credits-store";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { Zap } from "lucide-react";
 
@@ -96,11 +97,16 @@ function NavSection({
 
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = React.useState(true);
   const { profile, user, session } = useAuthStore();
   const remaining = useCreditsStore((s) => s.remaining);
+  const planAllowance = useCreditsStore((s) => s.planAllowance);
+  const isConfirmed = useCreditsStore((s) => s.isConfirmed);
   const hydrated = useHydrated();
-  const MONTHLY_QUOTA = 100;
+  const MONTHLY_QUOTA = isConfirmed
+    ? planAllowance
+    : getMonthlyTokenQuotaForPlan(profile?.plan_id);
 
   const ownerEmail = user?.email ?? profile?.email;
   const isOwner = Boolean(ownerEmail && isDreamosOwnerEmail(ownerEmail));
@@ -109,6 +115,14 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const visibleSections = navSections.filter(
     (s) => s.label !== "Admin" || isOwner,
   );
+
+  React.useEffect(() => {
+    for (const section of visibleSections) {
+      for (const item of section.items) {
+        router.prefetch(item.href);
+      }
+    }
+  }, [router, visibleSections]);
 
   const showBrandWordmark = !collapsed || mobileOpen;
 
@@ -220,7 +234,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               {hydrated && (
                 <Link
                   href="/credits"
-                  title={`${remaining} tokens remaining`}
+                  title={`${formatCreditAmount(remaining)} credits available`}
                   className="flex size-8 items-center justify-center rounded-md text-muted-foreground/70 transition hover:bg-surface hover:text-accent"
                 >
                   <Zap className="size-4" strokeWidth={1.65} />
@@ -247,9 +261,13 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                     Tokens
                   </div>
                   <span className="text-[12px] font-semibold tabular-nums text-foreground">
-                    {remaining} <span className="text-muted-foreground font-normal">/ {MONTHLY_QUOTA}</span>
+                    {formatCreditAmount(remaining)}{" "}
+                    <span className="text-muted-foreground font-normal">available</span>
                   </span>
                 </div>
+                <p className="mb-1.5 text-[10px] text-muted-foreground">
+                  Plan allowance: {formatCreditAmount(MONTHLY_QUOTA)}/mo
+                </p>
                 <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-accent transition-all duration-500"

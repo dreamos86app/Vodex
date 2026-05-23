@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateText } from "ai";
 import { parseFencedFiles } from "@/lib/creation/extract-fenced-code";
+import { FILE_PAYLOAD_RULE } from "@/lib/build/stage-prompts";
 import { validateGeneratedBuild } from "@/lib/creation/validate-build-quality";
 
 export type BuildFile = { path: string; content: string };
@@ -23,10 +24,11 @@ export function buildRepairPrompt(
   const preview = files.find((f) => /preview\/index\.html$/i.test(f.path));
   const excerpt = preview?.content.slice(0, 2000) ?? files[0]?.content.slice(0, 1500) ?? "";
   return [
-    "The generated app failed quality checks. Repair ONLY the broken/placeholder parts.",
+    FILE_PAYLOAD_RULE,
+    "The generated app failed quality checks. Repair by adding missing route files and fixing placeholders.",
     `Issues: ${reasons.join("; ")}`,
     `Original user request: ${userPrompt.slice(0, 500)}`,
-    "Return the same file paths with improved content. Include preview/index.html with polished UI.",
+    "REQUIRED paths: app/page.tsx plus at least 2 routes under app/ (e.g. app/dashboard/page.tsx).",
     "No Sample Item, no generic two-button placeholders, no lorem ipsum.",
     excerpt ? `\nCurrent preview excerpt:\n${excerpt}` : "",
   ].join("\n");

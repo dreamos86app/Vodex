@@ -1,0 +1,662 @@
+
+> dreamos-platform@0.1.0 verify:all:no-benchmark:with-server
+> node scripts/verify-all-no-benchmark-with-server.mjs
+
+
+=== verify:all:no-benchmark:with-server ===
+
+✓ Dev server already running at http://127.0.0.1:3000
+
+
+> dreamos-platform@0.1.0 verify:all:no-benchmark
+> node scripts/verify-all-no-benchmark.mjs
+
+
+=== verify:all:no-benchmark ===
+
+
+--- verify:tls ---
+
+
+> dreamos-platform@0.1.0 verify:tls
+> node scripts/verify-tls.mjs
+
+
+=== verify:tls ===
+
+Current Node TLS state
+  Node version:     v22.22.0
+  Platform:         win32
+  Supabase URL:     https://wciioegiczwqlmlroley.supabase.co
+  NODE_USE_SYSTEM_CA: 1 (enabled — good for Windows)
+  NODE_TLS_REJECT_UNAUTHORIZED: not disabled (good)
+  npm run dev:        uses cross-env NODE_USE_SYSTEM_CA=1
+✓ TLS verification not globally disabled
+✓ NODE_USE_SYSTEM_CA=1 is enabled
+✓ Supabase TLS probe succeeded (HTTP 200)
+✓ Dev server reachable at http://localhost:3000 (HTTP 200)
+
+✓ TLS verify OK
+
+
+--- verify:env-safety ---
+
+
+> dreamos-platform@0.1.0 verify:env-safety
+> node scripts/verify-env-safety.mjs
+
+
+=== verify:env-safety ===
+
+✓ NEXT_PUBLIC_SUPABASE_URL uses canonical ref
+✓ TLS verification not disabled in env or process
+✓ package.json scripts do not disable TLS
+✓ no src/middleware.ts
+✓ src/proxy.ts present
+✓ no xycqut refs in src/
+
+6 checks passed.
+
+
+--- verify:public-copy ---
+
+
+> dreamos-platform@0.1.0 verify:public-copy
+> node scripts/verify-public-copy.mjs
+
+
+=== verify:public-copy ===
+
+✓ src/lib/data.ts scanned
+✓ src/components/changelog/changelog-view.tsx scanned
+✓ src/components/marketing/public-landing.tsx scanned
+✓ src/components/marketing/public-conversion-cards.tsx scanned
+✓ src/components/marketing/how-it-works-demo.tsx scanned
+✓ May 23 changelog mentions 1500 ZIP limit
+
+--- verify:changelog ---
+
+
+> dreamos-platform@0.1.0 verify:changelog
+> node scripts/verify-changelog.mjs
+
+
+=== verify:changelog ===
+
+✓ May 23, 2026 entry
+✓ no internal economics in changelog
+✓ release title
+
+--- verify:storage ---
+
+
+> dreamos-platform@0.1.0 verify:storage
+> node scripts/verify-storage-buckets.mjs
+
+
+=== verify:storage ===
+
+✓ src/lib/import/zip-storage.ts: bucket constant
+✓ src/lib/import/zip-storage.ts: owner-scoped path
+✓ src/lib/supabase/ensure-storage-bucket.ts: private bucket ensure
+✓ src/app/api/projects/import-zip/route.ts: import route bucket
+✓ src/app/api/projects/import-zip/route.ts: import route ensure
+✓ src/app/api/projects/import-zip/route.ts: setup error code
+✓ src/app/api/projects/import-zip/route.ts: user-safe storage error
+✓ zip-imports migration present
+✓ import route does not use media bucket
+✓ live: bucket "zip-imports" exists
+✓ live: bucket "zip-imports" is private
+
+--- verify:app-files-schema ---
+
+
+> dreamos-platform@0.1.0 verify:app-files-schema
+> node scripts/verify-app-files-schema.mjs
+
+
+=== verify:app-files-schema ===
+
+✓ src/lib/projects/app-file-rows.ts: zip import row builder
+✓ src/lib/projects/app-file-rows.ts: zip_import source
+✓ src/app/api/projects/import-zip/route.ts: import uses row builder
+✓ src/app/api/projects/import-zip/route.ts: import includes owner_id
+✓ src/app/api/projects/import-zip/route.ts: import failure diagnostics
+✓ src/lib/projects/app-file-rows.ts: row builder owner_id
+✓ app_files metadata migration present
+✓ migration adds mime_type
+✓ migration adds size_bytes
+✓ migration adds source
+✓ live: PostgREST sees app_files.mime_type, size_bytes, source
+
+--- verify:billing ---
+
+
+> dreamos-platform@0.1.0 verify:billing
+> node scripts/verify-billing.mjs
+
+
+> dreamos-platform@0.1.0 verify:credit-economy-db
+> node scripts/verify-credit-economy-db.mjs
+
+
+=== verify:credit-economy-db ===
+
+✓ Table public.credit_quotes reachable (HTTP 403)
+✓ Table public.credit_reservations reachable (HTTP 403)
+✓ Table public.generation_cost_audits reachable (HTTP 403)
+✓ Table public.provider_usage_logs reachable (HTTP 403)
+✓ Table public.pending_diffs reachable (HTTP 200)
+✓ Table public.project_deployments reachable (HTTP 200)
+✓ Table public.published_apps reachable (HTTP 403)
+
+7 checks passed.
+
+
+=== verify:billing ===
+
+✓ wrong formula = 90 for $1 provider
+✓ $1 provider => 30 user credits
+✓ $1 must NOT require 90 user credits
+✓ $0.10 => 3 user credits
+✓ $0.025 => 1 user credit
+✓ 10 internal cost => 10 user min
+✓ product floor 8
+✓ floor >= profitable min
+✓ ~66.7% margin at 3x revenue
+✓ 3x revenue multiplier
+✓ pricing-config uses micro-USD math
+✓ TARGET_REVENUE_MULTIPLIER named correctly
+✓ polish mode in pricing config
+✓ polish API route exists
+
+14 checks passed.
+
+
+--- verify:credits ---
+
+
+> dreamos-platform@0.1.0 verify:credits
+> node scripts/verify-credits.mjs
+
+
+=== verify:credits ===
+
+✓ src/lib/credits/charge-ai-operation.ts: uses safe credit event writer
+✓ src/lib/credits/credit-events.ts: credit-events helper
+✓ src/lib/credits/credit-events.ts: credit_events event_type
+✓ src/lib/billing/credit-profit-guard.ts: discuss microcharge pricing
+✓ no legacy amount field on credit_events
+
+--- verify:admin-credit-economy ---
+
+
+> dreamos-platform@0.1.0 verify:admin-credit-economy
+> node scripts/verify-admin-credit-economy.mjs
+
+
+=== verify:admin-credit-economy ===
+
+✓ src/lib/credits/credit-events.ts
+✓ src/components/admin/admin-credit-economy-panel.tsx
+✓ src/app/api/admin/credit-economy/route.ts
+✓ src/lib/credits/credit-events.ts: zero credits safe
+✓ src/lib/credits/charge-ai-operation.ts: uses safe credit event writer
+
+--- verify:diagnostics ---
+
+
+> dreamos-platform@0.1.0 verify:diagnostics
+> node scripts/verify-diagnostics.mjs
+
+
+=== verify:diagnostics ===
+
+✓ src/components/dev/admin-diagnostics-drawer.tsx: charge_tokens status label
+✓ src/lib/db/admin-runtime-health.ts: postgrest probe
+✓ src/lib/db/probe-charge-tokens-rpc.ts: diagnosis tree
+✓ supabase/migrations/20260604120000_credit_events_hardening.sql: hardening migration
+✓ scripts/verify-editor.mjs: editor dev server check
+✓ scripts/credit-billing-sql-patch.sql: sql patch credits_consumed
+
+--- verify:chat ---
+
+
+> dreamos-platform@0.1.0 verify:chat
+> node scripts/verify-chat.mjs
+
+
+=== verify:chat ===
+
+✓ src/lib/ai/dreamos-knowledge-pack.ts
+✓ src/lib/ai/chat-mode-policy.ts
+✓ src/lib/ai/chat-capability-policy.ts
+✓ src/lib/ai/safe-product-context.ts
+✓ src/lib/ai/chat-system-prompts.ts
+✓ src/lib/creation/system-prompt.ts
+✓ system-prompt wired to knowledge pack
+✓ discuss prompt: NEVER claim you built, edited, or published
+✓ discuss prompt: Refuse revenue margins
+✓ discuss prompt: ZIP import
+✓ discuss prompt: what model are you using
+✓ discuss canBuildApps false
+✓ profit/multiplier confidential guard
+✓ confidential question guard
+✓ knowledge pack zip import
+✓ knowledge pack billing user safe
+✓ chat safe runtime tests
+
+--- verify:generation ---
+
+
+> dreamos-platform@0.1.0 verify:generation
+> node scripts/verify-generation.mjs
+
+
+=== verify:blueprint (inline) ===
+
+✓ schema has oneSentencePitch
+✓ approval helper exists
+✓ banned ref guard
+✓ secrets rejected
+✓ model names rejected for users
+✓ 10 user credits per USD
+✓ no public 50 credits=$1 copy ()
+✓ exists src/lib/build/blueprint-archetypes.ts
+✓ exists src/lib/build/blueprint-scoring.ts
+✓ exists src/lib/build/blueprint-deterministic.ts
+✓ blueprint depth runtime tests
+
+11 checks passed.
+
+
+=== verify:generation ===
+
+✓ exists src/lib/billing/pricing-config.ts
+✓ exists src/lib/build/blueprint-schema.ts
+✓ exists src/lib/build/app-blueprint.ts
+✓ exists src/app/api/build/blueprint/route.ts
+✓ exists src/lib/ai/generation-cache.ts
+✓ exists src/lib/ai/prompt-compressor.ts
+✓ exists src/lib/ai/file-fingerprint.ts
+✓ exists src/lib/build/premium-stage-labels.ts
+✓ exists src/lib/ai/generation-budget-planner.ts
+✓ exists src/components/builder/app-builder-workspace.tsx
+✓ exists src/lib/build/format-blueprint-prompt.ts
+✓ exists src/lib/build/blueprint-archetypes.ts
+✓ exists src/lib/build/backend-plan.ts
+✓ exists src/lib/build/database-depth-plan.ts
+✓ exists src/lib/templates/template-archetypes.ts
+✓ exists src/lib/ai/route-decision-log.ts
+✓ charge uses assertProfitableCharge
+✓ visible output cap 900
+✓ banned ref detector for xycqut
+✓ no 30k default in chat route
+
+20 checks passed.
+
+
+--- verify:blueprint ---
+
+
+> dreamos-platform@0.1.0 verify:blueprint
+> node scripts/verify-blueprint.mjs
+
+
+=== verify:blueprint (inline) ===
+
+✓ schema has oneSentencePitch
+✓ approval helper exists
+✓ banned ref guard
+✓ secrets rejected
+✓ model names rejected for users
+✓ 10 user credits per USD
+✓ no public 50 credits=$1 copy ()
+✓ exists src/lib/build/blueprint-archetypes.ts
+✓ exists src/lib/build/blueprint-scoring.ts
+✓ exists src/lib/build/blueprint-deterministic.ts
+✓ blueprint depth runtime tests
+
+11 checks passed.
+
+
+--- verify:templates ---
+
+
+> dreamos-platform@0.1.0 verify:templates
+> node scripts/verify-templates.mjs
+
+
+=== verify:templates ===
+
+✓ exists src/lib/templates/template-catalog.ts
+✓ exists src/lib/templates/template-archetypes.ts
+✓ exists src/lib/templates/template-blueprints.ts
+✓ exists src/lib/templates/template-data-models.ts
+✓ exists src/lib/templates/template-file-plans.ts
+✓ exists src/lib/templates/template-ui-patterns.ts
+✓ template saas-landing
+✓ template ai-assistant
+✓ template marketplace
+✓ template booking-app
+✓ template social-platform
+✓ template finance-app
+✓ template crm
+✓ template dashboard
+✓ template ecommerce-mini
+✓ template mobile-habit
+✓ template portfolio
+✓ template internal-tool
+✓ template learning-course
+✓ template support-helpdesk
+✓ template analytics-dashboard
+✓ templates wire data model + blueprint
+✓ template influence runtime tests
+
+23 checks passed.
+
+
+--- verify:backend-generation ---
+
+
+> dreamos-platform@0.1.0 verify:backend-generation
+> node scripts/verify-backend-generation.mjs
+
+
+=== verify:backend-generation ===
+
+✓ exists src/lib/build/backend-plan.ts
+✓ exists src/lib/build/blueprint-deterministic.ts
+✓ honest backend preview
+✓ RLS expectations
+✓ backend depth runtime tests
+
+5 checks passed.
+
+
+--- verify:database-depth ---
+
+
+> dreamos-platform@0.1.0 verify:database-depth
+> node scripts/verify-database-depth.mjs
+
+
+=== verify:database-depth ===
+
+✓ exists src/lib/build/database-depth-plan.ts
+✓ RLS + migration honesty
+✓ database depth runtime tests
+
+3 checks passed.
+
+
+--- verify:zip-import ---
+
+
+> dreamos-platform@0.1.0 verify:zip-import
+> node scripts/verify-zip-import.mjs
+
+
+=== verify:zip-import ===
+
+✓ exists src/lib/import/zip-import-service.ts
+✓ exists src/lib/import/zip-file-validator.ts
+✓ exists src/lib/import/framework-detector.ts
+✓ exists src/lib/import/package-script-detector.ts
+✓ exists src/lib/import/dependency-detector.ts
+✓ exists src/lib/import/env-requirement-detector.ts
+✓ exists src/lib/import/imported-app-validator.ts
+✓ exists src/lib/import/import-quality-score.ts
+✓ exists src/app/api/projects/import-zip/route.ts
+✓ exists src/app/api/import/zip/preview/route.ts
+✓ exists src/components/import/imported-app-view.tsx
+✓ exists src/components/apps/zip-import-wizard.tsx
+✓ exists src/components/create/workspace/app-dashboard-panel.tsx
+✓ .env excluded from import
+✓ node_modules skipped
+✓ 1500 file limit
+✓ deterministic scan no LLM cost
+✓ import route uses service + quality score
+✓ project metadata source zip_import
+✓ dashboard import + actions
+✓ import route private zip-imports bucket
+✓ import route avoids media bucket for ZIP
+✓ import route app_files row builder
+✓ app_files row helper tests
+✓ zip storage helper tests
+✓ zip import runtime tests
+
+26 checks passed.
+
+
+--- verify:zip-import-live-route ---
+
+
+> dreamos-platform@0.1.0 verify:zip-import-live-route
+> node scripts/verify-zip-import-live-route.mjs
+
+
+=== verify:zip-import-live-route ===
+
+✓ Using .playwright-auth.json session
+✓ Route returned projectId 99b441ec-0a40-45c5-a954-94b8fad6a52c
+✓ Project row exists
+✓ app_files rows inserted (3)
+✓ app_files.owner_id present
+✓ zip-imports storage object present
+✓ imported_projects row exists
+✓ redirectTo returned
+✓ publish/readiness 200 (files=3, buildCompleted=true)
+✓ files API count=3
+✓ Cleaned up test project
+
+verify:zip-import-live-route passed.
+
+
+--- verify:polling ---
+
+
+> dreamos-platform@0.1.0 verify:polling
+> node scripts/verify-polling.mjs
+
+✓ projects list avoids unconditional reconcile=1
+✓ projects list debounces reload
+✓ dashboard dedupes publish/readiness fetch
+
+--- verify:pricing ---
+
+
+> dreamos-platform@0.1.0 verify:pricing
+> node scripts/verify-pricing.mjs
+
+✓ Analytics Starter+
+✓ ZIP import Pro+
+✓ Android packaging row
+
+--- verify:analytics ---
+
+
+> dreamos-platform@0.1.0 verify:analytics
+> node scripts/verify-analytics.mjs
+
+✓ planIncludesAnalytics helper
+✓ API gates free plan
+✓ Free upgrade message
+✓ Empty traffic state
+
+--- verify:imported-file-tree ---
+
+
+> dreamos-platform@0.1.0 verify:imported-file-tree
+> node scripts/verify-imported-file-tree.mjs
+
+
+=== verify:imported-file-tree ===
+
+✓ loadProjectFilePaths
+✓ Paginated files API
+✓ Lazy content load
+✓ loadProjectFilePaths import
+✓ Icon detection
+✓ file path pagination
+✓ files API paginates
+✓ builder lazy content fetch
+
+--- live large-ZIP (optional) ---
+
+✓ app_files zip_import count=1104
+✓ files API count=1104 (expected ~1104)
+✓ DB count matches API count
+✓ lazy file content load works
+✓ source=zip_import
+✓ Cleaned up large fixture project
+
+verify:imported-file-tree passed.
+
+
+--- verify:secrets-setup ---
+
+
+> dreamos-platform@0.1.0 verify:secrets-setup
+> node scripts/verify-secrets-setup.mjs
+
+✓ src/components/import/imported-secrets-setup-panel.tsx
+✓ src/app/api/projects/[id]/secrets/route.ts
+✓ src/lib/secrets/seal.ts
+✓ src/lib/import/env-requirement-detector.ts
+✓ secrets setup panel UX
+✓ env detection patterns
+
+--- verify:integrations-ux ---
+
+
+> dreamos-platform@0.1.0 verify:integrations-ux
+> node scripts/verify-integrations-ux.mjs
+
+✓ Supabase scoped to user app
+✓ GitHub export fallback
+✓ No scary GitHub env in main UI
+✓ Supabase manual connection label
+
+--- verify:app-icons ---
+
+
+> dreamos-platform@0.1.0 verify:app-icons
+> node scripts/verify-app-icons.mjs
+
+✓ src/lib/import/detect-app-icon.ts
+✓ src/lib/projects/build-initials-icon-svg.ts
+✓ import sets icon_svg
+✓ icon route prefers stored svg
+✓ initials icon high contrast
+
+--- verify:users-panel ---
+
+
+> dreamos-platform@0.1.0 verify:users-panel
+> node scripts/verify-users-panel.mjs
+
+✓ Users tab removed from app dashboard
+✓ Setup tab present
+✓ No invite UI in app dashboard
+
+--- verify:imported-dashboard-copy ---
+
+
+> dreamos-platform@0.1.0 verify:imported-dashboard-copy
+> node scripts/verify-imported-dashboard-copy.mjs
+
+✓ imported ready copy
+✓ simple/advanced dashboard
+
+--- verify:chat-persistence ---
+
+
+> dreamos-platform@0.1.0 verify:chat-persistence
+> node scripts/verify-chat-persistence.mjs
+
+
+=== verify:chat-persistence ===
+
+✓ src/components/chat/chat-view.tsx: conversation switch
+✓ src/components/chat/chat-view.tsx: URL sync
+✓ src/components/chat/chat-view.tsx: single stream loader
+✓ src/components/chat/chat-view.tsx: exact suggestion send
+
+--- verify:credit-sync ---
+
+
+> dreamos-platform@0.1.0 verify:credit-sync
+> node scripts/verify-credit-sync.mjs
+
+
+=== verify:credit-sync ===
+
+✓ src/app/api/credits/route.ts: plan allowance field
+✓ src/app/api/credits/route.ts: canonical balance
+✓ src/lib/stores/credits-store.ts: store plan allowance
+✓ src/lib/billing/credit-profit-guard.ts: discuss pricing
+
+--- verify:data-consistency ---
+
+
+> dreamos-platform@0.1.0 verify:data-consistency
+> node scripts/verify-data-consistency.mjs
+
+
+=== verify:data-consistency ===
+
+✓ src/lib/stores/credits-store.ts: credits sync
+✓ src/components/chat/chat-view.tsx: chat list reload
+✓ src/components/dev/admin-diagnostics-drawer.tsx: infra-only blockers
+✓ src/lib/import/zip-file-validator.ts: zip file limit 1500
+✓ src/lib/import/zip-import-service.ts: deterministic zip scan
+✓ src/lib/import/zip-storage.ts: zip-imports bucket constant
+✓ src/lib/projects/app-file-rows.ts: app_files mime_type in row builder
+
+--- verify:deploy ---
+
+
+> dreamos-platform@0.1.0 verify:deploy
+> node scripts/verify-deploy.mjs
+
+
+=== verify:deploy ===
+
+✓ exists src/lib/deploy/provider-types.ts
+✓ exists src/lib/deploy/deploy-provider-registry.ts
+✓ exists src/lib/deploy/vercel-connection.ts
+✓ exists src/app/api/deploy/readiness/route.ts
+✓ exists src/app/api/deploy/export/route.ts
+✓ exists src/app/api/deploy/history/route.ts
+✓ exists src/components/deploy/deploy-readiness-center.tsx
+✓ exists src/components/deploy/deploy-workspace-panel.tsx
+✓ exists src/components/builder/app-builder-workspace.tsx
+✓ exists src/app/api/deploy/vercel/connect-status/route.ts
+✓ exists src/app/api/deploy/vercel/status/route.ts
+✓ exists src/app/api/deploy/vercel/start/route.ts
+✓ exists src/lib/deploy/vercel-client.ts
+✓ exists src/lib/deploy/vercel-config.ts
+✓ exists src/components/publish/public-url-mode-badge.tsx
+✓ exists scripts/deploy-tests.ts
+✓ vercel not_connected state
+✓ vercel token_invalid state
+✓ connection missing_env state
+✓ connection token_invalid
+✓ token validation against Vercel API
+✓ real zip export route
+✓ export includes README_DEPLOY
+✓ vercel start honest when not configured
+✓ vercel start rejects missing_env
+✓ vercel start rejects invalid token
+✓ vercel start needs project link
+✓ vercel start uses real client
+✓ vercel client calls provider API
+✓ disabled deploy when not connected
+✓ open deployment URL button
+✓ logs panel
+✓ subdomain uses honest public-url helper
+✗ missing honest deploy URL messaging
+
+✗ verify:deploy failed
+

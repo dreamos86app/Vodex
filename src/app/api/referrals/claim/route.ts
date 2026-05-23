@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { REFERRAL_CREDITS_PER_USER } from "@/lib/referrals/referral-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function POST() {
 
   const { data, error } = await supabase.rpc("claim_referral_reward", {
     p_referred_id: user.id,
-    p_credits: 20, // 1/5 of free monthly quota (100 / 5 = 20)
+    p_credits: REFERRAL_CREDITS_PER_USER,
   });
 
   if (error) {

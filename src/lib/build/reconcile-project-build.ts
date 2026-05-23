@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { reconcileProjectLifecycle } from "@/lib/projects/reconcile-lifecycle";
+import { completeBuildWithValidation } from "@/lib/build/complete-build-with-validation";
 
 type Writer = SupabaseClient<Database>;
 
@@ -66,31 +68,58 @@ export async function reconcileProjectBuildState(
     projectBuildStatus === "completed";
 
   if (files > 0 && !buildCompleted && latestBuild?.status !== "failed") {
-    await writer
-      .from("build_jobs")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        error_message: null,
-        result_summary: `Reconciled — ${files} file(s) on disk`,
-      } as never)
-      .eq("id", latestBuild!.id);
+    if (latestBuild?.id) {
+      await writer
+        .from("build_jobs")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          error_message: null,
+          result_summary: `Reconciled — ${files} file(s) on disk`,
+        } as never)
+        .eq("id", latestBuild.id);
 
-    await writer
-      .from("projects")
-      .update({
-        build_status: "completed",
-        last_build_id: latestBuild!.id,
-        last_build_at: new Date().toISOString(),
-        status: "draft",
-      } as never)
-      .eq("id", projectId)
-      .eq("owner_id", userId);
+      await writer
+        .from("projects")
+        .update({
+          build_status: "completed",
+          last_build_id: latestBuild.id,
+          last_build_at: new Date().toISOString(),
+        } as never)
+        .eq("id", projectId)
+        .eq("owner_id", userId);
+
+      await completeBuildWithValidation({ writer, userId, projectId });
+    } else {
+      const meta =
+        project?.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
+          ? (project.metadata as Record<string, unknown>)
+          : {};
+      const isImport = meta.source === "zip_import";
+
+      await writer
+        .from("projects")
+        .update({
+          build_status: isImport ? "imported" : "completed",
+          metadata: {
+            ...meta,
+            file_count: files,
+            build_reconciled_without_job: true,
+            lifecycle_status: isImport
+              ? meta.lifecycle_status ?? "imported_preview_ready"
+              : meta.lifecycle_status ?? "generated",
+          },
+        } as never)
+        .eq("id", projectId)
+        .eq("owner_id", userId);
+    }
 
     buildStatus = "completed";
     buildCompleted = true;
     reconciled = true;
   }
+
+  await reconcileProjectLifecycle(writer, projectId, userId);
 
   return {
     fileCount: files,

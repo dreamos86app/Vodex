@@ -5,6 +5,18 @@ alter table public.subscriptions add column if not exists stripe_price_id text;
 alter table public.subscriptions add column if not exists stripe_subscription_id text;
 alter table public.subscriptions add column if not exists stripe_customer_id text;
 alter table public.subscriptions add column if not exists current_period_end timestamptz;
+alter table public.subscriptions add column if not exists current_period_start timestamptz;
+alter table public.subscriptions add column if not exists cancel_at_period_end boolean default false;
+alter table public.subscriptions add column if not exists pending_downgrade_plan text;
+
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'subscriptions' and column_name = 'pending_downgrade')
+     and not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'subscriptions' and column_name = 'pending_downgrade_plan') then
+    alter table public.subscriptions rename column pending_downgrade to pending_downgrade_plan;
+  end if;
+exception when others then null;
+end $$;
 
 grant select on public.subscriptions to service_role;
 grant all on public.subscriptions to service_role;

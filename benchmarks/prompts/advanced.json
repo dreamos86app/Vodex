@@ -1,0 +1,10 @@
+{
+  "category": "crm",
+  "prompts": [
+    { "id": "crm-01", "text": "CRM for real estate agents with leads, listings, and follow-up tasks" },
+    { "id": "crm-02", "text": "CRM for dentists with patient records and appointment scheduling" },
+    { "id": "crm-03", "text": "CRM for B2B sales with pipeline stages and contact enrichment" },
+    { "id": "crm-04", "text": "CRM for nonprofits with donor tiers and campaign tracking" },
+    { "id": "crm-05", "text": "CRM for recruiters with candidates, jobs, and interview notes" }
+  ]
+}

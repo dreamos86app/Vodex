@@ -3,15 +3,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Sparkles, Shield, Zap, Rocket, X } from "lucide-react";
+import { ArrowRight, Sparkles, Shield, Zap, X } from "lucide-react";
 import { IntegrationShowcaseSection } from "@/components/marketing/integrations-showcase";
 import {
   PublicMarketingFooter,
   PublicMarketingHeader,
 } from "@/components/marketing/public-marketing-shell";
-import { PublicShipSection } from "@/components/marketing/public-ship-section";
 import { PublicSignupSection } from "@/components/marketing/public-signup-section";
+import { PublicConversionCards } from "@/components/marketing/public-conversion-cards";
+import { HowItWorksDemo } from "@/components/marketing/how-it-works-demo";
 import { DreamOsStatsSection } from "@/components/os-home/dreamos-stats-section";
+import { WhyDreamOsSection } from "@/components/os-home/why-dreamos-section";
+import { PublicLandingSecondaryCtas } from "@/components/marketing/public-landing-sections";
 import { cn } from "@/lib/utils";
 
 function PublicAuthModal({
@@ -60,7 +63,7 @@ function PublicAuthModal({
             </button>
             <p className="pr-10 text-[15px] font-semibold text-foreground">Sign in to build</p>
             <p className="mt-1 text-[12.5px] text-muted-foreground">
-              Save projects, chat with models, and publish — same home page, unlocked after you sign in.
+              Save projects, shape blueprints, and preview — unlock the full create workflow after sign in.
             </p>
             <label
               htmlFor="auth-gate-prompt"
@@ -79,12 +82,14 @@ function PublicAuthModal({
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Link
                 href={loginHref}
+                data-testid="public-auth-login"
                 className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-surface px-4 text-[13px] font-semibold text-foreground transition hover:bg-surface/80"
               >
                 Log in
               </Link>
               <Link
                 href={signupHref}
+                data-testid="public-auth-signup"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[13px] font-semibold text-white transition hover:bg-accent/90"
               >
                 Get Started
@@ -103,7 +108,10 @@ export function PublicLanding() {
   const [authOpen, setAuthOpen] = React.useState(false);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div
+      data-testid="public-landing"
+      className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden"
+    >
       <PublicAuthModal open={authOpen} onClose={() => setAuthOpen(false)} draft={draft} onDraftChange={setDraft} />
 
       <PublicMarketingHeader />
@@ -116,7 +124,6 @@ export function PublicLanding() {
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        {/* Hero */}
         <motion.section
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -126,11 +133,12 @@ export function PublicLanding() {
           <p className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
             <Sparkles className="size-3.5" strokeWidth={2} /> AI-native app OS
           </p>
-          <h1 className="mt-5 text-balance text-[28px] font-semibold tracking-tight text-foreground sm:text-[40px]">
-            Build real apps with AI.
+          <h1 className="mt-5 text-balance text-[28px] font-semibold tracking-tight text-foreground sm:text-[42px]">
+            Turn ideas into apps you can preview, polish, and launch.
           </h1>
           <p className="mt-4 text-pretty text-[15px] leading-relaxed text-muted-foreground sm:text-[17px]">
-            Describe what you need. DreamOS86 plans, builds, previews, and helps you publish — all in one workspace.
+            Describe what you want in plain language. Review the plan, watch it build in stages, accept changes, and
+            publish when it&apos;s truly ready.
           </p>
 
           <div className="mx-auto mt-8 max-w-xl rounded-2xl border border-accent/20 bg-gradient-to-b from-accent/[0.08] to-background p-1 shadow-[0_24px_64px_-28px_rgba(30,107,255,0.35)] ring-1 ring-border/80">
@@ -141,7 +149,7 @@ export function PublicLanding() {
                 className="w-full cursor-pointer text-left"
               >
                 <label htmlFor="public-hero-prompt-ro" className="sr-only">
-                  Describe what you want to build — sign in to continue
+                  Describe what you want to build
                 </label>
                 <div
                   id="public-hero-prompt-ro"
@@ -149,12 +157,13 @@ export function PublicLanding() {
                 >
                   {draft.trim()
                     ? draft
-                    : "Sign in to describe what you want to build — tap here to open login or sign up…"}
+                    : "Build me a CRM for dentists with appointments and patient notes…"}
                 </div>
               </button>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                 <button
                   type="button"
+                  data-testid="public-hero-continue"
                   onClick={() => setAuthOpen(true)}
                   className={cn(
                     "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold shadow-sm transition",
@@ -162,51 +171,58 @@ export function PublicLanding() {
                   )}
                 >
                   <Zap className="size-3.5" strokeWidth={2} />
-                  Continue — log in or sign up
+                  Get Started free
                   <ArrowRight className="size-3.5 opacity-80" strokeWidth={2} />
                 </button>
               </div>
             </div>
           </div>
 
+          <PublicLandingSecondaryCtas onStart={() => setAuthOpen(true)} />
+
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-[12px] text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-              <Shield className="size-3.5 text-accent" strokeWidth={1.75} /> Your data, your Supabase workspace
+              <Shield className="size-3.5 text-accent" strokeWidth={1.75} /> Cancel anytime — only pay for completed work
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Rocket className="size-3.5 text-accent" strokeWidth={1.75} /> Credits only after successful AI steps
+              <Zap className="size-3.5 text-accent" strokeWidth={1.75} /> Real preview & publish states
             </span>
           </div>
         </motion.section>
 
-        {/* Integrations — directly under hero */}
+        <PublicConversionCards />
+        <HowItWorksDemo />
+
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-40px" }}
           transition={{ duration: 0.4 }}
-          className="mx-auto mt-14 max-w-5xl"
+          className="mx-auto mt-20 max-w-5xl"
         >
           <IntegrationShowcaseSection variant="premium" />
         </motion.div>
 
-        {/* Ship section — "Now you can ship software within minutes — not months" */}
-        <motion.div className="mx-auto mt-14 max-w-5xl">
-          <PublicShipSection />
-        </motion.div>
-
-        {/* DreamOS86 in numbers */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-40px" }}
           transition={{ duration: 0.4 }}
-          className="mx-auto mt-14 w-full max-w-5xl"
+          className="mx-auto mt-16 max-w-5xl px-4 sm:px-6"
+        >
+          <WhyDreamOsSection />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={{ duration: 0.4 }}
+          className="mx-auto mt-16 max-w-5xl"
         >
           <DreamOsStatsSection />
         </motion.div>
 
-        {/* Bottom signup CTA */}
         <PublicSignupSection />
       </main>
 

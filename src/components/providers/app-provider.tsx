@@ -18,6 +18,7 @@ import { useNotificationsStore } from "@/lib/stores/notifications-store";
 import type { Notification } from "@/lib/supabase/types";
 import { ReferralCapture } from "@/components/referrals/referral-capture";
 import { CommandCenter } from "@/components/command/command-center";
+import { NavigationProgress } from "@/components/layout/navigation-progress";
 import { AuthStateDebug } from "@/components/dev/auth-state-debug";
 import { hasActiveSession, isStalePersistedProfile } from "@/lib/auth/client-identity";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/lib/cache/session-bootstrap-cache";
 import { loadUserProfileCoreDeduped } from "@/lib/supabase/load-user-profile";
 import type { Profile } from "@/lib/supabase/types";
+import { installChunkLoadRecovery } from "@/lib/navigation/chunk-load-recovery";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -42,6 +44,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // trigger rehydration here, then bootstrap the live session below.
   React.useEffect(() => {
     void useAuthStore.persist.rehydrate();
+    return installChunkLoadRecovery();
   }, []);
 
   const profile = useAuthStore((s) => s.profile);
@@ -73,17 +76,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const cached = getCachedBootstrap(userId);
       if (cached?.profile) {
         setProfile(cached.profile);
-        const creditsValue =
-          typeof cached.profile.credits_remaining === "number"
-            ? cached.profile.credits_remaining
-            : null;
-        if (creditsValue !== null) {
-          const planId = cached.profile.plan_id ?? "free";
-          const capped =
-            planId === "free"
-              ? Math.min(creditsValue, FREE_MONTHLY_QUOTA)
-              : creditsValue;
-          useCreditsStore.getState().setCredits(capped, cached.profile.credits_reset_at ?? null);
+        if (typeof cached.profile.credits_remaining === "number") {
+          useCreditsStore.getState().setCredits(
+            Math.max(0, cached.profile.credits_remaining),
+            cached.profile.credits_reset_at ?? null,
+            undefined,
+          );
         }
         if (cached.notifications.length > 0) {
           setNotifications(cached.notifications);
@@ -114,23 +112,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (coreProfile) {
         const profile = coreProfile as Profile;
         setProfile(profile);
-        // Set credits from profile immediately so we never flash 0.
-        // `setCredits` marks the store as `isConfirmed = true`, preventing
-        // false "out of credits" blocks during initial hydration.
-        const creditsValue = typeof profile.credits_remaining === "number"
-          ? profile.credits_remaining
-          : null;
-        if (creditsValue !== null) {
-          const planId = profile.plan_id ?? "free";
-          const capped =
-            planId === "free"
-              ? Math.min(creditsValue, FREE_MONTHLY_QUOTA)
-              : creditsValue;
+        if (typeof profile.credits_remaining === "number") {
           useCreditsStore.getState().setCredits(
-            capped,
+            Math.max(0, profile.credits_remaining),
             profile.credits_reset_at ?? null,
           );
         }
+        void syncCredits(userId, { force: true });
       }
 
       const { data: notifications } = await supabase
@@ -296,6 +284,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <NavigationProgress />
       <ReferralCapture />
       <CommandCenter />
       <AuthStateDebug />

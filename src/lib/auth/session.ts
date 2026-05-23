@@ -14,7 +14,11 @@ export async function getServerSessionUser(): Promise<User | null> {
       data: { user },
       error,
     } = await supabase.auth.getUser();
-    if (error && process.env.NODE_ENV !== "production") {
+    if (
+      error &&
+      process.env.NODE_ENV !== "production" &&
+      !/auth session missing/i.test(error.message)
+    ) {
       console.warn("[auth/session] getServerSessionUser:", error.message);
     }
     return user ?? null;

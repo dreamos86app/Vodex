@@ -1,13 +1,19 @@
-import type { Metadata } from "next";
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { OsHome } from "@/components/os-home/os-home";
+import dynamic from "next/dynamic";
 import { PublicLanding } from "@/components/marketing/public-landing";
 import { getServerSessionUser } from "@/lib/auth/session";
 import { buildAuthCallbackRedirectFromSearchParams } from "@/lib/auth/oauth-redirect";
+import { createClient } from "@/lib/supabase/server";
+import { readBannerSvg, buildBannerForProject } from "@/lib/projects/backfill-project-media";
+import { ensureProjectIconSvg } from "@/lib/projects/ensure-project-icon";
 
-export const metadata: Metadata = {
+const OsHome = dynamic(() => import("@/components/os-home/os-home").then((m) => m.OsHome), {
+  loading: () => <OsHomeFallback />,
+});
+
+export const metadata = {
   title: "Home",
   description: "The AI-native operating system for building software.",
 };
@@ -54,9 +60,13 @@ export default async function HomePage({
     name: string;
     gradient: string;
     status: string;
+    framework: string | null;
     updated_at: string;
     preview_url: string | null;
     icon_url: string | null;
+    icon_svg: string | null;
+    banner_svg: string | null;
+    metadata: Record<string, unknown> | null;
   };
 
   let recentProjects: RecentProject[] = [];
@@ -66,11 +76,38 @@ export default async function HomePage({
     const supabase = await createClient();
     const { data } = await supabase
       .from("projects")
-      .select("id, name, gradient, status, updated_at, preview_url, icon_url")
+      .select(
+        "id, name, app_name, gradient, status, framework, updated_at, preview_url, icon_url, icon_svg, metadata, published_subdomain",
+      )
       .eq("owner_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(8);
-    recentProjects = (data ?? []) as RecentProject[];
+
+    const rows = data ?? [];
+    for (const row of rows) {
+      const meta =
+        row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : {};
+      const displayName =
+        (typeof row.app_name === "string" && row.app_name.trim()) || row.name;
+      const icon_svg = ensureProjectIconSvg(displayName, row.icon_svg);
+      const banner_svg = readBannerSvg(row.metadata) ?? buildBannerForProject(row);
+
+      recentProjects.push({
+        id: row.id,
+        name: displayName,
+        gradient: row.gradient,
+        status: row.status,
+        framework: row.framework,
+        updated_at: row.updated_at,
+        preview_url: row.preview_url,
+        icon_url: row.icon_url,
+        icon_svg,
+        banner_svg,
+        metadata: meta,
+      });
+    }
   } catch (err) {
     if (process.env.NODE_ENV !== "production") {
       console.warn("[home] recent projects load failed:", err);

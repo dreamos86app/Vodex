@@ -1,75 +1,57 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, LayoutGrid, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProjectIcon } from "@/components/projects/project-icon";
+import { ProjectBanner } from "@/components/projects/project-banner";
+import { readImportMeta, isZipImportProject } from "@/lib/projects/imported-project-state";
 
 export type YourAppsProject = {
   id: string;
   name: string;
   gradient: string;
   status: string;
+  framework?: string | null;
   updated_at: string;
   preview_url: string | null;
   icon_url?: string | null;
+  icon_svg?: string | null;
+  banner_svg?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
-function AppPreview({ previewUrl, gradient }: { previewUrl: string | null; gradient: string }) {
-  if (previewUrl) {
-    return (
-      <div className="relative h-[108px] w-full overflow-hidden bg-muted/20">
-        <iframe
-          src={previewUrl}
-          title=""
-          tabIndex={-1}
-          loading="lazy"
-          sandbox="allow-scripts allow-same-origin"
-          className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[200%] max-w-none -translate-x-1/2 origin-top scale-[0.22] border-0 opacity-95"
-        />
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-background/75"
-          aria-hidden
-        />
-      </div>
-    );
+function frameworkLabel(project: YourAppsProject): string | null {
+  const meta =
+    project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
+      ? project.metadata
+      : null;
+  if (meta && isZipImportProject(meta)) {
+    const imp = readImportMeta(meta);
+    const fw = imp.framework?.id ?? project.framework;
+    if (fw && fw !== "unknown") return String(fw);
   }
-
-  return <div className={cn("h-[108px] w-full bg-gradient-to-br opacity-90", gradient)} aria-hidden />;
+  return project.framework && project.framework !== "unknown" ? project.framework : null;
 }
 
-function AppIcon({ project }: { project: YourAppsProject }) {
-  if (project.icon_url) {
-    return (
-      <div className="relative size-9 shrink-0 overflow-hidden rounded-lg bg-background ring-1 ring-border/70">
-        <Image
-          src={project.icon_url}
-          alt=""
-          width={36}
-          height={36}
-          className="size-full object-cover"
-          unoptimized
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "size-9 shrink-0 rounded-lg bg-gradient-to-br shadow-inner ring-1 ring-white/25",
-        project.gradient,
-      )}
-    />
-  );
+function fileSummary(project: YourAppsProject): string | null {
+  const meta =
+    project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
+      ? project.metadata
+      : null;
+  if (!meta || !isZipImportProject(meta)) return null;
+  const imp = readImportMeta(meta);
+  if (imp.file_count && imp.file_count > 0) return `${imp.file_count.toLocaleString()} files`;
+  if (imp.routes?.length) return `${imp.routes.length} routes`;
+  return null;
 }
 
 export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
   const hasApps = projects.length > 0;
 
   return (
-    <section className="w-full">
+    <section className="w-full" data-testid="your-apps-section">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <LayoutGrid className="size-3.5 text-accent" strokeWidth={1.75} />
@@ -90,28 +72,56 @@ export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
 
       {hasApps ? (
         <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none">
-          {projects.map((p, i) => (
-            <motion.div
-              key={p.id}
-              initial={{ opacity: 0, y: 8 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <Link
-                href={`/apps/${p.id}/builder`}
-                className="group flex w-[220px] flex-col overflow-hidden rounded-xl bg-surface ring-1 ring-border transition hover:ring-accent/35 hover:shadow-md"
+          {projects.map((p, i) => {
+            const fw = frameworkLabel(p);
+            const files = fileSummary(p);
+            return (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05 }}
               >
-                <AppPreview previewUrl={p.preview_url} gradient={p.gradient} />
-                <div className="flex items-center gap-2.5 p-3">
-                  <AppIcon project={p} />
-                  <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">
-                    {p.name}
-                  </p>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
+                <Link
+                  href={`/apps/${p.id}/builder`}
+                  className="group flex w-[220px] flex-col overflow-hidden rounded-xl bg-surface ring-1 ring-border transition hover:ring-accent/35 hover:shadow-md"
+                >
+                  <ProjectBanner
+                    projectId={p.id}
+                    bannerSvg={p.banner_svg}
+                    previewUrl={p.preview_url}
+                    title={p.name}
+                    heightClass="h-[108px]"
+                    previewOnly
+                  />
+                  <div className="flex items-start gap-2.5 p-3">
+                    <ProjectIcon
+                      projectId={p.id}
+                      iconSvg={p.icon_svg}
+                      iconUrl={p.icon_url}
+                      size={36}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-semibold text-foreground">{p.name}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {fw ? (
+                          <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">
+                            {fw}
+                          </span>
+                        ) : null}
+                        {files ? (
+                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
+                            {files}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            );
+          })}
           <Link
             href="/create"
             className="flex w-[140px] shrink-0 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border px-4 py-6 transition hover:border-accent/40 hover:bg-accent/5"

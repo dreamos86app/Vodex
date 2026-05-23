@@ -4,6 +4,19 @@ const REJECT_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\bTODO:\s*implement\b/i, reason: "contains TODO placeholders" },
 ];
 
+function normalizeFilePath(path: string): string {
+  return path.replace(/^\.?\//, "").replace(/\\/g, "/");
+}
+
+function isPageFile(path: string): boolean {
+  const p = normalizeFilePath(path);
+  return (
+    /(^|\/)page\.(tsx|jsx|js)$/i.test(p) ||
+    /(^|\/)pages?\//i.test(p) ||
+    /index\.html$/i.test(p)
+  );
+}
+
 export type BuildQualityResult = {
   ok: boolean;
   reasons: string[];
@@ -19,16 +32,16 @@ export function validateGeneratedBuild(files: Array<{ path: string; content: str
     if (pattern.test(combined)) reasons.push(reason);
   }
 
-  const pagePaths = files.filter(
-    (f) =>
-      /\/(page|pages)\//i.test(f.path) ||
-      /\/app\/[^/]+\/page\./i.test(f.path) ||
-      /\.html$/i.test(f.path),
+  const pagePaths = files.filter((f) => isPageFile(f.path));
+  const substantialHtml = files.some(
+    (f) => /index\.html$/i.test(f.path) && (f.content?.trim().length ?? 0) >= 400,
   );
   const previewOnly =
-    files.length <= 2 && files.every((f) => f.path.includes("preview"));
+    files.length <= 2 &&
+    files.every((f) => f.path.includes("preview")) &&
+    !substantialHtml;
   if (previewOnly) reasons.push("only preview file generated");
-  if (pagePaths.length < 1 && !files.some((f) => f.path.endsWith(".html"))) {
+  if (pagePaths.length < 1 && !substantialHtml) {
     reasons.push("no pages or screens detected");
   }
 

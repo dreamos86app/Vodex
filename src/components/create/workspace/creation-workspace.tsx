@@ -33,7 +33,9 @@ import {
   MODE_META,
   type CreationMode,
 } from "@/lib/creation/models";
-import { calculateCredits } from "@/lib/credits/cost-engine";
+import { CreditQuoteBanner, type CreditQuoteDisplay } from "@/components/billing/credit-quote-banner";
+import { BlueprintConfirmationModal } from "@/components/build/blueprint-confirmation-modal";
+import type { AppBlueprint } from "@/lib/build/blueprint-schema";
 import { ModelPicker } from "@/components/create/workspace/model-picker";
 import {
   ModeSwitch,
@@ -177,10 +179,10 @@ const MODE_STYLE = {
 // ─── Out-of-tokens card ───────────────────────────────────────────────────────
 
 const PLAN_META: Record<string, { name: string; quota: number; nextPlan: string; nextPrice: number; nextCredits: string }> = {
-  free:     { name: "Free",     quota: 100,   nextPlan: "Starter", nextPrice: 20,  nextCredits: "1,000" },
-  starter:  { name: "Starter",  quota: 1_000, nextPlan: "Pro",     nextPrice: 50,  nextCredits: "2,500" },
-  pro:      { name: "Pro",      quota: 2_500, nextPlan: "Infinity",nextPrice: 100, nextCredits: "5,000+" },
-  infinity: { name: "Infinity", quota: 5_000, nextPlan: "Infinity",nextPrice: 200, nextCredits: "10,000+" },
+  free:     { name: "Free",     quota: 30,    nextPlan: "Starter", nextPrice: 20,  nextCredits: "200" },
+  starter:  { name: "Starter",  quota: 200,   nextPlan: "Pro",     nextPrice: 50,  nextCredits: "500" },
+  pro:      { name: "Pro",      quota: 500,   nextPlan: "Infinity",nextPrice: 100, nextCredits: "1,000+" },
+  infinity: { name: "Infinity", quota: 1_000, nextPlan: "Infinity",nextPrice: 200, nextCredits: "2,000+" },
 };
 
 const UPGRADE_PERKS: Record<string, string[]> = {
@@ -363,7 +365,14 @@ export function CreationWorkspace({
 }: CreationWorkspaceProps) {
   const supabase = createClient();
   const { profile } = useAuthStore();
-  const { deductOptimistic, remaining, isConfirmed, totalUsedThisPeriod, resetAt } = useCreditsStore();
+  const { syncFromDB, remaining, isConfirmed, totalUsedThisPeriod, resetAt } = useCreditsStore();
+  const [creditQuote, setCreditQuote] = React.useState<CreditQuoteDisplay | null>(null);
+  const [quoteLoading, setQuoteLoading] = React.useState(false);
+  const [blueprint, setBlueprint] = React.useState<AppBlueprint | null>(null);
+  const [blueprintOpen, setBlueprintOpen] = React.useState(false);
+  const [blueprintLoading, setBlueprintLoading] = React.useState(false);
+  const [blueprintApproved, setBlueprintApproved] = React.useState(false);
+  const pendingSubmitRef = React.useRef<string | null>(null);
 
   // ─── UI state ───────────────────────────────────────────────────────────────
   const [input, setInput] = React.useState(initialPrompt);
@@ -398,9 +407,8 @@ export function CreationWorkspace({
             setCreditError(true);
           } else if (res.ok) {
             setCreditError(false);
-            // Use profitability-validated credit cost (3x margin guaranteed)
-            const creditCost = calculateCredits(modelId, modeRef.current);
-            deductOptimistic(creditCost);
+            const uid = useAuthStore.getState().user?.id;
+            if (uid) void syncFromDB(uid, { force: true });
           }
           return res;
         },
@@ -419,8 +427,45 @@ export function CreationWorkspace({
           },
         }),
       }),
-    [modelId, deductOptimistic, project?.id],
+    [modelId, syncFromDB, project?.id],
   );
+
+  React.useEffect(() => {
+    const prompt = input.trim();
+    if (!prompt || prompt.length < 8) {
+      setCreditQuote(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setQuoteLoading(true);
+      fetch("/api/credits/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          prompt,
+          modelId,
+          projectId: project?.id,
+        }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data) {
+            setCreditQuote({
+              estimatedCost: data.estimatedCost,
+              reservedEstimate: data.reservedEstimate,
+              label: data.label,
+              safeToRun: data.safeToRun,
+              balance: data.balance,
+              included: data.included,
+              savingsNote: data.savingsNote,
+            });
+          }
+        })
+        .finally(() => setQuoteLoading(false));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [input, mode, modelId, project?.id]);
 
   const {
     messages,
@@ -525,32 +570,9 @@ export function CreationWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Submit ────────────────────────────────────────────────────────────────
-  async function submit() {
-    const text = input.trim();
-    if (!text || isBusy) return;
-
-    // Credit gate — only block if the server has confirmed credits are exhausted.
-    // While `isConfirmed` is false the store holds the default free-plan quota,
-    // so we never block a user who simply hasn't synced yet.
-    if (isConfirmed && remaining <= 0) {
-      setCreditError(true);
-      return;
-    }
-
-    let composed = text;
-
-    // Attachments: include real names + sizes. Binary content is not uploaded
-    // — be explicit so the model doesn't pretend it can read files yet.
-    if (attachments.length > 0) {
-      const list = attachments
-        .map((a) => `- ${a.kind}: ${a.name}${a.size ? ` (${a.size} bytes)` : ""}`)
-        .join("\n");
-      composed = `${composed}\n\nThe user attached ${attachments.length} item(s):\n${list}\n\n(Binary content is not yet uploaded to the server — confirm with the user before writing code that depends on file contents.)`;
-    }
-
+  async function runSend(composed: string) {
     setInput("");
-    await ensureConversation(text);
+    await ensureConversation(composed);
 
     sendMessage({
       role: "user",
@@ -561,6 +583,65 @@ export function CreationWorkspace({
       if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
     });
     setAttachments([]);
+  }
+
+  async function loadBlueprint(text: string) {
+    setBlueprintLoading(true);
+    setBlueprintOpen(true);
+    try {
+      const res = await fetch("/api/build/blueprint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: text,
+          modelId,
+          projectId: project?.id,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.blueprint) {
+        setBlueprint(data.blueprint as AppBlueprint);
+      } else {
+        setBlueprint(null);
+      }
+    } finally {
+      setBlueprintLoading(false);
+    }
+  }
+
+  // ─── Submit ────────────────────────────────────────────────────────────────
+  async function submit() {
+    const text = input.trim();
+    if (!text || isBusy) return;
+
+    if (isConfirmed && remaining <= 0) {
+      setCreditError(true);
+      return;
+    }
+
+    let composed = text;
+    if (attachments.length > 0) {
+      const list = attachments
+        .map((a) => `- ${a.kind}: ${a.name}${a.size ? ` (${a.size} bytes)` : ""}`)
+        .join("\n");
+      composed = `${composed}\n\nThe user attached ${attachments.length} item(s):\n${list}\n\n(Binary content is not yet uploaded to the server — confirm with the user before writing code that depends on file contents.)`;
+    }
+
+    if (mode === "build" && !blueprintApproved) {
+      pendingSubmitRef.current = composed;
+      await loadBlueprint(text);
+      return;
+    }
+
+    await runSend(composed);
+  }
+
+  async function confirmBlueprintBuild() {
+    setBlueprintApproved(true);
+    setBlueprintOpen(false);
+    const composed = pendingSubmitRef.current;
+    pendingSubmitRef.current = null;
+    if (composed) await runSend(composed);
   }
 
   function startFresh() {
@@ -749,6 +830,9 @@ export function CreationWorkspace({
         {/* Composer */}
         <div className="shrink-0 border-t border-border/60 bg-background/90 px-3 py-3 backdrop-blur-xl">
           <div className="mx-auto max-w-3xl">
+            {(creditQuote || quoteLoading) && (
+              <CreditQuoteBanner quote={creditQuote} loading={quoteLoading} className="mb-2" />
+            )}
             <AttachmentRail
               attachments={attachments}
               onRemove={removeAttachment}
@@ -961,6 +1045,32 @@ export function CreationWorkspace({
       </AnimatePresence>
 
       </div>{/* end horizontal split */}
+
+      <BlueprintConfirmationModal
+        open={blueprintOpen}
+        blueprint={blueprint}
+        loading={blueprintLoading}
+        onClose={() => {
+          setBlueprintOpen(false);
+          pendingSubmitRef.current = null;
+        }}
+        onBuildNow={() => void confirmBlueprintBuild()}
+        onEditBlueprint={() => setBlueprintOpen(false)}
+        onCheaperMode={() => {
+          setBlueprintApproved(true);
+          setBlueprintOpen(false);
+          const t = pendingSubmitRef.current;
+          pendingSubmitRef.current = t ? `${t}\n\n[Cheaper build mode: reduce scope, fewer pages, standard components only]` : null;
+          void confirmBlueprintBuild();
+        }}
+        onPremiumMode={() => {
+          setBlueprintApproved(true);
+          setBlueprintOpen(false);
+          const t = pendingSubmitRef.current;
+          pendingSubmitRef.current = t ? `${t}\n\n[Premium quality: richer UI, more polish, stronger error handling]` : null;
+          void confirmBlueprintBuild();
+        }}
+      />
     </DropZone>
   );
 }

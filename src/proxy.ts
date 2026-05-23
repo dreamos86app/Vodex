@@ -10,11 +10,32 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { buildAuthCallbackRedirectFromSearchParams } from "@/lib/auth/oauth-redirect";
 import { classifyUrlHostname } from "@/lib/network/safe-fetch";
 
 const PROXY_AUTH_WARN_MS = 30_000;
+const PROXY_AUTH_TIMEOUT_MS = 2_500;
 let lastProxyAuthWarnAt = 0;
+
+async function resolveProxyUser(supabase: {
+  auth: { getUser: () => Promise<{ data: { user: User | null } }> };
+}): Promise<{ user: User | null; timedOut: boolean }> {
+  try {
+    const result = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("proxy_auth_timeout")), PROXY_AUTH_TIMEOUT_MS),
+      ),
+    ]);
+    return { user: result.data.user, timedOut: false };
+  } catch (e) {
+    if (e instanceof Error && e.message === "proxy_auth_timeout") {
+      return { user: null, timedOut: true };
+    }
+    throw e;
+  }
+}
 
 function hasSupabaseSessionCookie(request: NextRequest): boolean {
   return request.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("auth"));
@@ -131,8 +152,12 @@ export async function proxy(request: NextRequest) {
     user = null;
   } else {
     try {
-      const { data } = await supabase.auth.getUser();
-      user = data.user;
+      const resolved = await resolveProxyUser(supabase);
+      user = resolved.user;
+      if (resolved.timedOut) {
+        authRefreshFailed = true;
+        logProxyAuthFailure(new Error("proxy_auth_timeout"), supabaseHost);
+      }
     } catch (e) {
       authRefreshFailed = true;
       logProxyAuthFailure(e, supabaseHost);

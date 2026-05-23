@@ -5,6 +5,9 @@ import {
   loadUserProfileCore,
 } from "@/lib/supabase/load-user-profile";
 import { resolveWorkspaceIdForUser } from "@/lib/identity/resolve-workspace-id";
+import { monthlyTokensForPlan } from "@/lib/billing/plans";
+
+const FREE_CREDITS_FALLBACK = monthlyTokensForPlan("free");
 
 export type DreamosIdentity = {
   accountId: string;
@@ -77,10 +80,10 @@ export async function buildDreamosIdentity(
     "";
 
   const creditsRemaining =
-    typeof profile?.credits_remaining === "number" ? profile.credits_remaining : 100;
+    typeof profile?.credits_remaining === "number" ? profile.credits_remaining : FREE_CREDITS_FALLBACK;
   const profileRecord = profile as { credits_limit?: number } | null | undefined;
   const creditsLimit =
-    typeof profileRecord?.credits_limit === "number" ? profileRecord.credits_limit : 100;
+    typeof profileRecord?.credits_limit === "number" ? profileRecord.credits_limit : FREE_CREDITS_FALLBACK;
 
   let createdAt: string | null = null;
   try {

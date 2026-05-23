@@ -3,6 +3,7 @@ import type { Database, Json } from "@/lib/supabase/types";
 import { scoreTaskScope } from "@/lib/ai/task-scope-limiter";
 import { FULL_BUILD_CAP_USD } from "@/lib/ai/cost-budget";
 import { callProviderStructured, parseJsonFromModel } from "@/lib/ai/provider-call";
+import { parseFencedFiles } from "@/lib/creation/extract-fenced-code";
 import { logServerOperation } from "@/lib/ops/server-ops-log";
 import { requireId } from "@/lib/diagnostics/require-ids";
 import { dreamosLog } from "@/lib/diagnostics/dreamos-logger";
@@ -16,6 +17,7 @@ import {
   backendPrompt,
   buildPlanPrompt,
   frontendPrompt,
+  minimalFrontendPrompt,
   iconSvgPrompt,
   schemaPrompt,
   uiPlanPrompt,
@@ -73,16 +75,42 @@ function pushEvent(events: WorkflowEvent[], type: WorkflowEventType, label: stri
   events.push({ type, label, detail, at: new Date().toISOString() });
 }
 
+function normalizeFilePath(path: string): string {
+  return path.replace(/^\.?\//, "").replace(/\\/g, "/");
+}
+
+function isPageFile(path: string): boolean {
+  const p = normalizeFilePath(path);
+  return (
+    /(^|\/)page\.(tsx|jsx|js)$/i.test(p) ||
+    /(^|\/)pages?\//i.test(p) ||
+    /index\.html$/i.test(p)
+  );
+}
+
+function hasRouteFiles(files: BuildFile[]): boolean {
+  return files.some((f) => isPageFile(f.path));
+}
+
 function parseFilePayload(text: string): { files: BuildFile[]; events: { type: string; path: string; summary: string }[] } | null {
   const parsed = parseJsonFromModel<{
     files?: BuildFile[];
     events?: { type: string; path: string; summary: string }[];
   }>(text);
-  if (!parsed?.files?.length) return null;
-  return {
-    files: parsed.files.filter((f) => f.path && f.content),
-    events: parsed.events ?? [],
-  };
+  if (parsed?.files?.length) {
+    return {
+      files: parsed.files.filter((f) => f.path && f.content),
+      events: parsed.events ?? [],
+    };
+  }
+  const fenced = parseFencedFiles(text);
+  if (fenced.length) {
+    return {
+      files: fenced.filter((f) => f.path && f.content),
+      events: fenced.map((f) => ({ type: "wrote", path: f.path, summary: `Wrote ${f.path}` })),
+    };
+  }
+  return null;
 }
 
 function buildVisibleNarrative(
@@ -126,6 +154,7 @@ export async function runStagedBuildPipeline(input: {
   buildJobId: string | null;
   userPrompt: string;
   memoryBlock?: string;
+  blueprintBlock?: string;
   conversationId?: string | null;
 }): Promise<StagedBuildResult> {
   if (!requireId("projectId", input.projectId, { source: "server", userId: input.userId, buildId: input.buildJobId })) {
@@ -166,6 +195,8 @@ export async function runStagedBuildPipeline(input: {
     ? `Build Core V1 only. Queue for later: ${scope.backlog.slice(0, 5).join("; ")}`
     : "";
 
+  const planContext = [input.blueprintBlock, input.memoryBlock, scopeNote].filter(Boolean).join("\n\n");
+
   pushEvent(events, "planning", "Creating build plan");
   const planRes = await callProviderStructured({
     writer: input.writer,
@@ -174,7 +205,7 @@ export async function runStagedBuildPipeline(input: {
     operationId: `${input.operationId}:plan`,
     operationType: "build_plan",
     system: BUILD_SYSTEM,
-    prompt: buildPlanPrompt(input.userPrompt, scopeNote),
+    prompt: buildPlanPrompt(input.userPrompt, planContext),
     accumulatedCostUsd: accumulatedCost,
   });
   accumulatedCost += planRes.providerCostUsd;
@@ -262,7 +293,7 @@ export async function runStagedBuildPipeline(input: {
     operationId: `${input.operationId}:ui`,
     operationType: "ui_design_plan",
     system: BUILD_SYSTEM,
-    prompt: uiPlanPrompt(planJson, schemaJson),
+    prompt: uiPlanPrompt(planJson, schemaJson, input.userPrompt),
     complexity,
     accumulatedCostUsd: accumulatedCost,
   });
@@ -287,6 +318,10 @@ export async function runStagedBuildPipeline(input: {
   }
 
   pushEvent(events, "writing", "Generating frontend files");
+  const smokeBuild = process.env.DREAMOS_SMOKE_BUILD === "1";
+  const fePrompt = smokeBuild
+    ? minimalFrontendPrompt(input.userPrompt, planJson)
+    : frontendPrompt(input.userPrompt, planJson, uiJson, scope.maxFiles);
   const feRes = await callProviderStructured({
     writer: input.writer,
     userId: input.userId,
@@ -294,8 +329,8 @@ export async function runStagedBuildPipeline(input: {
     operationId: `${input.operationId}:frontend`,
     operationType: "frontend_implementation",
     system: BUILD_SYSTEM,
-    prompt: frontendPrompt(input.userPrompt, planJson, uiJson, scope.maxFiles),
-    complexity,
+    prompt: fePrompt,
+    complexity: smokeBuild ? 3 : complexity,
     accumulatedCostUsd: accumulatedCost,
   });
   accumulatedCost += feRes.providerCostUsd;
@@ -312,7 +347,29 @@ export async function runStagedBuildPipeline(input: {
     }
   }
 
-  if (complexity >= 7 && accumulatedCost < FULL_BUILD_CAP_USD * 0.9) {
+  if (!hasRouteFiles(allFiles) && accumulatedCost < FULL_BUILD_CAP_USD * 0.92) {
+    pushEvent(events, "writing", "Retrying with compact route set");
+    const miniRes = await callProviderStructured({
+      writer: input.writer,
+      userId: input.userId,
+      userEmail: input.userEmail,
+      operationId: `${input.operationId}:frontend-mini`,
+      operationType: "frontend_implementation",
+      system: BUILD_SYSTEM,
+      prompt: minimalFrontendPrompt(input.userPrompt, planJson),
+      complexity: 4,
+      accumulatedCostUsd: accumulatedCost,
+    });
+    accumulatedCost += miniRes.providerCostUsd;
+    const miniPayload = parseFilePayload(miniRes.text);
+    if (miniPayload?.files.length) {
+      const merged = new Map(allFiles.map((f) => [f.path, f]));
+      for (const f of miniPayload.files) merged.set(f.path, f);
+      allFiles = [...merged.values()].slice(0, scope.maxFiles);
+    }
+  }
+
+  if (complexity >= 7 && hasRouteFiles(allFiles) && accumulatedCost < FULL_BUILD_CAP_USD * 0.9) {
     pushEvent(events, "writing", "Generating backend files");
     try {
       const beRes = await callProviderStructured({
@@ -342,7 +399,7 @@ export async function runStagedBuildPipeline(input: {
   let quality = assessBuildQuality(allFiles);
   let repairAttempts = 0;
 
-  while (!quality.ok && repairAttempts < 1 && accumulatedCost < FULL_BUILD_CAP_USD) {
+  while (!quality.ok && repairAttempts < 2 && accumulatedCost < FULL_BUILD_CAP_USD) {
     pushEvent(events, "repairing", `Repair pass ${repairAttempts + 1}`);
     const repairRes = await callProviderStructured({
       writer: input.writer,
@@ -405,17 +462,22 @@ export async function runStagedBuildPipeline(input: {
   else pushEvent(events, "failed", quality.reasons.join("; ") || "No files generated");
 
   if (input.buildJobId) {
-    await input.writer
+    const pipelineMeta = {
+      pipeline: "staged",
+      complexity,
+      provider_cost_usd: accumulatedCost,
+      workflow_events: events as unknown as Json,
+    } as Json;
+    const { error: metaErr } = await input.writer
       .from("build_jobs")
-      .update({
-        meta: {
-          pipeline: "staged",
-          complexity,
-          provider_cost_usd: accumulatedCost,
-          workflow_events: events as unknown as Json,
-        } as Json,
-      } as never)
+      .update({ meta: pipelineMeta } as never)
       .eq("id", input.buildJobId);
+    if (metaErr?.message?.includes("meta")) {
+      await input.writer
+        .from("build_jobs")
+        .update({ metadata: pipelineMeta } as never)
+        .eq("id", input.buildJobId);
+    }
   }
 
   await logServerOperation({

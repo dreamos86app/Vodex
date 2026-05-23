@@ -1,6 +1,6 @@
 # Supabase custom auth domain (DreamOS86)
 
-Google OAuth shows the **hostname of `NEXT_PUBLIC_SUPABASE_URL`** in the account chooser (e.g. `xycqutvqxtkbszytaxbe.supabase.co`). To show a branded domain such as `auth.dreamos86.com`, configure Supabase Custom Domain and update env + OAuth clients.
+Google OAuth shows the **hostname of `NEXT_PUBLIC_SUPABASE_URL`** in the account chooser (e.g. `wciioegiczwqlmlroley.supabase.co`). To show a branded domain such as `auth.dreamos86.com`, configure Supabase Custom Domain and update env + OAuth clients.
 
 ## 1. Enable custom domain in Supabase
 

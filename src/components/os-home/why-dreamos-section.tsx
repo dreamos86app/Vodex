@@ -163,7 +163,7 @@ const FEATURES = [
 
 export function WhyDreamOsHeadline() {
   return (
-    <section className="w-full text-center">
+    <section className="w-full text-center" data-testid="why-dreamos-section">
       <motion.p
         initial={{ opacity: 0, y: 6 }}
         whileInView={{ opacity: 1, y: 0 }}

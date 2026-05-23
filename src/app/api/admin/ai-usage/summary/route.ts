@@ -81,7 +81,7 @@ export async function GET() {
     const mmKey = `${row.model_id}::${row.mode}`;
     add(byModelMode[mmKey] ?? (byModelMode[mmKey] = empty()));
 
-    if (row.mode === "discuss") add(chatOnly);
+    if (row.mode === "discuss" || row.mode === "Discuss" || /^discuss/i.test(row.mode)) add(chatOnly);
     else add(createModes);
   }
 

@@ -1,0 +1,10 @@
+{
+  "category": "mobile_first",
+  "prompts": [
+    { "id": "mob-01", "text": "Mobile-first food delivery app with cart bottom sheet and map stub" },
+    { "id": "mob-02", "text": "Mobile-first habit tracker with streaks and daily check-in" },
+    { "id": "mob-03", "text": "Mobile-first banking UI with balance card and recent transactions list" },
+    { "id": "mob-04", "text": "Mobile-first ride share passenger app with trip status stepper" },
+    { "id": "mob-05", "text": "Mobile-first language learning app with lesson cards and progress ring" }
+  ]
+}

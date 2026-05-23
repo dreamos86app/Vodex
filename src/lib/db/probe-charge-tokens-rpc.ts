@@ -125,7 +125,9 @@ function isExecutableResponse(message: string | undefined, data: unknown): boole
     m.includes("invalid_amount") ||
     m.includes("insufficient") ||
     m.includes("idempotent") ||
-    m.includes("user_id_required")
+    m.includes("user_id_required") ||
+    m.includes("foreign key constraint") ||
+    m.includes("violates foreign key")
   ) {
     return true;
   }

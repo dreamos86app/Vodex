@@ -31,6 +31,13 @@ type Payload = {
   note?: string;
 };
 
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Gemini",
+  xai: "xAI",
+};
+
 const STATUS_COLOR: Record<string, string> = {
   available: "text-emerald-600",
   degraded: "text-amber-600",
@@ -99,7 +106,9 @@ export function AdminProviderHealthPanel() {
               ) : (
                 <AlertTriangle className="size-4 text-amber-500" />
               )}
-              <span className="text-[12.5px] font-medium capitalize text-foreground">{p.provider}</span>
+              <span className="text-[12.5px] font-medium text-foreground">
+                {PROVIDER_LABELS[p.provider] ?? p.provider}
+              </span>
               <span
                 className={cn(
                   "text-[10px] font-mono uppercase",

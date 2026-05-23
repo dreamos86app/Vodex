@@ -4,6 +4,11 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import type { CreationMode } from "@/lib/creation/models";
 import { DreamOS86BrandIcon } from "@/components/brand/dreamos86-brand-icon";
+import {
+  MessageActionsMenu,
+  MessageCostBadge,
+  type MessageCostState,
+} from "@/components/chat/message-cost-header";
 
 const MODE_LABEL: Record<CreationMode, string> = {
   discuss: "Discuss",
@@ -16,15 +21,21 @@ export function DreamOSMessageShell({
   children,
   className,
   status,
+  costState,
+  creditsUsed,
+  messageTextForCopy,
 }: {
   mode: CreationMode;
   children: React.ReactNode;
   className?: string;
   status?: "thinking" | "done" | "error" | null;
+  costState?: MessageCostState;
+  creditsUsed?: number | null;
+  messageTextForCopy?: string;
 }) {
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         <div className="flex size-8 shrink-0 items-center justify-center">
           <DreamOS86BrandIcon variant="assistant" alt="" />
         </div>
@@ -43,6 +54,12 @@ export function DreamOSMessageShell({
             {status === "error" && (
               <span className="text-[10px] text-destructive">Error</span>
             )}
+            <div className="ml-auto flex items-center gap-1.5">
+              <MessageCostBadge state={costState ?? "idle"} credits={creditsUsed ?? null} />
+              {messageTextForCopy && status === "done" && (
+                <MessageActionsMenu messageText={messageTextForCopy} />
+              )}
+            </div>
           </div>
         </div>
       </div>

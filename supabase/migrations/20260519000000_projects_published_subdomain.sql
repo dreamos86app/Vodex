@@ -1,5 +1,5 @@
 -- Public app subdomain per project (e.g. {published_subdomain}.dreamos86.com)
--- Project ref: xycqutvqxtkbszytaxbe
+-- Project ref: wciioegiczwqlmlroley
 
 alter table public.projects add column if not exists published_subdomain text;
 

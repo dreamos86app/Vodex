@@ -208,6 +208,29 @@ export async function fetchAdminActions(
     return { rows: (primary.data ?? []) as AdminActionRow[] };
   }
 
+  if (primary.error?.message?.includes("target_id")) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const legacyTarget = await (admin as any)
+      .from("admin_actions")
+      .select("id,created_at,admin_id,target_user_id,action_type,amount,reason,metadata")
+      .order("created_at", { ascending: false })
+      .range(opts.offset, opts.offset + opts.limit - 1);
+    if (!legacyTarget.error) {
+      return {
+        rows: ((legacyTarget.data ?? []) as Record<string, unknown>[]).map((l) => ({
+          id: String(l.id),
+          created_at: String(l.created_at),
+          admin_id: String(l.admin_id),
+          target_id: String(l.target_user_id ?? ""),
+          action_type: String(l.action_type),
+          amount: (l.amount as number | null) ?? null,
+          reason: (l.reason as string | null) ?? null,
+          metadata: (l.metadata ?? {}) as Record<string, unknown>,
+        })),
+      };
+    }
+  }
+
   if (
     !primary.error?.message?.includes("admin_id") &&
     !primary.error?.message?.includes("action_type")
@@ -269,6 +292,37 @@ export async function fetchSubscriptions(
 
   if (!withPrice.error) {
     return { rows: (withPrice.data ?? []) as SubscriptionRow[] };
+  }
+
+  if (withPrice.error?.message?.includes("pending_downgrade_plan")) {
+    const legacyPlan = await admin
+      .from("subscriptions")
+      .select(
+        "id,user_id,plan_id,status,current_period_start,current_period_end,cancel_at_period_end,pending_downgrade,stripe_subscription_id,stripe_customer_id,stripe_price_id,created_at",
+      )
+      .order("created_at", { ascending: false })
+      .range(opts.offset, opts.offset + opts.limit - 1);
+    if (!legacyPlan.error && legacyPlan.data) {
+      return {
+        rows: (legacyPlan.data as unknown[]).map((s) => {
+          const row = s as Record<string, unknown>;
+          return {
+            id: String(row.id),
+            user_id: String(row.user_id),
+            plan_id: String(row.plan_id),
+            status: String(row.status),
+            current_period_start: (row.current_period_start as string | null) ?? null,
+            current_period_end: (row.current_period_end as string | null) ?? null,
+            cancel_at_period_end: Boolean(row.cancel_at_period_end),
+            pending_downgrade_plan: (row.pending_downgrade as string | null) ?? null,
+            stripe_subscription_id: (row.stripe_subscription_id as string | null) ?? null,
+            stripe_customer_id: (row.stripe_customer_id as string | null) ?? null,
+            stripe_price_id: (row.stripe_price_id as string | null) ?? null,
+            created_at: String(row.created_at),
+          };
+        }),
+      };
+    }
   }
 
   if (!withPrice.error?.message?.includes("stripe_price_id")) {

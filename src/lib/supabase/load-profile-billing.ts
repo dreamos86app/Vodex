@@ -14,14 +14,6 @@ import {
 } from "@/lib/supabase/load-user-profile";
 import { FREE_MONTHLY_QUOTA } from "@/lib/stores/credits-store";
 
-const FREE_PLAN_TOKEN_CAP = FREE_MONTHLY_QUOTA;
-
-function capFreePlanBalance(row: ProfileBillingRow): ProfileBillingRow {
-  if ((row.plan_id ?? "free") !== "free") return row;
-  if (row.credits_remaining <= FREE_PLAN_TOKEN_CAP) return row;
-  return { ...row, credits_remaining: FREE_PLAN_TOKEN_CAP };
-}
-
 export type ProfileBillingRow = {
   plan_id: string | null;
   credits_remaining: number;
@@ -45,9 +37,9 @@ function rowFromRecord(
   return {
     plan_id: typeof data.plan_id === "string" ? data.plan_id : "free",
     credits_remaining:
-      typeof data.credits_remaining === "number" ? data.credits_remaining : FREE_PLAN_TOKEN_CAP,
+      typeof data.credits_remaining === "number" ? data.credits_remaining : FREE_MONTHLY_QUOTA,
     credits_limit:
-      typeof data.credits_limit === "number" ? data.credits_limit : FREE_PLAN_TOKEN_CAP,
+      typeof data.credits_limit === "number" ? data.credits_limit : FREE_MONTHLY_QUOTA,
     credits_reset_at: optional.credits_reset_at,
     plan_interval: optional.plan_interval,
     email: typeof data.email === "string" ? data.email : emailFallback,
@@ -56,17 +48,17 @@ function rowFromRecord(
 
 function schemaFallbackRow(user: User, hint: string): { row: ProfileBillingRow; hint: string } {
   const fallbackCredits = Number(
-    process.env.PROFILE_BILLING_FALLBACK_CREDITS ?? String(FREE_PLAN_TOKEN_CAP),
+    process.env.PROFILE_BILLING_FALLBACK_CREDITS ?? String(FREE_MONTHLY_QUOTA),
   );
   return {
-    row: capFreePlanBalance({
+    row: {
       plan_id: "free",
-      credits_remaining: Number.isFinite(fallbackCredits) ? fallbackCredits : FREE_PLAN_TOKEN_CAP,
-      credits_limit: FREE_PLAN_TOKEN_CAP,
+      credits_remaining: Number.isFinite(fallbackCredits) ? fallbackCredits : FREE_MONTHLY_QUOTA,
+      credits_limit: FREE_MONTHLY_QUOTA,
       credits_reset_at: null,
       plan_interval: "monthly",
       email: user.email ?? null,
-    }),
+    },
     hint,
   };
 }
@@ -112,7 +104,7 @@ async function queryBillingRow(
 
   const optional = await loadProfileOptionalFields(supabase, userId);
   return {
-    row: capFreePlanBalance(rowFromRecord(data, optional, userEmail)),
+    row: rowFromRecord(data, optional, userEmail),
     schemaDegraded,
   };
 }

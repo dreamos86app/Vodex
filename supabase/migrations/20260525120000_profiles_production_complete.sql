@@ -1,6 +1,6 @@
 -- ============================================================
 -- DreamOS86 — Complete public.profiles repair (production)
--- Project: xycqutvqxtkbszytaxbe
+-- Project: wciioegiczwqlmlroley
 --
 -- Idempotent. Adds every column the app, admin panel, billing,
 -- uploads, and profile bootstrap expect. Safe on partial/manual schemas.

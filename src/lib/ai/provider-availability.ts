@@ -1,4 +1,5 @@
 import type { ProviderErrorClass, ProviderName } from "@/lib/ai/provider-errors";
+import { googleGenerativeApiKey } from "@/lib/llm/env-keys";
 
 type ProviderState = {
   status: ProviderErrorClass;
@@ -25,7 +26,7 @@ function envDisabled(p: ProviderName): boolean {
 export function isProviderConfigured(p: ProviderName): boolean {
   if (p === "anthropic") return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
   if (p === "openai") return Boolean(process.env.OPENAI_API_KEY?.trim());
-  if (p === "google") return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim());
+  if (p === "google") return Boolean(googleGenerativeApiKey());
   if (p === "xai") return Boolean(process.env.XAI_API_KEY?.trim());
   return false;
 }

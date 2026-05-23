@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { attachReferralByCode } from "@/lib/referrals/server-referral";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { REFERRAL_CREDITS_PER_USER } from "@/lib/referrals/referral-config";
 import {
   isMissingProfileColumnError,
   isPostgrestSchemaOrMissingTableError,
@@ -238,7 +239,7 @@ export async function completeOnboardingForUser(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: claimData, error: claimErr } = await (admin as any).rpc("claim_referral_reward", {
     p_referred_id: user.id,
-    p_credits: 20,
+    p_credits: REFERRAL_CREDITS_PER_USER,
   });
 
   if (claimErr && isPostgrestSchemaOrMissingTableError(claimErr.message)) {

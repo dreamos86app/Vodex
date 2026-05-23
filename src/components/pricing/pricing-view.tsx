@@ -14,10 +14,11 @@ import { variants } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/lib/toast";
+import { BUILD_CREDIT_HINTS, CREDIT_PACKAGE_EXAMPLES, USER_CREDITS_PER_USD } from "@/lib/pricing";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const FREE_CREDITS = 100;
+const FREE_CREDITS = 30;
 const ANNUAL_DISCOUNT = 0.20;
 const INFINITY_DISCOUNT = 0.05;
 
@@ -32,13 +33,13 @@ interface InfinityTier {
 }
 
 const INFINITY_TIERS: InfinityTier[] = [
-  { id: "inf-1", label: "Infinity I",   credits: 5_000,  baseMonthly: 100 },
-  { id: "inf-2", label: "Infinity II",  credits: 10_000, baseMonthly: 200 },
-  { id: "inf-3", label: "Infinity III", credits: 15_000, baseMonthly: 300 },
-  { id: "inf-4", label: "Infinity IV",  credits: 20_000, baseMonthly: 400, discount: INFINITY_DISCOUNT },
-  { id: "inf-5", label: "Infinity V",   credits: 30_000, baseMonthly: 600, discount: INFINITY_DISCOUNT },
-  { id: "inf-6", label: "Infinity VI",  credits: 45_000, baseMonthly: 900, discount: INFINITY_DISCOUNT },
-  { id: "inf-7", label: "Infinity VII", credits: 65_000, baseMonthly: 1300, discount: INFINITY_DISCOUNT },
+  { id: "inf-1", label: "Infinity I",   credits: 1_000,  baseMonthly: 100 },
+  { id: "inf-2", label: "Infinity II",  credits: 2_000,  baseMonthly: 200 },
+  { id: "inf-3", label: "Infinity III", credits: 3_000,  baseMonthly: 300 },
+  { id: "inf-4", label: "Infinity IV",  credits: 4_000,  baseMonthly: 400, discount: INFINITY_DISCOUNT },
+  { id: "inf-5", label: "Infinity V",   credits: 6_000,  baseMonthly: 600, discount: INFINITY_DISCOUNT },
+  { id: "inf-6", label: "Infinity VI",  credits: 9_000,  baseMonthly: 900, discount: INFINITY_DISCOUNT },
+  { id: "inf-7", label: "Infinity VII", credits: 13_000, baseMonthly: 1300, discount: INFINITY_DISCOUNT },
 ];
 
 function tierPrice(tier: InfinityTier, annual: boolean): number {
@@ -54,7 +55,7 @@ function tierOriginalPrice(tier: InfinityTier): number {
 // ─── Comparison table data ────────────────────────────────────────────────────
 
 const COMPARISON_ROWS: { label: string; free: string | boolean; starter: string | boolean; pro: string | boolean; infinity: string | boolean }[] = [
-  { label: "Monthly credits",      free: "100",       starter: "1,000",    pro: "2,500",         infinity: "5,000–65,000" },
+  { label: "Monthly credits",      free: "30",        starter: "200",      pro: "500",           infinity: "1,000–13,000" },
   { label: "Active projects",      free: "3",         starter: "Unlimited", pro: "Unlimited",    infinity: "Unlimited" },
   { label: "Discuss mode",         free: true,        starter: true,        pro: true,           infinity: true },
   { label: "Edit mode",            free: true,        starter: true,        pro: true,           infinity: true },
@@ -65,7 +66,9 @@ const COMPARISON_ROWS: { label: string; free: string | boolean; starter: string 
   { label: "Remove watermark",     free: false,       starter: true,        pro: true,           infinity: true },
   { label: "Source export",        free: false,       starter: true,        pro: true,           infinity: true },
   { label: "Team collaborators",   free: false,       starter: false,       pro: "5",            infinity: "Custom" },
-  { label: "Analytics",            free: false,       starter: false,       pro: true,           infinity: true },
+  { label: "Analytics",            free: false,       starter: true,        pro: true,           infinity: true },
+  { label: "ZIP import",           free: false,       starter: false,       pro: true,           infinity: true },
+  { label: "Android AAB & APK export", free: false,   starter: false,       pro: true,           infinity: true },
   { label: "API access",           free: false,       starter: false,       pro: true,           infinity: true },
   { label: "Dedicated compute",    free: false,       starter: false,       pro: false,          infinity: true },
   { label: "White-label",          free: false,       starter: false,       pro: false,          infinity: true },
@@ -78,7 +81,11 @@ const COMPARISON_ROWS: { label: string; free: string | boolean; starter: string 
 const FAQS = [
   {
     q: "What are credits?",
-    a: "Credits are the unit of AI compute used for every generation, edit, or build action. Each AI model request consumes a small number of credits based on the model selected and task complexity. Discuss mode is the most credit-efficient, while Build mode with frontier models uses more.",
+    a: `Credits pay for AI work in DreamOS86. You get ${USER_CREDITS_PER_USD} credits per $1 on paid packs (e.g. $5 → ${CREDIT_PACKAGE_EXAMPLES[0].credits} credits). Builds show an estimated cost and reserved credits before you run; unused reserved credits are returned after completion.`,
+  },
+  {
+    q: "How much does a typical build cost?",
+    a: `${BUILD_CREDIT_HINTS.simple}. ${BUILD_CREDIT_HINTS.standard}. ${BUILD_CREDIT_HINTS.advanced}. Premium models cost more — shown before you confirm. ${BUILD_CREDIT_HINTS.refundNote}.`,
   },
   {
     q: "Do credits roll over to next month?",
@@ -810,10 +817,10 @@ export function PricingView() {
           price={starterMonthly}
           annualPrice={starterAnnual}
           annual={annual}
-          credits="1,000 credits / mo"
+          credits="200 credits / mo"
           tagline="For individuals shipping real products."
           features={[
-            "1,000 credits / month",
+            "200 credits / month",
             "Unlimited projects",
             "Discuss, Edit & Build modes",
             "Manual model selection",
@@ -833,12 +840,12 @@ export function PricingView() {
           price={proMonthly}
           annualPrice={proAnnual}
           annual={annual}
-          credits="2,500 credits / mo"
+          credits="500 credits / mo"
           tagline="For teams building production apps."
           highlight
           badge="Most Popular"
           features={[
-            "2,500 credits / month",
+            "500 credits / month",
             "All frontier models",
             "Multi-agent generation",
             "5 collaborators",

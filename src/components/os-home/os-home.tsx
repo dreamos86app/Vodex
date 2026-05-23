@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,9 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IntegrationShowcaseSection } from "@/components/marketing/integrations-showcase";
-import { DreamOsStatsSection } from "@/components/os-home/dreamos-stats-section";
-import { WhyDreamOsSection } from "@/components/os-home/why-dreamos-section";
-import { YourAppsSection } from "@/components/os-home/your-apps-section";
+import { YourAppsSection, type YourAppsProject } from "@/components/os-home/your-apps-section";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { storeAutostartHandoff } from "@/lib/create/autostart-handoff";
 import { useCreditsStore } from "@/lib/stores/credits-store";
@@ -30,17 +29,19 @@ import { resolveDisplayName } from "@/lib/profile-display";
 import type { CreationMode } from "@/lib/creation/models";
 import { applyComposerPaste } from "@/lib/composer/textarea-handlers";
 
+const DreamOsStatsSection = dynamic(
+  () => import("@/components/os-home/dreamos-stats-section").then((m) => m.DreamOsStatsSection),
+  { loading: () => <div className="mx-auto h-52 max-w-5xl animate-pulse rounded-2xl bg-muted/20" /> },
+);
+
+const WhyDreamOsSection = dynamic(
+  () => import("@/components/os-home/why-dreamos-section").then((m) => m.WhyDreamOsSection),
+  { loading: () => <div className="mx-auto h-40 max-w-5xl animate-pulse rounded-2xl bg-muted/15" /> },
+);
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface RecentProject {
-  id: string;
-  name: string;
-  gradient: string;
-  status: string;
-  updated_at: string;
-  preview_url: string | null;
-  icon_url: string | null;
-}
+type RecentProject = YourAppsProject;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -471,14 +472,14 @@ export function OsHome({ recentProjects }: OsHomeProps) {
           transition={{ delay: 0.22 }}
           className="mx-auto w-full max-w-5xl"
         >
-          <IntegrationShowcaseSection variant="premium" />
+          <IntegrationShowcaseSection variant="default" />
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.23 }}
-          className="mx-auto w-full max-w-5xl"
+          transition={{ delay: 0.24 }}
+          className="mx-auto w-full max-w-5xl px-4 sm:px-0"
         >
           <WhyDreamOsSection />
         </motion.div>
@@ -486,8 +487,8 @@ export function OsHome({ recentProjects }: OsHomeProps) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.24 }}
-          className="mx-auto w-full max-w-5xl"
+          transition={{ delay: 0.26 }}
+          className="mx-auto w-full max-w-5xl px-4 sm:px-0"
         >
           <DreamOsStatsSection />
         </motion.div>
@@ -509,6 +510,7 @@ export function OsHome({ recentProjects }: OsHomeProps) {
             <Link
               key={href}
               href={href}
+              prefetch
               className="flex items-center gap-1.5 rounded-lg bg-surface px-3 py-1.5 text-[12px] font-medium text-muted-foreground ring-1 ring-border transition hover:bg-surface-raised hover:text-foreground hover:ring-accent/20"
             >
               <Icon className="size-3.5" strokeWidth={1.75} />

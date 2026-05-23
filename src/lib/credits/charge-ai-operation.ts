@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { ensureUserProfileServer } from "@/lib/auth/ensure-user-profile-server";
 import { buildChargeTokensRpcPayload } from "@/lib/db/charge-tokens-rpc";
+import { assertProfitableCharge } from "@/lib/billing/credit-profit-guard";
+import { logSecurityAudit } from "@/lib/security/audit-events";
+import { writeCreditEvent } from "@/lib/credits/credit-events";
 
 type Writer = SupabaseClient<Database>;
 
@@ -55,6 +58,44 @@ export async function chargeAiOperation(
   if (input.amount < 1) {
     logCredits("info", "charge skipped reason", { reason: "invalid_amount" });
     return { charged: false, remaining: null, error: "invalid_amount" };
+  }
+
+  const profitProviderUsd =
+    input.mode === "discuss"
+      ? Math.min(input.providerCostUsd ?? 0, 0.03)
+      : (input.providerCostUsd ?? 0);
+  const profitCheck = assertProfitableCharge(input.amount, profitProviderUsd);
+  if (!profitCheck.ok) {
+    logCredits("warn", "charge blocked — below 3x margin", {
+      reason: profitCheck.reason,
+      operation_id: input.operationId,
+    });
+    await writer.from("ai_usage_logs").insert({
+      user_id: input.userId,
+      user_email: input.userEmail,
+      model_id: input.modelId,
+      mode: input.mode,
+      tokens_charged: 0,
+      credits_charged: 0,
+      status: "charge_failed",
+      error_message: profitCheck.reason ?? "unprofitable_charge",
+      conversation_id: input.conversationId ?? null,
+      operation_id: input.operationId,
+      project_id: input.projectId ?? null,
+      charged_after_success: false,
+    } as never);
+    await writeCreditEvent(writer, {
+      userId: input.userId,
+      operationId: input.operationId,
+      modelId: input.modelId,
+      creditsConsumed: 0,
+      providerCostUsd: input.providerCostUsd ?? 0,
+      status: "failed",
+      projectId: input.projectId,
+      conversationId: input.conversationId,
+      metadata: { mode: input.mode, reason: profitCheck.reason ?? "unprofitable_charge" },
+    });
+    return { charged: false, remaining: null, error: profitCheck.reason ?? "unprofitable_charge" };
   }
 
   const ensured = await ensureUserProfileServer(input.userId, input.userEmail);
@@ -117,6 +158,17 @@ export async function chargeAiOperation(
       project_id: input.projectId ?? null,
       charged_after_success: false,
     } as never);
+    await writeCreditEvent(writer, {
+      userId: input.userId,
+      operationId: input.operationId,
+      modelId: input.modelId,
+      creditsConsumed: 0,
+      providerCostUsd: input.providerCostUsd ?? 0,
+      status: "failed",
+      projectId: input.projectId,
+      conversationId: input.conversationId,
+      metadata: { mode: input.mode, reason: rpcErr.message },
+    });
     return { charged: false, remaining: null, error: rpcErr.message };
   }
 
@@ -188,23 +240,22 @@ export async function chargeAiOperation(
         .eq("id", input.userId);
     }
 
-    await writer.from("credit_events").insert({
-      user_id: input.userId,
-      amount: -input.amount,
-      balance_after: remaining,
-      reason: input.mode,
-      operation_id: input.operationId,
-      project_id: input.projectId ?? null,
-      conversation_id: input.conversationId ?? null,
-      metadata: {
-        model_id: input.modelId,
-        provider: input.provider,
-      },
-    } as never);
-
+    // charge_tokens RPC writes the authoritative credit_events row on success.
     logCredits("info", "charge ok", {
       balance_after: remaining,
       operation_id: input.operationId,
+    });
+
+    await logSecurityAudit({
+      userId: input.userId,
+      action: "credit_charge",
+      projectId: input.projectId ?? null,
+      metadata: {
+        amount: input.amount,
+        mode: input.mode,
+        modelId: input.modelId,
+        operationId: input.operationId,
+      },
     });
   } else if (idempotent) {
     logCredits("info", "charge skipped idempotent", {
@@ -215,6 +266,20 @@ export async function chargeAiOperation(
     logCredits("warn", "charge failed", {
       error: creditResult?.error ?? "not_charged",
       operation_id: input.operationId,
+    });
+    await writeCreditEvent(writer, {
+      userId: input.userId,
+      operationId: input.operationId,
+      modelId: input.modelId,
+      creditsConsumed: 0,
+      providerCostUsd: input.providerCostUsd ?? 0,
+      status: "failed",
+      projectId: input.projectId,
+      conversationId: input.conversationId,
+      metadata: {
+        mode: input.mode,
+        reason: creditResult?.error ?? "not_charged",
+      },
     });
   }
 

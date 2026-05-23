@@ -51,7 +51,19 @@ This repo can run `npm run build` on push via `.github/workflows/ci.yml`. That d
 
 **Vercel does not run Supabase migrations.**
 
-Project ref: **`xycqutvqxtkbszytaxbe`**
+Canonical project ref: **`wciioegiczwqlmlroley`** (dashboard: **dreamos86app**). Runtime repair is already applied on this project.
+
+**Re-run runtime repair** only if schema health regresses (billing RPCs, admin tables, `runtime_diagnostics` view):
+
+1. Admin → **Copy SQL patch** (or open `scripts/dreamos-runtime-repair.sql` — **not** `runtime-repair-sql.ts`).
+2. Paste the **entire** file into Supabase SQL Editor for the **same** project as `NEXT_PUBLIC_SUPABASE_URL`.
+3. Run with zero errors, then:
+
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+
+Or with CLI access token: `node scripts/apply-runtime-repair-remote.mjs --project-ref <your-ref>`
 
 ### Option 1 — SQL Editor (dashboard)
 
@@ -69,7 +81,7 @@ NOTIFY pgrst, 'reload schema';
 ### Option 2 — Supabase CLI
 
 ```bash
-supabase link --project-ref xycqutvqxtkbszytaxbe
+supabase link --project-ref wciioegiczwqlmlroley
 supabase db push
 ```
 
@@ -94,7 +106,7 @@ Set in **Vercel → Project → Settings → Environment Variables → Productio
 
 | Variable | Notes |
 |----------|--------|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://xycqutvqxtkbszytaxbe.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://wciioegiczwqlmlroley.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only (or `SUPABASE_SECRET_KEY`) |
 | `NEXT_PUBLIC_APP_URL` | **`https://dreamos86.com`** (not localhost) |

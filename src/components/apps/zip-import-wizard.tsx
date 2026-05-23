@@ -29,48 +29,123 @@ interface ScanResult {
   detected: DetectedItem[];
   warnings: string[];
   estimatedRestore: string;
+  scanStats?: {
+    rawEntries: number;
+    acceptedFiles: number;
+    skippedIgnoredPaths: number;
+    skippedBinary: number;
+    scanProviderCostUsd: number;
+  };
 }
 
-function scanResultFromImportApi(j: { fileCount: number; framework: string }): ScanResult {
-  const fwLabel =
-    j.framework === "nextjs"
+function scanResultFromImportApi(j: {
+  fileCount: number;
+  framework: string;
+  frameworkLabel?: string;
+  qualityScore?: number;
+  routes?: string[];
+  warnings?: string[];
+  scanStats?: ScanResult["scanStats"];
+}): ScanResult {
+  const fwLabel = j.frameworkLabel ??
+    (j.framework === "nextjs"
       ? "Next.js"
       : j.framework === "vite"
         ? "Vite / React"
         : j.framework === "react"
           ? "React"
-          : "Unknown (generic)";
+          : j.framework === "static"
+            ? "Static HTML"
+            : "Unknown (generic)");
+
+  const stats = j.scanStats;
+  const skipped =
+    stats != null ? stats.skippedIgnoredPaths + stats.skippedBinary : null;
 
   return {
     framework: fwLabel,
     packageManager: "npm",
-    estimatedRestore: "Complete — source is in DreamOS86",
+    estimatedRestore: j.qualityScore != null && j.qualityScore >= 90 ? "Production-grade import" : "Complete — source is in DreamOS86",
+    scanStats: stats,
     warnings: [
+      ...(skipped != null && skipped > 0
+        ? [`Imported safely. Skipped ${skipped} dependency, build, cache, or non-text files.`]
+        : []),
+      ...(j.warnings ?? []),
       ".env secrets are never imported from ZIP — add keys in DreamOS86 settings.",
-      "Binary assets and non-text files are skipped; re-upload media if needed.",
-    ],
+      "Scan uses deterministic analysis only — estimated AI cost: $0.00. Optional AI repair is quoted separately.",
+    ].filter((w, i, arr) => arr.indexOf(w) === i),
     detected: [
+      ...(stats
+        ? [
+            {
+              id: "raw",
+              label: "Files in archive",
+              value: `${stats.rawEntries.toLocaleString()} entries scanned`,
+              status: "detected" as const,
+              icon: FileCode2,
+            },
+            {
+              id: "accepted",
+              label: "Source files accepted",
+              value: `${stats.acceptedFiles.toLocaleString()} text sources`,
+              status: "detected" as const,
+              icon: CheckCircle2,
+            },
+            {
+              id: "skipped",
+              label: "Skipped (deps/cache/binary)",
+              value: `${(stats.skippedIgnoredPaths + stats.skippedBinary).toLocaleString()} files`,
+              status: "detected" as const,
+              icon: AlertCircle,
+            },
+            {
+              id: "scan-cost",
+              label: "Scan cost",
+              value: "Deterministic checks — no AI credits required ($0.00)",
+              status: "detected" as const,
+              icon: CheckCircle2,
+            },
+          ]
+        : [
+            {
+              id: "scan-cost",
+              label: "Scan cost",
+              value: "Deterministic checks — no AI credits required ($0.00)",
+              status: "detected" as const,
+              icon: CheckCircle2,
+            },
+          ]),
       {
         id: "files",
         label: "Text sources saved",
-        value: `${j.fileCount} files stored (see Code tab in workspace)`,
+        value: `${j.fileCount} files stored`,
         status: "detected",
         icon: FileCode2,
       },
       {
         id: "fw",
-        label: "Framework hint",
-        value: `${fwLabel} (from package.json heuristics)`,
+        label: "Framework",
+        value: fwLabel,
         status: "detected",
         icon: Package,
       },
       {
-        id: "git",
-        label: "Git history",
-        value: ".git folders are ignored on import",
-        status: "warning",
+        id: "quality",
+        label: "Import quality",
+        value: j.qualityScore != null ? `${j.qualityScore}/100` : "Scored after import",
+        status: (j.qualityScore ?? 0) >= 85 ? "detected" : "warning",
         icon: GitBranch,
       },
+      ...(j.routes?.length
+        ? [{
+            id: "routes",
+            label: "Routes detected",
+            value: `${j.routes.length} routes mapped`,
+            status: "detected" as const,
+            icon: GitBranch,
+          }]
+        : []),
     ],
   };
 }
@@ -134,7 +209,16 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
     framework: string;
   } | null>(null);
   const [projectName, setProjectName] = React.useState("");
+  const [importError, setImportError] = React.useState<Record<string, unknown> | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const isDev = process.env.NODE_ENV !== "production";
+
+  function copyImportDiagnostics(payload: Record<string, unknown>) {
+    const text = JSON.stringify(payload, null, 2);
+    void navigator.clipboard.writeText(text).catch(() => {});
+    toast.success("Import diagnostics copied");
+  }
 
   function handleFile(f: File) {
     if (!f.name.endsWith(".zip")) {
@@ -154,6 +238,7 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
   async function startScan() {
     if (!file) return;
     setStep("scanning");
+    setImportError(null);
     const steps = PIPELINE.map((s) => ({ ...s, status: "pending" as const }));
     setPipeline(steps);
 
@@ -179,8 +264,17 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
     const res = await fetch("/api/projects/import-zip", { method: "POST", body: fd });
     const j = (await res.json()) as {
       error?: string;
+      devError?: string;
+      code?: string;
+      hint?: string;
+      adminDetail?: Record<string, unknown>;
       fileCount?: number;
       framework?: string;
+      frameworkLabel?: string;
+      qualityScore?: number;
+      routes?: string[];
+      warnings?: string[];
+      scanStats?: ScanResult["scanStats"];
       projectId?: string;
       redirectTo?: string;
     };
@@ -191,7 +285,26 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
           i === 0 ? { ...s, status: "error" } : { ...s, status: "pending" },
         ),
       );
-      toast.error(j.error ?? "Import failed");
+      const diagnostics = {
+        step: (j.adminDetail as { step?: string } | undefined)?.step ?? "unknown",
+        code: j.code,
+        userMessage: j.error,
+        devError: j.devError ?? j.hint ?? j.error,
+        adminDetail: j.adminDetail,
+        status: res.status,
+      };
+      setImportError(diagnostics);
+      console.error("[ZIP import failed]", diagnostics);
+
+      const userMsg =
+        isDev && j.devError
+          ? j.devError
+          : j.code === "IMPORT_STORAGE_NOT_CONFIGURED"
+            ? (j.error ?? "Import storage is not configured yet. Please contact the workspace owner or try again after setup.")
+            : j.code === "IMPORT_SCHEMA_UPDATING" || j.code === "IMPORT_APP_FILES_FAILED"
+              ? (j.error ?? "Import setup is updating. Please refresh and try again.")
+              : (j.error ?? "Import failed");
+      toast.error(userMsg);
       setStep("idle");
       return;
     }
@@ -209,6 +322,11 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
       scanResultFromImportApi({
         fileCount: j.fileCount ?? 0,
         framework: j.framework ?? "unknown",
+        frameworkLabel: j.frameworkLabel,
+        qualityScore: j.qualityScore,
+        routes: j.routes,
+        warnings: j.warnings,
+        scanStats: j.scanStats,
       }),
     );
     setStep("results");
@@ -310,6 +428,26 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                   </div>
                 )}
 
+                {importError && (
+                  <div className="space-y-2 rounded-lg bg-destructive/8 px-3 py-3 ring-1 ring-destructive/20">
+                    <p className="text-[12px] font-medium text-destructive">Import failed</p>
+                    <p className="text-[11px] text-muted-foreground break-words">
+                      {String(importError.devError ?? importError.userMessage ?? "Unknown error")}
+                    </p>
+                    {isDev && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => copyImportDiagnostics(importError)}
+                        >
+                          Copy import diagnostics
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-end gap-2">
                   <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
                   <Button variant="accent" size="sm" disabled={!file} onClick={startScan}>
@@ -319,7 +457,9 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                 </div>
 
                 <p className="text-center text-[11px] text-muted-foreground">
-                  Exclude <code className="font-mono">node_modules</code> and <code className="font-mono">.next</code> from your ZIP for best results.
+                  Scan uses deterministic checks — no AI credits required. Exclude{" "}
+                  <code className="font-mono">node_modules</code> and{" "}
+                  <code className="font-mono">.next</code> from your ZIP for best results.
                 </p>
               </motion.div>
             )}

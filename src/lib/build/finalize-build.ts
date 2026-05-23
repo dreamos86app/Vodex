@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/types";
 import type { BuilderOutputContract } from "@/lib/creation/parse-builder-metadata";
 import { refineAppName } from "@/lib/projects/project-context";
+import { completeBuildWithValidation } from "@/lib/build/complete-build-with-validation";
+import { lifecyclePatch, legacyProjectStatus } from "@/lib/projects/project-lifecycle";
 
 type Writer = SupabaseClient<Database>;
 
@@ -56,10 +58,19 @@ export async function finalizeBuildSuccess(input: FinalizeBuildInput): Promise<v
       ? (curProj.metadata as Record<string, unknown>)
       : {};
 
+  const completion = await completeBuildWithValidation({
+    writer,
+    userId,
+    projectId,
+  });
+  const lifecycle = completion.lifecycle;
+
   const buildMeta = {
     ...prevMeta,
+    ...lifecyclePatch(lifecycle, {
+      build_status: completion.validationOk ? "completed" : "needs_repair",
+    }),
     app_name: appName,
-    build_status: "completed",
     last_build_at: now,
     ...(buildJobId ? { last_build_id: buildJobId } : {}),
     builder: {
@@ -90,7 +101,7 @@ export async function finalizeBuildSuccess(input: FinalizeBuildInput): Promise<v
     build_status: "completed",
     last_build_id: buildJobId,
     last_build_at: now,
-    status: "draft",
+    status: legacyProjectStatus(completion.lifecycle),
     metadata: buildMeta as Json,
   };
 
@@ -137,9 +148,22 @@ export async function finalizeBuildFailed(input: {
   }
 
   if (input.projectId && input.userId) {
+    const { data: cur } = await input.writer
+      .from("projects")
+      .select("metadata")
+      .eq("id", input.projectId)
+      .maybeSingle();
+    const prevMeta =
+      cur?.metadata && typeof cur.metadata === "object" && !Array.isArray(cur.metadata)
+        ? (cur.metadata as Record<string, unknown>)
+        : {};
     await input.writer
       .from("projects")
-      .update({ build_status: "failed" } as never)
+      .update({
+        build_status: "failed",
+        status: "error",
+        metadata: { ...prevMeta, ...lifecyclePatch("failed", { error: input.errorMessage.slice(0, 500) }) },
+      } as never)
       .eq("id", input.projectId)
       .eq("owner_id", input.userId);
   }

@@ -1,0 +1,11 @@
+{
+  "runAt": "2026-05-22T13:53:52.288Z",
+  "promptCount": 50,
+  "placeholderRate": 1,
+  "buildSuccessRate": 0,
+  "previewSuccessRate": 0,
+  "publishReadinessRate": 0,
+  "averageQualityScore": 0,
+  "results": [],
+  "structureOnly": true
+}

@@ -8,14 +8,15 @@
  * Every model's credit cost is calculated as:
  *   userCreditCost = max(MIN_CREDITS, ceil(providerCostUsd * MARGIN_MULTIPLIER * CREDITS_PER_USD))
  *
- * Current exchange rate: 1 credit ≈ $0.002 user value
- * Minimum required: 3x actual provider cost
+ * User credits: 10 credits = $1 revenue (see pricing-config.ts)
+ * Minimum required: 3× provider cost in revenue dollars
  */
 
+/** Target revenue multiplier over provider cost — aligns with TARGET_REVENUE_MULTIPLIER */
 export const MARGIN_MULTIPLIER = 3;
 
-/** How many DreamOS86 credits equate to $1 of user billing value */
-export const CREDITS_PER_USD = 50; // 50 credits = $1 → 1 credit = $0.02
+/** User-facing credits per $1 revenue (see src/lib/billing/pricing-config.ts) */
+export const CREDITS_PER_USD = 10;
 
 /**
  * Estimated provider cost per request (in USD).
@@ -64,8 +65,8 @@ const PROVIDER_COST_USD: Record<string, number> = {
  */
 const MIN_CREDITS_PER_REQUEST = 1;
 
-/** Discuss/chat turns use the cheapest models but still need a sane floor so plans stay economically viable. */
-const DISCUSS_MIN_CREDITS = 3;
+/** Discuss/chat turns — flat 1 credit per successful message. */
+const DISCUSS_MIN_CREDITS = 1;
 
 /**
  * Orchestration complexity multipliers by creation mode.
@@ -92,12 +93,13 @@ export function calculateCredits(
   // Total cost with mode complexity and context overhead
   const adjustedCostUsd = providerCostUsd * modeMultiplier * Math.max(1, contextMultiplier);
 
+  if (mode === "discuss") {
+    return DISCUSS_MIN_CREDITS;
+  }
+
   // Apply 3x margin and convert to credits
   const requiredCredits = adjustedCostUsd * MARGIN_MULTIPLIER * CREDITS_PER_USD;
   const base = Math.max(MIN_CREDITS_PER_REQUEST, Math.ceil(requiredCredits));
-  if (mode === "discuss") {
-    return Math.max(DISCUSS_MIN_CREDITS, base);
-  }
   return base;
 }
 

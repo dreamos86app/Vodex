@@ -6,6 +6,11 @@ const projectRoot = path.resolve(__dirname);
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: projectRoot,
+  outputFileTracingIncludes: {
+    "/api/admin/credit-billing-sql-patch": [
+      "./scripts/dreamos-runtime-repair.sql",
+    ],
+  },
   turbopack: {
     root: projectRoot,
   },

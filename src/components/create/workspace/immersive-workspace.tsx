@@ -56,8 +56,11 @@ import { isSubmitDebugEnabled } from "@/lib/dev/submit-debug-enabled";
 import { IntegrationSecretsPanel } from "@/components/create/workspace/integration-secrets-panel";
 import { detectRequiredSecretNames } from "@/lib/integrations/detect-required-secrets";
 import { WorkspaceLauncher, type WorkspaceRightTab } from "@/components/create/workspace/workspace-launcher";
-import { AppDashboardPanel } from "@/components/create/workspace/app-dashboard-panel";
-import { CodeExplorerPanel, type CodeExplorerFile } from "@/components/create/workspace/code-explorer-panel";
+import { AppDashboardPanel, type DashSection } from "@/components/create/workspace/app-dashboard-panel";
+import type { CodeExplorerFile } from "@/components/create/workspace/code-explorer-panel";
+import { AppBuilderWorkspace } from "@/components/builder/app-builder-workspace";
+import { BlueprintConfirmationModal } from "@/components/build/blueprint-confirmation-modal";
+import type { AppBlueprint } from "@/lib/build/blueprint-schema";
 import { findProjectConversationId } from "@/lib/projects/project-conversation";
 import {
   consumeAutostartHandoff,
@@ -71,6 +74,15 @@ import {
 import { pushRuntimeDiagnostic } from "@/lib/dev/runtime-diagnostics";
 import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build";
 import { resolveDisplayName } from "@/lib/profile-display";
+import {
+  isZipImportProject,
+  readImportMeta,
+  preferredEntryFile,
+} from "@/lib/projects/imported-project-state";
+import {
+  loadProjectFilePaths,
+  loadProjectFileContent,
+} from "@/lib/projects/load-project-files";
 import { extractFencedCode, stripFencedCodeForChat, parseFencedFiles } from "@/lib/creation/extract-fenced-code";
 import { submitDebug, uiSubmitLog } from "@/lib/dev/submit-debug";
 import { useComposerClickCapture } from "@/lib/dev/composer-click-capture";
@@ -78,6 +90,9 @@ import { pushSubmitTrace } from "@/lib/dev/submit-pipeline-trace";
 import { SubmitPipelinePanel } from "@/components/dev/submit-pipeline-panel";
 import { CREATE_BUILD_BUNDLE } from "@/lib/dev/create-build-bundle";
 import type { Tables } from "@/lib/supabase/types";
+import { CreateIntentStep } from "@/components/create/create-intent-step";
+import { CreateCreditEstimate } from "@/components/create/create-credit-estimate";
+import type { CreateIntentResult } from "@/lib/intent/create-intent-classifier";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +138,7 @@ function MessageBubble({
   streaming,
   mode,
   creditsUsed,
+  costState,
 }: {
   message: UIMessage;
   userAvatar?: string | null;
@@ -130,6 +146,7 @@ function MessageBubble({
   streaming?: boolean;
   mode: CreationMode;
   creditsUsed?: number | null;
+  costState?: import("@/components/chat/message-cost-header").MessageCostState;
 }) {
   const isUser = message.role === "user";
   const raw = messageText(message);
@@ -174,6 +191,9 @@ function MessageBubble({
       <DreamOSMessageShell
         mode={mode}
         status={streaming ? "thinking" : text ? "done" : "thinking"}
+        costState={streaming ? "pending" : costState}
+        creditsUsed={creditsUsed}
+        messageTextForCopy={text || undefined}
       >
         {!text && streaming ? (
           <div className="rounded-xl bg-surface/80 px-3 py-2.5 text-[13px] text-muted-foreground ring-1 ring-border/60">
@@ -282,14 +302,22 @@ export function ImmersiveWorkspace({
   const autostartConsumedRef = React.useRef(false);
   const userPinnedScrollRef = React.useRef(false);
   const [showJumpToLatest, setShowJumpToLatest] = React.useState(false);
-  const [rightTab, setRightTab] = React.useState<WorkspaceRightTab>("preview");
+  const tabFromUrl = searchParams.get("tab");
+  const resolvedRightTab: WorkspaceRightTab =
+    tabFromUrl === "code" || tabFromUrl === "dashboard" || tabFromUrl === "preview"
+      ? tabFromUrl
+      : pathname.includes("/builder")
+        ? "code"
+        : "preview";
+  const [rightTab, setRightTab] = React.useState<WorkspaceRightTab>(resolvedRightTab);
+  React.useEffect(() => {
+    setRightTab(resolvedRightTab);
+  }, [resolvedRightTab]);
   type MobileCreatePanel = "chat" | WorkspaceRightTab;
   const [mobilePanel, setMobilePanel] = React.useState<MobileCreatePanel>("chat");
   const lastSubmitFingerprintRef = React.useRef<{ text: string; at: number } | null>(null);
   const pendingOperationIdRef = React.useRef<string | null>(null);
-  const [dashboardSection, setDashboardSection] = React.useState<
-    "overview" | "screens" | "data" | "actions" | "integrations" | "domains" | "security" | "logs" | "settings" | "secrets"
-  >("overview");
+  const [dashboardSection, setDashboardSection] = React.useState<DashSection>("overview");
   const [lastSubmitAt, setLastSubmitAt] = React.useState<number | null>(null);
   const [lastApiUrl, setLastApiUrl] = React.useState<string | null>(null);
   const [lastApiStatus, setLastApiStatus] = React.useState<string | null>(null);
@@ -346,6 +374,17 @@ export function ImmersiveWorkspace({
   React.useEffect(() => {
     if (project?.id) setLocalProjectId(null);
   }, [project?.id]);
+
+  React.useEffect(() => {
+    const meta = effectiveProject?.metadata as Record<string, unknown> | undefined;
+    const stored = meta?.approved_blueprint;
+    if (stored && typeof stored === "object") {
+      approvedBlueprintRef.current = stored as Record<string, unknown>;
+      blueprintApprovedRef.current = true;
+      setBlueprintApproved(true);
+      setBlueprint(stored as AppBlueprint);
+    }
+  }, [effectiveProject?.id, effectiveProject?.metadata]);
   const modeRef = React.useRef(mode);
   const scopeRef = React.useRef<EditScope | null>(scope);
   const editTargetRef = React.useRef<string | null>(null);
@@ -372,6 +411,7 @@ export function ImmersiveWorkspace({
           conversationId: conversationIdRef.current ?? undefined,
           operationId: pendingOperationIdRef.current ?? undefined,
           idempotencyKey: pendingOperationIdRef.current ?? undefined,
+          approvedBlueprint: approvedBlueprintRef.current ?? undefined,
         }),
         on402: () => setCreditError(true),
         onSuccess: () => setCreditError(false),
@@ -407,12 +447,47 @@ export function ImmersiveWorkspace({
     modelId: string;
     provider: string;
   } | null>(null);
+  const [lastMessageCost, setLastMessageCost] = React.useState<{
+    state: "pending" | "final" | "finalizing";
+    credits: number;
+  } | null>(null);
   const [projectFiles, setProjectFiles] = React.useState<CodeExplorerFile[]>([]);
   const [projectFilesLoading, setProjectFilesLoading] = React.useState(false);
   const [projectDataRefresh, setProjectDataRefresh] = React.useState(0);
+  const [pendingDiffRefresh, setPendingDiffRefresh] = React.useState(0);
   const [histLoading, setHistLoading] = React.useState(false);
   const [postBuildActive, setPostBuildActive] = React.useState(false);
   const [qualityRepairing, setQualityRepairing] = React.useState(false);
+  const [blueprint, setBlueprint] = React.useState<AppBlueprint | null>(null);
+  const [blueprintOpen, setBlueprintOpen] = React.useState(false);
+  const [blueprintLoading, setBlueprintLoading] = React.useState(false);
+  const [blueprintApproved, setBlueprintApproved] = React.useState(false);
+  const blueprintApprovedRef = React.useRef(false);
+  const pendingBuildTextRef = React.useRef<string | null>(null);
+  const approvedBlueprintRef = React.useRef<Record<string, unknown> | null>(null);
+  const [intentPreview, setIntentPreview] = React.useState<CreateIntentResult | null>(null);
+  const [intentLoading, setIntentLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    const text = input.trim();
+    if (text.length < 8) {
+      setIntentPreview(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setIntentLoading(true);
+      fetch("/api/projects/classify-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text, projectId: effectiveProjectId }),
+      })
+        .then((r) => r.json())
+        .then((data) => setIntentPreview(data as CreateIntentResult))
+        .catch(() => setIntentPreview(null))
+        .finally(() => setIntentLoading(false));
+    }, 450);
+    return () => clearTimeout(t);
+  }, [input, effectiveProjectId]);
 
   const unlockStream = React.useCallback(() => {
     streamActiveRef.current = false;
@@ -421,7 +496,7 @@ export function ImmersiveWorkspace({
 
   const drainPromptQueueRef = React.useRef<() => void>(() => {});
 
-  const { messages, sendMessage, status, error, clearError, regenerate, setMessages } = useChat({
+  const { messages, sendMessage, status, error, clearError, regenerate, setMessages, stop } = useChat({
     id: `dream-create-${createSessionId}`,
     transport,
     onError: (err) => {
@@ -445,15 +520,16 @@ export function ImmersiveWorkspace({
     },
     onFinish: () => {
       if (mode === "build") setPostBuildActive(true);
+      if (mode === "edit") setPendingDiffRefresh((k) => k + 1);
       unlockStream();
       setSubmitStatusLabel("Done");
+      setLastMessageCost({ state: "pending", credits: 0 });
       const beforeCredits = useCreditsStore.getState().remaining;
       if (uid) {
         void syncFromDB(uid, { force: true }).then(() => {
           const after = useCreditsStore.getState().remaining;
-          if (after < beforeCredits) {
-            toast.success(`Charged ${beforeCredits - after} credits`);
-          }
+          const delta = Math.max(0, beforeCredits - after);
+          setLastMessageCost({ state: "final", credits: delta });
           if (process.env.NODE_ENV !== "production") {
             submitDebug("create", "stream done", {
               creditsBefore: beforeCredits,
@@ -463,6 +539,7 @@ export function ImmersiveWorkspace({
           setTimeout(() => drainPromptQueueRef.current(), 400);
         });
       } else {
+        setLastMessageCost(null);
         setTimeout(() => drainPromptQueueRef.current(), 400);
       }
       setProjectDataRefresh((n) => n + 1);
@@ -532,14 +609,23 @@ export function ImmersiveWorkspace({
 
   const loadProjectFiles = React.useCallback(async (projectId: string) => {
     setProjectFilesLoading(true);
-    const { data, error: fErr } = await supabase
-      .from("app_files")
-      .select("path, content")
-      .eq("project_id", projectId)
-      .order("path");
-    if (!fErr && data) {
-      setProjectFiles(data.map((r) => ({ path: r.path, content: r.content ?? "" })));
+    const { paths, error: pathErr } = await loadProjectFilePaths(supabase, projectId);
+    if (pathErr) {
+      setProjectFilesLoading(false);
+      return;
     }
+    const entry = preferredEntryFile(paths);
+    let entryContent = "";
+    if (entry) {
+      const { content } = await loadProjectFileContent(supabase, projectId, entry);
+      entryContent = content;
+    }
+    setProjectFiles(
+      paths.map((path) => ({
+        path,
+        content: path === entry ? entryContent : "",
+      })),
+    );
     setProjectFilesLoading(false);
   }, [supabase]);
 
@@ -548,23 +634,21 @@ export function ImmersiveWorkspace({
     if (!id) return;
     let cancelled = false;
     void (async () => {
-      if (!isBusy) {
-        const { data, error: qErr } = await supabase
-          .from("projects")
-          .select(
-            "id, name, preview_url, icon_url, gradient, status, framework, custom_domain, is_public, metadata, published_subdomain, app_name, build_status, short_description, category, icon_svg",
-          )
-          .eq("id", id)
-          .maybeSingle();
-        if (!cancelled && !qErr && data) {
-          const patch = data as CreateWorkspaceProject & { app_name?: string | null };
-          setRemoteProjectPatch({
-            ...patch,
-            name: patch.app_name?.trim() || patch.name,
-          });
-        }
-        await loadProjectFiles(id);
+      const { data, error: qErr } = await supabase
+        .from("projects")
+        .select(
+          "id, name, preview_url, icon_url, gradient, status, framework, custom_domain, is_public, metadata, published_subdomain, app_name, build_status, short_description, category, icon_svg",
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (!cancelled && !qErr && data) {
+        const patch = data as CreateWorkspaceProject & { app_name?: string | null };
+        setRemoteProjectPatch({
+          ...patch,
+          name: patch.app_name?.trim() || patch.name,
+        });
       }
+      if (!cancelled) await loadProjectFiles(id);
     })();
     return () => {
       cancelled = true;
@@ -726,6 +810,66 @@ export function ImmersiveWorkspace({
     setQueueCount(promptQueueRef.current.length);
   }
 
+  async function loadBlueprint(text: string) {
+    setBlueprintLoading(true);
+    setBlueprintOpen(true);
+    try {
+      const res = await fetch("/api/build/blueprint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: text,
+          modelId,
+          projectId: effectiveProjectId,
+          qualityLevel: "standard",
+          mode: "llm_enriched",
+          stylePresetId:
+            (effectiveProject?.metadata as Record<string, unknown> | undefined)?.style_preset_id ??
+            undefined,
+          templateId:
+            (effectiveProject?.metadata as Record<string, unknown> | undefined)?.template_id ??
+            undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.blueprint) {
+        setBlueprint(data.blueprint as AppBlueprint);
+      } else {
+        setBlueprint(null);
+        toast.error(data.error ?? "Could not generate blueprint");
+      }
+    } finally {
+      setBlueprintLoading(false);
+    }
+  }
+
+  async function confirmBlueprintBuild() {
+    if (!blueprint || !effectiveProjectId) {
+      blueprintApprovedRef.current = true;
+      setBlueprintApproved(true);
+      setBlueprintOpen(false);
+    } else {
+      const res = await fetch("/api/build/blueprint", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blueprint, projectId: effectiveProjectId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        approvedBlueprintRef.current = (data.blueprint ?? blueprint) as Record<string, unknown>;
+        blueprintApprovedRef.current = true;
+        setBlueprintApproved(true);
+        setBlueprintOpen(false);
+      } else {
+        toast.error("Could not save blueprint approval");
+        return;
+      }
+    }
+    const text = pendingBuildTextRef.current;
+    pendingBuildTextRef.current = null;
+    if (text) await runSubmitRef.current("button", text);
+  }
+
   const runSubmit = React.useCallback(async (
     source: "button" | "enter" | "form" | "url-auto" = "button",
     overrideText?: string,
@@ -755,6 +899,15 @@ export function ImmersiveWorkspace({
       setDebugBlocked("empty");
       notifySubmitBlocked("empty");
       setSubmitStatusLabel("Failed: Type a message before building");
+      return;
+    }
+
+    if (mode === "build" && !blueprintApprovedRef.current) {
+      pendingBuildTextRef.current = text;
+      await loadBlueprint(text);
+      setSubmitStatusLabel("Review blueprint before build");
+      submitInFlightRef.current = false;
+      setBuildStarting(false);
       return;
     }
 
@@ -792,7 +945,49 @@ export function ImmersiveWorkspace({
     clearError();
     submitDebug("create", "selected mode", { mode });
 
+    if (mode === "edit" && projectFiles.length === 0 && parsedSourceFiles.length === 0) {
+      failSubmit("edit_requires_files", "Generate your app first — Edit unlocks after files exist.");
+      setSubmitStatusLabel("Edit requires generated files");
+      setBuildStarting(false);
+      submitInFlightRef.current = false;
+      return;
+    }
+
+    if (messages.length === 0 && mode !== "build") {
+      setMode("build");
+      failSubmit("first_prompt_build_only", "First prompt must use Build mode.");
+      setSubmitStatusLabel("Use Build mode for your first prompt");
+      setBuildStarting(false);
+      submitInFlightRef.current = false;
+      return;
+    }
+
     try {
+      if (mode === "build" && intentPreview?.intent === "question_only") {
+        failSubmit("question_only", intentPreview.userMessage);
+        setSubmitStatusLabel("This looks like a question — switch to Discuss or rephrase as a build request.");
+        setBuildStarting(false);
+        submitInFlightRef.current = false;
+        return;
+      }
+
+      if (!effectiveProjectId && mode === "build") {
+        const created = await fetch("/api/projects/create-from-prompt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: text, source: "prompt" }),
+        }).then((r) => r.json());
+        if (created.ok && created.projectId) {
+          setLocalProjectId(created.projectId);
+          router.replace(`/create?projectId=${created.projectId}`, { scroll: false });
+        } else if (!created.ok && created.code === "question_only") {
+          failSubmit("question_only", created.userMessage ?? created.error);
+          setBuildStarting(false);
+          submitInFlightRef.current = false;
+          return;
+        }
+      }
+
       setSubmitStatusLabel("Preflight started");
       setLastApiUrl("/api/ai/preflight");
       setLastApiStatus("preflight:pending");
@@ -905,6 +1100,8 @@ export function ImmersiveWorkspace({
     project?.id,
     clearError,
     sendMessage,
+    blueprintApproved,
+    effectiveProjectId,
   ]);
 
   const runSubmitRef = React.useRef(runSubmit);
@@ -1013,15 +1210,34 @@ export function ImmersiveWorkspace({
   }, [hydrated, mode]);
 
   const showEmpty = messages.length === 0 && !isBusy;
-  const modeStyle = MODE_STYLE[mode];
-  const lastAssistantText = React.useMemo(() => {
+  const lastAssistantTextEarly = React.useMemo(() => {
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     return last ? messageText(last) : "";
   }, [messages]);
-  const parsedSourceFiles = React.useMemo(
-    () => parseFencedFiles(lastAssistantText),
-    [lastAssistantText],
+  const parsedSourceFilesEarly = React.useMemo(
+    () => parseFencedFiles(lastAssistantTextEarly),
+    [lastAssistantTextEarly],
   );
+  const hasGeneratedFiles = projectFiles.length > 0 || parsedSourceFilesEarly.length > 0;
+  const zipImportMeta = React.useMemo(() => {
+    const meta = effectiveProject?.metadata;
+    if (!isZipImportProject(meta)) return null;
+    return readImportMeta(meta);
+  }, [effectiveProject?.metadata]);
+  const isZipImportApp = zipImportMeta != null;
+  const isFirstCreatePrompt = showEmpty && !hasGeneratedFiles && !isZipImportApp;
+  const disabledModes = React.useMemo((): CreationMode[] => {
+    if (isFirstCreatePrompt) return ["discuss", "edit"];
+    if (!hasGeneratedFiles) return ["edit"];
+    return [];
+  }, [isFirstCreatePrompt, hasGeneratedFiles]);
+
+  React.useEffect(() => {
+    if (disabledModes.includes(mode)) setMode("build");
+  }, [disabledModes, mode]);
+  const modeStyle = MODE_STYLE[mode];
+  const lastAssistantText = lastAssistantTextEarly;
+  const parsedSourceFiles = parsedSourceFilesEarly;
   const codeFiles = React.useMemo((): CodeExplorerFile[] => {
     if (projectFiles.length > 0) return projectFiles;
     return parsedSourceFiles;
@@ -1162,7 +1378,7 @@ export function ImmersiveWorkspace({
           )}
         >
           <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border/50 bg-background/60 px-2.5 backdrop-blur-sm">
-            <ModeSwitch value={mode} onChange={setMode} />
+            <ModeSwitch value={mode} onChange={setMode} disabledModes={disabledModes} />
             {modeStyle.badge && (
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1", modeStyle.badge.color)}>
                 {modeStyle.badge.label}
@@ -1184,15 +1400,49 @@ export function ImmersiveWorkspace({
                   <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent/30 to-accent/10">
                     <Zap className="size-4 text-accent" strokeWidth={1.75} />
                   </div>
-                  <p className="mt-2 text-[13px] font-semibold text-foreground">
-                    {mode === "build" ? "Start your build" : "How can we help?"}
-                  </p>
-                  <p className="mt-0.5 max-w-[240px] text-[11.5px] text-muted-foreground">{MODE_META[mode].description}</p>
+                  {isZipImportApp ? (
+                    <>
+                      <p className="mt-2 text-[13px] font-semibold text-foreground">Imported app ready</p>
+                      <p className="mt-0.5 max-w-[260px] text-[11.5px] text-muted-foreground">
+                        {zipImportMeta?.framework?.label ?? effectiveProject?.framework ?? "App"} ·{" "}
+                        {zipImportMeta?.file_count ?? projectFiles.length} files ·{" "}
+                        {zipImportMeta?.routes?.length ?? 0} routes
+                      </p>
+                      <div className="mt-3 flex flex-wrap justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRightTab("code")}
+                          className="rounded-lg bg-accent/12 px-2.5 py-1.5 text-[11px] font-semibold text-accent ring-1 ring-accent/20"
+                        >
+                          Review files
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRightTab("preview")}
+                          className="rounded-lg bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-foreground ring-1 ring-border"
+                        >
+                          Open preview
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 text-[13px] font-semibold text-foreground">
+                        {mode === "build" ? "Start your build" : "How can we help?"}
+                      </p>
+                      <p className="mt-0.5 max-w-[240px] text-[11.5px] text-muted-foreground">{MODE_META[mode].description}</p>
+                    </>
+                  )}
                 </div>
               )}
 
               <AnimatePresence initial={false}>
-                {messages.map((m, i) => (
+                {messages.map((m, i) => {
+                  const isLastAssistant =
+                    m.role === "assistant" &&
+                    i === messages.length - 1 &&
+                    !isBusy;
+                  return (
                   <MessageBubble
                     key={m.id}
                     message={m}
@@ -1200,8 +1450,11 @@ export function ImmersiveWorkspace({
                     userName={resolveDisplayName(profile, user)}
                     streaming={isBusy && i === messages.length - 1 && m.role === "assistant"}
                     mode={mode}
+                    creditsUsed={isLastAssistant ? lastMessageCost?.credits : undefined}
+                    costState={isLastAssistant ? lastMessageCost?.state : undefined}
                   />
-                ))}
+                  );
+                })}
               </AnimatePresence>
 
               {queuedPrompts.map((q) => (
@@ -1313,6 +1566,36 @@ export function ImmersiveWorkspace({
                 </Link>
               </div>
             )}
+            {(intentPreview || intentLoading) && (
+              <div className="mb-2 space-y-2">
+                <CreateIntentStep result={intentPreview} loading={intentLoading} />
+                <CreateCreditEstimate
+                  credits={preflightEstimate?.credits}
+                  creditsMax={preflightEstimate?.creditsMax}
+                  cheaperRecommended={((profile as { credits_remaining?: number } | null)?.credits_remaining ?? 99) < 15}
+                />
+              </div>
+            )}
+            {isStreaming && (
+              <div
+                data-testid="generation-cancel-bar"
+                className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-surface/50 px-3 py-2 text-[10.5px] text-muted-foreground"
+              >
+                <span>Credits reserved safely — only completed work is charged.</span>
+                <button
+                  type="button"
+                  data-testid="cancel-generation"
+                  onClick={() => {
+                    stop();
+                    unlockStream();
+                    setSubmitStatusLabel("Cancelled");
+                  }}
+                  className="shrink-0 font-semibold text-accent hover:underline"
+                >
+                  Cancel generation
+                </button>
+              </div>
+            )}
             <AttachmentRail attachments={attachments} onRemove={removeAttachment} className="mb-1.5" />
             {submitBlocker && (
               <div className="mb-2 flex flex-col gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
@@ -1383,8 +1666,8 @@ export function ImmersiveWorkspace({
                 }}
                 rows={2}
                 placeholder={
-                  mode === "build"
-                    ? "Describe what to build…"
+                  isFirstCreatePrompt || mode === "build"
+                    ? "Describe the app you want to create…"
                     : mode === "discuss"
                       ? "Ask anything…"
                       : "Describe the change…"
@@ -1555,16 +1838,53 @@ export function ImmersiveWorkspace({
               />
             )}
             {rightTab === "code" && (
-              <CodeExplorerPanel
-                files={codeFiles}
-                loading={projectFilesLoading && codeFiles.length === 0}
+              <AppBuilderWorkspace
                 projectId={effectiveProjectId}
-                fallbackText={extractedCode}
+                projectName={effectiveProject?.name ?? "App"}
+                files={codeFiles.map((f) => ({ path: f.path, content: f.content }))}
+                loading={projectFilesLoading && codeFiles.length === 0}
+                blueprint={blueprint}
+                previewUrl={effectiveProject?.preview_url ?? null}
+                pendingDiffRefreshKey={pendingDiffRefresh}
+                onFilesChanged={() => {
+                  if (effectiveProjectId) void loadProjectFiles(effectiveProjectId);
+                }}
+                className="h-full"
               />
             )}
           </div>
         </div>
       </div>
+
+      <BlueprintConfirmationModal
+        open={blueprintOpen}
+        blueprint={blueprint}
+        loading={blueprintLoading}
+        onClose={() => {
+          setBlueprintOpen(false);
+          pendingBuildTextRef.current = null;
+        }}
+        onBuildNow={() => void confirmBlueprintBuild()}
+        onEditBlueprint={() => toast.info("Adjust your prompt and submit again to refresh the blueprint.")}
+        onCheaperMode={() => void loadBlueprint((pendingBuildTextRef.current ?? input).trim())}
+        onPremiumMode={() => {
+          void fetch("/api/build/blueprint", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: pendingBuildTextRef.current ?? input,
+              qualityLevel: "premium",
+              mode: "llm_enriched",
+              projectId: effectiveProjectId,
+              modelId,
+            }),
+          })
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.blueprint) setBlueprint(d.blueprint as AppBlueprint);
+            });
+        }}
+      />
 
       {showFreeWatermark && (
         <div

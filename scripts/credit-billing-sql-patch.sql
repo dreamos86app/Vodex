@@ -273,7 +273,7 @@ begin
 
   insert into public.credit_events (
     user_id, operation_id, amount, balance_after, reason,
-    project_id, conversation_id, model_id, provider, metadata
+    project_id, conversation_id, model_id, credits_consumed, event_type, provider_cost_usd, status, metadata
   )
   values (
     p_user_id,
@@ -283,8 +283,11 @@ begin
     coalesce(p_reason, 'AI usage'),
     p_project_id,
     p_conversation_id,
-    coalesce(p_metadata->>'model_id', null),
-    v_provider,
+    coalesce(p_metadata->>'model_id', 'unknown'),
+    p_amount,
+    'generation',
+    coalesce((p_metadata->>'provider_cost_usd')::numeric, 0),
+    'finalized',
     coalesce(p_metadata, '{}'::jsonb)
   );
 

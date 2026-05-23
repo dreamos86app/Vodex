@@ -8,7 +8,12 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { loadMemory, formatMemoryForPrompt } from "@/lib/creation/memory";
 import { buildSystemPrompt } from "@/lib/creation/system-prompt";
-import { calculateTokens } from "@/lib/credits/cost-engine";
+import { planGenerationBudget } from "@/lib/ai/generation-budget-planner";
+import {
+  reserveCreditsForGeneration,
+  reconcileGenerationReservation,
+} from "@/lib/billing/credit-reservations";
+import { assertProfitableCharge } from "@/lib/billing/credit-profit-guard";
 import type { Json } from "@/lib/supabase/types";
 import { loadProfileBillingRow } from "@/lib/supabase/load-profile-billing";
 import { parseFencedFiles } from "@/lib/creation/extract-fenced-code";
@@ -24,6 +29,9 @@ import { allocatePublishedSubdomain } from "@/lib/publish/subdomain";
 import { googleGenerativeApiKey, hasAnyLlmProviderKey } from "@/lib/llm/env-keys";
 import { isAutomaticModelId } from "@/lib/ai/resolve-automatic-model";
 import { routeModel, mapChatModeToTask, routeOperation } from "@/lib/ai/model-router";
+import { resolveStageModel } from "@/lib/ai/model-cost-runtime";
+import { completeBuildWithValidation } from "@/lib/build/complete-build-with-validation";
+import { classifyCreateIntent } from "@/lib/intent/create-intent-classifier";
 import {
   classifyProviderError,
   pickFailoverCatalogModel,
@@ -43,6 +51,10 @@ import { finalizeBuildSuccess, finalizeBuildFailed } from "@/lib/build/finalize-
 import { runBuildQualityRepair } from "@/lib/build/quality-repair";
 import { ensureProjectConversation } from "@/lib/projects/project-conversation";
 import { loadProjectContextBlock, refineAppName } from "@/lib/projects/project-context";
+import { parseAppBlueprint, requiresBlueprintApproval } from "@/lib/build/blueprint-schema";
+import { readCreateFlowConfig, buildTierToQualityLevel } from "@/lib/create/create-flow-config";
+import { formatBlueprintForBuild } from "@/lib/build/format-blueprint-prompt";
+import { maybeCreatePendingDiffFromChatEdit } from "@/lib/chat/post-edit-pending-diff";
 import {
   hasRecentRunningBuildJob,
   hasSuccessfulChargeForOperation,
@@ -58,6 +70,8 @@ import { toApiModelId } from "@/lib/ai/model-catalog";
 import { requireId } from "@/lib/diagnostics/require-ids";
 import { dreamosLog } from "@/lib/diagnostics/dreamos-logger";
 import { logServerOperation } from "@/lib/ops/server-ops-log";
+import { requireAuthUser, isNextResponse } from "@/lib/ids/api-mutation-guard";
+import { guardExpensiveRoute } from "@/lib/security/route-guard";
 
 const LLM_SETUP_ERROR = "AI provider is not configured on this server.";
 const LLM_SETUP_HINT =
@@ -199,12 +213,8 @@ export async function POST(request: Request) {
   const writer = admin ?? supabase;
 
   const {
-    data: { user },
+    data: { user: sessionUser },
   } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   let raw: {
     messages?: UIMessage[];
@@ -217,6 +227,10 @@ export async function POST(request: Request) {
     attachmentIds?: unknown;
     operationId?: string;
     idempotencyKey?: string;
+    approvedBlueprint?: unknown;
+    qualityLevel?: string;
+    templateId?: string;
+    stylePresetId?: string;
   };
 
   try {
@@ -224,6 +238,10 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
+
+  const authUser = guardExpensiveRoute(sessionUser, "chat", raw as Record<string, unknown>);
+  if (isNextResponse(authUser)) return authUser;
+  const user = authUser;
 
   const uiMessages = raw.messages ?? [];
   if (!Array.isArray(uiMessages) || uiMessages.length === 0) {
@@ -261,6 +279,26 @@ export async function POST(request: Request) {
         : null;
   const projectId =
     typeof raw.projectId === "string" && raw.projectId.length > 0 ? raw.projectId : undefined;
+
+  if (mode === "edit" && !projectId) {
+    return NextResponse.json(
+      { error: "Edit mode requires an existing project.", code: "edit_requires_project" },
+      { status: 400 },
+    );
+  }
+
+  if (mode === "edit" && projectId) {
+    const { count } = await writer
+      .from("app_files")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId);
+    if (!count || count < 1) {
+      return NextResponse.json(
+        { error: "Edit mode requires generated files. Use Build mode first.", code: "edit_requires_files" },
+        { status: 400 },
+      );
+    }
+  }
 
   const { row: billingRow, hint: billingHint } = await loadProfileBillingRow(supabase, user);
   if (!billingRow) {
@@ -332,7 +370,43 @@ export async function POST(request: Request) {
   const requestedModel =
     typeof raw.modelId === "string" && raw.modelId.length > 0 ? raw.modelId : undefined;
   const taskMode = mapChatModeToTask(mode);
-  const routed = routeModel(taskMode, requestedModel);
+  const createIntent =
+    userTextEarly && mode === "build"
+      ? classifyCreateIntent(userTextEarly, Boolean(projectId)).intent
+      : undefined;
+  if (createIntent === "question_only" && mode === "build" && startBuildPipeline) {
+    return NextResponse.json(
+      {
+        error: "This looks like a question — use Discuss mode or rephrase as a build request.",
+        code: "question_only",
+      },
+      { status: 400 },
+    );
+  }
+  let projectQuality: "quick" | "standard" | "production" | "premium" = "standard";
+  if (projectId) {
+    const { data: projQ } = await writer
+      .from("projects")
+      .select("metadata")
+      .eq("id", projectId)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    const cfg = readCreateFlowConfig(projQ?.metadata);
+    projectQuality = buildTierToQualityLevel(cfg.buildTier);
+  }
+  if (raw.qualityLevel === "quick" || raw.qualityLevel === "production" || raw.qualityLevel === "premium") {
+    projectQuality = raw.qualityLevel === "premium" ? "premium" : raw.qualityLevel;
+  }
+
+  const costRuntime = resolveStageModel({
+    stage: mode === "build" ? "ui_generation" : mode === "edit" ? "file_plan" : "intent",
+    intent: createIntent,
+    mode: chargeMode,
+    userCreditsBalance: profileRow.credits_remaining ?? 0,
+    requestedModelId: requestedModel,
+    qualityLevel: projectQuality,
+  });
+  const routed = costRuntime.route;
   const modelId =
     freePlan && taskMode === "discuss"
       ? pickFreeDiscussModelId()
@@ -398,14 +472,21 @@ export async function POST(request: Request) {
   modelMessages = appendFileLinks(modelMessages, fileLinks);
   modelMessages = injectUserImages(modelMessages, imageUrls);
 
-  const tokensNeeded =
-    startBuildPipeline && projectId
-      ? calculateCreditsForStagedBuild({
-          providerCostUsd: 0.12,
-          complexity: 5,
-          primaryModelId: modelId,
-        }).creditsToCharge
-      : calculateTokens(modelId, chargeMode);
+  const userText = lastUserText(uiMessages);
+  const budgetPlan = planGenerationBudget({
+    prompt: userText || userTextEarly || "",
+    mode: startBuildPipeline ? "full_build" : chargeMode,
+    selectedModel: modelId,
+    userPlan: profileRow.plan_id as string | undefined,
+    hasExistingProject: Boolean(projectId),
+    qualityLevel:
+      projectQuality === "quick"
+        ? "economy"
+        : projectQuality === "production" || projectQuality === "premium"
+          ? "premium"
+          : "balanced",
+  });
+  const tokensNeeded = budgetPlan.creditQuote.userCreditsReserved;
   const balance = profileRow.credits_remaining;
 
   if (balance < tokensNeeded) {
@@ -414,12 +495,12 @@ export async function POST(request: Request) {
         error: "insufficient_tokens",
         tokens_remaining: balance,
         tokens_required: tokensNeeded,
+        estimated_cost: budgetPlan.creditQuote.userCreditsRequired,
+        hint: "Add credits or use a cheaper build mode.",
       },
       { status: 402 },
     );
   }
-
-  const userText = lastUserText(uiMessages);
   const userEmail = profileRow.email || user.email || "";
 
   const attachmentsJson: Json = attachmentRows.map((r) => ({
@@ -567,6 +648,73 @@ export async function POST(request: Request) {
     if (!requireId("projectId", projectId, { source: "server", userId: user.id, route: "/api/chat" })) {
       return NextResponse.json({ error: "projectId required for build", code: "missing_project_id" }, { status: 400 });
     }
+
+    let blueprintBlock = "";
+    const { data: projMetaRow } = await writer
+      .from("projects")
+      .select("metadata")
+      .eq("id", projectId)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    const buildMeta = (projMetaRow?.metadata ?? {}) as Record<string, unknown>;
+    const buildCfg = readCreateFlowConfig(buildMeta);
+    const buildUiCtx = {
+      stylePresetId: buildCfg.stylePresetId,
+      templateId: buildCfg.templateId,
+      buildTier: buildCfg.buildTier,
+    };
+
+    const bodyBp = raw.approvedBlueprint;
+    if (bodyBp) {
+      const parsed = parseAppBlueprint(bodyBp);
+      if (parsed.ok) blueprintBlock = formatBlueprintForBuild(parsed.blueprint, buildUiCtx);
+    }
+    if (!blueprintBlock) {
+      const stored = buildMeta.approved_blueprint;
+      if (stored) {
+        const parsed = parseAppBlueprint(stored);
+        if (parsed.ok) blueprintBlock = formatBlueprintForBuild(parsed.blueprint, buildUiCtx);
+      }
+    }
+
+    if (!blueprintBlock && requiresBlueprintApproval(projectQuality)) {
+      return NextResponse.json(
+        {
+          error: "Approve your blueprint before starting a full build.",
+          code: "blueprint_not_approved",
+        },
+        { status: 400 },
+      );
+    }
+
+    const reserve = await reserveCreditsForGeneration(writer, {
+      userId: user.id,
+      userEmail,
+      generationId: opId,
+      projectId,
+      conversationId,
+      balance,
+      mode: "full_build",
+      selectedModel: modelId,
+      complexity: budgetPlan.complexity,
+      estimatedProviderCostUsd: budgetPlan.providerBudgetUsd,
+      promptLength: userText.length,
+      expectedFiles: 12,
+      userPlan: profileRow.plan_id as string | undefined,
+    });
+
+    if (!reserve.ok) {
+      return NextResponse.json(
+        {
+          error: reserve.error,
+          code: reserve.code,
+          tokens_remaining: balance,
+          tokens_required: reserve.quote?.userCreditsReserved ?? tokensNeeded,
+        },
+        { status: reserve.code === "insufficient_tokens" ? 402 : 503 },
+      );
+    }
+
     return createStagedBuildStreamResponse({
       uiMessages,
       writer,
@@ -581,6 +729,8 @@ export async function POST(request: Request) {
       modelId: billedModelId,
       provider: routed.provider,
       routeReason: routed.routeReason,
+      reservedCredits: reserve.reserved,
+      blueprintBlock: blueprintBlock || undefined,
     });
   }
 
@@ -820,6 +970,11 @@ export async function POST(request: Request) {
                   creditsCharged: 0,
                   charged: false,
                 });
+                await completeBuildWithValidation({
+                  writer,
+                  userId: user.id,
+                  projectId,
+                });
                 await allocatePublishedSubdomain(writer, projectId, user.id);
 
                 if (!fileQuality.ok && buildJobId) {
@@ -946,10 +1101,31 @@ export async function POST(request: Request) {
               .limit(1)
               .maybeSingle();
             if (lastAsst?.id) {
-              await writer.from("messages").update({ credits_used: creditsToCharge }).eq("id", lastAsst.id);
+              await writer
+                .from("messages")
+                .update({
+                  credits_used: creditsToCharge,
+                  metadata: { mode, scope, projectId, billing: "finalized", credits: creditsToCharge } as never,
+                })
+                .eq("id", lastAsst.id);
             }
-          } else if (!charged && process.env.NODE_ENV !== "production") {
-            console.warn("[chat] charge after save:", chargeError);
+          } else if (!charged && chargeError && outputSaved) {
+            await writer.from("ai_usage_logs").insert({
+              user_id: user.id,
+              user_email: userEmail,
+              model_id: billedModelId,
+              mode: chargeMode,
+              tokens_charged: 0,
+              credits_charged: 0,
+              status: "charge_failed",
+              error_message: chargeError,
+              conversation_id: conversationId ?? null,
+              operation_id: opId,
+              project_id: projectId ?? null,
+            } as never);
+            if (process.env.NODE_ENV !== "production") {
+              console.warn("[chat] charge after save:", chargeError);
+            }
           }
         } else if (!alreadyCharged && outputSaved && event.text?.trim()) {
           const skipReason = buildFailureReason
@@ -984,6 +1160,19 @@ export async function POST(request: Request) {
               chargeError ??
               "Build did not meet quality requirements.",
           });
+        }
+
+        if (projectId && mode === "edit" && userText) {
+          await maybeCreatePendingDiffFromChatEdit({
+            writer,
+            supabase,
+            userId: user.id,
+            userEmail,
+            projectId,
+            conversationId,
+            userPrompt: userText,
+            mode: "edit",
+          }).catch(() => undefined);
         }
       },
     });

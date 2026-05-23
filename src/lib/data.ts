@@ -561,6 +561,29 @@ export const notifications: Notification[] = [];
 
 export const changelog: ChangelogEntry[] = [
   {
+    id: "production-reliability-may-2026",
+    version: "0.9.0",
+    date: "May 23, 2026",
+    type: "major",
+    title: "Production reliability, credits, ZIP import, and workflow upgrades",
+    description:
+      "A polished upgrade for daily use: more reliable AI Chat, clearer credit balances, larger ZIP imports for real projects, and smoother Create and homepage workflows.",
+    highlights: [
+      "AI Chat conversations save, reload, and switch reliably for signed-in users",
+      "Credit tracking is more reliable and easier to understand in your account menu",
+      "Billing diagnostics and credit processing are more dependable for paid AI actions",
+      "First create prompt is Build-only; Discuss and Edit unlock after an app exists",
+      "AI Chat knows DreamOS86 product flows and answers in plain language",
+      "Public homepage redesign with animated Build → Preview → Publish workflow",
+      "DreamOS86 in numbers section restored on the marketing site",
+      "ZIP import for existing projects with framework detection (up to 1,500 source files)",
+      "Create App dashboard and blueprint/template improvements",
+      "Faster navigation with clearer loading states",
+      "Admin diagnostics improvements for platform owners",
+      "Local development verify helpers for contributors",
+    ],
+  },
+  {
     id: "chat-persistence",
     version: "0.8.0",
     date: "May 15, 2026",

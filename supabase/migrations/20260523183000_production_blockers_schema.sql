@@ -1,6 +1,6 @@
 -- ============================================================
 -- DreamOS86 — Production blockers (profiles cache, chat, workspaces)
--- Apply to project ref: xycqutvqxtkbszytaxbe (via Supabase SQL or `db push`).
+-- Apply to project ref: wciioegiczwqlmlroley (via Supabase SQL or `db push`).
 -- Idempotent. Reloads PostgREST schema cache at end.
 -- ============================================================
 

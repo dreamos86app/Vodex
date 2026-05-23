@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { DREAMOS_SUPABASE_PROJECT_REF } from "@/lib/supabase/project-ref";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const EXPECTED_PROJECT_REF = "xycqutvqxtkbszytaxbe";
+const EXPECTED_PROJECT_REF = DREAMOS_SUPABASE_PROJECT_REF;
 
 /**
  * Dev-only Supabase OAuth diagnostics (no secrets in response).

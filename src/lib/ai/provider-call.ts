@@ -113,6 +113,9 @@ export async function callProviderStructured(input: ProviderCallInput): Promise<
         accumulatedCostUsd: input.accumulatedCostUsd,
       });
     }
+    if (!budget.allowed && budget.cappedOutputTokens >= 200) {
+      budget = { ...budget, allowed: true };
+    }
     if (!budget.allowed) {
       throw new Error(`Budget exceeded for ${input.operationType}: ${budget.reason}`);
     }

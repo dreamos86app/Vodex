@@ -1,4 +1,4 @@
--- DreamOS86 — Community + app engineering tables (project ref: xycqutvqxtkbszytaxbe)
+-- DreamOS86 — Community + app engineering tables (project ref: wciioegiczwqlmlroley)
 -- Apply: supabase db push --linked   OR paste in SQL Editor.
 -- Requires: public.set_updated_at() from foundational migrations (create if missing below).
 

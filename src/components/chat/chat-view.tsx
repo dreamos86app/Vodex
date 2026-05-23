@@ -10,7 +10,7 @@ import {
   Link2, HelpCircle, MessageSquare, PanelLeft,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -62,95 +62,153 @@ function planIsFree(planId: string | null | undefined): boolean {
 
 // ─── Data hooks ───────────────────────────────────────────────────────────────
 
-function useConversations(userId: string | undefined) {
-  const supabase = createClient();
+const CONV_LOAD_TIMEOUT_MS = 8_000;
+const MSG_LOAD_TIMEOUT_MS = 8_000;
+
+function useConversations(userId: string | undefined, sessionReady: boolean) {
   const [conversations, setConversations] = React.useState<Conversation[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [reloadTick, setReloadTick] = React.useState(0);
+
+  const reload = React.useCallback(() => {
+    setReloadTick((n) => n + 1);
+  }, []);
 
   React.useEffect(() => {
+    if (!sessionReady) return;
     if (!userId) {
+      setConversations([]);
       setLoading(false);
+      setError(null);
       return;
     }
 
     let cancelled = false;
+    const ac = new AbortController();
     setLoading(true);
-    const maxWait = setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 1000);
+    setError(null);
 
-    void Promise.resolve(
-      supabase
-        .from("conversations")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("archived", false)
-        .order("updated_at", { ascending: false })
-        .limit(50),
-    )
-      .then(({ data, error }) => {
+    const timeout = window.setTimeout(() => {
+      ac.abort();
+      if (!cancelled) {
+        setError("Conversations took too long — tap retry.");
+        setLoading(false);
+      }
+    }, CONV_LOAD_TIMEOUT_MS);
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/conversations", {
+          credentials: "include",
+          signal: ac.signal,
+          cache: "no-store",
+        });
         if (cancelled) return;
-        setConversations(error ? [] : (data ?? []));
-      })
-      .finally(() => {
-        if (!cancelled) {
-          clearTimeout(maxWait);
-          setLoading(false);
+        window.clearTimeout(timeout);
+        const body = (await res.json()) as { conversations?: Conversation[]; error?: string; code?: string };
+        if (res.status === 401 || body.code === "auth_required") {
+          setError("Sign in again to load conversations.");
+          setConversations([]);
+        } else if (!res.ok) {
+          setError(body.error ?? "Could not load conversations");
+        } else {
+          setConversations(body.conversations ?? []);
         }
-      });
+      } catch (err) {
+        if (cancelled) return;
+        window.clearTimeout(timeout);
+        if (err instanceof Error && err.name === "AbortError") {
+          setError("Conversations took too long — tap retry.");
+        } else {
+          setError(err instanceof Error ? err.message : "Could not load conversations");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
     return () => {
       cancelled = true;
-      clearTimeout(maxWait);
+      ac.abort();
+      window.clearTimeout(timeout);
     };
-  }, [userId]);
+  }, [userId, sessionReady, reloadTick]);
 
-  return { conversations, setConversations, loading };
+  return { conversations, setConversations, loading, error, reload };
 }
 
-function useMessages(conversationId: string | null, userId: string | undefined, reloadTick: number) {
-  const supabase = createClient();
+function useMessages(conversationId: string | null, userId: string | undefined, reloadTick: number, sessionReady: boolean) {
   const [history, setHistory] = React.useState<Message[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (!sessionReady) return;
     if (!conversationId || !userId) {
       setHistory([]);
       setLoading(false);
+      setError(null);
       return;
     }
 
     let cancelled = false;
+    const ac = new AbortController();
     setLoading(true);
-    const maxWait = setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 1000);
+    setError(null);
 
-    void Promise.resolve(
-      supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true }),
-    )
-      .then(({ data, error }) => {
+    const timeout = window.setTimeout(() => {
+      ac.abort();
+      if (!cancelled) {
+        setError("Messages took too long to load — tap retry.");
+        setLoading(false);
+      }
+    }, MSG_LOAD_TIMEOUT_MS);
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/conversations/${conversationId}/messages`, {
+          credentials: "include",
+          signal: ac.signal,
+          cache: "no-store",
+        });
         if (cancelled) return;
-        setHistory(error ? [] : ((data as Message[]) ?? []));
-      })
-      .finally(() => {
-        if (!cancelled) {
-          clearTimeout(maxWait);
-          setLoading(false);
+        window.clearTimeout(timeout);
+        const body = (await res.json()) as { messages?: Message[]; error?: string; code?: string };
+        if (res.status === 401 || body.code === "auth_required") {
+          setError("Sign in again to load this conversation.");
+          setHistory([]);
+        } else if (res.status === 404) {
+          setError("Conversation not found.");
+          setHistory([]);
+        } else if (!res.ok) {
+          setError(body.error ?? "Could not load this conversation.");
+          setHistory([]);
+        } else {
+          setHistory((body.messages as Message[]) ?? []);
         }
-      });
+      } catch (err) {
+        if (cancelled) return;
+        window.clearTimeout(timeout);
+        if (err instanceof Error && err.name === "AbortError") {
+          setError("Messages took too long to load — tap retry.");
+        } else {
+          setError(err instanceof Error ? err.message : "Could not load this conversation.");
+        }
+        setHistory([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
     return () => {
       cancelled = true;
-      clearTimeout(maxWait);
+      ac.abort();
+      window.clearTimeout(timeout);
     };
-  }, [conversationId, userId, reloadTick]);
+  }, [conversationId, userId, reloadTick, sessionReady]);
 
-  return { history, loading };
+  return { history, loading, error };
 }
 
 function messageText(msg: { content?: string; parts?: UIMessage["parts"] }): string {
@@ -347,6 +405,7 @@ function MessageBubble({ msg, displayName, avatarUrl, attachments = [] }: {
 export function ChatView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const authReturnTo = React.useMemo(() => {
     const qs = searchParams?.toString();
     return qs ? `${pathname}?${qs}` : pathname || "/chat";
@@ -400,8 +459,16 @@ export function ChatView() {
   const pendingAttachmentIdsRef = React.useRef<string[]>([]);
 
   const [histReload, setHistReload] = React.useState(0);
-  const { conversations, setConversations, loading: convLoading } = useConversations(userId);
-  const { history, loading: histLoading } = useMessages(activeConvId, userId, histReload);
+  const { conversations, setConversations, loading: convLoading, error: convError, reload: reloadConversations } =
+    useConversations(userId, sessionReady);
+  const { history, loading: histLoading, error: histError } = useMessages(
+    activeConvId,
+    userId,
+    histReload,
+    sessionReady,
+  );
+  const switchingConvRef = React.useRef(false);
+  const streamConvRef = React.useRef<string | null>(null);
 
   const convRef = React.useRef(activeConvId);
   convRef.current = activeConvId;
@@ -460,10 +527,46 @@ export function ChatView() {
     },
     onFinish: () => {
       pendingAttachmentIdsRef.current = [];
+      useCreditsStore.getState().deductOptimistic(1);
       if (userId) void syncFromDB(userId, { force: true });
+      void reloadConversations();
     },
   });
   const isBusy = status === "submitted" || status === "streaming";
+  const lastMessage = messages[messages.length - 1];
+  const showStreamLoader = isBusy && (!lastMessage || lastMessage.role === "user");
+
+  const updateChatUrl = React.useCallback(
+    (conversationId: string | null) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      if (conversationId) params.set("c", conversationId);
+      else params.delete("c");
+      const qs = params.toString();
+      router.replace(qs ? `/chat?${qs}` : "/chat", { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const switchConversation = React.useCallback(
+    (conversationId: string) => {
+      if (conversationId === activeConvId) return;
+      switchingConvRef.current = true;
+      streamConvRef.current = null;
+      clearError();
+      setMessages([]);
+      setActiveConvId(conversationId);
+      convRef.current = conversationId;
+      updateChatUrl(conversationId);
+    },
+    [activeConvId, clearError, setMessages, updateChatUrl],
+  );
+
+  React.useEffect(() => {
+    const fromUrl = searchParams?.get("c");
+    if (fromUrl && fromUrl !== activeConvId && userId) {
+      switchConversation(fromUrl);
+    }
+  }, [searchParams, userId]); // eslint-disable-line react-hooks/exhaustive-deps -- only hydrate from URL once params available
 
   const trimmedInput = input.trim();
   const submitDisabledReason = !trimmedInput ? "empty" : isBusy ? "busy" : null;
@@ -483,10 +586,13 @@ export function ChatView() {
   }, [isBusy, activeConvId]);
 
   React.useEffect(() => {
-    if (!activeConvId) return;
-    if (histLoading || isBusy) return;
-    // Do not replace live `useChat` messages with an empty history (brand-new thread + first reply race).
-    if (history.length === 0) return;
+    if (!activeConvId) {
+      if (!isBusy) setMessages([]);
+      return;
+    }
+    if (histLoading) return;
+    if (histError) return;
+    if (isBusy && streamConvRef.current === activeConvId && messages.length > 0) return;
     setMessages(
       history.map((m) => ({
         id: m.id,
@@ -494,7 +600,13 @@ export function ChatView() {
         parts: [{ type: "text" as const, text: m.content }],
       })),
     );
-  }, [history, activeConvId, histLoading, isBusy, setMessages]);
+    switchingConvRef.current = false;
+  }, [history, activeConvId, histLoading, histError, isBusy, setMessages]); // messages intentionally omitted — avoid loop during stream
+
+  React.useEffect(() => {
+    if (isBusy && activeConvId) streamConvRef.current = activeConvId;
+    if (!isBusy) streamConvRef.current = null;
+  }, [isBusy, activeConvId]);
 
   React.useEffect(() => {
     if (messages.length === 0 && !isBusy) return;
@@ -504,10 +616,12 @@ export function ChatView() {
   function startNewConversation() {
     setActiveConvId(null);
     convRef.current = null;
+    streamConvRef.current = null;
     setInput("");
     setMessages([]);
     setTokenError(false);
     pendingAttachmentIdsRef.current = [];
+    updateChatUrl(null);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
@@ -575,6 +689,14 @@ export function ChatView() {
     setTokenError(false);
     clearError();
 
+    // Instant UX — user message visible before preflight/network.
+    if (!presetText) setInput("");
+    const optimisticId = `opt-user-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: optimisticId, role: "user", parts: [{ type: "text", text }] },
+    ]);
+
     try {
     setSubmitStatusLabel("Preflight started");
     setLastApiUrl("/api/ai/preflight");
@@ -601,6 +723,7 @@ export function ChatView() {
     });
 
     if (!isAiPreflightSuccess(pre)) {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setPreflightState("error");
       const blocked = preflightBlockedLabel(pre.code, pre.status);
       if (pre.code === "insufficient_tokens") {
@@ -628,6 +751,8 @@ export function ChatView() {
     if (pre.conversationId) {
       convRef.current = pre.conversationId;
       setActiveConvId(pre.conversationId);
+      updateChatUrl(pre.conversationId);
+      streamConvRef.current = pre.conversationId;
       if (!hadConv) {
         const stub: Conversation = {
           id: pre.conversationId,
@@ -665,19 +790,19 @@ export function ChatView() {
     }
     pendingAttachmentIdsRef.current = uploadIds;
 
-    if (!presetText) setInput("");
-
       setSubmitStatusLabel("Chat started");
       uiSubmitLog("chat", "chat fetch start");
       setLastApiUrl("/api/chat");
       setLastApiStatus("pending");
       setChatState("pending");
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       await sendMessage({ text });
       setLastApiStatus((s) => (s === "pending" ? "ok" : s));
       setChatState("ok");
       submitDebug("chat", "ui updated");
       setSubmitStatusLabel("Chat started (stream active)");
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => !m.id.startsWith("opt-user-")));
       setChatState("error");
       const msg = err instanceof Error ? err.message : "Could not send message";
       if (!msg.includes("Not enough tokens") && !msg.toLowerCase().includes("credit")) {
@@ -797,9 +922,29 @@ export function ChatView() {
         </div>
 
         <div className="flex-1 overflow-y-auto py-1">
-          {convLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          {convLoading || !sessionReady ? (
+            <div className="space-y-2 px-3 py-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-10 animate-pulse rounded-lg bg-muted/40" />
+              ))}
+            </div>
+          ) : needsSignIn ? (
+            <div className="px-4 py-6 text-center">
+              <p className="text-[12px] text-muted-foreground">Sign in to view conversations.</p>
+              <Link href={`/auth/login?next=${encodeURIComponent(authReturnTo)}`} className="mt-2 inline-block text-[11px] font-medium text-accent underline">
+                Sign in
+              </Link>
+            </div>
+          ) : convError ? (
+            <div className="px-4 py-6 text-center">
+              <p className="text-[12px] text-destructive">Could not load conversations</p>
+              <button
+                type="button"
+                onClick={() => reloadConversations()}
+                className="mt-2 text-[11px] font-medium text-accent underline"
+              >
+                Retry
+              </button>
             </div>
           ) : filteredConvs.length === 0 ? (
             <div className="px-4 py-8 text-center">
@@ -818,7 +963,7 @@ export function ChatView() {
             filteredConvs.map((conv) => (
               <button
                 key={conv.id}
-                onClick={() => setActiveConvId(conv.id)}
+                onClick={() => switchConversation(conv.id)}
                 className={cn(
                   "group w-full cursor-pointer px-3 py-2.5 text-left transition hover:bg-surface",
                   activeConvId === conv.id && "bg-surface",
@@ -886,7 +1031,7 @@ export function ChatView() {
                     key={conv.id}
                     type="button"
                     onClick={() => {
-                      setActiveConvId(conv.id);
+                      switchConversation(conv.id);
                       setMobileConvOpen(false);
                     }}
                     className={cn(
@@ -989,31 +1134,41 @@ export function ChatView() {
                 </p>
                 <div className="mt-6 flex w-full max-w-xl flex-col gap-2">
                   {[
-                    { q: "What is DreamOS86 in one sentence?", prompt: "What is DreamOS86 in one sentence?" },
-                    { q: "How do I build my first app here?", prompt: "How do I build my first app step by step?" },
-                    { q: "Where do tokens and pricing work?", prompt: "How do tokens work and where is pricing?" },
-                    { q: "Can you link me to templates and examples?", prompt: "Where are templates and example apps?" },
-                  ].map(({ q, prompt }) => (
+                    "What is DreamOS86 in one sentence?",
+                    "How do I build my first app here?",
+                    "Where do tokens and pricing work?",
+                    "Where are templates and example apps?",
+                  ].map((text) => (
                     <button
-                      key={q}
+                      key={text}
                       type="button"
                       disabled={isBusy || tokenBlocked || !userId}
                       onClick={() => {
-                        setInput(prompt);
-                        requestAnimationFrame(() => textareaRef.current?.focus());
+                        void runSendRef.current("preset", text);
                       }}
                       className="cursor-pointer rounded-xl border border-border/80 bg-background/80 px-4 py-3 text-left text-[12.5px] text-muted-foreground shadow-sm transition hover:border-accent/35 hover:bg-surface hover:text-foreground hover:shadow-md active:scale-[0.99] disabled:pointer-events-none disabled:opacity-40"
                     >
-                      {q}
+                      {text}
                     </button>
                   ))}
                 </div>
               </motion.div>
             )}
 
-            {histLoading && messages.length === 0 ? (
+            {histLoading && (messages.length === 0 || switchingConvRef.current) ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : histError ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-6 text-center">
+                <p className="text-[13px] text-destructive">Could not load this conversation.</p>
+                <button
+                  type="button"
+                  onClick={() => setHistReload((n) => n + 1)}
+                  className="mt-2 text-[12px] font-medium text-accent underline"
+                >
+                  Retry
+                </button>
               </div>
             ) : (
               messages.map((msg, idx) => {
@@ -1031,7 +1186,7 @@ export function ChatView() {
               })
             )}
 
-            {isBusy && (
+            {showStreamLoader && (
               <div className="flex gap-3">
                 <div className="flex size-7 shrink-0 items-center justify-center">
                   <DreamOS86BrandIcon variant="assistant" alt="" />

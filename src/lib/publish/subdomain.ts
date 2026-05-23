@@ -1,10 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { buildPublicUrl } from "@/lib/publish/public-url";
+import { PLATFORM_BASE_DOMAIN } from "@/lib/publish/publish-config";
 
-const DOMAIN = "dreamos86.com";
+export { PLATFORM_BASE_DOMAIN };
 
+/** Honest public URL — subdomain only when DNS verified; otherwise /p/slug. */
 export function publicWebUrlForSubdomain(sub: string): string {
-  return `https://${sub}.${DOMAIN}`;
+  return buildPublicUrl(sub).url;
 }
 
 export function slugifyPublicSubdomain(raw: string): string {

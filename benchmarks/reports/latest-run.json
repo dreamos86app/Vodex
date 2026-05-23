@@ -1,0 +1,308 @@
+{
+  "runAt": "2026-05-22T20:52:30.540Z",
+  "mode": "structure_only",
+  "promptCount": 60,
+  "prompts": [
+    {
+      "id": "ai-01",
+      "prompt": "AI chat tool for summarizing PDFs with upload and citation panel",
+      "category": "ai_tool"
+    },
+    {
+      "id": "ai-02",
+      "prompt": "AI image prompt studio with history and favorite presets",
+      "category": "ai_tool"
+    },
+    {
+      "id": "ai-03",
+      "prompt": "AI code review assistant with diff viewer and severity tags",
+      "category": "ai_tool"
+    },
+    {
+      "id": "ai-04",
+      "prompt": "AI meeting notes tool with action items and share link",
+      "category": "ai_tool"
+    },
+    {
+      "id": "ai-05",
+      "prompt": "AI support copilot with ticket context and suggested replies",
+      "category": "ai_tool"
+    },
+    {
+      "id": "crm-01",
+      "prompt": "CRM for real estate agents with leads, listings, and follow-up tasks",
+      "category": "crm"
+    },
+    {
+      "id": "crm-02",
+      "prompt": "CRM for dentists with patient records and appointment scheduling",
+      "category": "crm"
+    },
+    {
+      "id": "crm-03",
+      "prompt": "CRM for B2B sales with pipeline stages and contact enrichment",
+      "category": "crm"
+    },
+    {
+      "id": "crm-04",
+      "prompt": "CRM for nonprofits with donor tiers and campaign tracking",
+      "category": "crm"
+    },
+    {
+      "id": "crm-05",
+      "prompt": "CRM for recruiters with candidates, jobs, and interview notes",
+      "category": "crm"
+    },
+    {
+      "id": "smoke-landing",
+      "prompt": "Build a landing page for a meditation app with calm gradients and email signup",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-saas-dash",
+      "prompt": "Build a SaaS analytics dashboard with revenue charts and team settings",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-crm",
+      "prompt": "Build me a CRM for dentists with scheduling and patient notes",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-booking",
+      "prompt": "Build a salon booking app with stylist calendar and reminders",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-finance",
+      "prompt": "Build a personal finance dashboard with budgets and transaction categories",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-ai-tool",
+      "prompt": "Build an AI writing assistant with prompt history and streaming responses",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-community",
+      "prompt": "Build a community forum app with posts, comments, and user profiles",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-admin",
+      "prompt": "Build an admin panel with user management, roles, and audit log table",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-mobile-habit",
+      "prompt": "Build a mobile-first habit tracker with streaks and daily check-in",
+      "category": "live_smoke"
+    },
+    {
+      "id": "smoke-ecommerce",
+      "prompt": "Build a mini e-commerce storefront with product grid and cart",
+      "category": "live_smoke"
+    },
+    {
+      "id": "mob-01",
+      "prompt": "Mobile-first food delivery app with cart bottom sheet and map stub",
+      "category": "mobile_first"
+    },
+    {
+      "id": "mob-02",
+      "prompt": "Mobile-first habit tracker with streaks and daily check-in",
+      "category": "mobile_first"
+    },
+    {
+      "id": "mob-03",
+      "prompt": "Mobile-first banking UI with balance card and recent transactions list",
+      "category": "mobile_first"
+    },
+    {
+      "id": "mob-04",
+      "prompt": "Mobile-first ride share passenger app with trip status stepper",
+      "category": "mobile_first"
+    },
+    {
+      "id": "mob-05",
+      "prompt": "Mobile-first language learning app with lesson cards and progress ring",
+      "category": "mobile_first"
+    },
+    {
+      "id": "book-01",
+      "prompt": "Salon booking app with stylist calendar and SMS reminders",
+      "category": "booking"
+    },
+    {
+      "id": "book-02",
+      "prompt": "Restaurant table booking with party size and time slots",
+      "category": "booking"
+    },
+    {
+      "id": "book-03",
+      "prompt": "Fitness class booking with capacity and waitlist",
+      "category": "booking"
+    },
+    {
+      "id": "book-04",
+      "prompt": "Medical appointment booking with insurance info form",
+      "category": "booking"
+    },
+    {
+      "id": "book-05",
+      "prompt": "Consulting booking with video call link and intake questionnaire",
+      "category": "booking"
+    },
+    {
+      "id": "saas-01",
+      "prompt": "Multi-tenant SaaS for invoice billing with Stripe and team settings",
+      "category": "saas"
+    },
+    {
+      "id": "saas-02",
+      "prompt": "Subscription analytics SaaS with MRR chart and churn table",
+      "category": "saas"
+    },
+    {
+      "id": "saas-03",
+      "prompt": "Customer feedback SaaS with NPS surveys and response inbox",
+      "category": "saas"
+    },
+    {
+      "id": "saas-04",
+      "prompt": "API keys management SaaS with usage meters and rate limits",
+      "category": "saas"
+    },
+    {
+      "id": "saas-05",
+      "prompt": "Documentation SaaS with sidebar nav and full-text search",
+      "category": "saas"
+    },
+    {
+      "id": "saas-06",
+      "prompt": "Onboarding checklist SaaS for new hires with progress tracking",
+      "category": "saas"
+    },
+    {
+      "id": "saas-07",
+      "prompt": "Compliance audit SaaS with evidence uploads and reviewer workflow",
+      "category": "saas"
+    },
+    {
+      "id": "saas-08",
+      "prompt": "Email campaign SaaS with template editor and send analytics",
+      "category": "saas"
+    },
+    {
+      "id": "saas-09",
+      "prompt": "Feature flag SaaS with environments and rollout percentage",
+      "category": "saas"
+    },
+    {
+      "id": "saas-10",
+      "prompt": "Warehouse ops SaaS with pick lists and shipment labels",
+      "category": "saas"
+    },
+    {
+      "id": "lp-01",
+      "prompt": "Landing page for a meditation app with calm gradients and signup CTA",
+      "category": "landing"
+    },
+    {
+      "id": "lp-02",
+      "prompt": "Marketing site for an AI writing assistant with hero, features, pricing",
+      "category": "landing"
+    },
+    {
+      "id": "lp-03",
+      "prompt": "Product launch page for a smart home device with video placeholder section",
+      "category": "landing"
+    },
+    {
+      "id": "lp-04",
+      "prompt": "Waitlist landing for a fintech startup with email capture",
+      "category": "landing"
+    },
+    {
+      "id": "lp-05",
+      "prompt": "Portfolio landing for a freelance designer with project grid",
+      "category": "landing"
+    },
+    {
+      "id": "lp-06",
+      "prompt": "Event landing page for a tech conference with schedule preview",
+      "category": "landing"
+    },
+    {
+      "id": "lp-07",
+      "prompt": "Nonprofit donation landing with impact stats and donate button",
+      "category": "landing"
+    },
+    {
+      "id": "lp-08",
+      "prompt": "Restaurant landing with menu highlights and reservation link",
+      "category": "landing"
+    },
+    {
+      "id": "lp-09",
+      "prompt": "Fitness app landing with before/after testimonials section",
+      "category": "landing"
+    },
+    {
+      "id": "lp-10",
+      "prompt": "B2B SaaS landing for inventory management with demo request form",
+      "category": "landing"
+    },
+    {
+      "id": "dash-01",
+      "prompt": "Analytics dashboard for e-commerce with revenue, orders, and top products",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-02",
+      "prompt": "Admin dashboard for user management with table, filters, and roles",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-03",
+      "prompt": "Project management dashboard with kanban board and team avatars",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-04",
+      "prompt": "Healthcare clinic dashboard with appointments and patient queue",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-05",
+      "prompt": "Marketing campaign dashboard with channel performance charts",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-06",
+      "prompt": "DevOps status dashboard with uptime monitors and incident log",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-07",
+      "prompt": "HR dashboard with hiring pipeline and offer tracking",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-08",
+      "prompt": "Support ticket dashboard with SLA timers and agent workload",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-09",
+      "prompt": "Inventory dashboard with low-stock alerts and supplier list",
+      "category": "dashboard"
+    },
+    {
+      "id": "dash-10",
+      "prompt": "Education admin dashboard with courses, enrollments, and grades",
+      "category": "dashboard"
+    }
+  ],
+  "note": "Run score-generation-benchmark.mjs after live generation results exist."
+}

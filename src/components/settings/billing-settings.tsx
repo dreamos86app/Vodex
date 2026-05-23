@@ -151,7 +151,7 @@ export function BillingSettings() {
     : null;
 
   return (
-    <motion.div variants={variants.staggerContainer} initial="hidden" animate="show" className="space-y-6">
+    <motion.div variants={variants.staggerContainer} initial="hidden" animate="show" className="dashboard-shell space-y-6 overflow-x-hidden">
       {!stripeReady && !loading && (
         <motion.div
           variants={variants.fadeUp}

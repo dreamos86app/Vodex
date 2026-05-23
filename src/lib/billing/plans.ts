@@ -1,24 +1,24 @@
 import type { PlanId } from "@/lib/supabase/types";
 
-/** Monthly credit allowance per plan (DreamOS86 UI: credits). */
+/** Monthly credit allowance per plan ($1 = 10 credits). */
 export const PLAN_MONTHLY_TOKENS: Record<PlanId, number> = {
-  free: 100,
-  starter: 1_000,
-  pro: 2_500,
-  business: 2_500,
-  infinity: 5_000,
-  enterprise: 5_000,
+  free: 30,
+  starter: 200,
+  pro: 500,
+  business: 500,
+  infinity: 1_000,
+  enterprise: 1_000,
 };
 
 export const PLAN_DISPLAY: Record<
   PlanId,
   { name: string; priceMonthlyUsd: number | null; description: string }
 > = {
-  free: { name: "Free", priceMonthlyUsd: 0, description: "100 credits / month" },
-  starter: { name: "Starter", priceMonthlyUsd: 20, description: "1,000 credits / month" },
-  pro: { name: "Pro", priceMonthlyUsd: 50, description: "2,500 credits / month" },
-  business: { name: "Pro", priceMonthlyUsd: 50, description: "2,500 credits / month (legacy id)" },
-  infinity: { name: "Infinity", priceMonthlyUsd: null, description: "High-volume credits — contact sales" },
+  free: { name: "Free", priceMonthlyUsd: 0, description: "30 credits / month" },
+  starter: { name: "Starter", priceMonthlyUsd: 20, description: "200 credits / month" },
+  pro: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month" },
+  business: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month (legacy id)" },
+  infinity: { name: "Infinity", priceMonthlyUsd: 100, description: "1,000 credits / month" },
   enterprise: { name: "Infinity", priceMonthlyUsd: null, description: "Enterprise tier" },
 };
 

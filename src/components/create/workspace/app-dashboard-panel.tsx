@@ -22,11 +22,22 @@ import {
   CheckCircle2,
   Clock,
   FileCode2,
+  Play,
+  Wrench,
+  Map,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 import { ProjectIntegrationsPanel } from "@/components/integrations/project-integrations-panel";
+import { PreviewWorkspace } from "@/components/preview/preview-workspace";
+import { RepairCenter } from "@/components/repair/repair-center";
+import { PublishStatusPanel } from "@/components/publish/publish-status-panel";
+import { ImportedAppView, type ImportedAppMeta } from "@/components/import/imported-app-view";
+import { ImportedSecretsSetupPanel } from "@/components/import/imported-secrets-setup-panel";
+import { BlueprintSummaryPanel } from "@/components/create/workspace/blueprint-summary-panel";
+import { loadProjectFilePaths } from "@/lib/projects/load-project-files";
+import { isZipImportProject } from "@/lib/projects/imported-project-state";
 
 type ProjectRow = Pick<
   Tables<"projects">,
@@ -49,8 +60,13 @@ type ProjectRow = Pick<
   published_subdomain?: string | null;
 };
 
-type DashSection =
+export type DashSection =
   | "overview"
+  | "preview"
+  | "setup"
+  | "publish"
+  | "activity"
+  | "settings"
   | "screens"
   | "data"
   | "actions"
@@ -58,11 +74,18 @@ type DashSection =
   | "domains"
   | "security"
   | "logs"
-  | "settings"
   | "secrets";
 
-const SECTIONS: Array<{ id: DashSection; label: string; icon: React.ElementType }> = [
+const SIMPLE_SECTIONS: Array<{ id: DashSection; label: string; icon: React.ElementType }> = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "preview", label: "Preview", icon: Monitor },
+  { id: "setup", label: "Setup", icon: KeyRound },
+  { id: "publish", label: "Publish", icon: Rocket },
+  { id: "activity", label: "Activity", icon: ScrollText },
+  { id: "settings", label: "Settings", icon: Settings },
+];
+
+const ADVANCED_SECTIONS: Array<{ id: DashSection; label: string; icon: React.ElementType }> = [
   { id: "screens", label: "Screens", icon: Monitor },
   { id: "data", label: "Data", icon: Database },
   { id: "actions", label: "Actions", icon: Zap },
@@ -70,7 +93,6 @@ const SECTIONS: Array<{ id: DashSection; label: string; icon: React.ElementType 
   { id: "domains", label: "Domains", icon: Globe },
   { id: "security", label: "Security", icon: Shield },
   { id: "logs", label: "Logs", icon: ScrollText },
-  { id: "settings", label: "Settings", icon: Settings },
   { id: "secrets", label: "Secrets", icon: KeyRound },
 ];
 
@@ -89,6 +111,7 @@ export function AppDashboardPanel({
 }) {
   const supabase = React.useMemo(() => createClient(), []);
   const [internalSection, setInternalSection] = React.useState<DashSection>("overview");
+  const [advancedMode, setAdvancedMode] = React.useState(false);
   const section = activeSection ?? internalSection;
   const setSection = (s: DashSection) => {
     if (onSectionChange) onSectionChange(s);
@@ -113,6 +136,7 @@ export function AppDashboardPanel({
     [],
   );
   const [secretsLoading, setSecretsLoading] = React.useState(false);
+  const readinessFetchedRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     if (!project?.id) {
@@ -125,7 +149,7 @@ export function AppDashboardPanel({
     setFilesLoading(true);
 
     void Promise.all([
-      supabase.from("app_files").select("path").eq("project_id", project.id).order("path"),
+      loadProjectFilePaths(supabase, project.id),
       supabase
         .from("build_jobs")
         .select("status, created_at, error_message, credits_charged, completed_at")
@@ -133,22 +157,10 @@ export function AppDashboardPanel({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
-        .from("app_files")
-        .select("id", { count: "exact", head: true })
-        .eq("project_id", project.id),
-      fetch(`/api/projects/${project.id}/publish/readiness`, { credentials: "include" }).then((r) =>
-        r.ok ? r.json() : null,
-      ),
-      fetch(`/api/projects/${project.id}/preview-errors`, { credentials: "include" }).then((r) =>
-        r.ok ? r.json() : null,
-      ),
-    ]).then(([filesRes, buildRes, fileCountRes, readyJson, errJson]) => {
+    ]).then(async ([pathsRes, buildRes]) => {
       if (cancelled) return;
-      if (!filesRes.error && filesRes.data) {
-        setFilePaths(filesRes.data.map((r) => r.path));
-      }
-      setFileCount(fileCountRes.count ?? filesRes.data?.length ?? 0);
+      if (!pathsRes.error) setFilePaths(pathsRes.paths);
+      setFileCount(pathsRes.paths.length);
       if (!buildRes.error && buildRes.data) {
         setBuildStatus(buildRes.data.status);
         setBuildAt(
@@ -160,15 +172,29 @@ export function AppDashboardPanel({
             : null,
         );
       }
+      setFilesLoading(false);
+
+      const rk = `${project.id}:${refreshKey}`;
+      if (readinessFetchedRef.current === rk) return;
+      readinessFetchedRef.current = rk;
+      const [readyJson, errJson] = await Promise.all([
+        fetch(`/api/projects/${project.id}/publish/readiness`, { credentials: "include" }).then((r) =>
+          r.ok ? r.json() : null,
+        ),
+        fetch(`/api/projects/${project.id}/preview-errors`, { credentials: "include" }).then((r) =>
+          r.ok ? r.json() : null,
+        ),
+      ]);
+      if (cancelled) return;
       const ready = readyJson as {
+        canPublish?: boolean;
         canPublishWeb?: boolean;
         blockers?: string[];
       } | null;
-      setPublishReady(Boolean(ready?.canPublishWeb));
+      setPublishReady(Boolean(ready?.canPublish ?? ready?.canPublishWeb));
       setPublishBlockers(ready?.blockers ?? []);
       const errs = errJson as { errors?: Array<{ message: string; file?: string; line?: number }> };
       setPreviewErrors(errs?.errors ?? []);
-      setFilesLoading(false);
     });
 
     return () => {
@@ -177,7 +203,7 @@ export function AppDashboardPanel({
   }, [project?.id, supabase, refreshKey]);
 
   React.useEffect(() => {
-    if (!project?.id || section !== "secrets") return;
+    if (!project?.id || (section !== "secrets" && section !== "setup")) return;
     let cancelled = false;
     setSecretsLoading(true);
     void fetch(`/api/projects/${project.id}/secrets`, { credentials: "include" })
@@ -201,7 +227,7 @@ export function AppDashboardPanel({
         </div>
         <p className="text-[14px] font-semibold text-foreground">No saved app yet</p>
         <p className="max-w-xs text-[12.5px] leading-relaxed text-muted-foreground">
-          Run a build to generate your app — the dashboard will show live status, screens, data model, and publish readiness.
+          Open an app from Your Apps — or import a ZIP to get started without building from scratch.
         </p>
         <Link href="/projects" className="text-[12px] font-semibold text-accent hover:underline">
           View your apps
@@ -231,8 +257,30 @@ export function AppDashboardPanel({
   const pageRoutes = filePaths.filter(
     (p) => /\/(page|pages)\//i.test(p) || /page\.(tsx|jsx|html)$/i.test(p),
   );
+  const isZipImport = isZipImportProject(meta);
+  const importMeta = (meta.import ?? {}) as ImportedAppMeta;
   const buildOk =
-    buildStatus === "completed" || buildStatus === "succeeded" || project.status === "live";
+    buildStatus === "completed" ||
+    buildStatus === "succeeded" ||
+    project.status === "live" ||
+    project.build_status === "imported" ||
+    (isZipImport && fileCount > 0);
+  const previewReady = meta.preview_ready === true && meta.preview_honest === true;
+  const lifecycleStatus =
+    typeof meta.lifecycle_status === "string" ? meta.lifecycle_status : project.status ?? "draft";
+  const blueprintApproved = Boolean(meta.blueprint_approved_at || meta.approved_blueprint);
+  const needsAttention = lifecycleStatus === "needs_attention" || lifecycleStatus === "failed" || buildStatus === "failed";
+  const qualityScore =
+    typeof importMeta.quality_score === "number"
+      ? importMeta.quality_score
+      : typeof meta.quality_score === "number"
+        ? meta.quality_score
+        : null;
+  const routeCountMeta = Array.isArray(importMeta.routes)
+    ? importMeta.routes.length
+    : pageRoutes.length;
+  const canPreview = (fileCount > 0 && buildOk) || (isZipImport && importMeta.preview_ready);
+  const canPublish = publishReady;
   const displayName =
     (project as ProjectRow).app_name?.trim() || project.name || "App";
   const displayDesc =
@@ -246,8 +294,20 @@ export function AppDashboardPanel({
   return (
     <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-[#f6f9ff] to-background">
       <div className="shrink-0 border-b border-border/60 bg-background/80 px-3 py-2 backdrop-blur-sm">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {advancedMode ? "Advanced dashboard" : "App dashboard"}
+          </p>
+          <button
+            type="button"
+            onClick={() => setAdvancedMode((v) => !v)}
+            className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-accent ring-1 ring-accent/25"
+          >
+            {advancedMode ? "Simple mode" : "Advanced"}
+          </button>
+        </div>
         <div className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
-          {SECTIONS.map((s) => (
+          {(advancedMode ? ADVANCED_SECTIONS : SIMPLE_SECTIONS).map((s) => (
             <button
               key={s.id}
               type="button"
@@ -291,10 +351,86 @@ export function AppDashboardPanel({
               </div>
             </div>
 
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/apps/${project.id}/builder`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-accent/90"
+              >
+                <Play className="size-3" />
+                Open builder
+              </Link>
+              {canPreview && (
+                <button
+                  type="button"
+                  onClick={() => setSection("preview")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-surface px-3 py-2 text-[11px] font-semibold text-foreground ring-1 ring-border hover:bg-surface-raised"
+                >
+                  <Monitor className="size-3" />
+                  Preview
+                </button>
+              )}
+              {canPublish ? (
+                <Link
+                  href={`/apps/${project.id}/builder?panel=publish`}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-emerald-600/90"
+                >
+                  <Rocket className="size-3" />
+                  Publish
+                </Link>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-[11px] font-medium text-muted-foreground"
+                  title={publishBlockers[0] ?? "Complete build validation first"}
+                >
+                  <Rocket className="size-3 opacity-50" />
+                  Publish locked
+                </span>
+              )}
+              {needsAttention && (
+                <button
+                  type="button"
+                  onClick={() => setSection("logs")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-2 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-500/25"
+                >
+                  <Wrench className="size-3" />
+                  Repair
+                </button>
+              )}
+            </div>
+
+            {isZipImport && (
+              <ImportedAppView meta={importMeta} filePaths={filePaths} projectId={project.id} />
+            )}
+
+            {!isZipImport && blueprintApproved && (
+              <div className="rounded-xl bg-white/90 p-3 ring-1 ring-border/70">
+                <div className="flex items-center gap-2">
+                  <Map className="size-3.5 text-accent" />
+                  <p className="text-[11px] font-semibold text-foreground">Blueprint approved</p>
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Routes, data model, and scope are locked for this build. Edit from Create → Blueprint.
+                </p>
+              </div>
+            )}
+
+            <BlueprintSummaryPanel
+              metadata={meta}
+              fileCount={fileCount || filePaths.length}
+              routeCount={routeCountMeta}
+              qualityScore={qualityScore}
+            />
+
             <div className="grid grid-cols-2 gap-2">
               <StatCard
-                label="Build"
-                value={buildStatus ?? "—"}
+                label={isZipImport ? "Import" : "Build"}
+                value={
+                  isZipImport
+                    ? importMeta.preview_ready
+                      ? "Preview ready"
+                      : "Imported"
+                    : (buildStatus ?? "—")
+                }
                 ok={buildOk}
                 icon={buildOk ? CheckCircle2 : Clock}
               />
@@ -316,20 +452,28 @@ export function AppDashboardPanel({
               />
               <StatCard
                 label="Preview"
-                value={previewErrors.length ? `${previewErrors.length} errors` : project.preview_url ? "Live" : "Pending"}
-                ok={previewErrors.length === 0 && Boolean(project.preview_url)}
+                value={
+                  previewErrors.length
+                    ? `${previewErrors.length} errors`
+                    : previewReady
+                      ? "Live"
+                      : fileCount > 0
+                        ? "Start preview"
+                        : "Pending"
+                }
+                ok={previewErrors.length === 0 && previewReady}
                 icon={Monitor}
               />
             </div>
 
             {publishBlockers.length > 0 && !publishReady && (
-              <div className="rounded-xl bg-amber-500/8 px-3 py-2.5 ring-1 ring-amber-500/20">
-                <p className="text-[11px] font-semibold text-foreground">Publish blockers</p>
-                <ul className="mt-1 list-inside list-disc text-[11px] text-muted-foreground">
-                  {publishBlockers.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
+              <div className="space-y-3">
+                <PublishStatusPanel
+                  projectId={project.id}
+                  status="blocked"
+                  readinessBlockers={publishBlockers}
+                />
+                <RepairCenter projectId={project.id} compact />
               </div>
             )}
 
@@ -339,7 +483,7 @@ export function AppDashboardPanel({
               </p>
             )}
 
-            {project.preview_url && (
+            {previewReady && project.preview_url && (
               <a
                 href={project.preview_url}
                 target="_blank"
@@ -351,6 +495,90 @@ export function AppDashboardPanel({
               </a>
             )}
           </div>
+        )}
+
+        {section === "preview" && project.id && (
+          <SectionCard title="Preview">
+            <PreviewWorkspace
+              projectId={project.id}
+              previewUrl={previewReady ? project.preview_url : null}
+              hasGenerated={fileCount > 0 && buildOk}
+              isImported={isZipImport}
+              lifecycleStatus={lifecycleStatus}
+              autoStart={false}
+            />
+            {previewErrors.length > 0 && (
+              <div className="mt-3">
+                <RepairCenter projectId={project.id} compact />
+              </div>
+            )}
+          </SectionCard>
+        )}
+
+        {section === "setup" && project.id && (
+          <SectionCard title="Setup & secrets">
+            <ImportedSecretsSetupPanel
+              projectId={project.id}
+              envRequirements={importMeta.env_requirements ?? meta.env_requirements ?? validationEnvReqs(meta)}
+              onSaved={() => {
+                readinessFetchedRef.current = null;
+              }}
+            />
+            <Link
+              href={`/apps/${project.id}/builder?tab=dashboard&section=integrations`}
+              className="mt-3 inline-flex text-[11px] font-semibold text-accent hover:underline"
+            >
+              Open integrations (Supabase, GitHub)
+            </Link>
+          </SectionCard>
+        )}
+
+        {section === "publish" && project.id && (
+          <SectionCard title="Publish">
+            <PublishStatusPanel
+              projectId={project.id}
+              status={publishReady ? "ready" : "blocked"}
+              readinessBlockers={publishBlockers}
+            />
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Default publish uses DreamOS86 path mode (/p/your-slug). Advanced Vercel deploy is under Integrations.
+            </p>
+          </SectionCard>
+        )}
+
+        {section === "activity" && (
+          <SectionCard title="Recent activity">
+            {previewErrors.length > 0 ? (
+              <ul className="space-y-2">
+                {previewErrors.map((e, i) => (
+                  <li key={i} className="rounded-lg bg-destructive/5 px-2.5 py-2 text-[11px] ring-1 ring-destructive/20">
+                    <p className="font-medium text-destructive">{e.message}</p>
+                    {e.file && (
+                      <p className="mt-0.5 font-mono text-muted-foreground">
+                        {e.file}
+                        {e.line != null ? `:${e.line}` : ""}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyHint text="No recent errors. Activity from preview and publish will appear here." />
+            )}
+          </SectionCard>
+        )}
+
+        {section === "screens" && project.id && (
+          <SectionCard title="Live preview">
+            <PreviewWorkspace
+              projectId={project.id}
+              previewUrl={previewReady ? project.preview_url : null}
+              hasGenerated={fileCount > 0 && buildOk}
+              isImported={isZipImport}
+              lifecycleStatus={lifecycleStatus}
+              autoStart={false}
+            />
+          </SectionCard>
         )}
 
         {section === "screens" && (
@@ -369,6 +597,8 @@ export function AppDashboardPanel({
                   <li key={p}>{p}</li>
                 ))}
               </ul>
+            ) : isZipImport ? (
+              <EmptyHint text="Routes were detected during import — open Code to browse pages, or Preview when ready." />
             ) : (
               <EmptyHint text="No screens detected yet. Run a build to generate pages." />
             )}
@@ -388,6 +618,8 @@ export function AppDashboardPanel({
                   </span>
                 ))}
               </div>
+            ) : isZipImport ? (
+              <EmptyHint text="Detected data/env references appear in Setup. Connect Supabase from Integrations if your app uses a database." />
             ) : (
               <EmptyHint text="Data model will appear after a successful build." />
             )}
@@ -540,6 +772,14 @@ function StatCard({
       <p className="mt-1 truncate text-[13px] font-semibold capitalize text-foreground">{value}</p>
     </div>
   );
+}
+
+function validationEnvReqs(meta: Record<string, unknown>): unknown {
+  const imp = meta.import;
+  if (imp && typeof imp === "object" && !Array.isArray(imp)) {
+    return (imp as Record<string, unknown>).env_requirements;
+  }
+  return undefined;
 }
 
 function EmptyHint({ text }: { text: string }) {

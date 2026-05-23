@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getSiteUrl } from "@/lib/app-url";
+import {
+  buildReferralInviteUrl,
+  MAX_REFERRALS_PER_USER,
+  REFERRAL_CREDITS_PER_USER,
+} from "@/lib/referrals/referral-config";
 import { randomBytes } from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_REFERRALS = 5;
+const MAX_REFERRALS = MAX_REFERRALS_PER_USER;
 
 function generateCode(userId: string): string {
   // Deterministic seed from userId so code is stable across requests
@@ -85,13 +89,12 @@ export async function GET() {
     .single();
 
   const totalReferrals = myProfile?.total_referrals ?? list.length;
-  const creditsPerReferral = 20; // 1/5 of free plan monthly credits (100 / 5 = 20)
+  const creditsPerReferral = REFERRAL_CREDITS_PER_USER;
   const creditsEarned = list.length * creditsPerReferral;
   const slotsUsed = list.length;
   const slotsRemaining = Math.max(0, MAX_REFERRALS - slotsUsed);
 
-  const base = getSiteUrl();
-  const inviteUrl = `${base}/auth/sign-up?ref=${code}`;
+  const inviteUrl = buildReferralInviteUrl(code);
 
   const referralRows = list.map((r) => ({
     id: r.id,

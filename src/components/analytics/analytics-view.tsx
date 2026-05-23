@@ -1,11 +1,14 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { BarChart2, Zap, Cpu, Upload, Rocket, Loader2 } from "lucide-react";
+import { BarChart2, Zap, Cpu, Upload, Rocket, Loader2, Lock } from "lucide-react";
 import { variants } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useCreditsStore } from "@/lib/stores/credits-store";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { planIncludesAnalytics } from "@/lib/pricing";
 
 type DailyPoint = { date: string; credits: number; generations: number };
 type ModelBreakdown = Record<string, number>;
@@ -72,19 +75,49 @@ function StatCard({
 
 export function AnalyticsView() {
   const { remaining } = useCreditsStore();
+  const { profile } = useAuthStore();
+  const planId = profile?.plan_id ?? "free";
   const [data, setData] = React.useState<AnalyticsData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
+  const [upgradeRequired, setUpgradeRequired] = React.useState(false);
 
   React.useEffect(() => {
+    if (!planIncludesAnalytics(planId)) {
+      setUpgradeRequired(true);
+      setLoading(false);
+      return;
+    }
     fetch("/api/analytics")
       .then((r) => {
+        if (r.status === 403) {
+          setUpgradeRequired(true);
+          throw new Error("upgrade");
+        }
         if (!r.ok) throw new Error();
         return r.json();
       })
       .then((d) => { setData(d); setLoading(false); })
-      .catch(() => { setError(true); setLoading(false); });
-  }, []);
+      .catch((e) => {
+        if (e instanceof Error && e.message === "upgrade") setLoading(false);
+        else { setError(true); setLoading(false); }
+      });
+  }, [planId]);
+
+  if (upgradeRequired) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 px-6 text-center">
+        <Lock className="size-8 text-muted-foreground/40" strokeWidth={1.5} />
+        <p className="text-[14px] font-semibold text-foreground">Analytics is on Starter and above</p>
+        <p className="max-w-sm text-[12.5px] text-muted-foreground">
+          Upgrade to Starter to see usage trends, model breakdown, and activity after you publish apps.
+        </p>
+        <Link href="/pricing" className="rounded-lg bg-accent px-4 py-2 text-[12px] font-semibold text-white hover:opacity-90">
+          View plans
+        </Link>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -102,6 +135,26 @@ export function AnalyticsView() {
         <button onClick={() => window.location.reload()} className="text-[12px] text-accent hover:underline underline-offset-2">
           Retry
         </button>
+      </div>
+    );
+  }
+
+  const noActivity =
+    data.totals.generations === 0 &&
+    data.totals.deployments === 0 &&
+    data.totals.credits_used === 0;
+
+  if (noActivity) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 px-6 text-center">
+        <BarChart2 className="size-8 text-muted-foreground/30" strokeWidth={1.25} />
+        <p className="text-[14px] font-semibold text-foreground">No visits yet</p>
+        <p className="max-w-md text-[12.5px] text-muted-foreground">
+          Analytics will appear after people open your published app. Publish an app first, then check back here for page views and usage.
+        </p>
+        <Link href="/projects" className="text-[12px] font-semibold text-accent hover:underline">
+          Your apps
+        </Link>
       </div>
     );
   }

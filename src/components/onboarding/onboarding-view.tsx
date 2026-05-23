@@ -261,7 +261,7 @@ export function OnboardingView() {
       title: "Promo / referral code",
       subtitle: promoLocked
         ? "This code was applied from your invite link."
-        : "Optional — enter a friend’s code for +20 credits each after you finish.",
+        : "Optional — enter a friend’s code for +5 credits each after you finish.",
       content: (
         <div className="space-y-3">
           {referralFromUrl && promoLocked ? (

@@ -916,7 +916,7 @@ export function AdminUsersPanel() {
 
                 <th className="px-4 py-2.5">Plan</th>
 
-                <th className="px-4 py-2.5">Credits</th>
+                <th className="px-4 py-2.5">Available credits</th>
 
                 <th className="px-4 py-2.5">Joined</th>
 

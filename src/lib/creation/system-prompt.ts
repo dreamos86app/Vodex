@@ -5,7 +5,8 @@
  * Exported as buildSystemPrompt so chat route stays decoupled from internal terminology.
  */
 
-import { getDreamOS86ProductContext } from "@/lib/dreamos-context";
+import { getSafeProductContext } from "@/lib/ai/safe-product-context";
+import { buildDiscussSystemPrompt, buildEditSystemPrompt } from "@/lib/ai/chat-system-prompts";
 
 export function buildSystemPrompt(args: {
   mode: "discuss" | "edit" | "build";
@@ -21,6 +22,8 @@ export function buildSystemPrompt(args: {
 
   if (mode === "build") {
     return [
+      getSafeProductContext("build"),
+      ``,
       `You are DreamOS86 in BUILD mode. You generate complete, production-ready application systems from a single user prompt.`,
       ``,
       `FIRST: Emit a fenced JSON block (user never sees raw JSON in chat UI — it is parsed separately):`,
@@ -81,48 +84,8 @@ export function buildSystemPrompt(args: {
   }
 
   if (mode === "edit") {
-    const scopeContext = scope
-      ? `You are editing a specific scope: "${scope}". Focus all changes on this scope only.`
-      : `You are making a surgical edit. Focus on the exact change described.`;
-
-    return [
-      `You are DreamOS86 in EDIT mode. You make precise, minimal code changes.`,
-      ``,
-      scopeContext,
-      ``,
-      `Rules:`,
-      `- Summarize the change in plain language first.`,
-      `- List files touched as short bullets — do not paste huge diffs in chat.`,
-      `- Put full code in fenced blocks with file= paths (Code tab).`,
-      `- Preserve existing patterns, naming conventions, and structure.`,
-      memory,
-    ]
-      .filter((l) => l !== undefined)
-      .join("\n");
+    return buildEditSystemPrompt({ scope, projectMemoryBlock });
   }
 
-  // Discuss mode — DreamOS86 product + app-building guide (not generic short ChatGPT)
-  return [
-    getDreamOS86ProductContext(),
-    ``,
-    `You are DreamOS86's app-building assistant in DISCUSS mode. You help people plan, price, and ship apps on DreamOS86 — not generic chit-chat.`,
-    ``,
-    `Technical stack when relevant: Next.js, TypeScript, Tailwind, Supabase, Framer Motion.`,
-    ``,
-    `Answer quality (mandatory):`,
-    `- Give useful, structured answers: short intro, then bullets or numbered steps when helpful.`,
-    `- Aim for 3–8 sentences minimum for product questions; more when explaining credits, pricing, or workflows.`,
-    `- Never reply with only "I'm here to help" or one vague line.`,
-    `- Explain credits clearly: DreamOS86 charges **credits** (not "tokens" in user-facing text) after a **successful** AI action.`,
-    `- Modes: Discuss (Q&A), Build (full app generation in Create), Edit (surgical changes). Costs can differ by mode/model.`,
-    `- For "How do credits work?" or pricing: cover what credits are, when they charge, where to see balance (account menu / Settings), and link /pricing.`,
-    `- For unrelated topics: gently redirect to building apps, but still be helpful if tangentially relevant (e.g. auth, deploy, Supabase).`,
-    `- Do not refuse reasonable product questions.`,
-    `- Do not dump full app source here — point to Create → Build for generation.`,
-    `- No large code blocks unless they explicitly ask for a snippet.`,
-    hasProject ? `- The user has an active project — tie answers to that app when useful.` : ``,
-    memory,
-  ]
-    .filter((l) => l !== undefined && l !== "")
-    .join("\n");
+  return buildDiscussSystemPrompt({ projectMemoryBlock, hasProject });
 }

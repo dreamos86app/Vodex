@@ -1,7 +1,8 @@
 import { classifyUrlHostname } from "@/lib/network/safe-fetch";
+import { DREAMOS_SUPABASE_PROJECT_REF, DREAMOS_SUPABASE_URL } from "@/lib/supabase/project-ref";
 
-const EXPECTED_PROJECT_REF = "xycqutvqxtkbszytaxbe";
-const DEFAULT_PROJECT_URL = `https://${EXPECTED_PROJECT_REF}.supabase.co`;
+const EXPECTED_PROJECT_REF = DREAMOS_SUPABASE_PROJECT_REF;
+const DEFAULT_PROJECT_URL = DREAMOS_SUPABASE_URL;
 
 export type SupabaseEnvValidation = {
   ok: boolean;
@@ -12,14 +13,6 @@ export type SupabaseEnvValidation = {
 };
 
 let validatedOnce = false;
-
-function hostOnly(url: string): string | null {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Validate NEXT_PUBLIC_SUPABASE_URL at server boot — never logs keys.

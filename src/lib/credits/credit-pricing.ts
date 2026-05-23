@@ -1,13 +1,22 @@
-import { calculateCredits, CREDITS_PER_USD } from "@/lib/credits/cost-engine";
+import { calculateCredits } from "@/lib/credits/cost-engine";
 import { estimateProviderCostUsd } from "@/lib/credits/usage-cost";
 import { estimateTokenProviderCostUsd } from "@/lib/credits/token-cost";
 import type { AiOperationType } from "@/lib/ai/operation-types";
+import {
+  TARGET_REVENUE_MULTIPLIER,
+  USER_CREDITS_PER_USD,
+} from "@/lib/billing/pricing-config";
 
-/** User-facing markup: dreamos_charge = provider_cost × 3.5 */
-export const DREAMOS_CREDIT_MARKUP = 3.5;
+import {
+  quoteGenerationCost,
+  creditsFromProviderCostUsd,
+  quoteDiscussCost,
+} from "@/lib/billing/credit-profit-guard";
 
-/** USD value per credit charged to user */
-export const CREDIT_UNIT_VALUE_USD = 1 / CREDITS_PER_USD;
+/** @deprecated Use TARGET_REVENUE_MULTIPLIER */
+export const DREAMOS_CREDIT_MARKUP = TARGET_REVENUE_MULTIPLIER;
+
+export const CREDIT_UNIT_VALUE_USD = 1 / USER_CREDITS_PER_USD;
 
 export type CreditEstimateInput = {
   mode: "discuss" | "edit" | "build";
@@ -26,26 +35,22 @@ export type CreditEstimateResult = {
 };
 
 export function estimateCreditsForOperation(input: CreditEstimateInput): CreditEstimateResult {
-  const base = calculateCredits(input.modelId, input.mode);
-  const promptBump =
-    input.mode === "build" && (input.promptLength ?? 0) > 800
-      ? Math.min(8, Math.floor((input.promptLength ?? 0) / 400))
-      : 0;
-  const fileBump =
-    input.mode === "build" && (input.expectedFiles ?? 0) > 6
-      ? Math.min(10, Math.floor((input.expectedFiles ?? 0) / 3))
-      : 0;
-
   const providerCost = estimateProviderCostUsd(
     input.modelId,
     input.mode,
     input.inputTokens ?? null,
     input.outputTokens ?? null,
   );
-  const fromUsage = creditsFromProviderCost(providerCost);
-
-  const creditsMin = base + promptBump;
-  const creditsMax = Math.max(creditsMin, fromUsage + fileBump);
+  const quote = quoteGenerationCost({
+    mode: input.mode === "build" ? "build" : input.mode,
+    selectedModel: input.modelId,
+    estimatedProviderCostUsd: providerCost,
+    promptLength: input.promptLength,
+    expectedFiles: input.expectedFiles,
+  });
+  const legacy = calculateCredits(input.modelId, input.mode);
+  const creditsMin = Math.max(legacy, quote.userCreditsRequired);
+  const creditsMax = Math.max(creditsMin, quote.userCreditsReserved);
 
   return {
     creditsMin,
@@ -70,11 +75,16 @@ export function calculateCreditsForStagedBuild(input: {
   if (input.complexity >= 8) floor = OP_MIN_CREDITS.build_hard ?? 35;
   else if (input.complexity >= 5) floor = OP_MIN_CREDITS.build_medium ?? 18;
 
-  const fromCost = creditsFromProviderCost(Math.max(tokenCost, input.providerCostUsd));
-  return {
-    creditsToCharge: normalizeCreditCharge(Math.max(floor, fromCost)),
+  const quote = quoteGenerationCost({
+    mode: "full_build",
+    complexity: input.complexity,
+    selectedModel: input.primaryModelId,
     estimatedProviderCostUsd: Math.max(tokenCost, input.providerCostUsd),
-    marginMultiplier: DREAMOS_CREDIT_MARKUP,
+  });
+  return {
+    creditsToCharge: normalizeCreditCharge(Math.max(floor, quote.userCreditsRequired)),
+    estimatedProviderCostUsd: Math.max(tokenCost, input.providerCostUsd),
+    marginMultiplier: quote.revenueMultiplier,
   };
 }
 
@@ -108,11 +118,28 @@ const OP_MIN_CREDITS: Partial<Record<AiOperationType | "build_simple" | "build_m
 };
 
 export function creditsFromProviderCost(providerCostUsd: number): number {
-  const dreamosCharge = providerCostUsd * DREAMOS_CREDIT_MARKUP;
-  return Math.max(1, Math.ceil(dreamosCharge / CREDIT_UNIT_VALUE_USD));
+  return creditsFromProviderCostUsd(providerCostUsd);
 }
 
 export function calculateCreditsToCharge(input: ChargeCalculationInput): ChargeCalculationResult {
+  if (input.mode === "discuss") {
+    const tokenCost =
+      input.inputTokens != null && input.outputTokens != null
+        ? estimateTokenProviderCostUsd(input.modelId, input.inputTokens, input.outputTokens)
+        : estimateProviderCostUsd(input.modelId, "discuss", input.inputTokens, input.outputTokens);
+    const quote = quoteDiscussCost({
+      selectedModel: input.modelId,
+      estimatedProviderCostUsd: tokenCost,
+      inputTokens: input.inputTokens,
+      outputTokens: input.outputTokens,
+    });
+    return {
+      creditsToCharge: quote.userCreditsRequired,
+      estimatedProviderCostUsd: tokenCost,
+      marginMultiplier: quote.revenueMultiplier,
+    };
+  }
+
   const est = estimateCreditsForOperation({
     mode: input.mode,
     modelId: input.modelId,
@@ -140,6 +167,6 @@ export function calculateCreditsToCharge(input: ChargeCalculationInput): ChargeC
   return {
     creditsToCharge: normalizeCreditCharge(Math.max(est.creditsMin, fromProvider) + fileBump),
     estimatedProviderCostUsd: est.estimatedProviderCostUsd,
-    marginMultiplier: DREAMOS_CREDIT_MARKUP,
+    marginMultiplier: TARGET_REVENUE_MULTIPLIER,
   };
 }

@@ -73,7 +73,7 @@ async function ensureProfileForAuthUser(
     email,
     full_name: fullName,
     display_name: fullName,
-    credits_remaining: 100,
+    credits_remaining: monthlyTokensForPlan("free"),
     plan_id: "free",
   } as never);
 

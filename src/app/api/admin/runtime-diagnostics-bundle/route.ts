@@ -55,7 +55,9 @@ export async function GET() {
       has_service_role: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
       has_openai: Boolean(process.env.OPENAI_API_KEY),
       has_anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
-      has_google: Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
+      has_google: Boolean(
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim(),
+      ),
     },
   });
 }

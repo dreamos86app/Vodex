@@ -4,6 +4,9 @@ import {
   isOptionalProfileSchemaError,
   parseMissingProfileColumn,
 } from "@/lib/supabase/schema-errors";
+import { monthlyTokensForPlan } from "@/lib/billing/plans";
+
+const FREE_CREDITS_FALLBACK = monthlyTokensForPlan("free");
 
 /** Safe columns for bootstrap / Create — never include billing-only fields here. */
 export const PROFILE_REQUIRED_SELECT =
@@ -134,7 +137,7 @@ export async function loadUserProfileCore(
     email: typeof data.email === "string" ? data.email : "",
     plan_id: (typeof data.plan_id === "string" ? data.plan_id : "free") as Profile["plan_id"],
     credits_remaining:
-      typeof data.credits_remaining === "number" ? data.credits_remaining : 100,
+      typeof data.credits_remaining === "number" ? data.credits_remaining : FREE_CREDITS_FALLBACK,
     onboarding_completed: Boolean(data.onboarding_completed),
     workspace_name:
       typeof data.workspace_name === "string" ? data.workspace_name : "My Workspace",

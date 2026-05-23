@@ -88,7 +88,7 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
   conversations: ["id", "user_id", "title", "mode", "model_id", "last_message_at"],
   messages: ["id", "conversation_id", "user_id", "role", "content", "credits_used"],
   message_attachments: ["id", "message_id", "user_id", "file_url", "file_name"],
-  app_files: ["id", "project_id", "path", "content"],
+  app_files: ["id", "project_id", "path", "content", "mime_type", "size_bytes"],
   build_jobs: ["id", "user_id", "project_id", "status", "prompt"],
   publish_jobs: ["id", "user_id", "project_id", "status", "target"],
   wrap_jobs: ["id", "user_id", "project_id", "status", "artifact_url"],

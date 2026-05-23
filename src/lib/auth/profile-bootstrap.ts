@@ -5,7 +5,9 @@ import { attachReferralByCode } from "@/lib/referrals/server-referral";
 import { isMissingProfileColumnError } from "@/lib/supabase/schema-errors";
 import { ensureUserProfileServer } from "@/lib/auth/ensure-user-profile-server";
 
-const FREE_TOKENS = 100;
+import { monthlyTokensForPlan } from "@/lib/billing/plans";
+
+const FREE_TOKENS = monthlyTokensForPlan("free");
 
 export function readRefCookieFromRequest(request: Request): string | null {
   return readRefCodeFromCookieHeader(request.headers.get("cookie"));

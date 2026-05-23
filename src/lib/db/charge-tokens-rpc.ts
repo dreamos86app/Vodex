@@ -58,14 +58,17 @@ export function normalizePgArgs(args: string): string {
 /** Accept p_user_id-first (production) or legacy p_amount-first overloads. */
 export function isCanonicalChargeTokensArgs(args: string): boolean {
   const n = normalizePgArgs(args);
+  if (n === normalizePgArgs(CANONICAL_CHARGE_TOKENS_PG_ARGS)) return true;
   const parts = n.split(",").map((p) => p.trim());
   if (parts.length < 6) return false;
-  const hasUuid = parts.filter((p) => p === "uuid").length >= 3;
-  const hasInt = parts.includes("integer");
-  const hasText = parts.filter((p) => p === "text").length >= 2;
-  const hasJsonb = parts.includes("jsonb");
+  const hasUserIdFirst = parts[0]?.startsWith("p_user_id uuid") || parts[0] === "uuid";
+  const hasAmountFirst = parts[0]?.startsWith("p_amount integer") || parts[0] === "integer";
+  const hasUuid = parts.filter((p) => p.endsWith(" uuid") || p === "uuid").length >= 3;
+  const hasInt = parts.some((p) => p.endsWith(" integer") || p === "integer");
+  const hasText = parts.filter((p) => p.endsWith(" text") || p === "text").length >= 2;
+  const hasJsonb = parts.some((p) => p.endsWith(" jsonb") || p === "jsonb");
   if (!hasUuid || !hasInt || !hasText || !hasJsonb) return false;
-  return n.startsWith("uuid,") || n.startsWith("integer,");
+  return hasUserIdFirst || hasAmountFirst;
 }
 
 export function isCanonicalEnsureUserProfileArgs(args: string): boolean {

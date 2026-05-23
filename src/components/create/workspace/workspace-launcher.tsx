@@ -35,7 +35,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useCreditsStore } from "@/lib/stores/credits-store";
 import { resolveDisplayName } from "@/lib/profile-display";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
-import { FREE_MONTHLY_QUOTA } from "@/lib/stores/credits-store";
+import { FREE_MONTHLY_QUOTA, getMonthlyTokenQuotaForPlan } from "@/lib/stores/credits-store";
 import { PublishModal, type PublishUiState } from "@/components/create/workspace/publish-modal";
 import {
   WorkspaceIntegrationsModal,
@@ -173,7 +173,7 @@ function WorkspaceDropdown({
 
   const plan = profile?.plan_id ?? "free";
   const planLabel = plan === "free" ? "Free" : plan.charAt(0).toUpperCase() + plan.slice(1);
-  const planQuota = plan === "free" ? FREE_MONTHLY_QUOTA : plan === "pro" ? 25000 : plan === "business" ? 100000 : 10000;
+  const planQuota = getMonthlyTokenQuotaForPlan(plan);
   const FREE_QUOTA = planQuota;
   const used = Math.max(0, FREE_QUOTA - remaining);
 

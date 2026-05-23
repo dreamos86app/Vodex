@@ -26,7 +26,7 @@ export async function GET(req: Request) {
         {
           error,
           users: [],
-          hint: "Apply supabase/migrations/20260525120000_profiles_production_complete.sql on project xycqutvqxtkbszytaxbe",
+          hint: "Apply supabase/migrations/20260525120000_profiles_production_complete.sql on project wciioegiczwqlmlroley",
         },
         { status: 500 },
       );

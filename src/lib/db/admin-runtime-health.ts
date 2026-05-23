@@ -154,6 +154,8 @@ async function loadDebugCatalog(
     const parsed = data as Record<string, unknown>;
     const rawCharge = parsed.charge_tokens_signatures as Array<{ args?: string }> | undefined;
     const rawEnsure = parsed.ensure_user_profile_signatures as Array<{ args?: string }> | undefined;
+    const rawGrantTokens = parsed.grant_tokens_signatures as Array<{ args?: string }> | undefined;
+    const rawGrantCredits = parsed.grant_credits_signatures as Array<{ args?: string }> | undefined;
     const chargeSignatures = (rawCharge ?? []).map((s) => ({
       args: String(s.args ?? "").trim(),
       returns: "jsonb",
@@ -171,6 +173,9 @@ async function loadDebugCatalog(
       rpcExistsInPg: {
         charge_tokens: chargeSignatures.length > 0,
         ensure_user_profile: ensureSignatures.length > 0,
+        grant_tokens: (rawGrantTokens ?? []).length > 0,
+        grant_credits: (rawGrantCredits ?? []).length > 0,
+        grant_credits_admin: (rawGrantCredits ?? []).length > 0,
         dreamos_debug_credit_rpc: true,
       },
       catalogError: null,
@@ -363,7 +368,17 @@ export async function getAdminRuntimeHealth(opts?: {
   }
   tables.runtime_diagnostics = await probeRuntimeDiagnosticsTable(adminClient);
 
-  const chargePayload = buildChargeTokensProbePayload();
+  let probeUserId: string | null = null;
+  const { data: probeProfile } = await adminClient
+    .from("profiles")
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+  if (probeProfile?.id) probeUserId = probeProfile.id;
+
+  const chargePayload = buildChargeTokensProbePayload(
+    probeUserId ? { p_user_id: probeUserId } : { p_amount: 0 },
+  );
   const chargePg = postgresExistsForRpc(catalog, "charge_tokens", catalog.chargeSignatures);
   const chargePostgrest = await probePostgrestRpc("charge_tokens", chargePayload as unknown as Record<string, unknown>);
   const chargeSr = await probeServiceRoleRpc(adminClient, "charge_tokens", chargePayload as unknown as Record<string, unknown>);
@@ -373,10 +388,9 @@ export async function getAdminRuntimeHealth(opts?: {
   const chargeExistsPg =
     chargePg || (chargeSr.executable && !isNotFoundFunction(chargeSr.lastError));
 
-  const ensurePayload = {
-    p_user_id: chargePayload.p_user_id,
-    p_email: "health-probe@dreamos86.local",
-  };
+  const ensurePayload = probeUserId
+    ? { p_user_id: probeUserId, p_email: "health-probe@dreamos86.local" }
+    : { p_user_id: null, p_email: null };
   const ensurePg = postgresExistsForRpc(catalog, "ensure_user_profile", catalog.ensureSignatures);
   const ensurePostgrest = await probePostgrestRpc("ensure_user_profile", ensurePayload);
   const ensureSr = await probeServiceRoleRpc(adminClient, "ensure_user_profile", ensurePayload);
@@ -426,24 +440,36 @@ export async function getAdminRuntimeHealth(opts?: {
       lastError: catalog.catalogError ?? debugSr.lastError ?? undefined,
     },
     charge_credits: await probeNamedRpc("charge_credits", chargePayload as unknown as Record<string, unknown>),
-    grant_tokens: await probeNamedRpc("grant_tokens", {
-      p_user_id: chargePayload.p_user_id,
-      p_amount: 0,
-      p_reason: "health_probe",
-      p_idempotency_key: `probe_grant_${Date.now()}`,
-    }),
-    grant_credits: await probeNamedRpc("grant_credits", {
-      p_admin_id: chargePayload.p_user_id,
-      p_user_id: chargePayload.p_user_id,
-      p_amount: 0,
-      p_reason: "health_probe",
-    }),
-    grant_credits_admin: await probeNamedRpc("grant_credits_admin", {
-      p_admin_id: chargePayload.p_user_id,
-      p_user_id: chargePayload.p_user_id,
-      p_amount: 0,
-      p_reason: "health_probe",
-    }),
+    grant_tokens: await probeNamedRpc(
+      "grant_tokens",
+      {
+        p_user_id: probeUserId,
+        p_amount: 0,
+        p_reason: "health_probe",
+        p_idempotency_key: `probe_grant_${Date.now()}`,
+      },
+      catalog.rpcExistsInPg.grant_tokens,
+    ),
+    grant_credits: await probeNamedRpc(
+      "grant_credits",
+      {
+        p_admin_id: probeUserId,
+        p_user_id: probeUserId,
+        p_amount: 0,
+        p_reason: "health_probe",
+      },
+      catalog.rpcExistsInPg.grant_credits,
+    ),
+    grant_credits_admin: await probeNamedRpc(
+      "grant_credits_admin",
+      {
+        p_admin_id: probeUserId,
+        p_user_id: probeUserId,
+        p_amount: 0,
+        p_reason: "health_probe",
+      },
+      catalog.rpcExistsInPg.grant_credits_admin,
+    ),
     complete_user_onboarding: await probeNamedRpc("complete_user_onboarding", {
       p_user_id: chargePayload.p_user_id,
     }),

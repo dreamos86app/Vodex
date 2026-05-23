@@ -36,8 +36,8 @@ export default async function DashboardPage() {
   if (!user) redirect("/auth/login");
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8 sm:py-10">
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-accent/20 bg-gradient-to-br from-accent/[0.12] via-background to-violet-500/[0.06] px-6 py-8 ring-1 ring-accent/10 sm:px-8 sm:py-10">
+    <div className="dashboard-shell mx-auto flex w-full max-w-4xl flex-col gap-8 overflow-x-hidden px-4 py-8 sm:py-10">
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-accent/20 bg-gradient-to-br from-accent/[0.12] via-background to-violet-500/[0.06] px-5 py-7 ring-1 ring-accent/10 sm:px-8 sm:py-10">
         <div
           className="pointer-events-none absolute inset-0 opacity-90"
           aria-hidden
@@ -49,8 +49,7 @@ export default async function DashboardPage() {
         <p className="relative text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">Workspace hub</p>
         <h1 className="relative mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Dashboard</h1>
         <p className="relative mt-2 max-w-xl text-[14px] leading-relaxed text-muted-foreground">
-          This is separate from the create view — use it to move around the product without the builder&apos;s project
-          sidebar taking you here by mistake.
+          Jump to create, your apps, chat, billing, and settings — everything in one place.
         </p>
       </div>
 

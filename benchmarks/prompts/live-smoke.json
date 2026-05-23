@@ -1,0 +1,16 @@
+{
+  "category": "live_smoke",
+  "description": "10-prompt live generation smoke subset — requires provider keys, credits, and auth",
+  "prompts": [
+    { "id": "smoke-landing", "appType": "landing", "text": "Build a landing page for a meditation app with calm gradients and email signup" },
+    { "id": "smoke-saas-dash", "appType": "saas_dashboard", "text": "Build a SaaS analytics dashboard with revenue charts and team settings" },
+    { "id": "smoke-crm", "appType": "crm", "text": "Build me a CRM for dentists with scheduling and patient notes" },
+    { "id": "smoke-booking", "appType": "booking", "text": "Build a salon booking app with stylist calendar and reminders" },
+    { "id": "smoke-finance", "appType": "finance_dashboard", "text": "Build a personal finance dashboard with budgets and transaction categories" },
+    { "id": "smoke-ai-tool", "appType": "ai_tool", "text": "Build an AI writing assistant with prompt history and streaming responses" },
+    { "id": "smoke-community", "appType": "community", "text": "Build a community forum app with posts, comments, and user profiles" },
+    { "id": "smoke-admin", "appType": "admin_panel", "text": "Build an admin panel with user management, roles, and audit log table" },
+    { "id": "smoke-mobile-habit", "appType": "habit_tracker", "text": "Build a mobile-first habit tracker with streaks and daily check-in" },
+    { "id": "smoke-ecommerce", "appType": "ecommerce", "text": "Build a mini e-commerce storefront with product grid and cart" }
+  ]
+}

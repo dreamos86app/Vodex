@@ -1,13 +1,35 @@
 /**
  * DreamOS86 — Pricing Architecture
  *
- * Credits are the internal abstraction layer. All operations consume credits
- * at variable rates. Users see credits; we manage actual AI costs internally.
- *
- * Internal cost scaling targets:
- *   Monthly plans: 3.5× ROI minimum
- *   Yearly plans:  2.9× ROI minimum
+ * User-facing: 10 credits = $1 revenue (see @/lib/billing/pricing-config.ts).
+ * Provider cost uses a separate internal ledger (30 internal credits = $1 cost).
  */
+import {
+  USER_CREDITS_PER_USD,
+  USER_CREDIT_FLOORS,
+} from "@/lib/billing/pricing-config";
+
+export { USER_CREDITS_PER_USD, USER_CREDIT_FLOORS };
+
+/** USD price for a credit package */
+export function usdForCreditPackage(credits: number): number {
+  return credits / USER_CREDITS_PER_USD;
+}
+
+/** Display helper: $5 → 50 credits */
+export const CREDIT_PACKAGE_EXAMPLES = [
+  { usd: 5, credits: 5 * USER_CREDITS_PER_USD },
+  { usd: 10, credits: 10 * USER_CREDITS_PER_USD },
+  { usd: 25, credits: 25 * USER_CREDITS_PER_USD },
+  { usd: 50, credits: 50 * USER_CREDITS_PER_USD },
+] as const;
+
+export const BUILD_CREDIT_HINTS = {
+  simple: `Simple app: from ${USER_CREDIT_FLOORS.build_simple} credits`,
+  standard: `Standard app: from ${USER_CREDIT_FLOORS.build_medium} credits`,
+  advanced: `Advanced app: from ${USER_CREDIT_FLOORS.build_hard} credits`,
+  refundNote: "Unused reserved credits are returned",
+} as const;
 
 // ─── Plan IDs ─────────────────────────────────────────────────────────────────
 
@@ -81,7 +103,7 @@ export const plans: Plan[] = [
     gradientFrom: "from-slate-500/12",
     gradientTo: "to-gray-500/8",
     limits: {
-      credits: 100,
+      credits: 200,
       projects: 3,
       storage: "1 GB",
       collaborators: 1,
@@ -97,7 +119,7 @@ export const plans: Plan[] = [
       dedicatedInfra: false,
     },
     features: [
-      "100 AI credits / month",
+      "200 AI credits / month",
       "3 active projects",
       "1 GB asset storage",
       "5 deployments / month",
@@ -126,7 +148,7 @@ export const plans: Plan[] = [
     gradientFrom: "from-blue-500/14",
     gradientTo: "to-indigo-500/10",
     limits: {
-      credits: 600,
+      credits: 500,
       projects: 15,
       storage: "10 GB",
       collaborators: 3,
@@ -142,7 +164,7 @@ export const plans: Plan[] = [
       dedicatedInfra: false,
     },
     features: [
-      "600 AI credits / month",
+      "500 AI credits / month",
       "15 projects",
       "10 GB storage",
       "Unlimited deployments",
@@ -530,6 +552,16 @@ export const modelCreditMultipliers: Record<string, number> = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Analytics dashboard — Starter and above. */
+export function planIncludesAnalytics(planId: PlanId | string | null | undefined): boolean {
+  return planId != null && planId !== "free";
+}
+
+/** ZIP import — Pro and above. */
+export function planIncludesZipImport(planId: PlanId | string | null | undefined): boolean {
+  return planId === "pro" || planId === "infinity" || (typeof planId === "string" && planId.startsWith("infinity"));
+}
 
 export function getPlanById(id: PlanId): Plan {
   return plans.find((p) => p.id === id)!;

@@ -295,10 +295,10 @@ export function PlatformShell({
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={pathname}
-              initial={{ opacity: 0, y: isFullBleed ? 0 : 8 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.08, ease: "linear" }}
               className={
                 isHomeShellScroll
                   ? "flex w-full min-w-0 flex-col"

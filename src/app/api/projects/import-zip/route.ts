@@ -1,41 +1,35 @@
 import { NextResponse } from "next/server";
-import JSZip from "jszip";
 import { createClient } from "@/lib/supabase/server";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { ensurePrivateBucket } from "@/lib/supabase/ensure-storage-bucket";
+import { extractAndAnalyzeZip } from "@/lib/import/zip-import-service";
+import { detectAppIconFromImport } from "@/lib/import/detect-app-icon";
+import { ensureProjectIconSvg } from "@/lib/projects/ensure-project-icon";
+import { buildProjectBannerSvg } from "@/lib/projects/build-project-banner-svg";
 import {
-  normalizeZipEntryPath,
-  shouldSkipZipPath,
-  detectFrameworkHint,
-  accumulateIfOk,
-  ZIP_IMPORT_LIMITS,
-  type ZipImportFile,
-} from "@/lib/zip/safe-import-paths";
+  ZIP_IMPORT_BUCKET,
+  ZIP_IMPORT_ALLOWED_MIMES,
+  ZIP_IMPORT_MAX_BYTES,
+  buildZipImportStoragePath,
+  formatImportStorageError,
+  importStorageNotConfiguredUserMessage,
+  importStorageSetupDetail,
+  isStorageBucketMissingError,
+} from "@/lib/import/zip-storage";
+import {
+  buildZipImportAppFileRows,
+  ZIP_IMPORT_APP_FILE_INSERT_KEYS,
+} from "@/lib/projects/app-file-rows";
+import {
+  formatZipImportFailure,
+  type ZipImportFailureStep,
+} from "@/lib/import/zip-import-diagnostics";
+import { lifecyclePatch } from "@/lib/projects/project-lifecycle";
 import type { Json } from "@/lib/supabase/types";
 
 export const runtime = "nodejs";
 
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-
-const TEXT_EXT = new Set([
-  "ts",
-  "tsx",
-  "js",
-  "jsx",
-  "mjs",
-  "cjs",
-  "json",
-  "md",
-  "mdx",
-  "css",
-  "scss",
-  "html",
-  "htm",
-  "svg",
-  "txt",
-  "env",
-  "yml",
-  "yaml",
-]);
-
+const MAX_UPLOAD_BYTES = ZIP_IMPORT_MAX_BYTES;
 const FY_REMOVE = /[^a-z0-9-]/g;
 
 function slugFromName(name: string): string {
@@ -49,9 +43,50 @@ function slugFromName(name: string): string {
   return base || "imported-app";
 }
 
-function extOf(path: string): string {
-  const i = path.lastIndexOf(".");
-  return i >= 0 ? path.slice(i + 1).toLowerCase() : "";
+const APP_FILES_BATCH_SIZE = 100;
+
+async function upsertAppFilesBatched(
+  client: ReturnType<typeof createSupabaseAdmin>,
+  rows: ReturnType<typeof buildZipImportAppFileRows>,
+): Promise<{ ok: true } | { ok: false; message: string; batchIndex: number }> {
+  for (let i = 0; i < rows.length; i += APP_FILES_BATCH_SIZE) {
+    const batch = rows.slice(i, i + APP_FILES_BATCH_SIZE);
+    const { error } = await client.from("app_files").upsert(batch, {
+      onConflict: "project_id,path",
+    });
+    if (error) {
+      return { ok: false, message: error.message, batchIndex: i / APP_FILES_BATCH_SIZE };
+    }
+  }
+  return { ok: true };
+}
+
+async function rollbackImport(args: {
+  admin: ReturnType<typeof createSupabaseAdmin>;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  projectId: string;
+  storagePath: string;
+}) {
+  await args.admin.storage.from(ZIP_IMPORT_BUCKET).remove([args.storagePath]).catch(() => {});
+  await args.supabase.from("projects").delete().eq("id", args.projectId).eq("owner_id", args.userId);
+}
+
+function importFail(
+  step: ZipImportFailureStep,
+  rawMessage: string,
+  extra?: { insertPayloadKeys?: string[]; projectId?: string },
+  status = 500,
+) {
+  return NextResponse.json(
+    formatZipImportFailure({
+      step,
+      rawMessage,
+      insertPayloadKeys: extra?.insertPayloadKeys,
+      projectId: extra?.projectId,
+    }),
+    { status },
+  );
 }
 
 export async function POST(req: Request) {
@@ -96,56 +131,69 @@ export async function POST(req: Request) {
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
-  let zip: JSZip;
-  try {
-    zip = await JSZip.loadAsync(buf);
-  } catch {
-    return NextResponse.json({ error: "Invalid or corrupted ZIP file" }, { status: 400 });
+  const extracted = await extractAndAnalyzeZip(buf);
+  if (!extracted.ok) {
+    return NextResponse.json({ error: extracted.error }, { status: 400 });
   }
 
-  const acc: { files: ZipImportFile[]; total: number } = { files: [], total: 0 };
-
-  for (const [rawPath, entry] of Object.entries(zip.files)) {
-    if (!entry || entry.dir) continue;
-    const normalized = normalizeZipEntryPath(rawPath);
-    if (!normalized || shouldSkipZipPath(normalized)) continue;
-    const ext = extOf(normalized);
-    if (!TEXT_EXT.has(ext)) continue;
-
-    let content: string;
-    try {
-      content = await entry.async("string");
-    } catch {
-      continue;
-    }
-    const ok = accumulateIfOk(acc, normalized, content);
-    if (!ok.ok) {
-      return NextResponse.json({ error: ok.error }, { status: 400 });
-    }
-  }
-
-  if (acc.files.length === 0) {
-    return NextResponse.json(
-      { error: "No importable text files found (after skipping build artifacts and dependencies)" },
-      { status: 400 },
-    );
-  }
-
-  const framework = detectFrameworkHint(acc.files);
+  const { files, validation, rejectedSecrets, rejectedPaths } = extracted;
   const baseSlug = slugFromName(file.name);
   const slug = `${baseSlug}-${Date.now().toString(36)}`;
   const defaultTitle = baseSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const frameworkId = validation.framework.id;
+
+  const lifecycleStatus = validation.previewReady ? "imported_preview_ready" : "imported";
+
+  const icon = detectAppIconFromImport(files, displayName ?? defaultTitle);
+  const displayTitle = displayName ?? defaultTitle;
+  const iconSvg = ensureProjectIconSvg(displayTitle, icon.svg);
+  const bannerSvg = buildProjectBannerSvg({
+    title: displayTitle,
+    framework: frameworkId === "unknown" ? "nextjs" : frameworkId,
+    fileCount: files.length,
+    routeCount: validation.routes.length,
+    kind: "imported",
+  });
 
   const { data: project, error: projErr } = await supabase
     .from("projects")
     .insert({
       owner_id: user.id,
-      name: displayName ?? defaultTitle,
+      name: displayTitle,
       slug,
-      status: "draft",
-      framework: framework === "nextjs" ? "nextjs" : framework === "unknown" ? "nextjs" : framework,
+      status: validation.previewReady ? "draft" : "draft",
+      framework: frameworkId === "unknown" ? "nextjs" : frameworkId,
+      icon_svg: iconSvg,
       metadata: {
-        import: { original_name: file.name, file_count: acc.files.length, framework },
+        source: "zip_import",
+        lifecycle_status: lifecycleStatus,
+        icon_source: icon.source,
+        icon_path: icon.path ?? null,
+        banner_svg: bannerSvg,
+        import: {
+          original_name: file.name,
+          file_count: files.length,
+          framework: validation.framework,
+          routes: validation.routes,
+          scripts: validation.scripts,
+          package_manager: validation.packageManager,
+          dependencies: {
+            production_count: validation.dependencies.production.length,
+            has_supabase: validation.dependencies.hasSupabase,
+            has_stripe: validation.dependencies.hasStripe,
+            has_tailwind: validation.dependencies.hasTailwind,
+          },
+          env_requirements: validation.envRequirements,
+          quality_score: validation.qualityScore,
+          preview_ready: validation.previewReady,
+          publish_ready: validation.publishReady,
+          warnings: validation.warnings,
+          rejected_secrets: rejectedSecrets,
+          rejected_paths: rejectedPaths,
+        },
+        preview_ready: validation.previewReady,
+        preview_honest: validation.previewReady,
+        ...lifecyclePatch(lifecycleStatus),
       } as Json,
     } as never)
     .select("id")
@@ -159,58 +207,113 @@ export async function POST(req: Request) {
   }
 
   const projectId = project.id;
-  const storagePath = `${user.id}/imports/${projectId}.zip`;
+  const storagePath = buildZipImportStoragePath(user.id, projectId, file.name);
 
-  const { error: upErr } = await supabase.storage.from("media").upload(storagePath, buf, {
+  let admin;
+  try {
+    admin = createSupabaseAdmin();
+  } catch (e) {
+    await supabase.from("projects").delete().eq("id", projectId).eq("owner_id", user.id);
+    const msg = e instanceof Error ? e.message : "Server configuration error";
+    return NextResponse.json(
+      {
+        error: importStorageNotConfiguredUserMessage(),
+        code: "IMPORT_STORAGE_NOT_CONFIGURED",
+        adminDetail: importStorageSetupDetail(),
+        hint: msg,
+      },
+      { status: 503 },
+    );
+  }
+
+  const bucket = await ensurePrivateBucket(admin, ZIP_IMPORT_BUCKET, {
+    fileSizeLimit: ZIP_IMPORT_MAX_BYTES,
+    allowedMimeTypes: [...ZIP_IMPORT_ALLOWED_MIMES],
+  });
+  if (!bucket.ok) {
+    await supabase.from("projects").delete().eq("id", projectId).eq("owner_id", user.id);
+    const storageErr = isStorageBucketMissingError(bucket.error)
+      ? formatImportStorageError(bucket.error)
+      : {
+          error: importStorageNotConfiguredUserMessage(),
+          code: "IMPORT_STORAGE_NOT_CONFIGURED" as const,
+          adminDetail: importStorageSetupDetail(),
+          rawMessage: bucket.error,
+        };
+    return NextResponse.json(
+      {
+        ...storageErr,
+        hint: bucket.hint,
+      },
+      { status: 503 },
+    );
+  }
+
+  const { error: upErr } = await admin.storage.from(ZIP_IMPORT_BUCKET).upload(storagePath, buf, {
     contentType: "application/zip",
     upsert: true,
   });
   if (upErr) {
     await supabase.from("projects").delete().eq("id", projectId).eq("owner_id", user.id);
+    if (isStorageBucketMissingError(upErr.message)) {
+      return NextResponse.json(formatImportStorageError(upErr.message), { status: 503 });
+    }
     return NextResponse.json(
-      { error: `Storage upload failed: ${upErr.message}` },
-      { status: 500 },
+      {
+        error: importStorageNotConfiguredUserMessage(),
+        code: "IMPORT_STORAGE_NOT_CONFIGURED",
+        adminDetail: importStorageSetupDetail(),
+        hint: upErr.message,
+      },
+      { status: 503 },
     );
   }
 
-  const { data: publicData } = supabase.storage.from("media").getPublicUrl(storagePath);
-  const publicUrl = publicData.publicUrl;
+  const rows = buildZipImportAppFileRows(projectId, user.id, files);
 
-  const rows = acc.files.map((f) => ({
-    project_id: projectId,
-    path: f.path,
-    content: f.content,
-    mime_type: "text/plain",
-    size_bytes: f.sizeBytes,
-  }));
-
-  const { error: filesErr } = await supabase.from("app_files").upsert(rows, {
-    onConflict: "project_id,path",
-  });
-  if (filesErr) {
-    await supabase.storage.from("media").remove([storagePath]);
-    await supabase.from("projects").delete().eq("id", projectId).eq("owner_id", user.id);
-    return NextResponse.json({ error: filesErr.message }, { status: 500 });
+  const filesResult = await upsertAppFilesBatched(admin, rows);
+  if (!filesResult.ok) {
+    await rollbackImport({ admin, supabase, userId: user.id, projectId, storagePath });
+    return importFail("app_files_upsert", filesResult.message, {
+      insertPayloadKeys: [...ZIP_IMPORT_APP_FILE_INSERT_KEYS],
+      projectId,
+    });
   }
 
-  const { error: impErr } = await supabase.from("imported_projects").insert({
+  const { error: importedErr } = await supabase.from("imported_projects").insert({
     user_id: user.id,
     project_id: projectId,
     source_archive_path: storagePath,
-    framework_detected: framework,
+    framework_detected: frameworkId,
     meta: {
-      public_url: publicUrl,
-      limits: ZIP_IMPORT_LIMITS,
+      bucket: ZIP_IMPORT_BUCKET,
+      storage_path: storagePath,
+      original_name: file.name,
+      quality_score: validation.qualityScore,
+      routes: validation.routes,
+      scan_stats: extracted.stats,
     } as Json,
   });
-  if (impErr && process.env.NODE_ENV !== "production") {
-    console.warn("[import-zip] imported_projects:", impErr.message);
+  if (importedErr) {
+    await rollbackImport({ admin, supabase, userId: user.id, projectId, storagePath });
+    return importFail("imported_projects_insert", importedErr.message, { projectId }, 503);
   }
 
   return NextResponse.json({
     projectId,
-    fileCount: acc.files.length,
-    framework,
-    redirectTo: `/create?projectId=${projectId}&mode=build`,
+    fileCount: files.length,
+    scanStats: extracted.stats,
+    estimatedAiCostUsd: 0,
+    aiRepairOptional: true,
+    framework: frameworkId,
+    frameworkLabel: validation.framework.label,
+    qualityScore: validation.qualityScore,
+    previewReady: validation.previewReady,
+    publishReady: validation.publishReady,
+    routes: validation.routes,
+    warnings: validation.warnings,
+    rejectedSecrets,
+    redirectTo: `/apps/${projectId}/dashboard?imported=1`,
+    alsoCreate: `/create?projectId=${projectId}&mode=build`,
   });
 }

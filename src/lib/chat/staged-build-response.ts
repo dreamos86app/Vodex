@@ -4,7 +4,10 @@ import type { Database } from "@/lib/supabase/types";
 import { runStagedBuildPipeline } from "@/lib/build/build-pipeline";
 import { calculateCreditsForStagedBuild } from "@/lib/credits/credit-pricing";
 import { chargeAiOperation } from "@/lib/credits/charge-ai-operation";
+import { reconcileGenerationReservation } from "@/lib/billing/credit-reservations";
+import { assertProfitableCharge } from "@/lib/billing/credit-profit-guard";
 import { finalizeBuildSuccess, finalizeBuildFailed } from "@/lib/build/finalize-build";
+import { completeBuildWithValidation } from "@/lib/build/complete-build-with-validation";
 import { allocatePublishedSubdomain } from "@/lib/publish/subdomain";
 import { getAppUrl } from "@/lib/app-url";
 import { hasSuccessfulChargeForOperation } from "@/lib/chat/server-idempotency";
@@ -26,6 +29,8 @@ export function createStagedBuildStreamResponse(input: {
   modelId: string;
   provider: string;
   routeReason: string;
+  reservedCredits?: number;
+  blueprintBlock?: string;
 }): Response {
   let pipelineResult: Awaited<ReturnType<typeof runStagedBuildPipeline>> | null = null;
 
@@ -50,6 +55,7 @@ export function createStagedBuildStreamResponse(input: {
           buildJobId: input.buildJobId,
           userPrompt: input.userPrompt,
           memoryBlock: input.memoryBlock,
+          blueprintBlock: input.blueprintBlock,
           conversationId: input.conversationId,
         });
 
@@ -126,7 +132,11 @@ export function createStagedBuildStreamResponse(input: {
               creditsCharged: 0,
               charged: false,
             });
-            await allocatePublishedSubdomain(input.writer, input.projectId, input.userId);
+            await completeBuildWithValidation({
+              writer: input.writer,
+              userId: input.userId,
+              projectId: input.projectId,
+            });
           }
         }
 
@@ -146,24 +156,51 @@ export function createStagedBuildStreamResponse(input: {
             primaryModelId: pr.primaryModelId,
           });
 
-          const charge = await chargeAiOperation(input.writer, {
-            userId: input.userId,
-            userEmail: input.userEmail,
-            amount: chargeCalc.creditsToCharge,
-            modelId: pr.primaryModelId,
-            mode: "build",
-            operationId: input.operationId,
-            conversationId: input.conversationId,
-            projectId: input.projectId,
-            buildJobId: input.buildJobId,
-            providerCostUsd: chargeCalc.estimatedProviderCostUsd,
-            tokensInput: pr.totalInputTokens,
-            tokensOutput: pr.totalOutputTokens,
-            provider: input.provider,
-            routeReason: input.routeReason,
-          });
+          const profitable = assertProfitableCharge(
+            chargeCalc.creditsToCharge,
+            chargeCalc.estimatedProviderCostUsd,
+          );
 
-          if (charge.charged && input.buildJobId && savedAppName) {
+          let creditsCharged = chargeCalc.creditsToCharge;
+          let charged = false;
+
+          if (input.reservedCredits && input.reservedCredits > 0) {
+            const recon = await reconcileGenerationReservation(input.writer, {
+              userId: input.userId,
+              generationId: input.operationId,
+              reservedCredits: input.reservedCredits,
+              actualUserCredits: Math.min(
+                input.reservedCredits,
+                chargeCalc.creditsToCharge,
+              ),
+              providerCostUsd: chargeCalc.estimatedProviderCostUsd,
+              success: true,
+              projectId: input.projectId,
+            });
+            creditsCharged = recon.finalCharged;
+            charged = true;
+          } else if (profitable.ok) {
+            const charge = await chargeAiOperation(input.writer, {
+              userId: input.userId,
+              userEmail: input.userEmail,
+              amount: chargeCalc.creditsToCharge,
+              modelId: pr.primaryModelId,
+              mode: "build",
+              operationId: input.operationId,
+              conversationId: input.conversationId,
+              projectId: input.projectId,
+              buildJobId: input.buildJobId,
+              providerCostUsd: chargeCalc.estimatedProviderCostUsd,
+              tokensInput: pr.totalInputTokens,
+              tokensOutput: pr.totalOutputTokens,
+              provider: input.provider,
+              routeReason: input.routeReason,
+            });
+            charged = charge.charged;
+            creditsCharged = chargeCalc.creditsToCharge;
+          }
+
+          if (charged && input.buildJobId && savedAppName) {
             await finalizeBuildSuccess({
               writer: input.writer,
               userId: input.userId,
@@ -175,10 +212,20 @@ export function createStagedBuildStreamResponse(input: {
               iconSvg: savedIconSvg,
               meta: savedMeta,
               fileCount: savedFileCount,
-              creditsCharged: chargeCalc.creditsToCharge,
+              creditsCharged,
               charged: true,
             });
           }
+        } else if (!pr.ok && input.reservedCredits) {
+          await reconcileGenerationReservation(input.writer, {
+            userId: input.userId,
+            generationId: input.operationId,
+            reservedCredits: input.reservedCredits,
+            actualUserCredits: 0,
+            providerCostUsd: pr.totalProviderCostUsd,
+            success: false,
+            projectId: input.projectId,
+          });
         } else if (!pr.ok && input.buildJobId) {
           await finalizeBuildFailed({
             writer: input.writer,

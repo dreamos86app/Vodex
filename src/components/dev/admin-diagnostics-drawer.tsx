@@ -189,10 +189,10 @@ export function AdminDiagnosticsDrawer() {
   const domScan = scanDomWiringIssues();
 
   const rh = data?.runtimeHealth;
-  const blockers =
-    (rh?.ok ? 0 : 1) +
-    (rh?.rpcs.charge_tokens.callableByPostgrest ? 0 : 1) +
-    ((data?.apiErrors as unknown[])?.length ? 1 : 0);
+  const infraBlockers =
+    (rh?.ok ? 0 : 1) + (rh?.rpcs.charge_tokens.callableByPostgrest ? 0 : 1);
+  const blockers = infraBlockers;
+  const recentApiErrors = (data?.apiErrors as unknown[])?.length ?? 0;
 
   let panel: React.ReactNode = null;
   switch (tab) {
@@ -230,7 +230,7 @@ export function AdminDiagnosticsDrawer() {
                 {rh?.helperRpcUnavailable ? "debug helper unavailable" : "available"}
               </span>
             </li>
-            <li>API errors (recent): {(data?.apiErrors as unknown[])?.length ?? 0}</li>
+            <li>API errors (recent): {recentApiErrors}</li>
             <li>Build jobs: {(data?.buildPipeline?.jobs as unknown[])?.length ?? 0}</li>
             <li>Missing ID events: {(data?.missingIds as unknown[])?.length ?? 0}</li>
             <li>DOM wiring issues: {domScan.length}</li>

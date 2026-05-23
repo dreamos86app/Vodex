@@ -545,10 +545,12 @@ export interface Database {
           created_at: string;
           updated_at: string;
           project_id: string;
+          owner_id?: string | null;
           path: string;
           content: string;
           mime_type: string;
           size_bytes: number;
+          source?: string | null;
         };
         Insert: Omit<
           Database["public"]["Tables"]["app_files"]["Row"],

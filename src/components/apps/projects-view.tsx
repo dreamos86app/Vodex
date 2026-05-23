@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Plus, Search, Star, LayoutGrid, List,
-  Sparkles, Loader2, ArrowUpRight, Upload, AppWindow,
+  Sparkles, Loader2, Upload, AppWindow,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";  
 import { EmptyState } from "@/components/ui/empty-state";
@@ -17,6 +17,22 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useTimedLoading } from "@/lib/hooks/use-timed-loading";
 import type { Project } from "@/lib/supabase/types";
 import { ZipImportWizard } from "@/components/apps/zip-import-wizard";
+import { ProjectIcon } from "@/components/projects/project-icon";
+import { ProjectBanner } from "@/components/projects/project-banner";
+import { LIFECYCLE_META, readLifecycleFromMetadata } from "@/lib/projects/project-lifecycle";
+import {
+  importedStatusLabel,
+  isZipImportProject,
+  resolveImportedLifecycleStatus,
+  readImportMeta,
+} from "@/lib/projects/imported-project-state";
+
+type ProjectRow = Project & {
+  lifecycle_status?: string;
+  lifecycle_label?: string;
+  public_url?: string | null;
+  banner_svg?: string | null;
+};
 
 const STATUS_CONFIG: Record<Project["status"], { label: string; dot: string; text: string }> = {
   live: { label: "Live", dot: "bg-positive animate-pulse", text: "text-positive" },
@@ -26,8 +42,86 @@ const STATUS_CONFIG: Record<Project["status"], { label: string; dot: string; tex
   error: { label: "Error", dot: "bg-destructive", text: "text-destructive" },
 };
 
-function ProjectCard({ project }: { project: Project }) {
-  const cfg = STATUS_CONFIG[project.status];
+function cardStatusLabel(project: ProjectRow): { label: string; dot: string; text: string } {
+  const meta =
+    project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
+      ? (project.metadata as Record<string, unknown>)
+      : {};
+  if (isZipImportProject(meta)) {
+    const imp = readImportMeta(meta);
+    const st = resolveImportedLifecycleStatus(meta, imp.file_count ?? 0, false);
+    const label = st ? importedStatusLabel(st) : "Imported ZIP";
+    const tone =
+      st === "imported_preview_ready"
+        ? "text-positive"
+        : st === "imported_error"
+          ? "text-destructive"
+          : st === "imported_needs_setup"
+            ? "text-amber-400"
+            : "text-muted-foreground";
+    const dot =
+      st === "imported_preview_ready"
+        ? "bg-positive"
+        : st === "imported_error"
+          ? "bg-destructive"
+          : st === "imported_needs_setup"
+            ? "bg-amber-400"
+            : "bg-accent";
+    return { label, dot, text: tone };
+  }
+  const ls = project.lifecycle_status ?? readLifecycleFromMetadata(project.metadata).lifecycle_status;
+  if (ls && ls in LIFECYCLE_META) {
+    const m = LIFECYCLE_META[ls as keyof typeof LIFECYCLE_META];
+    const tone =
+      ls === "published"
+        ? "text-positive"
+        : ls === "building" || ls === "blueprint_generating"
+          ? "text-accent"
+          : ls === "failed" || ls === "needs_attention"
+            ? "text-destructive"
+            : "text-muted-foreground";
+    const dot =
+      ls === "published"
+        ? "bg-positive animate-pulse"
+        : ls === "building" || ls === "blueprint_generating"
+          ? "bg-accent animate-pulse"
+          : ls === "failed" || ls === "needs_attention"
+            ? "bg-destructive"
+            : "bg-muted-foreground/40";
+    return { label: project.lifecycle_label ?? m.userLabel, dot, text: tone };
+  }
+  const metaFallback =
+    project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
+      ? (project.metadata as Record<string, unknown>)
+      : {};
+  const buildStatus = typeof metaFallback.build_status === "string" ? metaFallback.build_status : null;
+  if (buildStatus === "completed") {
+    return { label: "Generated", dot: "bg-positive", text: "text-positive" };
+  }
+  return STATUS_CONFIG[project.status] ?? STATUS_CONFIG.draft;
+}
+
+function ProjectCardSkeleton() {
+  return (
+    <div className="animate-pulse overflow-hidden rounded-[var(--radius-xl)] bg-surface ring-1 ring-border">
+      <div className="h-20 bg-muted/40" />
+      <div className="space-y-3 p-4">
+        <div className="flex gap-2">
+          <div className="size-10 rounded-xl bg-muted/60" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-2/3 rounded bg-muted/60" />
+            <div className="h-2 w-1/2 rounded bg-muted/50" />
+          </div>
+        </div>
+        <div className="h-2 w-full rounded bg-muted/40" />
+        <div className="h-8 w-full rounded-lg bg-muted/50" />
+      </div>
+    </div>
+  );
+}
+
+function ProjectCard({ project }: { project: ProjectRow }) {
+  const cfg = cardStatusLabel(project);
   const meta =
     project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
       ? (project.metadata as Record<string, unknown>)
@@ -45,11 +139,18 @@ function ProjectCard({ project }: { project: Project }) {
     typeof (project as Project & { icon_svg?: string }).icon_svg === "string"
       ? (project as Project & { icon_svg: string }).icon_svg
       : null;
-  const iconSrc = iconSvg
-    ? `data:image/svg+xml,${encodeURIComponent(iconSvg)}`
-    : project.icon_url ?? `/api/projects/${project.id}/icon`;
-  const buildStatus =
-    typeof meta.build_status === "string" ? meta.build_status : project.status;
+  const bannerSvg = project.banner_svg ?? null;
+  const ls = project.lifecycle_status ?? readLifecycleFromMetadata(project.metadata).lifecycle_status;
+  const isZipImport =
+    meta.source === "zip_import" ||
+    Boolean((meta.import as Record<string, unknown> | undefined)?.original_name);
+  const canPreview =
+    Boolean(project.preview_url) &&
+    ls &&
+    ["generated", "preview_ready", "publish_ready", "published"].includes(ls);
+  const canPublish = ls === "preview_ready" || ls === "publish_ready" || ls === "published";
+  const needsRepair = ls === "needs_attention" || ls === "failed";
+  const publicUrl = project.public_url ?? null;
 
   return (
     <motion.div
@@ -63,15 +164,19 @@ function ProjectCard({ project }: { project: Project }) {
         aria-label={`Open ${project.name}`}
         className="absolute inset-0 z-0"
       />
-      <div className={cn("pointer-events-none relative h-20 w-full bg-gradient-to-br", project.gradient, "opacity-80")} />
+      <ProjectBanner
+        projectId={project.id}
+        bannerSvg={bannerSvg}
+        previewUrl={project.preview_url}
+        title={appName}
+        className="pointer-events-none"
+        previewOnly
+      />
 
       <div className="pointer-events-none relative z-[1] flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-start gap-2.5">
-            <div className="relative size-10 shrink-0 overflow-hidden rounded-xl ring-1 ring-border bg-white">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={iconSrc} alt="" className="size-full object-cover" />
-            </div>
+            <ProjectIcon projectId={project.id} iconSvg={iconSvg} iconUrl={project.icon_url} size={40} />
             <div className="min-w-0">
             <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
               {appName}
@@ -79,8 +184,8 @@ function ProjectCard({ project }: { project: Project }) {
             {shortDesc && (
               <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{shortDesc}</p>
             )}
-            {buildStatus === "completed" && (
-              <p className="mt-1 text-[10px] font-medium text-positive">Ready to preview</p>
+            {publicUrl && (
+              <p className="mt-1 truncate text-[10px] font-medium text-positive">{publicUrl}</p>
             )}
             </div>
           </div>
@@ -95,47 +200,61 @@ function ProjectCard({ project }: { project: Project }) {
             href={`/apps/${project.id}/builder`}
             className="rounded-lg bg-accent/12 px-2.5 py-1 text-[10.5px] font-semibold text-accent ring-1 ring-accent/20 transition hover:bg-accent hover:text-white"
           >
-            Builder
+            Open builder
           </Link>
+          {needsRepair && (
+            <Link
+              href={`/apps/${project.id}/builder?repair=1`}
+              className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-[10.5px] font-semibold text-amber-700 ring-1 ring-amber-500/20"
+            >
+              Fix issues
+            </Link>
+          )}
+          {canPreview && project.preview_url && (
+            <a
+              href={project.preview_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-lg bg-surface px-2.5 py-1 text-[10.5px] font-medium text-foreground ring-1 ring-border transition hover:ring-accent/25"
+            >
+              Preview
+            </a>
+          )}
+          {canPublish && (
+            <Link
+              href={`/apps/${project.id}/dashboard?tab=publish`}
+              className="rounded-lg bg-positive/10 px-2.5 py-1 text-[10.5px] font-semibold text-positive ring-1 ring-positive/20"
+            >
+              Publish
+            </Link>
+          )}
           <Link
             href={`/apps/${project.id}/dashboard`}
             className="rounded-lg bg-surface px-2.5 py-1 text-[10.5px] font-medium text-foreground ring-1 ring-border transition hover:ring-accent/25"
           >
-            App dashboard
-          </Link>
-          <Link
-            href={`/projects/${project.id}`}
-            className="rounded-lg px-2.5 py-1 text-[10.5px] font-medium text-muted-foreground ring-1 ring-border/60 transition hover:text-foreground"
-          >
-            Details
+            Dashboard
           </Link>
         </div>
 
-        <div className="mt-auto flex items-center justify-between">
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span>{project.framework}</span>
+        <div className="mt-auto flex items-center justify-between pt-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            {isZipImport && (
+              <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent ring-1 ring-accent/20">
+                Imported ZIP
+              </span>
+            )}
+            <span className="truncate">{project.framework}</span>
             <span>{new Date(project.updated_at).toLocaleDateString()}</span>
           </div>
-          <div className="pointer-events-auto flex gap-1 opacity-0 transition group-hover:opacity-100">
-            {project.preview_url && (
-              <a
-                href={project.preview_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="relative z-10 flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-background hover:text-foreground"
-              >
-                <ArrowUpRight className="size-3.5" strokeWidth={1.75} />
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={(e) => e.stopPropagation()}
-              className="relative z-10 flex items-center justify-center rounded-lg p-1.5 text-muted-foreground transition hover:bg-background hover:text-amber-400"
-            >
-              <Star className={cn("size-3.5", project.is_favorite && "fill-amber-400 text-amber-400")} strokeWidth={1.75} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-10 flex shrink-0 items-center justify-center rounded-lg p-1.5 text-muted-foreground transition hover:bg-background hover:text-amber-400"
+            aria-label={project.is_favorite ? "Remove favorite" : "Add favorite"}
+          >
+            <Star className={cn("size-3.5", project.is_favorite && "fill-amber-400 text-amber-400")} strokeWidth={1.75} />
+          </button>
         </div>
       </div>
     </motion.div>
@@ -146,47 +265,89 @@ export function ProjectsView() {
   const router = useRouter();
   const supabase = createClient();
   const { profile } = useAuthStore();
-  const [projects, setProjects] = React.useState<Project[]>([]);
+  const [projects, setProjects] = React.useState<ProjectRow[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const isLoading = useTimedLoading(loading, 1000);
   const [search, setSearch] = React.useState("");
+  const [sort, setSort] = React.useState<"updated" | "name">("updated");
   const [view, setView] = React.useState<"grid" | "list">("grid");
   const [showImport, setShowImport] = React.useState(false);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const lastLoadRef = React.useRef(0);
+
+  const loadProjects = React.useCallback((reconcile = false) => {
+    if (!profile?.id) return;
+    const now = Date.now();
+    if (!reconcile && now - lastLoadRef.current < 30_000 && projects.length > 0) return;
+    lastLoadRef.current = now;
+    setLoading(true);
+    setLoadError(null);
+    const qs = reconcile ? "?reconcile=1" : "";
+    fetch(`/api/projects${qs}`)
+      .then((r) => r.json())
+      .then((body: { projects?: ProjectRow[] }) => {
+        setProjects(body.projects ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        void Promise.resolve(
+          supabase
+            .from("projects")
+            .select("*, app_name, short_description, category, icon_svg, build_status, icon_url")
+            .eq("owner_id", profile.id)
+            .order("updated_at", { ascending: false }),
+        )
+          .then(({ data, error }) => {
+            if (error) throw error;
+            setProjects((data as ProjectRow[]) ?? []);
+            setLoading(false);
+          })
+          .catch(() => {
+            setLoadError("Could not load your apps. Try again.");
+            setLoading(false);
+          });
+      });
+  }, [profile?.id, supabase, projects.length]);
 
   React.useEffect(() => {
     if (!profile?.id) {
-      // Don't spin forever — if profile hasn't loaded after mount, clear loading
       const t = setTimeout(() => setLoading(false), 2000);
       return () => clearTimeout(t);
     }
-    setLoading(true);
-    supabase
-      .from("projects")
-      .select(
-        "*, app_name, short_description, category, icon_svg, build_status, icon_url",
-      )
-      .eq("owner_id", profile.id)
-      .order("updated_at", { ascending: false })
-      .then(({ data }) => {
-        setProjects((data as Project[]) ?? []);
-        setLoading(false);
-      });
-  }, [profile?.id]);
+    loadProjects(true);
+    const onFocus = () => {
+      if (Date.now() - lastLoadRef.current > 120_000) loadProjects(false);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [profile?.id, loadProjects]);
 
-  const filtered = projects.filter(
-    (p) => !search || p.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = projects
+    .filter((p) => {
+      const q = search.toLowerCase();
+      const name = (p.name ?? "").toLowerCase();
+      const appName = ((p as ProjectRow).app_name ?? "").toLowerCase();
+      const matchSearch = !q || name.includes(q) || appName.includes(q);
+      const ls = p.lifecycle_status ?? readLifecycleFromMetadata(p.metadata).lifecycle_status;
+      const matchStatus = statusFilter === "all" || ls === statusFilter || p.status === statusFilter;
+      return matchSearch && matchStatus;
+    })
+    .sort((a, b) => {
+      if (sort === "name") return (a.name ?? "").localeCompare(b.name ?? "");
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
 
   return (
     <motion.div
       variants={variants.staggerContainer}
       initial="hidden"
       animate="show"
-      className="space-y-5 pb-10"
+      className="dashboard-shell space-y-5 overflow-x-hidden pb-10 safe-area-pad-b"
     >
       {/* Header */}
-      <motion.div variants={variants.fadeUp} className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <motion.div variants={variants.fadeUp} className="flex flex-wrap items-center gap-2 overflow-x-hidden sm:gap-3">
+        <div className="relative min-w-[140px] flex-1 basis-full sm:basis-auto sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
           <input
             value={search}
@@ -195,6 +356,31 @@ export function ProjectsView() {
             className="h-9 w-full rounded-[var(--radius-lg)] bg-surface pl-9 pr-3 text-[13px] text-foreground ring-1 ring-border outline-none focus:ring-accent/40"
           />
         </div>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-9 rounded-[var(--radius-lg)] bg-surface px-2 text-[12px] text-foreground ring-1 ring-border outline-none"
+          aria-label="Filter by status"
+        >
+          <option value="all">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="building">Building</option>
+          <option value="generated">Generated</option>
+          <option value="published">Published</option>
+          <option value="needs_attention">Needs attention</option>
+          <option value="failed">Failed</option>
+        </select>
+
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as "updated" | "name")}
+          className="h-9 rounded-[var(--radius-lg)] bg-surface px-2 text-[12px] text-foreground ring-1 ring-border outline-none"
+          aria-label="Sort projects"
+        >
+          <option value="updated">Recently updated</option>
+          <option value="name">Name A–Z</option>
+        </select>
 
         <div className="flex rounded-lg ring-1 ring-border">
           {(["grid", "list"] as const).map((v) => (
@@ -220,11 +406,20 @@ export function ProjectsView() {
           <Upload className="size-3.5" strokeWidth={1.75} />
           Import ZIP
         </Button>
-        <Button variant="accent" size="sm" className="gap-1.5" onClick={() => router.push("/")}>
+        <Button variant="accent" size="sm" className="gap-1.5" onClick={() => router.push("/create")}>
           <Plus className="size-3.5" strokeWidth={2} />
-          New project
+          New app
         </Button>
       </motion.div>
+
+      {loadError && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
+          <p className="text-[13px] text-destructive">{loadError}</p>
+          <Button variant="secondary" size="sm" onClick={() => loadProjects(true)}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* ZIP import wizard */}
       {showImport && (
@@ -232,20 +427,21 @@ export function ProjectsView() {
           onClose={() => setShowImport(false)}
           onComplete={() => {
             setShowImport(false);
+            loadProjects(true);
           }}
         />
       )}
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-24">
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative flex size-12 items-center justify-center">
-              <div className="absolute size-12 animate-ping rounded-full bg-accent/20" />
-              <div className="relative size-6 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
-            </div>
-            <p className="text-[12.5px] text-muted-foreground">Loading your apps…</p>
-          </div>
+        <div className={cn(
+          view === "grid"
+            ? "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+            : "space-y-2",
+        )}>
+          {Array.from({ length: view === "grid" ? 6 : 4 }).map((_, i) => (
+            <ProjectCardSkeleton key={i} />
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         !search ? (
@@ -269,10 +465,10 @@ export function ProjectsView() {
             </div>
             <div className="flex flex-col items-center gap-3 sm:flex-row">
               <Link
-                href="/"
+                href="/create"
                 className="flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-[13.5px] font-semibold text-white transition hover:bg-accent/90"
               >
-                Start building
+                Create your app
               </Link>
               <Link
                 href="/templates"

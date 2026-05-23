@@ -194,12 +194,12 @@ export function routeOperation(ctx: RouteOperationContext): RoutedModelSpec {
     case "ui_design_plan":
       return spec(op, pickStandardFast("openai"), 1500, { strictJson: true, temperature: 0 });
     case "frontend_implementation": {
-      const m = implementationModel(complexity, ctx.ownerEmail);
+      const m = pickStandardFast("openai");
       return spec(
         op,
-        m.id,
-        implementationMaxOut(op, complexity),
-        { tier: m.tier, temperature: 0.2, routeReason: "automatic_implementation" },
+        m,
+        Math.min(implementationMaxOut(op, complexity), 2000),
+        { tier: "standard_fast", strictJson: true, temperature: 0.1, routeReason: "frontend_json_files" },
         complexity,
       );
     }

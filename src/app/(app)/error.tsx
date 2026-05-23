@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { AlertTriangle, RotateCcw, Home, Sparkles, ArrowRight } from "lucide-react";
+import { isChunkLoadError, safeChunkReloadOnce } from "@/lib/navigation/chunk-load-recovery";
 
 export default function AppError({
   error,
@@ -12,6 +13,8 @@ export default function AppError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  const chunkError = isChunkLoadError(error);
+
   useEffect(() => {
     console.error("[DreamOS86] App error:", error);
   }, [error]);
@@ -34,11 +37,12 @@ export default function AppError({
         </div>
 
         <h1 className="mt-5 text-[20px] font-semibold tracking-[-0.03em] text-foreground">
-          Page failed to load
+          {chunkError ? "This page took too long to load" : "Page failed to load"}
         </h1>
         <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
-          Something unexpected happened while rendering this section.
-          Your data and projects are safe. Try retrying or return to the workspace.
+          {chunkError
+            ? "A script chunk timed out — common while the dev server compiles. Retry once; your projects are safe."
+            : "Something unexpected happened while rendering this section. Your data and projects are safe. Try retrying or return to the workspace."}
         </p>
 
         {isDev && error.message && (
@@ -55,7 +59,10 @@ export default function AppError({
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           <button
             type="button"
-            onClick={() => unstable_retry()}
+            onClick={() => {
+              if (chunkError && safeChunkReloadOnce()) return;
+              unstable_retry();
+            }}
             className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-accent/90"
           >
             <RotateCcw className="size-3.5" strokeWidth={2} />

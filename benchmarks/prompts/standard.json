@@ -1,0 +1,15 @@
+{
+  "category": "dashboard",
+  "prompts": [
+    { "id": "dash-01", "text": "Analytics dashboard for e-commerce with revenue, orders, and top products" },
+    { "id": "dash-02", "text": "Admin dashboard for user management with table, filters, and roles" },
+    { "id": "dash-03", "text": "Project management dashboard with kanban board and team avatars" },
+    { "id": "dash-04", "text": "Healthcare clinic dashboard with appointments and patient queue" },
+    { "id": "dash-05", "text": "Marketing campaign dashboard with channel performance charts" },
+    { "id": "dash-06", "text": "DevOps status dashboard with uptime monitors and incident log" },
+    { "id": "dash-07", "text": "HR dashboard with hiring pipeline and offer tracking" },
+    { "id": "dash-08", "text": "Support ticket dashboard with SLA timers and agent workload" },
+    { "id": "dash-09", "text": "Inventory dashboard with low-stock alerts and supplier list" },
+    { "id": "dash-10", "text": "Education admin dashboard with courses, enrollments, and grades" }
+  ]
+}

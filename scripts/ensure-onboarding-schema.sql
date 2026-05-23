@@ -1,4 +1,4 @@
--- Run once in Supabase Dashboard → SQL Editor for project xycqutvqxtkbszytaxbe
+-- Run once in Supabase Dashboard → SQL Editor for project wciioegiczwqlmlroley
 -- (or your project ref from NEXT_PUBLIC_SUPABASE_URL).
 -- Fixes: Could not find the 'onboarding_answers' column of 'profiles' in the schema cache
 

@@ -3,6 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { scanAppSourceForReadiness } from "@/lib/publish/readiness-scan";
 import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build";
+import { requireAuthUser, requireMutationProjectId, isNextResponse } from "@/lib/ids/api-mutation-guard";
+import { checkPublishReadiness } from "@/lib/publish/publish-readiness";
+import {
+  isBuildCompleteForProject,
+  isZipImportProject,
+  readImportMeta,
+} from "@/lib/projects/imported-project-state";
 
 export const dynamic = "force-dynamic";
 
@@ -10,26 +17,29 @@ export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const { id: projectId } = await ctx.params;
+  const { id: rawId } = await ctx.params;
+  const projectId = requireMutationProjectId(rawId);
+  if (isNextResponse(projectId)) return projectId;
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authUser = requireAuthUser(user);
+  if (isNextResponse(authUser)) return authUser;
 
   const { data: project } = await supabase
     .from("projects")
     .select("id, owner_id, name, metadata, preview_url, app_name, build_status, icon_svg")
     .eq("id", projectId)
-    .eq("owner_id", user.id)
+    .eq("owner_id", authUser.id)
     .maybeSingle();
 
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const admin = createServiceRoleClient() ?? supabase;
 
-  const buildReconcile = await reconcileProjectBuildState(admin, projectId, user.id);
-  const filesCount = buildReconcile.fileCount;
+  const buildReconcile = await reconcileProjectBuildState(admin, projectId, authUser.id);
 
   const { data: files } = await admin
     .from("app_files")
@@ -50,15 +60,25 @@ export async function GET(
       ? (project.metadata as Record<string, unknown>)
       : {};
 
+  const isImport = isZipImportProject(meta);
+  const importMeta = readImportMeta(meta);
+  const filesCount = buildReconcile.fileCount;
   const buildStatus = buildReconcile.buildStatus ?? latestBuild?.status ?? null;
   const metaBuildStatus = typeof meta.build_status === "string" ? meta.build_status : null;
   const projectBuildStatus = project.build_status ?? null;
   const buildCompleted =
     buildReconcile.buildCompleted ||
+    isBuildCompleteForProject({
+      metadata: meta,
+      fileCount: filesCount,
+      buildJobStatus: latestBuild?.status,
+      projectBuildStatus,
+    }) ||
     buildStatus === "completed" ||
     buildStatus === "succeeded" ||
     metaBuildStatus === "completed" ||
-    projectBuildStatus === "completed";
+    projectBuildStatus === "completed" ||
+    projectBuildStatus === "imported";
 
   const metaAppName =
     typeof meta.app_name === "string"
@@ -67,7 +87,7 @@ export async function GET(
         ? ((meta.builder as Record<string, unknown>).app as { name?: string })?.name
         : null;
 
-  const appName = (project.app_name || metaAppName || project.name || "").trim();
+  const appName = (project.app_name || metaAppName || importMeta.original_name || project.name || "").trim();
   const hasAppName = Boolean(appName && !/^new app$/i.test(appName) && !/^new build$/i.test(appName));
 
   const { data: previewErrs } = await admin
@@ -79,38 +99,59 @@ export async function GET(
   const hasPreviewErrors = (previewErrs?.length ?? 0) > 0;
   const hasPreview = Boolean(project.preview_url) || files?.some((f) => /preview/i.test(f.path));
 
-  const issues = scanAppSourceForReadiness(
-    (files ?? []).map((f) => ({ path: f.path, content: f.content ?? "" })),
-  );
+  const fileRows = (files ?? []).map((f) => ({ path: f.path, content: f.content ?? "" }));
+  const issues = scanAppSourceForReadiness(fileRows);
 
-  const blockers: string[] = [];
-  if (filesCount === 0) {
-    blockers.push(
-      buildCompleted
-        ? "Build saved no files — check build logs"
-        : "No generated app files yet",
-    );
+  const routeMap = Array.isArray(meta.blueprint_routes)
+    ? (meta.blueprint_routes as string[])
+    : null;
+
+  const readiness = checkPublishReadiness({
+    files: fileRows,
+    projectId,
+    ownerId: authUser.id,
+    metadata: meta,
+    routeMap,
+  });
+
+  const blockers = [...readiness.blockers];
+  if (filesCount === 0 && buildCompleted) {
+    blockers.unshift("Build saved no files — check build logs");
   }
-  if (!buildCompleted) blockers.push("Latest build has not completed successfully");
-  if (!hasAppName) blockers.push("App needs a generated name");
+  if (!buildCompleted && !isImport) blockers.push("Latest build has not completed successfully");
+  if (!hasAppName && !isImport) blockers.push("App needs a generated name");
+  if (isImport && (importMeta.env_requirements?.length ?? 0) > 0) {
+    blockers.push("Missing environment variables — complete setup in Secrets");
+  }
   if (hasPreviewErrors) blockers.push("Preview has compile errors — fix before publish");
 
   const canPublishWeb =
-    filesCount > 0 && buildCompleted && hasAppName && !hasPreviewErrors;
+    readiness.ok &&
+    filesCount > 0 &&
+    buildCompleted &&
+    hasAppName &&
+    !hasPreviewErrors;
 
   const { data: published } = await admin
-    .from("publish_records")
-    .select("published_url, subdomain, status")
+    .from("published_apps" as never)
+    .select("subdomain, status, public_url, slug")
     .eq("project_id", projectId)
-    .order("created_at", { ascending: false })
+    .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
+  const pubRow = published as {
+    public_url?: string;
+    subdomain?: string;
+    status?: string;
+    slug?: string;
+  } | null;
+
   const publicUrl =
-    published?.published_url ??
-    (typeof meta.public_url === "string" ? meta.public_url : null) ??
-    project.preview_url ??
-    null;
+    pubRow?.status === "published"
+      ? (pubRow.public_url ?? null)
+      : readiness.publicUrl ??
+        (typeof meta.public_url === "string" ? meta.public_url : null);
 
   return NextResponse.json({
     fileCount: filesCount,
@@ -127,12 +168,21 @@ export async function GET(
     previewErrors: hasPreviewErrors,
     canPublishWeb,
     artifactsReady: filesCount > 0 && buildCompleted,
-    publishedUrl: published?.published_url ?? null,
+    publishedUrl: pubRow?.public_url ?? null,
     publicUrl,
-    subdomain: published?.subdomain ?? null,
+    subdomain: pubRow?.subdomain ?? pubRow?.slug ?? readiness.slug,
+    slug: readiness.slug,
     issues,
     scannedAt: new Date().toISOString(),
-    blockers,
+    blockers: [...new Set(blockers)],
     reconciled: buildReconcile.reconciled,
+    lifecycleStatus: typeof meta.lifecycle === "string" ? meta.lifecycle : null,
+    validationOk: readiness.validationOk,
+    uiQualityOk: readiness.uiQualityOk,
+    uiQualityScore: readiness.uiQualityScore,
+    previewReady: readiness.previewReady,
+    secretsOk: readiness.secretsOk,
+    routeRenderable: readiness.routeRenderable,
+    canPublish: canPublishWeb,
   });
 }

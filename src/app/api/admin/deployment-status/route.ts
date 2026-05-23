@@ -5,8 +5,9 @@ import { safeFetch } from "@/lib/network/safe-fetch";
 import { checkBuilderSchemaHealth } from "@/lib/builder/schema-health";
 import { checkOnboardingSchemaHealth } from "@/lib/onboarding/schema-health";
 import { RUNTIME_MIGRATION_FILE, RUNTIME_SQL_FALLBACK } from "@/lib/schema/runtime-required-schema";
+import { DREAMOS_SUPABASE_PROJECT_REF } from "@/lib/supabase/project-ref";
 
-const EXPECTED_SUPABASE_REF = "xycqutvqxtkbszytaxbe";
+const EXPECTED_SUPABASE_REF = DREAMOS_SUPABASE_PROJECT_REF;
 
 const ENV_CHECKS = [
   "NEXT_PUBLIC_SUPABASE_URL",

@@ -12,6 +12,14 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+.playwright-auth.json
+.dreamos-evidence.json
+.dreamos-benchmark-results.json
+.dreamos-benchmark-results.live.json
+.dreamos-benchmark-results.structure.json
+.dreamos-benchmark-live-state.json
 
 # next.js
 /.next/

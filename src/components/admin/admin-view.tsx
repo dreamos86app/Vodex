@@ -11,7 +11,9 @@ import {
   HardDriveUpload,
   CreditCard,
   Shield,
+  Trophy,
 } from "lucide-react";
+import { CompetitiveScorePanel } from "@/components/admin/competitive-score-panel";
 import { variants } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { AuthHealthPanel } from "@/components/admin/auth-health-panel";
@@ -19,6 +21,7 @@ import { DeploymentStatusPanel } from "@/components/admin/deployment-status-pane
 import { ContactRequestsPanel } from "@/components/admin/contact-requests-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { AdminBillingPanel } from "@/components/admin/admin-billing-panel";
+import { AdminCreditEconomyPanel } from "@/components/admin/admin-credit-economy-panel";
 import { AdminAiUsagePanel } from "@/components/admin/admin-ai-usage-panel";
 import { AdminAuditPanel, AdminStoragePanel } from "@/components/admin/admin-lazy-panels";
 import { AdminSchemaHealthBanner } from "@/components/admin/admin-schema-health-banner";
@@ -30,7 +33,8 @@ export type AdminTab =
   | "storage"
   | "audit"
   | "auth"
-  | "billing";
+  | "billing"
+  | "competitive";
 
 type Tab = AdminTab;
 
@@ -49,6 +53,7 @@ export function AdminView({ initialTab = "users" }: { initialTab?: AdminTab }) {
     { id: "audit", label: "Audit log", icon: Shield },
     { id: "billing", label: "Billing", icon: CreditCard },
     { id: "auth", label: "System", icon: ShieldCheck },
+    { id: "competitive", label: "Competitive", icon: Trophy },
   ];
 
   return (
@@ -93,7 +98,12 @@ export function AdminView({ initialTab = "users" }: { initialTab?: AdminTab }) {
 
       {activeTab === "users" && <AdminUsersPanel />}
       {activeTab === "contacts" && <ContactRequestsPanel />}
-      {activeTab === "billing" && <AdminBillingPanel />}
+      {activeTab === "billing" && (
+        <div className="space-y-6">
+          <AdminCreditEconomyPanel />
+          <AdminBillingPanel />
+        </div>
+      )}
       {activeTab === "ai" && <AdminAiUsagePanel />}
       {activeTab === "storage" && <AdminStoragePanel />}
       {activeTab === "audit" && <AdminAuditPanel />}
@@ -104,6 +114,8 @@ export function AdminView({ initialTab = "users" }: { initialTab?: AdminTab }) {
           <AuthHealthPanel />
         </div>
       )}
+
+      {activeTab === "competitive" && <CompetitiveScorePanel />}
     </motion.div>
   );
 }

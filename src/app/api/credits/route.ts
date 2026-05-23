@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { loadProfileBillingRow } from "@/lib/supabase/load-profile-billing";
-import { FREE_MONTHLY_QUOTA, getMonthlyTokenQuotaForPlan } from "@/lib/stores/credits-store";
+import { loadCreditSummary } from "@/lib/credits/credit-summary";
 import { getChargeTokensProbeCached } from "@/lib/db/charge-probe-cache";
 
 export async function GET() {
@@ -27,30 +27,20 @@ export async function GET() {
     );
   }
 
-  const { data: usage } = await supabase
-    .from("credit_events")
-    .select("credits_consumed")
-    .eq("user_id", user.id)
-    .eq("event_type", "generation")
-    .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
-
-  const total_used = usage?.reduce((sum, e) => sum + e.credits_consumed, 0) ?? 0;
-
-  const planId = profile.plan_id ?? "free";
-  const quota = getMonthlyTokenQuotaForPlan(planId);
-  let remaining = profile.credits_remaining;
-  if (planId === "free") {
-    remaining = Math.min(remaining, FREE_MONTHLY_QUOTA);
-  }
-
+  const summary = await loadCreditSummary(supabase, user.id, profile);
   const chargeProbe = await getChargeTokensProbeCached();
 
   return NextResponse.json({
-    remaining,
-    quota,
-    reset_at: profile.credits_reset_at,
-    plan_id: profile.plan_id,
-    total_used,
+    remaining: summary.available,
+    balance: summary.available,
+    available: summary.available,
+    quota: summary.planAllowance,
+    plan_allowance: summary.planAllowance,
+    used_this_period: summary.usedThisPeriod,
+    reserved: summary.reserved,
+    reset_at: summary.resetAt,
+    plan_id: summary.planId,
+    total_used: summary.usedThisPeriod,
     charging_enabled: chargeProbe.ok,
     charging_error: chargeProbe.ok ? null : chargeProbe.lastError,
   });

@@ -1,0 +1,10 @@
+{
+  "category": "booking",
+  "prompts": [
+    { "id": "book-01", "text": "Salon booking app with stylist calendar and SMS reminders" },
+    { "id": "book-02", "text": "Restaurant table booking with party size and time slots" },
+    { "id": "book-03", "text": "Fitness class booking with capacity and waitlist" },
+    { "id": "book-04", "text": "Medical appointment booking with insurance info form" },
+    { "id": "book-05", "text": "Consulting booking with video call link and intake questionnaire" }
+  ]
+}

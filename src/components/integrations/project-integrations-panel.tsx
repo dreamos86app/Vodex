@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Loader2, Plug, CheckCircle2, AlertCircle, GitBranch } from "lucide-react";
 import { IntegrationIconWell } from "@/components/brand/integration-icons";
 import { toast } from "@/lib/toast";
@@ -150,11 +151,20 @@ function GitHubConnectForm({
           Connect with GitHub in one click
         </button>
       ) : (
-        <p className="text-[11px] text-muted-foreground">
-          GitHub connection is being configured on DreamOS86. Ask your workspace admin to add{" "}
-          <span className="font-mono text-[10px]">GITHUB_CLIENT_ID</span> and{" "}
-          <span className="font-mono text-[10px]">GITHUB_CLIENT_SECRET</span>.
-        </p>
+        <div className="mt-3 space-y-2 rounded-lg border border-border bg-surface/50 p-3">
+          <p className="text-[11px] text-muted-foreground">
+            GitHub connection is not configured on this workspace yet.
+          </p>
+          <p className="text-[11px] text-foreground">
+            You can export your app source from the builder Code tab, or connect manually when OAuth is available.
+          </p>
+          <Link
+            href={`/apps/${projectId}/builder?tab=code`}
+            className="inline-flex text-[11px] font-semibold text-accent hover:underline"
+          >
+            Export source from Code tab
+          </Link>
+        </div>
       )}
       <details className="rounded-lg border border-dashed border-border/80 bg-background/60 px-2.5 py-2">
         <summary className="cursor-pointer text-[11px] font-semibold text-muted-foreground">
@@ -236,8 +246,8 @@ function SupabaseConnectForm({
   return (
     <div className="mt-3 space-y-3 rounded-lg border border-border bg-surface/50 p-3">
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Connect <strong>your app&apos;s</strong> Supabase project (separate from DreamOS86 login).
-        DreamOS86 will store keys encrypted and generate SQL migrations for your generated app.
+        Connect <strong>your app&apos;s</strong> Supabase project (separate from DreamOS86 login). Manual connection —
+        paste keys below. DreamOS86 stores them encrypted for this app only.
       </p>
       <ol className="list-decimal space-y-1.5 pl-4 text-[11px] text-foreground">
         <li>
@@ -430,8 +440,8 @@ export function ProjectIntegrationsPanel({ projectId }: { projectId: string }) {
               </p>
             )}
             {!wired && (
-              <p className="mt-2 text-[11px] text-amber-800 dark:text-amber-200">
-                Connect flow coming soon — use Secrets in the builder for now.
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Use Setup → Secrets in the dashboard for API keys, or connect when available.
               </p>
             )}
 

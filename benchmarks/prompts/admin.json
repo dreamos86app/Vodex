@@ -1,0 +1,10 @@
+{
+  "category": "ai_tool",
+  "prompts": [
+    { "id": "ai-01", "text": "AI chat tool for summarizing PDFs with upload and citation panel" },
+    { "id": "ai-02", "text": "AI image prompt studio with history and favorite presets" },
+    { "id": "ai-03", "text": "AI code review assistant with diff viewer and severity tags" },
+    { "id": "ai-04", "text": "AI meeting notes tool with action items and share link" },
+    { "id": "ai-05", "text": "AI support copilot with ticket context and suggested replies" }
+  ]
+}

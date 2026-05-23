@@ -18,12 +18,15 @@ export function ModeSwitch({
   onChange,
   className,
   compact = false,
+  disabledModes = [],
 }: {
   value: CreationMode;
   onChange: (mode: CreationMode) => void;
   className?: string;
   compact?: boolean;
+  disabledModes?: CreationMode[];
 }) {
+  const disabledSet = new Set(disabledModes);
   return (
     <div
       role="tablist"
@@ -35,19 +38,30 @@ export function ModeSwitch({
     >
       {MODES.map(({ id, icon: Icon }) => {
         const active = value === id;
+        const disabled = disabledSet.has(id);
         return (
           <button
             key={id}
             role="tab"
             type="button"
             aria-selected={active}
-            onClick={() => onChange(id)}
-            title={MODE_META[id].description}
+            aria-disabled={disabled || undefined}
+            disabled={disabled}
+            onClick={() => {
+              if (!disabled) onChange(id);
+            }}
+            title={
+              disabled
+                ? "Available after an app is created"
+                : MODE_META[id].description
+            }
             className={cn(
               "relative z-10 flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-[12px] font-medium transition",
-              active
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground",
+              disabled
+                ? "cursor-not-allowed opacity-40"
+                : active
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
             )}
           >
             {active && (

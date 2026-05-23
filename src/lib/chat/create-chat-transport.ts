@@ -14,6 +14,10 @@ export type ChatTransportBody = {
   attachmentIds?: string[];
   operationId?: string;
   idempotencyKey?: string;
+  approvedBlueprint?: Record<string, unknown> | null;
+  qualityLevel?: string;
+  templateId?: string;
+  stylePresetId?: string;
 };
 
 export function createDreamChatTransport({
@@ -59,6 +63,7 @@ export function createDreamChatTransport({
           attachmentIds: extra.attachmentIds,
           operationId: extra.operationId ?? extra.idempotencyKey,
           idempotencyKey: extra.idempotencyKey ?? extra.operationId,
+          approvedBlueprint: extra.approvedBlueprint ?? undefined,
         },
       };
     },

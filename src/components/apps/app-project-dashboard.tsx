@@ -4,20 +4,17 @@ import * as React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/supabase/types";
-import { AppDashboardPanel } from "@/components/create/workspace/app-dashboard-panel";
+import { AppDashboardPanel, type DashSection } from "@/components/create/workspace/app-dashboard-panel";
 import { ProjectIntegrationsPanel } from "@/components/integrations/project-integrations-panel";
+import { isZipImportProject } from "@/lib/projects/imported-project-state";
 import {
   LayoutGrid,
   MonitorPlay,
-  Users,
-  BarChart3,
-  Globe,
-  Plug,
   KeyRound,
-  Shield,
+  Rocket,
   ScrollText,
   Settings,
-  Code2,
+  Plug,
 } from "lucide-react";
 
 type ProjectRow = Pick<
@@ -28,19 +25,16 @@ type ProjectRow = Pick<
 const SECTIONS = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
   { id: "preview", label: "Preview", icon: MonitorPlay },
-  { id: "users", label: "Users", icon: Users },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
-  { id: "domains", label: "Domains", icon: Globe },
+  { id: "setup", label: "Setup", icon: KeyRound },
+  { id: "publish", label: "Publish", icon: Rocket },
+  { id: "activity", label: "Activity", icon: ScrollText },
   { id: "integrations", label: "Integrations", icon: Plug },
-  { id: "secrets", label: "Secrets", icon: KeyRound },
-  { id: "security", label: "Security", icon: Shield },
-  { id: "logs", label: "Logs", icon: ScrollText },
   { id: "settings", label: "Settings", icon: Settings },
-  { id: "code", label: "Code", icon: Code2 },
 ] as const;
 
 export function AppProjectDashboard({ project }: { project: ProjectRow }) {
-  const [active, setActive] = React.useState<string>("overview");
+  const [active, setActive] = React.useState<DashSection>("overview");
+  const isImport = isZipImportProject(project.metadata);
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -52,9 +46,7 @@ export function AppProjectDashboard({ project }: { project: ProjectRow }) {
             <button
               key={s.id}
               type="button"
-              onClick={() => {
-                setActive(s.id);
-              }}
+              onClick={() => setActive(s.id as DashSection)}
               className={cn(
                 "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-[12.5px] font-medium transition whitespace-nowrap",
                 on ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
@@ -69,33 +61,29 @@ export function AppProjectDashboard({ project }: { project: ProjectRow }) {
 
       <div className="min-h-[420px] flex-1 overflow-hidden rounded-[var(--radius-xl)] ring-1 ring-border bg-background">
         <div className="border-b border-border bg-gradient-to-r from-accent/[0.06] to-transparent px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">App dashboard</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {isImport ? "Imported app" : "App dashboard"}
+          </p>
           <p className="text-[13px] text-muted-foreground">
-            Global hub stays at{" "}
             <Link href="/projects" className="font-medium text-accent hover:underline">
               Your apps
             </Link>
-            .
+            {" · "}
+            <Link href={`/apps/${project.id}/builder`} className="font-medium text-accent hover:underline">
+              Open builder
+            </Link>
           </p>
         </div>
         <div className="max-h-[min(70vh,720px)] overflow-y-auto">
-          {active === "overview" ? (
-            <AppDashboardPanel project={project} isBusy={false} />
-          ) : active === "integrations" ? (
+          {active === "integrations" ? (
             <ProjectIntegrationsPanel projectId={project.id} />
           ) : (
-            <div className="p-6 text-center">
-              <p className="text-[13px] text-muted-foreground">
-                <span className="font-medium text-foreground">{SECTIONS.find((x) => x.id === active)?.label}</span> —
-                not wired to backend yet. Use the builder for live preview and code.
-              </p>
-              <Link
-                href={`/apps/${project.id}/builder`}
-                className="mt-4 inline-flex rounded-lg bg-accent px-3 py-2 text-[12px] font-semibold text-white hover:opacity-90"
-              >
-                Open builder
-              </Link>
-            </div>
+            <AppDashboardPanel
+              project={project}
+              isBusy={false}
+              activeSection={active}
+              onSectionChange={setActive}
+            />
           )}
         </div>
       </div>

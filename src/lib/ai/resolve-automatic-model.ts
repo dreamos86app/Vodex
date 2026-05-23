@@ -43,8 +43,8 @@ export function pickAutomaticImplementationModelId(
     return "claude-opus-4.6";
   }
   if (c >= 7) return "claude-opus-4.6";
-  if (c >= 5) return "claude-sonnet-4.6";
-  return "claude-sonnet-4.6";
+  if (c >= 5) return "claude-sonnet-4-6";
+  return "claude-sonnet-4-6";
 }
 
 /** Legacy export — maps modes to tiered automatic picks (no longer forces Sonnet everywhere). */
