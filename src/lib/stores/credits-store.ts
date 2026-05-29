@@ -111,7 +111,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
     build: { ...EMPTY_BUCKET, planAllowance: 30 },
     action: { ...EMPTY_BUCKET, planAllowance: 25 },
     planId: "free",
-    loading: true,
+    loading: false,
     error: null,
     lastSyncedAt: null,
     isConfirmed: false,
@@ -137,7 +137,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         build: payload.build,
         action: payload.action,
         planId: payload.planId,
-        loading: true,
+        loading: false,
         error: null,
         lastSyncedAt: null,
         isConfirmed: false,
@@ -178,11 +178,6 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
 
     if (inFlightRequest) {
       logCreditSync(reason, "deduped — joined in-flight request");
-      return inFlightRequest;
-    }
-
-    if (loading && !force) {
-      logCreditSync(reason, "skipped — already loading");
       return inFlightRequest;
     }
 

@@ -15,6 +15,7 @@ export function useCreditsSync(enabled: boolean) {
   const applyCanonical = useCreditsStore((s) => s.applyCanonical);
   const syncFromDB = useCreditsStore((s) => s.syncFromDB);
   const bootstrapped = useRef(false);
+  const lastEnabled = useRef(false);
 
   useEffect(() => {
     return subscribeCreditUpdated((payload) => {
@@ -27,9 +28,19 @@ export function useCreditsSync(enabled: boolean) {
   }, [applyCanonical, syncFromDB]);
 
   useEffect(() => {
-    if (!enabled || bootstrapped.current) return;
+    if (!enabled) {
+      lastEnabled.current = false;
+      return;
+    }
+    const shouldBootstrap = !bootstrapped.current || !lastEnabled.current;
+    lastEnabled.current = true;
+    if (!shouldBootstrap) return;
     bootstrapped.current = true;
-    void syncFromDB({ reason: "bootstrap" });
+    void syncFromDB({ reason: "bootstrap" }).then((payload) => {
+      if (!payload) {
+        void syncFromDB({ force: true, reason: "bootstrap" });
+      }
+    });
   }, [enabled, syncFromDB]);
 
   useEffect(() => {

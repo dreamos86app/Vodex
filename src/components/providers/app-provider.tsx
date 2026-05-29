@@ -52,8 +52,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((s) => s.session);
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
-  const hasSession = Boolean(session && user);
-  useCreditsSync(hasSession);
+  const creditsSyncEnabled = Boolean(user?.id ?? profile?.id);
+  useCreditsSync(creditsSyncEnabled);
 
   React.useEffect(() => {
     if (!profile?.id) return;
@@ -107,6 +107,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (cached?.profile) {
         setProfile(cached.profile);
         seedCreditsFromProfile(cached.profile);
+        void useCreditsStore.getState().syncFromDB({ reason: "bootstrap" });
       }
       if (cached?.notifications.length) {
         setNotifications(cached.notifications);

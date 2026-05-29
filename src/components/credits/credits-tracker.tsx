@@ -395,7 +395,11 @@ export function CreditsTracker({
   const isCompact = variant === "compact";
   const isFull = variant === "full";
 
-  if (loading || !isConfirmed) {
+  const hasDisplayableCredits =
+    build.planAllowance > 0 || action.planAllowance > 0 || build.available > 0 || action.available > 0;
+  const awaitingFirstSync = !isConfirmed && loading && !hasDisplayableCredits;
+
+  if (awaitingFirstSync) {
     return (
       <div className={cn(className)} data-testid="credits-loading">
         {isPopover || isCompact ? (

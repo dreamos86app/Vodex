@@ -93,9 +93,9 @@ export function UserMenu() {
   const isFree = entitlements.tier === "free";
 
   React.useEffect(() => {
-    if (!open || isConfirmed) return;
+    if (!open) return;
     void syncFromDB({ reason: "popover-open" });
-  }, [open, syncFromDB, isConfirmed]);
+  }, [open, syncFromDB]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -177,7 +177,7 @@ export function UserMenu() {
                 action={action}
                 planId={effectivePlanId}
                 isConfirmed={isConfirmed}
-                loading={loading || !isConfirmed}
+                loading={loading}
                 error={error}
                 variant="popover"
                 onRetry={() => void syncFromDB({ force: true, reason: "manual" })}

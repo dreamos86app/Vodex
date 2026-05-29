@@ -42,4 +42,9 @@ export function seedCreditsFromProfile(profile: Partial<Profile>): void {
       source: "canonical_balance",
     },
   });
+
+  const after = useCreditsStore.getState();
+  if (!after.isConfirmed) {
+    void after.syncFromDB({ reason: "bootstrap" });
+  }
 }
