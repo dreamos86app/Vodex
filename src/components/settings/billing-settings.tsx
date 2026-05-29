@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Loader2,
   AlertTriangle,
-  CheckCircle2,
 } from "lucide-react";
 import { variants } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -17,11 +16,13 @@ import { CreditsTracker } from "@/components/credits/credits-tracker";
 import { refreshCredits, useCreditsStore } from "@/lib/stores/credits-store";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { PlanUpgradeModal } from "@/components/billing/plan-upgrade-modal";
 import {
   PLAN_DISPLAY,
   STRIPE_CHECKOUT_PLANS,
   type StripeCheckoutPlan,
 } from "@/lib/billing/plans";
+import { UPGRADE_POLICY_COPY } from "@/lib/billing/upgrade-policy";
 
 type BillingState = {
   planId: string;
@@ -51,7 +52,7 @@ export function BillingSettings() {
   const { build, action, planId: creditsPlanId, loading: creditsLoading, error: creditsError, isConfirmed } = useCreditsStore();
   const [billing, setBilling] = React.useState<BillingState | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [checkoutPlan, setCheckoutPlan] = React.useState<StripeCheckoutPlan | null>(null);
+  const [upgradePlan, setUpgradePlan] = React.useState<StripeCheckoutPlan | null>(null);
   const [downgradePlan, setDowngradePlan] = React.useState<StripeCheckoutPlan | "free" | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = React.useState(false);
   const [acting, setActing] = React.useState(false);
@@ -69,36 +70,16 @@ export function BillingSettings() {
     void loadBilling();
   }, [loadBilling]);
 
-  async function startCheckout(plan: StripeCheckoutPlan) {
-    if (!checkoutPlan) {
-      setCheckoutPlan(plan);
-      return;
-    }
-    setActing(true);
-    const res = await fetch("/api/billing/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: plan, confirmed: true }),
-    });
-    const json = (await res.json()) as { url?: string; error?: string; missingEnv?: string[] };
-    setActing(false);
-    if (!res.ok) {
-      toast.error(json.error ?? "Checkout unavailable");
-      if (json.missingEnv?.length) {
-        toast.info(`Missing: ${json.missingEnv.join(", ")}`);
-      }
-      return;
-    }
-    if (json.url) window.location.href = json.url;
-  }
-
   async function scheduleDowngrade(plan: StripeCheckoutPlan | "free") {
     if (downgradePlan !== plan) {
       setDowngradePlan(plan);
       return;
     }
     setActing(true);
-    const res = await fetch("/api/billing/downgrade", {
+    const downgradeUrl = paddleReady
+      ? "/api/billing/paddle/downgrade"
+      : "/api/billing/downgrade";
+    const res = await fetch(downgradeUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ planId: plan, confirmed: true }),
@@ -268,28 +249,17 @@ export function BillingSettings() {
 
           <div className="border-t border-border bg-surface/50 px-6 py-4 space-y-4">
             <p className="text-[13px] font-medium text-foreground">Upgrade</p>
-            <p className="text-[12px] text-muted-foreground">
-              Upgrades open Stripe Checkout after you confirm price and Build Credits allowance. Your new billing period starts when payment
-              succeeds.
-            </p>
+            <p className="text-[12px] text-muted-foreground">{UPGRADE_POLICY_COPY.upgradeSummary}</p>
             <div className="flex flex-wrap gap-2">
               {STRIPE_CHECKOUT_PLANS.map((p) => (
                 <Button
                   key={p}
-                  variant={checkoutPlan === p ? "accent" : "outline"}
+                  variant="outline"
                   size="sm"
-                  disabled={!stripeReady || acting || planId === p}
-                  onClick={() => void startCheckout(p)}
+                  disabled={!paddleReady || acting || planId === p}
+                  onClick={() => setUpgradePlan(p)}
                 >
-                  {checkoutPlan === p ? (
-                    <>
-                      <CheckCircle2 className="mr-1 size-3.5" /> Confirm → Stripe
-                    </>
-                  ) : (
-                    <>
-                      {PLAN_DISPLAY[p].name} · ${PLAN_DISPLAY[p].priceMonthlyUsd}/mo
-                    </>
-                  )}
+                  {PLAN_DISPLAY[p].name} · ${PLAN_DISPLAY[p].priceMonthlyUsd}/mo full price
                 </Button>
               ))}
             </div>
@@ -297,7 +267,7 @@ export function BillingSettings() {
               <>
                 <p className="text-[13px] font-medium pt-2">Downgrade or cancel</p>
                 <p className="text-[12px] text-muted-foreground">
-                  Downgrades keep your current plan until period end. Cancel stops renewal but paid access continues until{" "}
+                  {UPGRADE_POLICY_COPY.downgradeSummary} Cancel stops renewal but paid access continues until{" "}
                   {billing?.subscription?.currentPeriodEnd
                     ? new Date(billing.subscription.currentPeriodEnd).toLocaleDateString()
                     : "period end"}
@@ -337,6 +307,18 @@ export function BillingSettings() {
           </div>
         </div>
       </motion.div>
+      {upgradePlan && (
+        <PlanUpgradeModal
+          open
+          targetPlanId={upgradePlan}
+          onClose={() => setUpgradePlan(null)}
+          onSuccess={() => {
+            toast.success("Upgrade submitted — credits refresh after payment confirms.");
+            void loadBilling();
+            void refreshCredits({ reason: "manual", force: true });
+          }}
+        />
+      )}
     </motion.div>
   );
 }

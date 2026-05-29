@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useAuthStore } from "@/lib/stores/auth-store";
-import { DREAMOS_REF_STORAGE_KEY, persistReferralCodeForBrowser } from "@/lib/auth/ref-cookie";
+import { DREAMOS_REF_STORAGE_KEY } from "@/lib/auth/ref-cookie";
+import { captureReferralFromLocationSearch } from "@/lib/auth/oauth-prep";
 
 /**
  * Mounted globally. Persists ?ref= to cookie + localStorage so OAuth/email callback can attribute.
@@ -13,10 +14,7 @@ export function ReferralCapture() {
 
   React.useEffect(() => {
     try {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("ref");
-      if (!code?.trim()) return;
-      persistReferralCodeForBrowser(code);
+      captureReferralFromLocationSearch(window.location.search);
     } catch {
       /* ignore */
     }

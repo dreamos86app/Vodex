@@ -12,6 +12,8 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { buildAuthCallbackRedirectFromSearchParams } from "@/lib/auth/oauth-redirect";
+import { safeAuthReturnPath } from "@/lib/auth/oauth-prep";
+import { DREAMOS_REF_COOKIE } from "@/lib/auth/ref-cookie";
 import { classifyUrlHostname } from "@/lib/network/safe-fetch";
 
 const PROXY_AUTH_WARN_MS = 30_000;
@@ -87,6 +89,19 @@ const PROTECTED_PATHS = [
 
 /** Routes that should redirect authenticated users to home */
 const AUTH_PATHS = ["/auth/login", "/auth/signup", "/auth/sign-up", "/auth/waitlist"];
+
+function attachReferralCookieIfPresent(request: NextRequest, response: NextResponse): void {
+  const ref = request.nextUrl.searchParams.get("ref");
+  if (!ref?.trim()) return;
+  const code = ref.trim().toUpperCase();
+  if (code.length < 4 || code.length > 16) return;
+  response.cookies.set(DREAMOS_REF_COOKIE, encodeURIComponent(code), {
+    path: "/",
+    maxAge: 3600,
+    sameSite: "lax",
+    secure: request.nextUrl.protocol === "https:",
+  });
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
@@ -181,10 +196,13 @@ export async function proxy(request: NextRequest) {
   if (!user && PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     const loginUrl = new URL("/auth/login", request.url);
     const nextPath = `${pathname}${request.nextUrl.search}`;
-    loginUrl.searchParams.set("next", nextPath);
-    return NextResponse.redirect(loginUrl);
+    loginUrl.searchParams.set("next", safeAuthReturnPath(nextPath) ?? pathname);
+    const redirect = NextResponse.redirect(loginUrl);
+    attachReferralCookieIfPresent(request, redirect);
+    return redirect;
   }
 
+  attachReferralCookieIfPresent(request, supabaseResponse);
   return supabaseResponse;
 }
 

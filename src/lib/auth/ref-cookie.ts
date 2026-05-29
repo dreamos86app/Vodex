@@ -24,6 +24,7 @@ export function persistReferralCodeForBrowser(code: string): void {
   if (c.length < 4 || c.length > 16) return;
   try {
     window.localStorage.setItem(DREAMOS_REF_STORAGE_KEY, c);
+    window.sessionStorage.setItem("dreamos_referral_code", c);
   } catch {
     /* ignore */
   }

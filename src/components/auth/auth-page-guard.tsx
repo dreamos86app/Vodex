@@ -3,11 +3,10 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { safeAuthReturnPath } from "@/lib/auth/oauth-prep";
 
 function safeNextPath(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/create";
-  if (raw.startsWith("/auth")) return "/create";
-  return raw;
+  return safeAuthReturnPath(raw) ?? "/create";
 }
 
 /** Redirect signed-in users away from login/signup without signing them out. */

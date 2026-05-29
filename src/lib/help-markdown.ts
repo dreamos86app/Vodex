@@ -10,10 +10,75 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function isTableSeparatorRow(row: string): boolean {
+  return /^\|[\s\-:|]+\|$/.test(row.trim());
+}
+
+function parseTableRow(row: string): string[] {
+  return row
+    .trim()
+    .split("|")
+    .slice(1, -1)
+    .map((c) => c.trim());
+}
+
+function renderMarkdownTableBlock(tableLines: string[]): string {
+  if (tableLines.length < 2) return tableLines.join("\n");
+
+  const headerCells = parseTableRow(tableLines[0]);
+  const bodyStart = isTableSeparatorRow(tableLines[1]) ? 2 : 1;
+  const bodyRows = tableLines.slice(bodyStart).filter((line) => line.trim().startsWith("|"));
+
+  const th = headerCells
+    .map(
+      (cell, i) =>
+        `<th scope="col" class="help-doc-th ${i === 0 ? "help-doc-th-plan" : "help-doc-th-num"}">${cell}</th>`,
+    )
+    .join("");
+
+  const trs = bodyRows
+    .map((row) => {
+      const cells = parseTableRow(row);
+      return `<tr class="help-doc-tr">${cells
+        .map(
+          (cell, i) =>
+            `<td class="help-doc-td ${i === 0 ? "help-doc-td-plan" : "help-doc-td-num"}">${cell}</td>`,
+        )
+        .join("")}</tr>`;
+    })
+    .join("");
+
+  return `<div class="help-doc-table-wrap"><table class="help-doc-table"><thead><tr class="help-doc-tr">${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+
+function extractMarkdownTables(md: string): string {
+  const lines = md.split("\n");
+  const out: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    if (lines[i].trim().startsWith("|")) {
+      const block: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        block.push(lines[i]);
+        i += 1;
+      }
+      out.push(renderMarkdownTableBlock(block));
+      continue;
+    }
+    out.push(lines[i]);
+    i += 1;
+  }
+
+  return out.join("\n");
+}
+
 export function renderHelpMarkdown(md: string): string {
   const codeBlocks: string[] = [];
 
-  let text = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+  let text = extractMarkdownTables(md);
+
+  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
     const idx = codeBlocks.length;
     const safe = escapeHtml(code.trimEnd());
     codeBlocks.push(
@@ -40,17 +105,6 @@ export function renderHelpMarkdown(md: string): string {
   );
   text = text.replace(/^### (.+)$/gm, '<h3 class="mt-6 mb-2 text-base font-semibold text-foreground">$1</h3>');
   text = text.replace(/^#### (.+)$/gm, '<h4 class="mt-4 mb-2 text-sm font-semibold text-foreground">$1</h4>');
-
-  text = text.replace(/^\|(.+)\|$/gm, (row) => {
-    if (/^\|[\s\-:|]+\|$/.test(row)) return "";
-    const cells = row.split("|").slice(1, -1).map((c) => c.trim());
-    return `<tr>${cells.map((c) => `<td class="border border-border px-3 py-2 text-sm">${c}</td>`).join("")}</tr>`;
-  });
-  text = text.replace(
-    /(<tr>[\s\S]*?<\/tr>)/g,
-    (block) =>
-      `<div class="my-4 overflow-x-auto rounded-lg ring-1 ring-border"><table class="w-full border-collapse">${block}</table></div>`,
-  );
 
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>');
 

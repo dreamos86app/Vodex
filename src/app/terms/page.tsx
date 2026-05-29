@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PublicMarketingShell } from "@/components/marketing/public-marketing-shell";
+import { LegalDocumentShell } from "@/components/marketing/legal-document-shell";
 import { TermsContent } from "@/components/marketing/legal/terms-content";
 
 export const metadata: Metadata = {
@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <PublicMarketingShell>
+    <LegalDocumentShell>
       <TermsContent />
-    </PublicMarketingShell>
+    </LegalDocumentShell>
   );
 }

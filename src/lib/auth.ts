@@ -10,11 +10,23 @@ import { getAppUrl } from "@/lib/app-url";
 import { CONNECTION_SETUP_USER_MESSAGE } from "@/lib/network/ssl-diagnostics-store";
 import {
   getCallbackUrl as buildCallbackUrl,
+  getCanonicalOAuthCallbackUrl,
   getPasswordResetUrl as buildPasswordResetUrl,
 } from "@/lib/auth/oauth-redirect";
+import { prepareClientOAuthSignIn } from "@/lib/auth/oauth-prep";
 
 export { getAppUrl } from "@/lib/app-url";
-export { getCallbackUrl, getPasswordResetUrl, getOAuthBaseUrl } from "@/lib/auth/oauth-redirect";
+export {
+  getCallbackUrl,
+  getCanonicalOAuthCallbackUrl,
+  getPasswordResetUrl,
+  getOAuthBaseUrl,
+} from "@/lib/auth/oauth-redirect";
+export {
+  safeAuthReturnPath,
+  prepareClientOAuthSignIn,
+  captureReferralFromLocationSearch,
+} from "@/lib/auth/oauth-prep";
 
 export async function authSignIn(email: string, password: string) {
   return createClient().auth.signInWithPassword({ email, password });
@@ -30,14 +42,24 @@ export async function authSignUp(
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: buildCallbackUrl(),
+      emailRedirectTo: getCanonicalOAuthCallbackUrl(),
     },
   });
 }
 
-export async function authSignInWithOAuth(provider: "google" | "github", next?: string) {
+export type OAuthSignInOptions = {
+  /** Relative in-app path only (e.g. /create). Referral codes use cookies, not redirectTo. */
+  returnTo?: string | null;
+};
+
+export async function authSignInWithOAuth(
+  provider: "google" | "github",
+  options?: OAuthSignInOptions | string | null,
+) {
   const client = createClient();
-  const redirectTo = buildCallbackUrl(next);
+  const returnTo =
+    typeof options === "string" ? options : (options?.returnTo ?? null);
+  const { redirectTo } = prepareClientOAuthSignIn(returnTo, provider);
 
   if (provider === "google") {
     return client.auth.signInWithOAuth({
@@ -205,7 +227,7 @@ export function humanizeAuthError(
             : provider === "github"
               ? "GitHub"
               : "OAuth";
-        return `${name} sign-in failed (unsupported provider). Check Supabase Auth URL config includes ${buildCallbackUrl()} and matches this origin.`;
+        return `${name} sign-in failed (unsupported provider). Check Supabase Auth URL config includes ${getCanonicalOAuthCallbackUrl()} and matches this origin.`;
       }
       if (replacement === "__CONNECTION_SETUP__") {
         return CONNECTION_SETUP_USER_MESSAGE;

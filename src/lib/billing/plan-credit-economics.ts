@@ -119,8 +119,10 @@ export function monthlyActionCreditsForPlan(plan: string | null | undefined): nu
 export type PlanPricingCardCopy = {
   buildCredits: number;
   actionCredits: number;
+  /** Single-line hero label for the pricing card. */
   buildPill: string;
-  actionLine: string;
+  /** Short description under Action Credits at card bottom. */
+  actionBlurb: string;
   taglineBuildFeature: string;
 };
 
@@ -128,23 +130,23 @@ export function planPricingCardCopy(plan: string | null | undefined): PlanPricin
   const id = normalizePlanId(plan ?? "free") as PlanId;
   const buildCredits = BUILD_CREDITS_BY_PLAN[id];
   const actionCredits = ACTION_CREDITS_BY_PLAN[id];
-  const buildPill = `${buildCredits.toLocaleString()} Build Credits / mo`;
+  const buildPill = `${buildCredits.toLocaleString()}\u00a0Build\u00a0Credits\u00a0/\u00a0mo`;
 
-  const actionLineByPlan: Record<PlanId, string> = {
-    free: `Includes ${actionCredits} Action Credits for light AI/email tests`,
-    starter: `Includes ${actionCredits.toLocaleString()} Action Credits for AI, email & media`,
-    pro: `Includes ${actionCredits.toLocaleString()} Action Credits for runtime AI, email & media`,
-    business: `Includes ${actionCredits.toLocaleString()} Action Credits for runtime AI, email & media`,
-    infinity: `Includes ${actionCredits.toLocaleString()} Action Credits for higher-volume AI, email & media`,
-    enterprise: `Includes ${actionCredits.toLocaleString()} Action Credits for higher-volume AI, email & media`,
+  const actionBlurbByPlan: Record<PlanId, string> = {
+    free: "For light AI, email, and media tests in live apps.",
+    starter: "For AI, email, and media when your apps are live.",
+    pro: "For runtime AI, email, and media in production apps.",
+    business: "For runtime AI, email, and media in production apps.",
+    infinity: "For higher-volume runtime AI, email, and media.",
+    enterprise: "For higher-volume runtime AI, email, and media.",
   };
 
   return {
     buildCredits,
     actionCredits,
     buildPill,
-    actionLine: actionLineByPlan[id],
-    taglineBuildFeature: `${buildCredits} Build Credits / month`,
+    actionBlurb: actionBlurbByPlan[id],
+    taglineBuildFeature: `${buildCredits.toLocaleString()} Build Credits / month`,
   };
 }
 

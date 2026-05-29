@@ -3,13 +3,14 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
-  Check, X, ChevronDown, ChevronUp, Zap, Sparkles,
+  Check, X, ChevronDown, ChevronUp, Zap, Sparkles, Activity,
   Building2, ArrowRight, MessageCircle, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { useAppearanceStore } from "@/lib/stores/appearance-store";
 import { variants } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,7 +95,15 @@ const FAQS = [
   },
   {
     q: "Can I change my plan at any time?",
-    a: "Yes. You can upgrade or downgrade your plan at any time. Upgrades take effect immediately, with prorated billing for the rest of your period. Downgrades apply at the next renewal.",
+    a: "Yes. You can upgrade or downgrade your plan at any time. Upgrades start a new billing cycle immediately: you pay the full new plan price today, your renewal date resets, and your monthly Build Credits and Action Credits refresh to the new plan allowance. Downgrades apply at your next renewal.",
+  },
+  {
+    q: "Do upgrades use prorated billing?",
+    a: "No. Plan upgrades are not prorated. When you upgrade, you start a new billing cycle and receive the full credit allowance for the new plan. This keeps pricing simple and prevents unexpected credit abuse.",
+  },
+  {
+    q: "Do unused credits carry over when I upgrade?",
+    a: "Monthly plan credits do not stack or roll over when upgrading. Your new plan starts fresh with its full Build Credit and Action Credit allowance. Purchased credit packs or admin-granted bonus credits may remain separate if applicable.",
   },
   {
     q: "What happens when I run out of credits?",
@@ -120,7 +129,23 @@ const FAQS = [
     q: "Can I cancel anytime?",
     a: "Absolutely. You can cancel your subscription at any time. Your plan stays active until the end of the current billing period, then reverts to Free. No lock-ins, no cancellation fees.",
   },
+  {
+    q: "What is your refund policy?",
+    a: "refund-policy-link",
+  },
 ];
+
+const FAQ_REFUND_ANSWER = (
+  <>
+    DreamOS86 subscriptions may qualify for a refund within a limited window after purchase. Build Credits and Action
+    Credits are generally not refundable once consumed. Generated-app payments follow your connected processor&apos;s
+    rules.{" "}
+    <Link href="/refunds" className="font-medium text-accent hover:underline underline-offset-2">
+      Read the full Refund Policy
+    </Link>
+    .
+  </>
+);
 
 // ─── Cell helper ──────────────────────────────────────────────────────────────
 
@@ -132,7 +157,7 @@ function Cell({ value }: { value: string | boolean }) {
 
 // ─── FAQ item ─────────────────────────────────────────────────────────────────
 
-function FaqItem({ q, a }: { q: string; a: string }) {
+function FaqItem({ q, a }: { q: string; a: React.ReactNode }) {
   const [open, setOpen] = React.useState(false);
   return (
     <div className="border-b border-border/60 last:border-b-0">
@@ -153,7 +178,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <p className="px-1 pb-4 text-[13.5px] leading-relaxed text-muted-foreground">{a}</p>
+            <div className="px-1 pb-4 text-[13.5px] leading-relaxed text-muted-foreground">{a}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -396,7 +421,8 @@ interface PlanCardProps {
   annualPrice?: number | null;
   annual: boolean;
   credits: string;
-  actionCreditsLine?: string;
+  actionCredits?: number;
+  actionCreditsBlurb?: string;
   tagline: string;
   features: string[];
   notIncluded?: string[];
@@ -406,11 +432,13 @@ interface PlanCardProps {
   currentPlanId?: string | null;
   children?: React.ReactNode;
   ctaOnClick?: () => void;
+  /** Slightly tighter card when the app sidebar is expanded */
+  compact?: boolean;
 }
 
 function PlanCard({
-  id, name, price, annualPrice, annual, credits, actionCreditsLine, tagline, features, notIncluded = [],
-  highlight, badge, cta, currentPlanId, children, ctaOnClick,
+  id, name, price, annualPrice, annual, credits, actionCredits, actionCreditsBlurb, tagline, features,
+  notIncluded = [], highlight, badge, cta, currentPlanId, children, ctaOnClick, compact,
 }: PlanCardProps) {
   const isCurrent = currentPlanId === id;
   const displayPrice = annual && annualPrice != null ? annualPrice : price;
@@ -420,7 +448,7 @@ function PlanCard({
     <motion.div
       variants={variants.fadeUp}
       className={cn(
-        "relative flex flex-col rounded-[var(--radius-xl)] ring-1 overflow-hidden",
+        "relative flex h-full flex-col rounded-[var(--radius-xl)] ring-1 overflow-hidden",
         highlight
           ? "bg-gradient-to-b from-accent/8 via-background to-background ring-accent/40 shadow-[0_0_0_1px_hsl(var(--accent)/0.15),0_12px_40px_-8px_hsl(var(--accent)/0.25)]"
           : "bg-background ring-border",
@@ -436,18 +464,30 @@ function PlanCard({
           </span>
         </div>
       )}
-      <div className="flex flex-col gap-4 p-6">
+      <div className={cn("flex flex-1 flex-col gap-4 p-6", compact && "gap-3.5 p-5")}>
         {/* Header */}
         <div>
           <p className="text-[13px] font-semibold text-muted-foreground">{name}</p>
           <div className="mt-1 flex items-end gap-1.5">
             {price === 0 ? (
-              <span className="text-[32px] font-bold tracking-tight text-foreground leading-none">Free</span>
+              <span
+                className={cn(
+                  "font-bold tracking-tight text-foreground leading-none",
+                  compact ? "text-[28px]" : "text-[32px]",
+                )}
+              >
+                Free
+              </span>
             ) : price === null ? (
               <span className="text-[24px] font-bold tracking-tight text-foreground leading-none">Custom</span>
             ) : (
               <>
-                <span className="text-[32px] font-bold tracking-tight text-foreground leading-none">
+                <span
+                  className={cn(
+                    "font-bold tracking-tight text-foreground leading-none",
+                    compact ? "text-[28px]" : "text-[32px]",
+                  )}
+                >
                   ${displayPrice}
                 </span>
                 {originalPrice !== null && originalPrice !== displayPrice && (
@@ -459,31 +499,36 @@ function PlanCard({
               </>
             )}
           </div>
-          {annual && price !== null && price !== 0 && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Billed annually ({20}% off)
+          {annual ? (
+            <p
+              className={cn(
+                "mt-0.5 min-h-[1.125rem] text-[11px] leading-snug",
+                price !== null && price !== 0 ? "text-muted-foreground" : "text-muted-foreground/75",
+              )}
+            >
+              {price !== null && price !== 0
+                ? `Billed annually (${Math.round(ANNUAL_DISCOUNT * 100)}% off)`
+                : "Always free — no annual billing"}
             </p>
-          )}
+          ) : null}
           <p className="mt-2 text-[11.5px] text-muted-foreground leading-snug">{tagline}</p>
         </div>
 
-        {/* Credits pill */}
-        <div className="flex flex-col gap-1 rounded-xl bg-accent/8 px-3 py-2 ring-1 ring-accent/15">
-          <div className="flex items-center gap-2">
+        {/* Build Credits pill — single line */}
+        <div className="rounded-xl bg-accent/8 px-3 py-2.5 ring-1 ring-accent/15">
+          <div className="flex min-w-0 items-center gap-2">
             <Zap className="size-3.5 shrink-0 text-accent" strokeWidth={2} />
-            <span className="text-[12px] font-semibold text-accent">{credits}</span>
+            <span
+              className={cn(
+                "whitespace-nowrap font-semibold leading-none text-accent",
+                compact ? "text-[10.5px]" : "text-[11px] sm:text-[12px]",
+              )}
+            >
+              {credits}
+            </span>
           </div>
-          {actionCreditsLine ? (
-            <p className="text-[10.5px] leading-snug text-muted-foreground pl-5">
-              {actionCreditsLine}{" "}
-              <Link href="/help/docs/how-credits-work" className="text-accent/80 hover:text-accent underline-offset-2 hover:underline">
-                What are Action Credits?
-              </Link>
-            </p>
-          ) : null}
         </div>
 
-        {/* Children (Infinity dropdown) */}
         {children}
 
         {/* CTA */}
@@ -520,7 +565,7 @@ function PlanCard({
         })()}
 
         {/* Features */}
-        <div className="space-y-2">
+        <div className="flex-1 space-y-2">
           {features.map((f) => (
             <div key={f} className="flex items-start gap-2">
               <Check className="size-3.5 mt-0.5 shrink-0 text-positive" strokeWidth={2.5} />
@@ -534,6 +579,30 @@ function PlanCard({
             </div>
           ))}
         </div>
+
+        {actionCredits != null && actionCreditsBlurb ? (
+          <div className="mt-auto rounded-xl border border-border/80 bg-surface/50 px-3.5 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Activity className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Action Credits
+                </span>
+              </div>
+              <Link
+                href="/help/docs/how-credits-work"
+                className="shrink-0 text-[10px] font-medium text-accent hover:underline underline-offset-2"
+              >
+                What are these?
+              </Link>
+            </div>
+            <p className="mt-2 whitespace-nowrap text-[17px] font-bold leading-none tracking-tight text-foreground tabular-nums">
+              {actionCredits.toLocaleString()}
+              <span className="text-[12px] font-medium text-muted-foreground"> / mo</span>
+            </p>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{actionCreditsBlurb}</p>
+          </div>
+        ) : null}
       </div>
     </motion.div>
   );
@@ -719,8 +788,26 @@ function InfinityDropdown({
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 
+const pricingPageReveal = {
+  hidden: { opacity: 0, y: 20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] as const },
+  },
+} as const;
+
+const pricingSectionStagger = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.07, delayChildren: 0.06 },
+  },
+} as const;
+
 export function PricingView() {
   const { profile } = useAuthStore();
+  const sidebarCollapsed = useAppearanceStore((s) => s.sidebarCollapsed);
+  const reduceMotion = useReducedMotion();
   const [annual, setAnnual] = React.useState(false);
   const [infTier, setInfTier] = React.useState<InfinityTier>(INFINITY_TIERS[0]);
   const [contactOpen, setContactOpen] = React.useState(false);
@@ -746,15 +833,20 @@ export function PricingView() {
   const starterAnnual = Math.round(starterMonthly * (1 - ANNUAL_DISCOUNT));
   const proAnnual = Math.round(proMonthly * (1 - ANNUAL_DISCOUNT));
 
+  const pageMotion = reduceMotion
+    ? { initial: false, animate: false }
+    : { initial: "hidden" as const, animate: "show" as const };
+
   return (
     <>
-    <div className="mx-auto max-w-6xl px-4 py-12 space-y-20">
-
+    <motion.div
+      {...pageMotion}
+      variants={pricingPageReveal}
+      className="mx-auto max-w-6xl px-4 py-12 space-y-20"
+    >
       {/* Hero */}
       <motion.div
-        variants={variants.staggerContainer}
-        initial="hidden"
-        animate="show"
+        variants={reduceMotion ? undefined : pricingSectionStagger}
         className="text-center space-y-4"
       >
         <motion.div variants={variants.fadeUp}>
@@ -792,21 +884,24 @@ export function PricingView() {
         </motion.div>
       </motion.div>
 
-      {/* Plan cards */}
+      {/* Plan cards — always 4 across on lg+; compact padding when sidebar is expanded */}
       <motion.div
-        variants={variants.staggerContainer}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        variants={reduceMotion ? undefined : pricingSectionStagger}
+        className={cn(
+          "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4",
+          !sidebarCollapsed && "lg:gap-3",
+        )}
       >
         <PlanCard
           id="free"
           name="Free"
           price={0}
           annual={annual}
+          compact={!sidebarCollapsed}
           credits={planPricingCardCopy("free").buildPill}
-          actionCreditsLine={planPricingCardCopy("free").actionLine}
-          tagline="Start building for free. No card required."
+          actionCredits={planPricingCardCopy("free").actionCredits}
+          actionCreditsBlurb={planPricingCardCopy("free").actionBlurb}
+          tagline="Start free — no card required."
           features={[
             planPricingCardCopy("free").taglineBuildFeature,
             "3 active projects",
@@ -830,8 +925,10 @@ export function PricingView() {
           price={starterMonthly}
           annualPrice={starterAnnual}
           annual={annual}
+          compact={!sidebarCollapsed}
           credits={planPricingCardCopy("starter").buildPill}
-          actionCreditsLine={planPricingCardCopy("starter").actionLine}
+          actionCredits={planPricingCardCopy("starter").actionCredits}
+          actionCreditsBlurb={planPricingCardCopy("starter").actionBlurb}
           tagline="For individuals shipping real products."
           features={[
             planPricingCardCopy("starter").taglineBuildFeature,
@@ -854,8 +951,10 @@ export function PricingView() {
           price={proMonthly}
           annualPrice={proAnnual}
           annual={annual}
+          compact={!sidebarCollapsed}
           credits={planPricingCardCopy("pro").buildPill}
-          actionCreditsLine={planPricingCardCopy("pro").actionLine}
+          actionCredits={planPricingCardCopy("pro").actionCredits}
+          actionCreditsBlurb={planPricingCardCopy("pro").actionBlurb}
           tagline="For teams building production apps."
           highlight
           badge="Most Popular"
@@ -879,15 +978,19 @@ export function PricingView() {
           name="Infinity"
           price={tierPrice(infTier, annual)}
           annual={annual}
+          compact={!sidebarCollapsed}
           credits={
             infTier.id === "inf-1"
               ? planPricingCardCopy("infinity").buildPill
-              : `${infTier.credits.toLocaleString()} Build Credits / mo`
+              : `${infTier.credits.toLocaleString()}\u00a0Build\u00a0Credits\u00a0/\u00a0mo`
           }
-          actionCreditsLine={
-            infTier.id === "inf-1" ? planPricingCardCopy("infinity").actionLine : undefined
+          actionCredits={
+            infTier.id === "inf-1" ? planPricingCardCopy("infinity").actionCredits : undefined
           }
-          tagline="For power teams that need unlimited scale."
+          actionCreditsBlurb={
+            infTier.id === "inf-1" ? planPricingCardCopy("infinity").actionBlurb : undefined
+          }
+          tagline="For power teams at any scale."
           features={[
             infTier.id === "inf-1"
               ? planPricingCardCopy("infinity").taglineBuildFeature
@@ -915,9 +1018,7 @@ export function PricingView() {
       {/* Custom plan banner */}
       <motion.div
         id="contact"
-        variants={variants.fadeUp}
-        initial="hidden"
-        animate="show"
+        variants={reduceMotion ? undefined : variants.fadeUp}
         className="scroll-mt-24 rounded-[var(--radius-xl)] bg-gradient-to-r from-accent/8 via-background to-violet-500/8 ring-1 ring-border px-8 py-8"
       >
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -951,7 +1052,7 @@ export function PricingView() {
       </motion.div>
 
       {/* Comparison table */}
-      <motion.div variants={variants.fadeUp} initial="hidden" animate="show">
+      <motion.div variants={reduceMotion ? undefined : variants.fadeUp}>
         <h2 className="text-[22px] font-bold tracking-tight text-foreground mb-6 text-center">Compare plans</h2>
         <div className="overflow-x-auto rounded-[var(--radius-xl)] ring-1 ring-border">
           <table className="w-full min-w-[600px] text-center text-[13px]">
@@ -981,16 +1082,24 @@ export function PricingView() {
       </motion.div>
 
       {/* FAQ */}
-      <motion.div variants={variants.fadeUp} initial="hidden" animate="show">
+      <motion.div variants={reduceMotion ? undefined : variants.fadeUp}>
         <h2 className="text-[22px] font-bold tracking-tight text-foreground mb-6 text-center">Frequently asked questions</h2>
         <div className="mx-auto max-w-2xl rounded-[var(--radius-xl)] bg-background ring-1 ring-border px-6 divide-y divide-border/50">
           {FAQS.map((faq) => (
-            <FaqItem key={faq.q} q={faq.q} a={faq.a} />
+            <FaqItem
+              key={faq.q}
+              q={faq.q}
+              a={faq.a === "refund-policy-link" ? FAQ_REFUND_ANSWER : faq.a}
+            />
           ))}
         </div>
       </motion.div>
 
       <p className="mt-10 text-center text-[11px] text-muted-foreground">
+        <Link href="/help/docs/policies" className="hover:underline underline-offset-4">
+          Policies
+        </Link>
+        {" · "}
         <Link href="/terms" className="hover:underline underline-offset-4">
           Terms
         </Link>
@@ -1004,7 +1113,7 @@ export function PricingView() {
         </Link>
       </p>
 
-    </div>
+    </motion.div>
 
     <SubscriptionsLockedModal
       open={paidLockedOpen}

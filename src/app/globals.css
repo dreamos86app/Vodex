@@ -335,3 +335,120 @@ body {
   overflow-x: hidden;
   max-width: 100%;
 }
+
+/* Help Center — aligned data tables (plan credits, comparisons) */
+.help-doc-table-wrap {
+  margin: 1rem 0 1.25rem;
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
+}
+
+.help-doc-table {
+  width: 100%;
+  min-width: 20rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.help-doc-th,
+.help-doc-td {
+  padding: 0.625rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.help-doc-th {
+  font-weight: 600;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+  text-align: left;
+}
+
+.help-doc-th-num,
+.help-doc-td-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.help-doc-th-plan,
+.help-doc-td-plan {
+  width: 28%;
+  text-align: left;
+}
+
+.help-doc-tr:last-child .help-doc-td {
+  border-bottom: none;
+}
+
+.help-doc-td {
+  color: var(--muted-foreground);
+}
+
+.help-doc-td-plan {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+/* Help Center — soft blue wash top → white bottom (full scroll height) */
+.help-page-shell {
+  isolation: isolate;
+}
+
+.help-page-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% -15%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 72%),
+    radial-gradient(ellipse 80% 55% at 10% 5%, color-mix(in oklab, #93c5fd 12%, transparent), transparent 68%),
+    radial-gradient(ellipse 70% 50% at 95% 8%, color-mix(in oklab, #a5b4fc 8%, transparent), transparent 65%),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--accent) 10%, #f0f5ff) 0%,
+      color-mix(in oklab, var(--accent) 5%, var(--background)) 22%,
+      color-mix(in oklab, var(--accent) 2%, var(--background)) 48%,
+      var(--background) 78%,
+      var(--background) 100%
+    );
+}
+
+.dark .help-page-glow {
+  background:
+    radial-gradient(ellipse 120% 70% at 50% -15%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 74%),
+    radial-gradient(ellipse 80% 55% at 8% 8%, color-mix(in oklab, #4d8dff 14%, transparent), transparent 70%),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--accent) 14%, #0c1220) 0%,
+      color-mix(in oklab, var(--accent) 6%, var(--background)) 28%,
+      var(--background) 72%,
+      var(--background) 100%
+    );
+}
+
+.help-welcome-strip {
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent) 9%, var(--background)) 0%,
+    color-mix(in oklab, var(--background) 92%, white) 45%,
+    var(--background) 100%
+  );
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 80%, transparent) inset,
+    0 8px 32px -12px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+.dark .help-welcome-strip {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent) 12%, var(--background)) 0%,
+    var(--background) 100%
+  );
+  box-shadow: 0 8px 32px -12px color-mix(in oklab, var(--accent) 35%, transparent);
+}

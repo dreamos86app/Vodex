@@ -96,6 +96,18 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
     title: "Help Center",
     subtitle: "Guides, docs, and support resources.",
   },
+  "/terms": {
+    title: "Terms of Service",
+    subtitle: "Platform terms and acceptable use.",
+  },
+  "/privacy": {
+    title: "Privacy Policy",
+    subtitle: "How we collect and protect your data.",
+  },
+  "/refunds": {
+    title: "Refund Policy",
+    subtitle: "Subscriptions, credits, and refunds.",
+  },
   "/changelog": {
     title: "Changelog",
     subtitle: "What's new in DreamOS86.",

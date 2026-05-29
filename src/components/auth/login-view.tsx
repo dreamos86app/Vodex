@@ -12,6 +12,7 @@ import { variants } from "@/lib/motion";
 import {
   authSignIn,
   authSignInWithOAuth,
+  safeAuthReturnPath,
   humanizeAuthError,
   humanizeLoginError,
   humanizeCallbackError,
@@ -26,8 +27,7 @@ export function LoginView() {
   const searchParams = useSearchParams();
 
   function safeInternalPath(raw: string | null): string {
-    if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
-    return raw;
+    return safeAuthReturnPath(raw) ?? "/";
   }
 
   const [showPassword, setShowPassword] = React.useState(false);
@@ -153,10 +153,8 @@ export function LoginView() {
     setOauthLoading(provider);
     setError(null);
     setAccountExistsHint(false);
-    logAuthEvent("oauth_started", { provider });
-
-    const next = searchParams.get("next") ?? undefined;
-    const { error: oauthError } = await authSignInWithOAuth(provider, next);
+    const returnTo = safeAuthReturnPath(searchParams.get("next"));
+    const { error: oauthError } = await authSignInWithOAuth(provider, { returnTo });
 
     if (oauthError) {
       const msg = humanizeAuthError(oauthError.message, provider);

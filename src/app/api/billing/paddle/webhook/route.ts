@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { verifyPaddleWebhookSignature } from "@/lib/billing/paddle-api";
-import { handlePaddleSubscriptionEvent } from "@/lib/billing/paddle-webhook-handlers";
+import {
+  handlePaddleSubscriptionEvent,
+  handlePaddleTransactionCompleted,
+} from "@/lib/billing/paddle-webhook-handlers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +31,13 @@ export async function POST(request: Request) {
   const eventType = payload.event_type ?? "";
   const eventId = payload.event_id ?? `paddle:${Date.now()}`;
   const data = payload.data ?? {};
+
+  if (eventType === "transaction.completed") {
+    await handlePaddleTransactionCompleted({
+      data,
+      paddleEventId: eventId,
+    });
+  }
 
   if (eventType.startsWith("subscription.")) {
     await handlePaddleSubscriptionEvent({

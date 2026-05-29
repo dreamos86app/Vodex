@@ -18,50 +18,29 @@ import {
   Check,
   Play,
   AlertCircle,
-  KeyRound,
-  Database,
-  Wallet,
-  Globe,
   Smartphone,
+  Sparkles,
+  KeyRound,
+  Scale,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { variants } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import { getDocsByCategory } from "@/lib/docs";
+import { getDocsByCategory, type DocArticle } from "@/lib/docs";
 import { searchHelpArticles } from "@/lib/help-search";
 
-const QUICK_SETUP = [
-  {
-    icon: KeyRound,
-    label: "OAuth setup",
-    description: "Google, GitHub, callback URLs",
-    href: "/help/docs/oauth-setup",
-  },
-  {
-    icon: Database,
-    label: "Supabase setup",
-    description: "Project, keys, redirect URLs",
-    href: "/help/docs/supabase-setup",
-  },
-  {
-    icon: Wallet,
-    label: "Payments setup",
-    description: "Stripe, webhooks, compliance",
-    href: "/help/docs/payments-providers",
-  },
-  {
-    icon: Globe,
-    label: "Publishing setup",
-    description: "Deploy, domains, env vars",
-    href: "/help/docs/deployment",
-  },
-  {
-    icon: Smartphone,
-    label: "Mobile app setup",
-    description: "Play Store, TWA, wrapping",
-    href: "/help/docs/play-store-setup",
-  },
+const CATEGORY_ORDER = [
+  "Getting Started",
+  "AI Modes",
+  "Integrations",
+  "Billing",
+  "Deployment",
+  "Configuration",
+  "Mobile Publishing",
+  "ZIP Imports",
+  "Policies",
+  "FAQ",
 ] as const;
 
 const CATEGORY_ICONS: Record<string, typeof Rocket> = {
@@ -73,8 +52,79 @@ const CATEGORY_ICONS: Record<string, typeof Rocket> = {
   Configuration: BookOpen,
   "Mobile Publishing": Smartphone,
   "ZIP Imports": BookOpen,
+  Policies: Shield,
   FAQ: MessageSquare,
 };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  Policies: "Policies & legal",
+};
+
+/** External legal pages — listed under Policies like other doc links */
+const POLICY_EXTERNAL_LINKS = [
+  { label: "Terms of Service", href: "/terms" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Refund Policy", href: "/refunds" },
+] as const;
+
+const POPULAR_GUIDES = [
+  { label: "Getting started", href: "/help/docs/getting-started", icon: Rocket },
+  { label: "How credits work", href: "/help/docs/how-credits-work", icon: CreditCard },
+  { label: "OAuth setup", href: "/help/docs/oauth-setup", icon: KeyRound },
+  { label: "Policies & legal", href: "/help/docs/policies", icon: Scale },
+] as const;
+
+function HelpWelcomeStrip() {
+  return (
+    <section className="help-welcome-strip relative overflow-hidden rounded-2xl px-5 py-5 sm:px-6 sm:py-6">
+      <div
+        className="pointer-events-none absolute -right-12 -top-10 size-40 rounded-full bg-accent/20 blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -bottom-8 left-1/4 size-28 rounded-full bg-sky-300/15 blur-2xl"
+        aria-hidden
+      />
+
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="max-w-md text-left">
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-0.5 text-[11px] font-semibold text-accent ring-1 ring-accent/15">
+            <Sparkles className="size-3" strokeWidth={2} />
+            Popular guides
+          </div>
+          <p className="text-[15px] font-medium leading-snug text-foreground">
+            New here? Start with a guide, or browse every topic below.
+          </p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            Docs for building apps, credits, integrations, and publishing — all in one place.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 sm:max-w-sm sm:justify-end">
+          {POPULAR_GUIDES.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="inline-flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1.5 text-[12px] font-medium text-foreground ring-1 ring-border/80 shadow-sm transition hover:bg-background hover:ring-accent/30"
+              >
+                <Icon className="size-3.5 text-accent" strokeWidth={1.75} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function orderedDocCategories(byCategory: Record<string, DocArticle[]>) {
+  return CATEGORY_ORDER.filter((cat) => byCategory[cat]?.length).map(
+    (cat) => [cat, byCategory[cat]!] as const,
+  );
+}
 
 type TicketForm = {
   subject: string;
@@ -112,9 +162,9 @@ function ContactSupport() {
 
   if (success) {
     return (
-      <div className="flex flex-col items-center py-8 text-center">
-        <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-positive/10 ring-1 ring-positive/20">
-          <Check className="size-6 text-positive" strokeWidth={2} />
+      <div className="flex flex-col items-center py-6 text-center">
+        <div className="mb-2 flex size-10 items-center justify-center rounded-full bg-positive/10 ring-1 ring-positive/20">
+          <Check className="size-5 text-positive" strokeWidth={2} />
         </div>
         <p className="text-sm font-semibold text-foreground">Ticket submitted</p>
         <p className="mt-1 text-xs text-muted-foreground">We&apos;ll get back to you within 24 hours.</p>
@@ -124,7 +174,7 @@ function ContactSupport() {
             setSuccess(false);
             setForm({ subject: "", body: "", category: "general" });
           }}
-          className="mt-4 text-xs text-accent hover:underline underline-offset-2"
+          className="mt-3 text-xs text-accent hover:underline underline-offset-2"
         >
           Submit another ticket
         </button>
@@ -133,7 +183,7 @@ function ContactSupport() {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-3">
       {error && (
         <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive ring-1 ring-destructive/20">
           <AlertCircle className="size-3.5 shrink-0" />
@@ -141,7 +191,7 @@ function ContactSupport() {
         </div>
       )}
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <label className="text-xs font-medium text-foreground">Category</label>
         <select
           value={form.category}
@@ -156,7 +206,7 @@ function ContactSupport() {
         </select>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <label className="text-xs font-medium text-foreground">Subject</label>
         <Input
           placeholder="Brief description of your issue"
@@ -166,13 +216,13 @@ function ContactSupport() {
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <label className="text-xs font-medium text-foreground">Details</label>
         <textarea
           placeholder="Describe your issue in detail…"
           value={form.body}
           onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
-          rows={5}
+          rows={4}
           required
           className="w-full resize-none rounded-[var(--radius-md)] bg-surface px-3 py-2 text-sm text-foreground ring-1 ring-border outline-none focus:ring-accent/40"
         />
@@ -192,22 +242,73 @@ function ContactSupport() {
   );
 }
 
-function HelpAmbientBackground({ reducedMotion }: { reducedMotion: boolean }) {
-  if (reducedMotion) {
+function DocRow({
+  href,
+  label,
+  external,
+}: {
+  href: string;
+  label: string;
+  external?: boolean;
+}) {
+  const className =
+    "flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] text-muted-foreground transition hover:bg-muted/40 hover:text-foreground";
+  const content = (
+    <>
+      <ChevronRight className="size-3 shrink-0 opacity-50" strokeWidth={2} />
+      {label}
+    </>
+  );
+  if (external) {
     return (
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-accent/8 to-transparent"
-      />
+      <a href={href} className={className}>
+        {content}
+      </a>
     );
   }
+  return (
+    <Link href={href} className={className}>
+      {content}
+    </Link>
+  );
+}
+
+function CategoryCard({
+  cat,
+  docs,
+  externalLinks = [],
+}: {
+  cat: string;
+  docs: DocArticle[];
+  externalLinks?: readonly { label: string; href: string }[];
+}) {
+  const Icon = CATEGORY_ICONS[cat] ?? BookOpen;
+  const isBilling = cat === "Billing";
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden">
-      <div className="help-ambient-orb help-ambient-orb-a absolute -left-20 top-8 size-56 rounded-full bg-violet-500/20 blur-3xl" />
-      <div className="help-ambient-orb help-ambient-orb-b absolute -right-16 top-12 size-48 rounded-full bg-accent/15 blur-3xl" />
-      <div className="absolute inset-0 bg-gradient-to-b from-accent/5 via-transparent to-transparent" />
-    </div>
+    <article
+      className={cn(
+        "rounded-[var(--radius-lg)] bg-background p-4 ring-1 ring-border",
+        isBilling && "sm:col-span-2",
+      )}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <Icon className="size-4 text-accent" strokeWidth={1.75} />
+        <h3 className="text-[13px] font-semibold text-foreground">{CATEGORY_LABELS[cat] ?? cat}</h3>
+      </div>
+      <ul className={cn("space-y-0", isBilling && "sm:columns-2 sm:gap-x-6 [&>li]:break-inside-avoid")}>
+        {docs.map((doc) => (
+          <li key={doc.slug}>
+            <DocRow href={`/help/docs/${doc.slug}`} label={doc.title} />
+          </li>
+        ))}
+        {externalLinks.map((link) => (
+          <li key={link.href}>
+            <DocRow href={link.href} label={link.label} external />
+          </li>
+        ))}
+      </ul>
+    </article>
   );
 }
 
@@ -215,6 +316,7 @@ export function HelpView() {
   const [search, setSearch] = React.useState("");
   const reduceMotion = useReducedMotion();
   const byCategory = React.useMemo(() => getDocsByCategory(), []);
+  const categories = React.useMemo(() => orderedDocCategories(byCategory), [byCategory]);
   const searchHits = React.useMemo(
     () => (search.trim() ? searchHelpArticles(search, 10) : []),
     [search],
@@ -223,57 +325,54 @@ export function HelpView() {
   const showSearchResults = search.trim().length > 0;
 
   return (
-    <div className="relative mx-auto max-w-4xl pb-16">
-      <HelpAmbientBackground reducedMotion={!!reduceMotion} />
+    <div className="help-page-shell relative -mx-[var(--page-padding-x)] min-h-full px-[var(--page-padding-x)] pb-14 pt-1">
+      <div className="help-page-glow" aria-hidden />
 
-      <motion.div
-        variants={variants.staggerContainer}
-        initial={reduceMotion ? false : "hidden"}
-        animate="show"
-        className="relative space-y-8"
-      >
-        <motion.div variants={variants.fadeUp} className="text-center">
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground">Help Center</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Find answers, guides, and support resources.</p>
-          <div className="relative mx-auto mt-5 max-w-md">
+      <div className="relative z-[1] mx-auto max-w-4xl">
+        <motion.div
+          variants={variants.staggerContainer}
+          initial={reduceMotion ? false : "hidden"}
+          animate="show"
+          className="space-y-8"
+        >
+          <motion.header variants={variants.fadeUp} className="text-center">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[26px]">
+              Help Center
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">Guides, docs, and support.</p>
+            <div className="relative mx-auto mt-5 max-w-md">
             <Search
-              className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
               strokeWidth={1.75}
             />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search docs, errors, keywords…"
-              className="h-11 w-full rounded-[var(--radius-xl)] bg-surface/90 pl-10 pr-4 text-sm text-foreground ring-1 ring-border backdrop-blur-sm outline-none transition-shadow focus:ring-accent/40"
+              className="h-11 w-full rounded-xl bg-background/95 pl-9 pr-3 text-sm text-foreground shadow-sm ring-1 ring-border/90 outline-none backdrop-blur-sm focus:ring-accent/40"
             />
           </div>
-        </motion.div>
+        </motion.header>
 
-        {showSearchResults && (
-          <motion.div
-            variants={variants.fadeUp}
-            className="rounded-[var(--radius-xl)] bg-surface/95 p-4 ring-1 ring-border backdrop-blur-sm"
-          >
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Search results
+        {showSearchResults ? (
+          <motion.div variants={variants.fadeUp} className="rounded-xl bg-background p-4 ring-1 ring-border">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Results
             </p>
             {searchHits.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No articles found. Try &quot;redirect URI mismatch&quot;, &quot;Build Credits&quot;, or &quot;Play
-                Store&quot;.
-              </p>
+              <p className="text-sm text-muted-foreground">No articles found.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul>
                 {searchHits.map((hit) => (
                   <li key={hit.slug}>
                     <Link
                       href={`/help/docs/${hit.slug}`}
-                      className="flex items-start gap-2 rounded-lg px-2 py-2 transition hover:bg-background"
+                      className="flex items-start gap-2 rounded-md px-1.5 py-1.5 text-sm transition hover:bg-muted/40"
                     >
                       <ChevronRight className="mt-0.5 size-3 shrink-0 text-accent" strokeWidth={2} />
                       <span>
-                        <span className="block text-sm font-medium text-foreground">{hit.title}</span>
-                        <span className="block text-xs text-muted-foreground">{hit.description}</span>
+                        <span className="font-medium text-foreground">{hit.title}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">{hit.description}</span>
                       </span>
                     </Link>
                   </li>
@@ -281,88 +380,38 @@ export function HelpView() {
               </ul>
             )}
           </motion.div>
+        ) : (
+          <>
+            <motion.div variants={variants.fadeUp}>
+              <HelpWelcomeStrip />
+            </motion.div>
+
+            <motion.div variants={variants.fadeUp}>
+              <p className="mb-3 text-center text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/80">
+                All documentation
+              </p>
+              <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                {categories.map(([cat, docs]) => (
+                  <CategoryCard
+                    key={cat}
+                    cat={cat}
+                    docs={docs}
+                    externalLinks={cat === "Policies" ? POLICY_EXTERNAL_LINKS : undefined}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          </>
         )}
 
-        <motion.div variants={variants.fadeUp}>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Quick setup assistant
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {QUICK_SETUP.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "group relative overflow-hidden rounded-[var(--radius-xl)] bg-surface/90 p-4 ring-1 ring-border",
-                  "transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-accent/5 hover:ring-accent/30",
-                )}
-              >
-                <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-accent/10 transition group-hover:bg-accent/15">
-                  <item.icon className="size-4 text-accent" strokeWidth={1.75} />
-                </div>
-                <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
-              </Link>
-            ))}
+        <motion.div variants={variants.fadeUp} className="rounded-xl bg-background p-4 ring-1 ring-border">
+          <div className="flex items-center gap-2">
+            <Play className="size-4 text-muted-foreground" strokeWidth={1.75} />
+            <p className="text-[13px] font-semibold text-foreground">Video tutorials</p>
+            <span className="ml-auto text-[10px] font-medium text-muted-foreground">Coming soon</span>
           </div>
-        </motion.div>
-
-        {!showSearchResults && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Object.entries(byCategory).map(([cat, docs]) => {
-              const Icon = CATEGORY_ICONS[cat] ?? BookOpen;
-              return (
-                <motion.div
-                  key={cat}
-                  variants={variants.fadeUp}
-                  className={cn(
-                    "rounded-[var(--radius-xl)] bg-surface/90 p-5 ring-1 ring-border backdrop-blur-sm",
-                    "transition duration-300 hover:-translate-y-0.5 hover:ring-accent/25",
-                  )}
-                >
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="flex size-8 items-center justify-center rounded-lg bg-accent/10">
-                      <Icon className="size-4 text-accent" strokeWidth={1.75} />
-                    </div>
-                    <h3 className="text-sm font-semibold text-foreground">{cat}</h3>
-                  </div>
-                  <ul className="space-y-1.5">
-                    {docs.map((doc) => (
-                      <li key={doc.slug}>
-                        <Link
-                          href={`/help/docs/${doc.slug}`}
-                          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-background hover:text-foreground"
-                        >
-                          <ChevronRight className="size-3 shrink-0" strokeWidth={1.75} />
-                          {doc.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
-
-        <motion.div
-          variants={variants.fadeUp}
-          className="rounded-[var(--radius-xl)] bg-surface/90 p-5 ring-1 ring-border backdrop-blur-sm"
-        >
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-muted/50">
-              <Play className="size-4 text-muted-foreground" strokeWidth={1.75} />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Video Tutorials</h3>
-              <p className="text-xs text-muted-foreground">Step-by-step walkthroughs</p>
-            </div>
-            <span className="ml-auto rounded-full bg-muted/60 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
-              Coming Soon
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Video tutorials are launching soon. Until then, start with the{" "}
+          <p className="mt-2 text-[13px] text-muted-foreground">
+            Until then, see{" "}
             <Link href="/help/docs/help-faq" className="text-accent hover:underline">
               FAQ
             </Link>{" "}
@@ -374,62 +423,26 @@ export function HelpView() {
           </p>
         </motion.div>
 
-        <motion.div
-          variants={variants.fadeUp}
-          className="rounded-[var(--radius-xl)] bg-surface/90 ring-1 ring-border backdrop-blur-sm"
-        >
-          <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+        <motion.div variants={variants.fadeUp} className="rounded-xl bg-background ring-1 ring-border">
+          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <MessageSquare className="size-4 text-muted-foreground" strokeWidth={1.75} />
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Contact Support</h3>
-              <p className="text-xs text-muted-foreground">
-                We typically respond within 24 hours ·{" "}
-                <a
-                  href="mailto:support@dreamos86.com"
-                  className="text-accent hover:underline underline-offset-2"
-                >
+              <p className="text-[13px] font-semibold text-foreground">Contact support</p>
+              <p className="text-[11px] text-muted-foreground">
+                <a href="mailto:support@dreamos86.com" className="text-accent hover:underline">
                   support@dreamos86.com
                 </a>
+                {" · "}
+                ~24h response
               </p>
             </div>
           </div>
-          <div className="p-5">
+          <div className="p-4">
             <ContactSupport />
           </div>
         </motion.div>
-      </motion.div>
-
-      <style jsx global>{`
-        @keyframes help-orb-drift-a {
-          0%,
-          100% {
-            transform: translate(0, 0) scale(1);
-          }
-          50% {
-            transform: translate(24px, 12px) scale(1.08);
-          }
-        }
-        @keyframes help-orb-drift-b {
-          0%,
-          100% {
-            transform: translate(0, 0) scale(1);
-          }
-          50% {
-            transform: translate(-20px, 16px) scale(1.05);
-          }
-        }
-        .help-ambient-orb-a {
-          animation: help-orb-drift-a 14s ease-in-out infinite;
-        }
-        .help-ambient-orb-b {
-          animation: help-orb-drift-b 18s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .help-ambient-orb {
-            animation: none !important;
-          }
-        }
-      `}</style>
+        </motion.div>
+      </div>
     </div>
   );
 }

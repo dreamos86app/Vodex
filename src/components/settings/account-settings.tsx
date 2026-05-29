@@ -21,6 +21,8 @@ import { resolveDisplayName } from "@/lib/profile-display";
 import { hasActiveSession, resolveAccountEmail } from "@/lib/auth/client-identity";
 import { resolveClientUserId } from "@/lib/chat/resolve-client-user";
 import { cn } from "@/lib/utils";
+import { getCanonicalOAuthCallbackUrl } from "@/lib/auth/oauth-redirect";
+import { persistAuthReturnToForBrowser } from "@/lib/auth/oauth-prep";
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -394,7 +396,8 @@ function ConnectedAccountsSection() {
   ];
 
   async function handleConnect(providerId: "google" | "github") {
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings/account")}`;
+    persistAuthReturnToForBrowser("/settings/account");
+    const redirectTo = getCanonicalOAuthCallbackUrl();
     if (providerId === "google") {
       await supabase.auth.linkIdentity({
         provider: "google",

@@ -58,7 +58,7 @@ const EXPLICIT_GRANT_SOURCES = new Set([
   "top_up",
 ]);
 
-async function sumExplicitBuildGrants(
+export async function sumExplicitBuildGrants(
   admin: ReturnType<typeof createSupabaseAdmin>,
   userId: string,
 ): Promise<number> {

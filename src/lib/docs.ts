@@ -649,7 +649,7 @@ When a pool reaches zero, related actions are paused. You can:
 
 Monthly plan credits reset each billing cycle. They do not roll over.
 
-If you upgrade your plan mid-cycle, your used credits carry forward — you won't lose progress. For example, if you used 100 out of 200 Build Credits on Starter and upgrade to Pro (500 Build Credits), your balance reflects 100 used against the new 500 allowance — not a full reset to zero used.
+If you upgrade your plan, you pay the **full new plan price today** (no prorated upgrade charge). Your billing cycle restarts and you receive the **full** Build Credit and Action Credit allowance for the new plan — unused monthly allowance from the previous plan does not stack. Purchased credit packs and explicit bonus grants stay separate.
 
 | Plan | Build Credits / mo | Action Credits / mo |
 |------|-------------------|---------------------|
@@ -665,6 +665,8 @@ Credit packs let you purchase additional Build Credits that never expire, separa
 ## Questions?
 
 If you believe credits were charged incorrectly, contact support with the conversation ID. We can review exact token counts and usage logs.
+
+See also: [Policies & Legal](/help/docs/policies) · [Refund Policy](/refunds).
 `,
   },
 
@@ -1339,6 +1341,17 @@ DreamOS86 **plan** subscriptions (Free, Starter, Pro, Infinity) are processed by
 
 Paddle handles checkout, tax, and subscription management for your **DreamOS86 account**.
 
+### Upgrades (no proration)
+
+- You pay the **full new plan price** when you upgrade — not a prorated “remaining days” charge.
+- Your billing cycle **restarts** and monthly Build + Action Credits **refresh** to the new plan allowance.
+- Unused monthly allowance from the old plan does **not** stack on top of the new plan.
+- Credits update only after Paddle confirms payment (webhook).
+
+### Downgrades
+
+- Downgrades apply at your **next renewal**. Your current plan stays active until then.
+
 This is separate from payment processors you connect to **your generated apps** for your own customers.`,
   },
 
@@ -1360,6 +1373,57 @@ This is separate from payment processors you connect to **your generated apps** 
 DreamOS86 is **not** responsible for your app's chargebacks, taxes, disputes, refunds, or KYC — only for integration patterns and UI.
 
 See [Payments setup](/help/docs/payments-providers) for connecting processors to apps.`,
+  },
+
+  {
+    slug: "policies",
+    title: "Policies & Legal",
+    description:
+      "One place for DreamOS86 terms, privacy, refunds, billing rules, and acceptable use.",
+    category: "Policies",
+    readMinutes: 4,
+    keywords: ["terms", "privacy", "refund", "legal", "policy", "billing policy"],
+    content: `## Overview
+
+DreamOS86 policies explain how the platform works, what we are responsible for, and what you agree to when you use the product. Use this page as your index — each policy has a full version on its own page.
+
+---
+
+## Platform legal documents
+
+| Document | Summary | Full policy |
+|----------|---------|-------------|
+| **Terms of Service** | Account rules, acceptable use, liability, and service boundaries | [Read Terms](/terms) |
+| **Privacy Policy** | How we collect, use, and protect your data | [Read Privacy](/privacy) |
+| **Refund Policy** | Subscription refunds, credits, and generated-app payments | [Read Refunds](/refunds) |
+
+---
+
+## Billing & credits policies
+
+These rules are also summarized on [Pricing](/pricing) and in [How credits work](/help/docs/how-credits-work).
+
+| Topic | Policy |
+|-------|--------|
+| **Plan upgrades** | Full new plan price today — **no prorated upgrade charges**. Billing cycle restarts; monthly Build and Action Credits refresh to the new allowance. |
+| **Plan downgrades** | Apply at **next renewal**; current plan stays active until then. |
+| **Monthly credits** | Reset each billing cycle; unused monthly allowance does not roll over. |
+| **Credit packs** | Purchased top-ups are separate from plan allowance and may persist separately. |
+| **DreamOS86 billing** | Platform subscriptions use **Paddle** as Merchant of Record. See [DreamOS86 Billing with Paddle](/help/docs/dreamos86-paddle-billing). |
+
+---
+
+## Generated app payments
+
+Payment processors you connect to **apps you build** (Stripe, Paddle, PayPal, etc.) are governed by **your** agreements with those providers and your own policies — not DreamOS86's subscription terms.
+
+See [Generated app payments vs DreamOS86 billing](/help/docs/app-payments-vs-dreamos-billing).
+
+---
+
+## Questions
+
+Contact [support@dreamos86.com](mailto:support@dreamos86.com) if you need clarification on any policy.`,
   },
 ];
 

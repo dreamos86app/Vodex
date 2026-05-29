@@ -12,6 +12,7 @@ import { variants } from "@/lib/motion";
 import {
   authSignUp,
   authSignInWithOAuth,
+  safeAuthReturnPath,
   humanizeAuthError,
   isSignupDuplicateWithoutError,
   isSignupExistingUserError,
@@ -138,8 +139,8 @@ export function SignupView() {
     setOauthLoading(provider);
     setError(null);
 
-    const next = searchParams.get("next") ?? undefined;
-    const { error: oauthError } = await authSignInWithOAuth(provider, next);
+    const returnTo = safeAuthReturnPath(searchParams.get("next"));
+    const { error: oauthError } = await authSignInWithOAuth(provider, { returnTo });
 
     if (oauthError) {
       const msg = humanizeAuthError(oauthError.message, provider);

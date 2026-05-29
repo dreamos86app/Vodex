@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { authSignInWithOAuth, humanizeAuthError } from "@/lib/auth";
+import { authSignInWithOAuth, captureReferralFromLocationSearch, humanizeAuthError } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -41,6 +41,7 @@ export function PublicSignupSection() {
   async function handleOAuth(provider: "google" | "github") {
     setOauthLoading(provider);
     setError(null);
+    captureReferralFromLocationSearch(window.location.search);
     const { error: oauthError } = await authSignInWithOAuth(provider);
     if (oauthError) {
       setError(humanizeAuthError(oauthError.message, provider));

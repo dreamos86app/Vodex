@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PublicMarketingShell } from "@/components/marketing/public-marketing-shell";
+import { LegalDocumentShell } from "@/components/marketing/legal-document-shell";
 import { RefundContent } from "@/components/marketing/legal/refund-content";
 
 export const metadata: Metadata = {
@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 export default function RefundsPage() {
   return (
-    <PublicMarketingShell>
+    <LegalDocumentShell>
       <RefundContent />
-    </PublicMarketingShell>
+    </LegalDocumentShell>
   );
 }

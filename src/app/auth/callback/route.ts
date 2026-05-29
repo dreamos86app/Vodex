@@ -5,6 +5,10 @@ import {
   readRefCookieFromRequest,
 } from "@/lib/auth/profile-bootstrap";
 import { DREAMOS_REF_COOKIE } from "@/lib/auth/ref-cookie";
+import {
+  OAUTH_EPHEMERAL_COOKIES,
+  resolvePostAuthDestination,
+} from "@/lib/auth/oauth-prep";
 import { callbackErrorSlugFromExchangeMessage } from "@/lib/auth";
 import { logAuthEvent } from "@/lib/auth/auth-diagnostics";
 
@@ -16,7 +20,7 @@ export async function GET(request: Request) {
 
   const code = searchParams.get("code");
   const type = searchParams.get("type");
-  const nextRaw = searchParams.get("next") ?? "/";
+  const nextRaw = searchParams.get("next");
 
   const providerError = searchParams.get("error");
   const providerErrorDesc = searchParams.get("error_description");
@@ -108,7 +112,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const safeNext = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
+  const safeNext = resolvePostAuthDestination(nextRaw, request.headers.get("cookie"));
   const destination = onboardingCompleted
     ? safeNext
     : `/onboarding?next=${encodeURIComponent(safeNext)}`;
@@ -120,8 +124,8 @@ export async function GET(request: Request) {
   }
 
   const response = NextResponse.redirect(`${origin}${destination}`);
-  if (refCookie) {
-    response.cookies.set(DREAMOS_REF_COOKIE, "", {
+  for (const name of OAUTH_EPHEMERAL_COOKIES) {
+    response.cookies.set(name, "", {
       path: "/",
       maxAge: 0,
       sameSite: "lax",
