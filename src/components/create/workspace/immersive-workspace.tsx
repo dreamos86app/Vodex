@@ -331,7 +331,17 @@ export function ImmersiveWorkspace({
   const supabase = createClient();
   const { profile, user } = useAuthStore();
   const uid = user?.id ?? profile?.id;
-  const { remaining, isConfirmed, resetAt, syncFromDB, deductOptimistic, build: buildCredits, action: actionCredits, planId: creditsPlanId, loading: creditsLoading } = useCreditsStore();
+  const {
+    remaining,
+    isConfirmed: creditsConfirmed,
+    resetAt,
+    syncFromDB,
+    deductOptimistic,
+    build: buildCredits,
+    action: actionCredits,
+    planId: creditsPlanId,
+    loading: creditsLoading,
+  } = useCreditsStore();
   const hydrated = useHydrated();
   const debugEnabled = isSubmitDebugEnabled(
     searchParams,
@@ -1014,6 +1024,7 @@ export function ImmersiveWorkspace({
         userId: uid,
         creditError,
         creditsLoading,
+        creditsConfirmed,
         buildCreditsAvailable: Math.max(0, buildCredits?.available ?? 0),
         buildJobActive,
         queueCount,
@@ -1027,6 +1038,7 @@ export function ImmersiveWorkspace({
       uid,
       creditError,
       creditsLoading,
+      creditsConfirmed,
       buildCredits,
       buildJobActive,
       queueCount,
@@ -1191,9 +1203,9 @@ export function ImmersiveWorkspace({
     if (mode !== "edit") setEditNeedsApp(false);
   }, [mode]);
 
-  const tokenBlocked = isConfirmed && remaining <= 0;
+  const tokenBlocked = creditsConfirmed && remaining <= 0;
 
-  const tokensStatus = !isConfirmed ? "loading" : tokenBlocked ? "blocked" : `${remaining}`;
+  const tokensStatus = !creditsConfirmed ? "loading" : tokenBlocked ? "blocked" : `${remaining}`;
   const planId = profile?.plan_id ?? "free";
   const nextPlanLabel = PLAN_NEXT_LABEL[planId] ?? "Starter";
   const showUpgradeCard = tokenBlocked && planId !== "enterprise";

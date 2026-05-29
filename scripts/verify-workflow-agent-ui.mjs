@@ -19,6 +19,12 @@ const jobEvents = read("src/lib/build/build-job-events.ts");
 const execute = read("src/lib/build/execute-staged-build-job.ts");
 const contract = read("src/lib/build/post-build-contract.ts");
 const immersive = read("src/components/create/workspace/immersive-workspace.tsx");
+const pipeline = read("src/lib/build/build-pipeline.ts");
+const lineCounts = read("src/lib/build/file-line-counts.ts");
+const creationWs = read("src/components/create/workspace/creation-workspace.tsx");
+const createPage = read("src/components/create/create-page-body.tsx");
+const composerText = read("src/lib/create/composer-text.ts");
+const builderGate = read("src/components/create/builder-project-gate.tsx");
 
 const suites = {
   "workflow-event-schema": () => {
@@ -42,6 +48,43 @@ const suites = {
   "workflow-natural-assistant-messages": () => {
     if (!jobEvents.includes("stream_category")) throw new Error("assistant stream_category metadata missing");
     if (!jobEvents.includes("I'll build this based on your request")) throw new Error("natural opener missing");
+  },
+  "composer-enablement-credits-gate": () => {
+    if (!composerText.includes("creditsConfirmed")) {
+      throw new Error("composer must gate credits on creditsConfirmed");
+    }
+    if (!createPage.includes("opacity-0")) {
+      throw new Error("create workspace layer must not use display:hidden during hydrate");
+    }
+    if (read("src/components/create/create-server-composer-island.tsx").includes('data-testid="create-composer-ready"')) {
+      throw new Error("server island must not emit fake create-composer-ready");
+    }
+  },
+  "workflow-assistant-messages-during-build": () => {
+    if (!pipeline.includes("trackAssistant")) throw new Error("trackAssistant missing in pipeline");
+    if (!pipeline.includes("I understand what you're building")) throw new Error("mid-build assistant missing");
+    if (!jobEvents.includes("persistAssistantBuildMessage")) throw new Error("persistAssistantBuildMessage missing");
+    if (!execute.includes("persistAssistantBuildMessage")) throw new Error("terminal assistant summary missing");
+  },
+  "workflow-line-counts-from-backend": () => {
+    if (!lineCounts.includes("computeFileLineMeta")) throw new Error("computeFileLineMeta missing");
+    if (!pipeline.includes("mergeIncomingBuildFiles")) throw new Error("mergeIncomingBuildFiles missing");
+    if (!jobEvents.includes("added_lines")) throw new Error("persist must include added_lines metadata");
+    if (!jobEvents.includes("old_line_count")) throw new Error("persist must include old_line_count metadata");
+  },
+  "no-legacy-build-timeline-visible": () => {
+    if (creationWs.includes("BuildTimeline") || creationWs.includes("BuildStatusNarrator")) {
+      throw new Error("creation-workspace still mounts legacy timeline/narrator");
+    }
+    if (!immersive.includes("BuildLiveProgress") && !immersive.includes("AgentWorkflowStream")) {
+      throw new Error("immersive must use agent workflow stream");
+    }
+    if (!createPage.includes("CreateWorkspaceEntry")) {
+      throw new Error("create page must use CreateWorkspaceEntry (ImmersiveWorkspace)");
+    }
+    if (!builderGate.includes("ImmersiveWorkspace")) {
+      throw new Error("builder gate must use ImmersiveWorkspace");
+    }
   },
   "workflow-status-state-guards": () => {
     if (!guards.includes("deriveBuildStatusFacts")) throw new Error("deriveBuildStatusFacts missing");

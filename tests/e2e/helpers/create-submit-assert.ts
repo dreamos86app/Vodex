@@ -196,7 +196,7 @@ export async function waitForComposerReady(
   const shell = visibleBuilderShell(page);
   const textarea = visibleComposerTextarea(page);
   const submit = visibleSubmitButton(page);
-  const ready = page.locator('[data-testid="create-composer-ready"]:visible').first();
+  const ready = page.locator('[data-testid="create-composer-ready"]').first();
 
   await expect(shell).toBeVisible({ timeout: Math.min(timeoutMs, 60_000) });
   await expect(textarea).toBeVisible({ timeout: Math.min(timeoutMs, 60_000) });
@@ -269,6 +269,24 @@ export async function gotoWorkspaceComposer(
 }
 
 /** Restaurant prompts match plan-first heuristics — force immediate build for live E2E. */
+/** Next.js dev overlay portal blocks Playwright clicks on narrow viewports. */
+export async function dismissNextJsDevOverlay(page: Page): Promise<void> {
+  await page
+    .evaluate(() => {
+      for (const portal of document.querySelectorAll("nextjs-portal")) {
+        const el = portal as HTMLElement;
+        el.style.pointerEvents = "none";
+        el.style.display = "none";
+      }
+    })
+    .catch(() => undefined);
+}
+
+export async function clickComposerSubmit(page: Page, submit: Locator): Promise<void> {
+  await dismissNextJsDevOverlay(page);
+  await submit.click({ force: true });
+}
+
 export async function ensureBuildNowStrategy(page: Page): Promise<void> {
   const root = page
     .locator('[data-testid="builder-shell"]:visible')

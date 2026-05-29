@@ -78,6 +78,7 @@ import {
   schemaPrompt,
   uiPlanPrompt,
 } from "@/lib/build/stage-prompts";
+import { computeFileLineMeta, type FileLineMeta } from "@/lib/build/file-line-counts";
 
 export type WorkflowEventType =
   | "thinking"
@@ -99,11 +100,18 @@ export type WorkflowEventType =
   | "done"
   | "failed";
 
+export type WorkflowEventMeta = {
+  filePath?: string;
+  fileLineMeta?: import("@/lib/build/file-line-counts").FileLineMeta;
+  streamCategory?: string;
+};
+
 export type WorkflowEvent = {
   type: WorkflowEventType;
   label: string;
   detail?: string;
   at: string;
+  meta?: WorkflowEventMeta;
 };
 
 export type StagedBuildResult = {
@@ -141,10 +149,59 @@ function appendWorkflowEvent(
   label: string,
   detail?: string,
   onWorkflowEvent?: (ev: WorkflowEvent) => void | Promise<void>,
+  meta?: WorkflowEventMeta,
 ) {
-  const row: WorkflowEvent = { type, label, detail, at: new Date().toISOString() };
+  const row: WorkflowEvent = {
+    type,
+    label,
+    detail,
+    at: new Date().toISOString(),
+    meta,
+  };
   events.push(row);
   void onWorkflowEvent?.(row);
+}
+
+function trackAssistant(
+  events: WorkflowEvent[],
+  message: string,
+  onWorkflowEvent?: (ev: WorkflowEvent) => void | Promise<void>,
+) {
+  appendWorkflowEvent(events, "thinking", message, undefined, onWorkflowEvent, {
+    streamCategory: "assistant_message",
+  });
+}
+
+function mergeIncomingBuildFiles(
+  existing: BuildFile[],
+  incoming: BuildFile[],
+  events: WorkflowEvent[],
+  trackFn: (
+    events: WorkflowEvent[],
+    type: WorkflowEventType,
+    label: string,
+    detail?: string,
+    meta?: WorkflowEventMeta,
+  ) => void,
+  maxFiles: number,
+): BuildFile[] {
+  const merged = new Map(existing.map((f) => [f.path, f]));
+  for (const f of filterRenderableBuildFiles(incoming)) {
+    const prev = merged.get(f.path);
+    const fileLineMeta = computeFileLineMeta(prev?.content, f.content);
+    const path = f.path;
+    const meta: WorkflowEventMeta = {
+      filePath: path,
+      ...(fileLineMeta ? { fileLineMeta } : {}),
+    };
+    if (prev) {
+      trackFn(events, "editing", `Updated ${path}`, path, meta);
+    } else {
+      trackFn(events, "writing", `Created ${path}`, path, meta);
+    }
+    merged.set(f.path, f);
+  }
+  return [...merged.values()].slice(0, maxFiles);
 }
 
 function parseFilePayload(text: string) {
@@ -216,7 +273,8 @@ export async function runStagedBuildPipeline(input: {
     type: WorkflowEventType,
     label: string,
     detail?: string,
-  ) => appendWorkflowEvent(events, type, label, detail, emit);
+    meta?: WorkflowEventMeta,
+  ) => appendWorkflowEvent(events, type, label, detail, emit, meta);
   if (!requireId("projectId", input.projectId, { source: "server", userId: input.userId, buildId: input.buildJobId })) {
     dreamosLog({
       source: "server",
@@ -328,6 +386,11 @@ export async function runStagedBuildPipeline(input: {
     "classified",
     `Complexity ${effectiveComplexity}/10`,
     firstPassScope ? `First pass (${firstPassScope.tier})` : scope.coreV1Only ? "Core V1 first" : undefined,
+  );
+  trackAssistant(
+    events,
+    `I understand what you're building — I'll map the core screens and data model next.`,
+    emit,
   );
 
   const scopeNote = firstPassScope
@@ -578,6 +641,16 @@ export async function runStagedBuildPipeline(input: {
     uiJson,
   );
 
+  const entityHint =
+    planParsed?.entities?.length && planParsed.entities.length > 0
+      ? String(planParsed.entities.slice(0, 3).join(", "))
+      : archetype.label;
+  trackAssistant(
+    events,
+    `Data model and routes are set (${entityHint}) — I'll generate screens and components next.`,
+    emit,
+  );
+
   if (accumulatedCost >= FULL_BUILD_CAP_USD * 0.85) {
     return {
       ok: false,
@@ -602,13 +675,18 @@ export async function runStagedBuildPipeline(input: {
         pageCount: 0,
         uiQualityScore: 0,
         previewReady: false,
-        userMessage: "Build needs repair — credits were returned.",
+        userMessage: "This build is too large for one pass — try a smaller scope or continue in a follow-up prompt.",
       },
       errorMessage: "build_budget_precheck",
       appArchetype: archetype.id,
     };
   }
 
+  trackAssistant(
+    events,
+    `I'm writing the core screens and components for ${appName} now.`,
+    emit,
+  );
   track(events, "writing", "Adding the required pages…");
   if (input.buildTrace) traceBuildWorkerStage(input.buildTrace, "file_generation_started");
 
@@ -659,11 +737,20 @@ export async function runStagedBuildPipeline(input: {
       primaryModelId = feCall.result.spec.modelId;
       const fePayload = parseFilePayload(feCall.result.text);
       if (fePayload.files.length) {
-        const merged = new Map(allFiles.map((f) => [f.path, f]));
-        for (const f of filterRenderableBuildFiles(fePayload.files)) merged.set(f.path, f);
-        allFiles = [...merged.values()].slice(0, effectiveMaxFiles);
-        for (const ev of fePayload.events.slice(0, 12)) {
-          track(events, "writing", ev.summary || `Wrote ${ev.path}`, ev.path);
+        const beforeCount = allFiles.length;
+        allFiles = mergeIncomingBuildFiles(
+          allFiles,
+          fePayload.files,
+          events,
+          track,
+          effectiveMaxFiles,
+        );
+        if (allFiles.length > beforeCount) {
+          trackAssistant(
+            events,
+            `Generated ${allFiles.length - beforeCount} file${allFiles.length - beforeCount === 1 ? "" : "s"} — checking quality next.`,
+            emit,
+          );
         }
       }
     }
@@ -699,9 +786,13 @@ export async function runStagedBuildPipeline(input: {
     accumulatedCost += miniCall.result.providerCostUsd;
     const miniPayload = parseFilePayload(miniCall.result.text);
     if (miniPayload.files.length) {
-      const merged = new Map(allFiles.map((f) => [f.path, f]));
-      for (const f of filterRenderableBuildFiles(miniPayload.files)) merged.set(f.path, f);
-      allFiles = [...merged.values()].slice(0, effectiveMaxFiles);
+      allFiles = mergeIncomingBuildFiles(
+        allFiles,
+        miniPayload.files,
+        events,
+        track,
+        effectiveMaxFiles,
+      );
     }
     }
   }
@@ -796,9 +887,13 @@ export async function runStagedBuildPipeline(input: {
       accumulatedCost += beCall.result.providerCostUsd;
       const bePayload = parseFilePayload(beCall.result.text);
       if (bePayload.files.length) {
-        const merged = new Map(allFiles.map((f) => [f.path, f]));
-        for (const f of filterRenderableBuildFiles(bePayload.files)) merged.set(f.path, f);
-        allFiles = [...merged.values()].slice(0, effectiveMaxFiles);
+        allFiles = mergeIncomingBuildFiles(
+          allFiles,
+          bePayload.files,
+          events,
+          track,
+          effectiveMaxFiles,
+        );
       }
       }
     } catch {
@@ -806,6 +901,11 @@ export async function runStagedBuildPipeline(input: {
     }
   }
 
+  trackAssistant(
+    events,
+    `Checking imports, routes, and preview readiness across ${allFiles.length} file${allFiles.length === 1 ? "" : "s"}.`,
+    emit,
+  );
   track(events, "validating", `Validating ${allFiles.length} files`);
   let quality = assessBuildQuality(allFiles);
   let repairAttempts = 0;
@@ -856,9 +956,9 @@ export async function runStagedBuildPipeline(input: {
     accumulatedCost += repairCall.result.providerCostUsd;
     const repaired = parseFilePayload(repairCall.result.text);
     if (repaired.files.length) {
-      const merged = new Map(allFiles.map((f) => [f.path, f]));
-      for (const f of filterRenderableBuildFiles(repaired.files)) merged.set(f.path, f);
-      allFiles = filterRenderableBuildFiles([...merged.values()]);
+      allFiles = filterRenderableBuildFiles(
+        mergeIncomingBuildFiles(allFiles, repaired.files, events, track, effectiveMaxFiles),
+      );
     }
     quality = assessBuildQuality(allFiles);
     uiQuality = checkGeneratedUiQuality({

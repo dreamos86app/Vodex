@@ -51,8 +51,6 @@ import {
 import { PreviewPanel } from "@/components/create/workspace/preview-panel";
 import { WorkspaceLauncher, type WorkspaceRightTab } from "@/components/create/workspace/workspace-launcher";
 import { AgentPhases } from "@/components/create/workspace/agent-phases";
-import { BuildTimeline } from "@/components/create/workspace/build-timeline";
-import { BuildStatusNarrator } from "@/components/create/workspace/build-status-narrator";
 import { AppDashboardPanel } from "@/components/create/workspace/app-dashboard-panel";
 import { DreamOS86BrandIcon } from "@/components/brand/dreamos86-brand-icon";
 import { extractFencedCode } from "@/lib/creation/extract-fenced-code";
@@ -649,10 +647,9 @@ export function CreationWorkspace({
   const showEmpty = messages.length === 0 && !isBusy;
   const modeStyle = MODE_STYLE[mode];
 
-  // Show build timeline when build mode is active and we have content
-  const showBuildTimeline = mode === "build" && (isBusy || lastAssistantText.length > 0);
-
   // ─── Render ─────────────────────────────────────────────────────────────────
+  // Note: live async build workflow UI lives in ImmersiveWorkspace (BuildLiveProgress /
+  // AgentWorkflowStream). This legacy shell is not mounted on /create or /apps/.../builder routes.
   return (
     <DropZone
       onFiles={onFiles}
@@ -683,26 +680,6 @@ export function CreationWorkspace({
 
       {/* Horizontal split: timeline + chat + preview */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-
-      {/* BUILD TIMELINE sidebar (left, build mode only) */}
-      <AnimatePresence initial={false}>
-        {showBuildTimeline && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 200, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="hidden shrink-0 overflow-hidden border-r border-violet-500/15 bg-atmosphere xl:flex"
-          >
-            <div className="p-3 pt-4 w-full">
-              <BuildTimeline
-                streamingText={lastAssistantText}
-                isStreaming={isBusy}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* CENTER: chat column */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -776,15 +753,6 @@ export function CreationWorkspace({
                 />
               )}
             </div>
-
-            {/* Live build status */}
-            {isBusy && messages[messages.length - 1]?.role === "user" && (
-              <BuildStatusNarrator
-                isStreaming={isBusy}
-                streamingText={lastAssistantText}
-                className="mt-1 xl:hidden"
-              />
-            )}
 
             {/* Out-of-credits upgrade card */}
             {creditError && (

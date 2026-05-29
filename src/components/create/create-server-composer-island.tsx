@@ -117,13 +117,6 @@ export function CreateServerComposerIsland({
           </div>
         </div>
       </div>
-      <div
-        data-testid="create-composer-ready"
-        data-ready="true"
-        data-reason="ready"
-        className="sr-only"
-        aria-hidden
-      />
     </div>
   );
 }

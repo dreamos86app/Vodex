@@ -29,7 +29,7 @@
         "testMatch": [
           "**/*.@(spec|test).?(c|m)[jt]s?(x)"
         ],
-        "timeout": 600000
+        "timeout": 30000
       }
     ],
     "quiet": false,
@@ -59,28 +59,27 @@
   },
   "suites": [
     {
-      "title": "restaurant-inventory-workflow.spec.ts",
-      "file": "restaurant-inventory-workflow.spec.ts",
+      "title": "workflow-agent-stream.spec.ts",
+      "file": "workflow-agent-stream.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "Restaurant inventory — @live workflow",
-          "file": "restaurant-inventory-workflow.spec.ts",
-          "line": 110,
+          "title": "Agent workflow stream @workflow-qa",
+          "file": "workflow-agent-stream.spec.ts",
+          "line": 22,
           "column": 6,
           "specs": [
             {
-              "title": "@live full restaurant inventory journey",
+              "title": "desktop — stream visible with assistant + file events",
               "ok": true,
               "tags": [
-                "live",
-                "live"
+                "workflow-qa"
               ],
               "tests": [
                 {
-                  "timeout": 600000,
+                  "timeout": 360000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "chromium",
@@ -90,12 +89,19 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 148025,
+                      "duration": 52147,
                       "errors": [],
                       "stdout": [],
-                      "stderr": [],
+                      "stderr": [
+                        {
+                          "text": "[e2e] create-composer-ready marker false but DOM fallback passed { reason: \u001b[32m'shell_missing'\u001b[39m }\n"
+                        },
+                        {
+                          "text": "[e2e] create-composer-ready marker false but DOM fallback passed { reason: \u001b[32m'shell_missing'\u001b[39m }\n"
+                        }
+                      ],
                       "retry": 0,
-                      "startTime": "2026-05-29T08:48:06.970Z",
+                      "startTime": "2026-05-29T17:16:57.458Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -103,9 +109,49 @@
                   "status": "expected"
                 }
               ],
-              "id": "18b4ed5cfae3644aab3f-baecfa6d1e08f7f50891",
-              "file": "restaurant-inventory-workflow.spec.ts",
-              "line": 113,
+              "id": "d470186025717df18998-bb57e44037445ec19005",
+              "file": "workflow-agent-stream.spec.ts",
+              "line": 29,
+              "column": 7
+            },
+            {
+              "title": "mobile — stream visible on builder",
+              "ok": true,
+              "tags": [
+                "workflow-qa"
+              ],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 21471,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [
+                        {
+                          "text": "[e2e] create-composer-ready marker false but DOM fallback passed { reason: \u001b[32m'shell_missing'\u001b[39m }\n"
+                        }
+                      ],
+                      "retry": 0,
+                      "startTime": "2026-05-29T17:17:49.780Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d470186025717df18998-cd02dd59773e55356cb5",
+              "file": "workflow-agent-stream.spec.ts",
+              "line": 162,
               "column": 7
             }
           ]
@@ -115,9 +161,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-05-29T08:48:05.744Z",
-    "duration": 149474.944,
-    "expected": 1,
+    "startTime": "2026-05-29T17:16:49.068Z",
+    "duration": 82293.28600000001,
+    "expected": 2,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

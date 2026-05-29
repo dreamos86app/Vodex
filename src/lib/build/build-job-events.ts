@@ -184,6 +184,17 @@ export async function persistWorkflowEvent(
   const useSpecific =
     Boolean(specificTitle) &&
     specificTitle !== userTitleForJobEvent(type, specificTitle);
+  const lineMeta = ev.meta?.fileLineMeta;
+  const streamCategory =
+    ev.meta?.streamCategory ??
+    (ev.type === "repairing"
+      ? "repair_started"
+      : ev.type === "writing"
+        ? "file_created"
+        : ev.type === "editing"
+          ? "file_edited"
+          : undefined);
+
   await persistBuildJobEvent(writer, {
     jobId: ctx.jobId,
     projectId: ctx.projectId,
@@ -191,19 +202,38 @@ export async function persistWorkflowEvent(
     type,
     title: useSpecific ? specificTitle! : userTitleForJobEvent(type, ev.label),
     detail: ev.detail ?? ev.label,
-    filePath,
+    filePath: filePath ?? ev.meta?.filePath ?? null,
     progressPercent: pct,
     metadata: {
-      stream_category:
-        ev.type === "repairing"
-          ? "repair_started"
-          : ev.type === "writing"
-            ? "file_created"
-            : ev.type === "editing"
-              ? "file_edited"
-              : undefined,
+      stream_category: streamCategory,
       display_title: useSpecific ? specificTitle : undefined,
       repair_pass: ev.type === "repairing" ? true : undefined,
+      ...(lineMeta
+        ? {
+            added_lines: lineMeta.added_lines,
+            removed_lines: lineMeta.removed_lines,
+            old_line_count: lineMeta.old_line_count,
+            new_line_count: lineMeta.new_line_count,
+          }
+        : {}),
+    },
+  });
+}
+
+export async function persistAssistantBuildMessage(
+  writer: Writer,
+  ctx: { jobId: string; projectId: string; userId: string },
+  input: { message: string; progressPercent?: number },
+): Promise<void> {
+  await persistBuildJobEvent(writer, {
+    ...ctx,
+    type: "understanding_request",
+    title: input.message.slice(0, 200),
+    detail: input.message,
+    progressPercent: input.progressPercent ?? 10,
+    metadata: {
+      stream_category: "assistant_message",
+      display_title: input.message.slice(0, 200),
     },
   });
 }

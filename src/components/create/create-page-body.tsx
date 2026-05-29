@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { CreateServerComposerIsland, readPendingCreatePrompt } from "@/components/create/create-server-composer-island";
 import { CreateWorkspaceEntry } from "@/components/create/create-workspace-entry";
 import { useAuthStore } from "@/lib/stores/auth-store";
@@ -67,7 +68,10 @@ export function CreatePageBody(props: CreatePageBodyProps) {
         loadingHint={loadingHint}
       />
       <div
-        className={workspaceReady ? "relative h-full w-full" : "hidden"}
+        className={cn(
+          "relative h-full w-full",
+          !workspaceReady && "pointer-events-none opacity-0",
+        )}
         aria-hidden={!workspaceReady}
         data-testid="create-workspace-layer"
       >

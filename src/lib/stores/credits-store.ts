@@ -109,7 +109,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
     build: { ...EMPTY_BUCKET, planAllowance: 30 },
     action: { ...EMPTY_BUCKET, planAllowance: 25 },
     planId: "free",
-    loading: false,
+    loading: true,
     error: null,
     lastSyncedAt: null,
     isConfirmed: false,

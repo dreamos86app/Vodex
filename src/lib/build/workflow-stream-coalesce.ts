@@ -101,7 +101,11 @@ function rowToStreamEvent(row: BuildJobEventRow, terminal: boolean): AgentWorkfl
   const filePath = row.file_path ?? undefined;
   const counts = parseLineCounts(row.detail);
   const added =
-    typeof meta.added_lines === "number" ? meta.added_lines : counts.added;
+    typeof meta.added_lines === "number"
+      ? meta.added_lines
+      : typeof meta.new_line_count === "number" && !meta.old_line_count
+        ? meta.new_line_count
+        : counts.added;
   const removed =
     typeof meta.removed_lines === "number" ? meta.removed_lines : counts.removed;
 

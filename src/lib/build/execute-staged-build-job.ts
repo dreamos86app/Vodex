@@ -19,6 +19,7 @@ import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { startPreviewSession } from "@/lib/preview/preview-build-service";
 import { lifecyclePatch } from "@/lib/projects/project-lifecycle";
 import {
+  persistAssistantBuildMessage,
   persistBuildJobEvent,
   persistWorkflowEvent,
 } from "@/lib/build/build-job-events";
@@ -803,6 +804,14 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       }
     }
 
+    const doneSummary =
+      pr.meta?.summary?.trim() ||
+      `Done — ${pr.appName} is ready to preview with ${fileGate.fileCount} files.`;
+    await persistAssistantBuildMessage(input.writer, eventCtx, {
+      message: doneSummary.slice(0, 280),
+      progressPercent: 98,
+    });
+
     await persistBuildJobEvent(input.writer, {
       ...eventCtx,
       type: "completed",
@@ -815,6 +824,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         credits_charged: creditsCharged,
         preview_url: previewResult.previewUrl ?? null,
         files_persisted: fileGate.fileCount,
+        stream_category: "completed",
       },
     });
 

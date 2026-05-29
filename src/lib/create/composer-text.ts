@@ -43,6 +43,8 @@ export function resolveComposerSubmitDisabledReason(input: {
   userId: string | null | undefined;
   creditError: boolean;
   creditsLoading: boolean;
+  /** When false, build credits have not been confirmed from the API yet — do not block submit. */
+  creditsConfirmed?: boolean;
   buildCreditsAvailable: number;
   buildJobActive: boolean;
   queueCount: number;
@@ -52,11 +54,8 @@ export function resolveComposerSubmitDisabledReason(input: {
   if (input.fatalError) return "error";
   if (input.hydrated && !input.userId) return "auth";
   if (input.creditError) return "credits";
-  if (
-    input.hydrated &&
-    !input.creditsLoading &&
-    input.buildCreditsAvailable <= 0
-  ) {
+  const creditsKnown = input.creditsConfirmed === true && !input.creditsLoading;
+  if (input.hydrated && creditsKnown && input.buildCreditsAvailable <= 0) {
     return "credits";
   }
   if (input.queueCount >= input.queueMax) return "queue_full";
