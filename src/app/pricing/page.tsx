@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { PublicMarketingShell } from "@/components/marketing/public-marketing-shell";
-import { PricingView } from "@/components/pricing/pricing-view";
+import { PricingPageShell } from "@/components/pricing/pricing-page-shell";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -8,12 +7,6 @@ export const metadata: Metadata = {
     "DreamOS86 pricing — Free, Starter, Pro, and Infinity plans with Build Credits and Action Credits.",
 };
 
-export default function PublicPricingPage() {
-  return (
-    <PublicMarketingShell className="bg-atmosphere">
-      <div data-testid="public-pricing-page" className="pb-16">
-        <PricingView publicMode />
-      </div>
-    </PublicMarketingShell>
-  );
+export default function PricingPage() {
+  return <PricingPageShell />;
 }
