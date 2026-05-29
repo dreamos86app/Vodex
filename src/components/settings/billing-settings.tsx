@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   CreditCard,
@@ -70,6 +71,33 @@ export function BillingSettings() {
     void loadBilling();
   }, [loadBilling]);
 
+  const searchParams = useSearchParams();
+  const paddleReturn = searchParams.get("paddle");
+  const [activationMessage, setActivationMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (paddleReturn !== "success") return;
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      const res = await fetch("/api/billing/status", { credentials: "include" });
+      const json = (await res.json()) as {
+        message?: string;
+        active?: boolean;
+        webhookPending?: boolean;
+      };
+      if (cancelled) return;
+      setActivationMessage(json.message ?? "Activating your plan…");
+      if (json.active || attempts > 40) return;
+      window.setTimeout(() => void poll(), 3000);
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [paddleReturn]);
+
   async function scheduleDowngrade(plan: StripeCheckoutPlan | "free") {
     if (downgradePlan !== plan) {
       setDowngradePlan(plan);
@@ -101,7 +129,8 @@ export function BillingSettings() {
       return;
     }
     setActing(true);
-    const res = await fetch("/api/billing/cancel", {
+    const cancelUrl = paddleReady ? "/api/billing/paddle/cancel" : "/api/billing/cancel";
+    const res = await fetch(cancelUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ confirmed: true }),
@@ -142,6 +171,19 @@ export function BillingSettings() {
 
   return (
     <motion.div variants={variants.staggerContainer} initial="hidden" animate="show" className="dashboard-shell space-y-6 overflow-x-hidden">
+      {paddleReturn === "success" && activationMessage ? (
+        <motion.div
+          variants={variants.fadeUp}
+          className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-[13px]"
+        >
+          <p className="font-medium text-foreground">Payment received — activating your plan</p>
+          <p className="mt-1 text-muted-foreground">{activationMessage}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Credits update only after Paddle webhook confirmation (never from the browser).
+          </p>
+        </motion.div>
+      ) : null}
+
       {!paddleReady && !loading && (
         <motion.div
           variants={variants.fadeUp}
@@ -216,6 +258,7 @@ export function BillingSettings() {
 
                 <div className="mt-5">
                   <CreditsTracker
+                    isConfirmed={isConfirmed}
                     build={build}
                     action={action}
                     planId={creditsPlanId}
@@ -240,7 +283,9 @@ export function BillingSettings() {
                       <CreditCard className="size-3.5 text-muted-foreground" />
                       <p className="text-[11px] font-medium uppercase text-muted-foreground">Billing</p>
                     </div>
-                    <p className="text-[22px] font-bold">{stripeReady ? "Stripe" : "Not configured"}</p>
+                    <p className="text-[22px] font-bold">
+                      {paddleReady ? "Paddle" : stripeReady ? "Stripe" : "Not configured"}
+                    </p>
                   </div>
                 </div>
               </>

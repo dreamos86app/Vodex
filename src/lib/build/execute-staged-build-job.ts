@@ -415,6 +415,124 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       return;
     }
 
+    if (
+      !buildSucceeded &&
+      !input.partialCreditBuild &&
+      saveableFileCount >= MIN_RENDERABLE_FILES
+    ) {
+      await persistStage("persist_started", `${pr.files.length} files in memory`);
+      const { result: persist } = await tracePersistGeneratedFiles({
+        writer: input.writer,
+        projectId: input.projectId,
+        ownerId: input.userId,
+        files: pr.files,
+        operationId: input.operationId,
+        executionInstanceId: workerCtx.executionInstanceId,
+      });
+
+      const savedCount = Math.max(persist.savedCount, saveableFileCount);
+      const postKind = failureKindForPersist({
+        fileCount: savedCount,
+        repairAttempted: pr.buildContract.failures.some((f) => /ui_quality|repair/i.test(f)),
+        previewFailedWithFiles: false,
+      });
+
+      await refundBuildReservation({
+        writer: input.writer,
+        userId: input.userId,
+        operationId: input.operationId,
+        reservedCredits: input.reservedCredits,
+        providerCostUsd: pr.totalProviderCostUsd,
+        projectId: input.projectId,
+        buildJobId: input.buildJobId,
+      });
+
+      const { data: curSaved } = await input.writer
+        .from("projects")
+        .select("metadata")
+        .eq("id", input.projectId)
+        .maybeSingle();
+      const prevMetaSaved =
+        curSaved?.metadata && typeof curSaved.metadata === "object" && !Array.isArray(curSaved.metadata)
+          ? (curSaved.metadata as Record<string, unknown>)
+          : {};
+
+      await input.writer
+        .from("projects")
+        .update({
+          build_status: "needs_repair",
+          metadata: {
+            ...prevMetaSaved,
+            ...lifecyclePatch("needs_attention", {
+              build_contract_failures: pr.buildContract.failures,
+              files_ready: true,
+              credits_refunded: true,
+            }),
+            file_count: savedCount,
+            ui_quality_score: pr.uiQualityScore,
+          } as Json,
+        } as never)
+        .eq("id", input.projectId)
+        .eq("owner_id", input.userId);
+
+      await transitionBuildJobStatus(input.writer, {
+        jobId: input.buildJobId,
+        ctx: workerCtx,
+        toStatus: "failed",
+        reason: pr.buildContract.userMessage,
+      });
+
+      await finalizeBuildFailed({
+        writer: input.writer,
+        buildJobId: input.buildJobId,
+        projectId: input.projectId,
+        userId: input.userId,
+        errorMessage: pr.buildContract.userMessage,
+        skipJobStatusUpdate: true,
+      });
+
+      await persistBuildJobEvent(input.writer, {
+        ...eventCtx,
+        type: "failed",
+        title: userSafeFailureTitle(postKind),
+        detail: userSafeFailureDetail(postKind, pr.buildContract.userMessage),
+        progressPercent: 100,
+        metadata: {
+          failures: pr.buildContract.failures,
+          failure_kind: postKind,
+          file_count: savedCount,
+          files_persisted: savedCount,
+          execution_instance_id: workerCtx.executionInstanceId,
+        },
+      });
+
+      await persistBuildJobEvent(input.writer, {
+        ...eventCtx,
+        type: "refunded",
+        title: "Credits were returned",
+        detail: "Credits were returned for this attempt.",
+        progressPercent: 100,
+        metadata: { stream_category: "assistant_message" },
+      });
+
+      await logServerOperation({
+        writer: input.writer,
+        userId: input.userId,
+        userEmail: input.userEmail,
+        stage: "build",
+        event: "async_build_failed",
+        status: "error",
+        mode: "build",
+        modelId: pr.primaryModelId,
+        projectId: input.projectId,
+        buildJobId: input.buildJobId,
+        operationId: input.operationId,
+        errorMessage: pr.errorMessage ?? pr.buildContract.userMessage,
+        metadata: { failures: pr.buildContract.failures, files_persisted: savedCount },
+      });
+      return;
+    }
+
     if (!buildSucceeded) {
       await clearGeneratedBuildFiles({
         writer: input.writer,

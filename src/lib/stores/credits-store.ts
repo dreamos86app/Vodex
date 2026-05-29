@@ -48,6 +48,8 @@ interface CreditsState {
   isConfirmed: boolean;
 
   applyCanonical: (payload: CanonicalCreditsPayload) => void;
+  /** Profile/bootstrap hint — not confirmed until /api/credits succeeds. */
+  applyProfileHint: (payload: CanonicalCreditsPayload) => void;
   syncFromDB: (options?: CreditSyncOptions) => Promise<CanonicalCreditsPayload | null>;
   deductOptimistic: (amount: number) => void;
   reset: () => void;
@@ -125,6 +127,20 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         error: null,
         lastSyncedAt: Date.now(),
         isConfirmed: true,
+      }),
+    );
+  },
+
+  applyProfileHint: (payload) => {
+    set(
+      withLegacyFields({
+        build: payload.build,
+        action: payload.action,
+        planId: payload.planId,
+        loading: true,
+        error: null,
+        lastSyncedAt: null,
+        isConfirmed: false,
       }),
     );
   },

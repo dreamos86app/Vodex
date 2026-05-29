@@ -21,12 +21,19 @@ const ENTITLEMENTS: Record<MobileEntitlement, PlanSlug[]> = {
   mobile_white_label: ["enterprise", "infinity"],
 };
 
+function entitlementPlanSlug(planId: string): PlanSlug {
+  const plan = normalizePlanId(planId);
+  if (plan.startsWith("infinity_") || plan === "infinity" || plan === "enterprise") return "infinity";
+  if (plan === "business") return "pro";
+  return plan as PlanSlug;
+}
+
 export function hasMobileEntitlement(
   planId: string | null | undefined,
   key: MobileEntitlement,
 ): boolean {
   if (process.env.NODE_ENV === "development") return true;
-  const plan = normalizePlanId(planId ?? "free");
+  const plan = entitlementPlanSlug(planId ?? "free");
   return ENTITLEMENTS[key].includes(plan);
 }
 

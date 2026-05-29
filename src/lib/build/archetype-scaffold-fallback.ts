@@ -6,6 +6,7 @@ import {
 } from "@/lib/build/generated-file-utils";
 import { countComponentFiles } from "@/lib/build/import-graph";
 import { mergeRestaurantInventoryScaffold } from "@/lib/build/restaurant-inventory-scaffold";
+import { mergeGenericSaaSScaffold } from "@/lib/build/generic-saas-scaffold";
 import {
   STANDARD_MIN_COMPONENTS,
   STANDARD_MIN_RENDERABLE_FILES,
@@ -32,16 +33,31 @@ export type ScaffoldFallbackResult = {
 
 const KNOWN_SCAFFOLD_ARCHETYPES = new Set<AppArchetypeId>([
   "restaurant_inventory",
+  "saas_dashboard",
   "crm",
   "booking",
   "finance_tracker",
   "ecommerce",
   "marketplace",
   "customer_support",
+  "admin_panel",
+  "ai_tool",
+  "project_management",
+  "generic_app",
 ]);
 
 /** Archetypes with a full deterministic file tree in-repo (expand over time). */
-const FULL_SCAFFOLD_ARCHETYPES = new Set<AppArchetypeId>(["restaurant_inventory"]);
+const FULL_SCAFFOLD_ARCHETYPES = new Set<AppArchetypeId>([
+  "restaurant_inventory",
+  "saas_dashboard",
+  "crm",
+  "booking",
+  "finance_tracker",
+  "marketplace",
+  "admin_panel",
+  "ai_tool",
+  "generic_app",
+]);
 
 export function hasDeterministicScaffold(archetypeId: string): boolean {
   return KNOWN_SCAFFOLD_ARCHETYPES.has(archetypeId as AppArchetypeId);
@@ -51,9 +67,16 @@ export function hasFullScaffoldTree(archetypeId: string): boolean {
   return FULL_SCAFFOLD_ARCHETYPES.has(archetypeId as AppArchetypeId);
 }
 
-function mergeScaffoldForArchetype(archetypeId: AppArchetypeId, files: BuildFile[]): BuildFile[] {
+function mergeScaffoldForArchetype(
+  archetypeId: AppArchetypeId,
+  files: BuildFile[],
+  appName = "Dream App",
+): BuildFile[] {
   if (archetypeId === "restaurant_inventory") {
     return mergeRestaurantInventoryScaffold(files);
+  }
+  if (FULL_SCAFFOLD_ARCHETYPES.has(archetypeId)) {
+    return mergeGenericSaaSScaffold(archetypeId, files, appName);
   }
   return files;
 }
@@ -76,6 +99,7 @@ export function isWeakBuildOutput(files: BuildFile[], archetypeId: string): bool
 export function applyArchetypeScaffoldFallback(
   archetypeId: string,
   files: BuildFile[],
+  appName = "Dream App",
 ): ScaffoldFallbackResult {
   const id = archetypeId as AppArchetypeId;
   const before = filterRenderableBuildFiles(files);
@@ -115,7 +139,7 @@ export function applyArchetypeScaffoldFallback(
   else if (beforeCount < STANDARD_MIN_RENDERABLE_FILES) reason = "below_minimum_renderable";
   else reason = "llm_output_too_weak";
 
-  const merged = filterRenderableBuildFiles(mergeScaffoldForArchetype(id, files));
+  const merged = filterRenderableBuildFiles(mergeScaffoldForArchetype(id, files, appName));
   return {
     files: merged,
     usedFallback: true,

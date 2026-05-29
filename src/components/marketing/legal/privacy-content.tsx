@@ -58,6 +58,13 @@ export function PrivacyContent() {
           tokens fairly; host previews; process payments; send transactional notices; prevent abuse; comply with law; and
           communicate product updates. We do not sell your personal information.
         </LegalParagraph>
+        <LegalParagraph>
+          <strong className="text-foreground">Marketing emails (optional).</strong> If you opt in during checkout or in
+          account settings, DreamOS86 may send product updates, onboarding tips, offers, and other marketing emails. Marketing
+          consent is optional. We do not send marketing emails unless you opted in. You may unsubscribe or opt out at any time
+          using the link in our emails or by contacting support. We may still send transactional and service emails for your
+          account, billing, security, product operation, and support even if you opt out of marketing.
+        </LegalParagraph>
       </LegalSection>
 
       <LegalSection title="3. AI provider processing">
@@ -86,7 +93,11 @@ export function PrivacyContent() {
             <strong className="text-foreground">AI providers</strong> — model inference as described above.
           </li>
           <li>
-            <strong className="text-foreground">Stripe</strong> — payments when enabled.
+            <strong className="text-foreground">Paddle</strong> — DreamOS86 subscription checkout and billing (when enabled).
+            Paddle may collect optional marketing consent at checkout; we store your preference when provided.
+          </li>
+          <li>
+            <strong className="text-foreground">Stripe</strong> — legacy payments when enabled.
           </li>
           <li>
             <strong className="text-foreground">Email providers</strong> (for example, Resend) — transactional email when

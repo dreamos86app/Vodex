@@ -5,7 +5,9 @@ import {
   createPaddleCheckoutSession,
   updatePaddleSubscriptionPlan,
 } from "@/lib/billing/paddle-api";
-import { getPaddleBillingStatus, type PaddleCheckoutPlan } from "@/lib/billing/paddle-billing";
+import { fromUpgradePolicyInterval } from "@/lib/billing/plan-billing-catalog";
+import { getPaddleBillingStatus, validateCheckoutPlanInterval } from "@/lib/billing/paddle-billing";
+import { billablePlanDefinition, billablePlanToPlanId } from "@/lib/billing/plan-billing-catalog";
 import {
   billingPeriodEndFromNow,
   fullPlanPriceUsd,
@@ -16,8 +18,12 @@ import { monthlyTokensForPlan, normalizePlanId, PLAN_DISPLAY } from "@/lib/billi
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
 
 const schema = z.object({
-  planId: z.enum(["starter", "pro", "infinity"]),
-  interval: z.enum(["monthly", "yearly"]).optional().default("monthly"),
+  planId: z.string(),
+  interval: z
+    .enum(["monthly", "yearly", "annual"])
+    .optional()
+    .default("monthly")
+    .transform((v) => (v === "annual" ? "yearly" : v)),
   confirmed: z.literal(true),
 });
 
@@ -41,7 +47,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Confirm upgrade details before continuing." }, { status: 400 });
   }
 
-  const targetPlan = parsed.data.planId as PaddleCheckoutPlan;
+  const catalogInterval = parsed.data.interval === "yearly" ? "annual" : "monthly";
+  const validated = validateCheckoutPlanInterval(parsed.data.planId, catalogInterval);
+  if (!validated.ok) {
+    return NextResponse.json({ error: validated.error, code: "invalid_price" }, { status: 400 });
+  }
+  const targetPlan = validated.plan;
+  const targetStoragePlan = billablePlanToPlanId(targetPlan);
   const interval = parsed.data.interval;
 
   const { data: profile } = await supabase
@@ -51,7 +63,7 @@ export async function POST(request: Request) {
     .single();
 
   const currentPlan = normalizePlanId(profile?.plan_id ?? "free");
-  if (!isPlanUpgrade(currentPlan, targetPlan)) {
+  if (!isPlanUpgrade(currentPlan, targetStoragePlan)) {
     return NextResponse.json({ error: "Target plan must be higher than your current plan." }, { status: 400 });
   }
 
@@ -60,10 +72,11 @@ export async function POST(request: Request) {
   const preview = {
     currentPlan: { id: currentPlan, name: PLAN_DISPLAY[currentPlan].name },
     newPlan: {
-      id: targetPlan,
-      name: PLAN_DISPLAY[targetPlan].name,
-      buildCredits: monthlyTokensForPlan(targetPlan),
-      actionCredits: monthlyActionCreditsForPlan(targetPlan),
+      id: targetStoragePlan,
+      billableSlug: targetPlan,
+      name: billablePlanDefinition(targetPlan).label,
+      buildCredits: monthlyTokensForPlan(targetStoragePlan),
+      actionCredits: monthlyActionCreditsForPlan(targetStoragePlan),
     },
     amountDueTodayUsd,
     proratedAmountUsd: null,
@@ -84,9 +97,9 @@ export async function POST(request: Request) {
     const updated = await updatePaddleSubscriptionPlan({
       subscriptionId: existingSubId,
       planId: targetPlan,
+      interval: validated.interval,
       userId: user.id,
       billingIntent: interval === "yearly" ? "interval_change" : "upgrade",
-      billingInterval: interval,
     });
 
     if (!updated.ok) {
@@ -109,12 +122,12 @@ export async function POST(request: Request) {
 
   const checkout = await createPaddleCheckoutSession({
     planId: targetPlan,
+    interval: validated.interval,
     userId: user.id,
     email,
     successUrl: `${appUrl}/settings/billing?paddle=success`,
     cancelUrl: `${appUrl}/settings/billing?paddle=canceled`,
     billingIntent: "new_subscription",
-    billingInterval: interval,
   });
 
   if (!checkout.ok) {

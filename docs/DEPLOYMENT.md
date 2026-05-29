@@ -141,6 +141,47 @@ Set in **Vercel → Project → Settings → Environment Variables → Productio
 | `GOOGLE_GENERATIVE_AI_API_KEY` | If using Gemini (`GEMINI_API_KEY` also accepted) |
 | `VERCEL_ACCESS_TOKEN` | Deployment Center / Vercel API (create at [Vercel tokens](https://vercel.com/account/settings/tokens)) — **server only**, not in Supabase |
 
+### Paddle (DreamOS86 subscriptions)
+
+DreamOS86 paid plans bill through **Paddle** (Starter, Pro, Infinity I–VII). Generated apps may use their own payment providers separately. See `.env.example` for the full list.
+
+| Variable | Notes |
+|----------|--------|
+| `PADDLE_ENVIRONMENT` | `sandbox` locally; `production` on Vercel Production |
+| `PADDLE_API_KEY` | Server only |
+| `PADDLE_WEBHOOK_SECRET` | Server only |
+| `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` | Only public Paddle token (client checkout) |
+| `PADDLE_*_MONTHLY_PRICE_ID` / `PADDLE_*_ANNUAL_PRICE_ID` | `pri_*` per plan tier (18 price IDs for 9 paid plans) |
+| `PADDLE_*_PRODUCT_ID` | Optional `pro_*` for admin/debug |
+
+**Owner setup (Products + Prices — not manual subscriptions)**
+
+1. Paddle → **Catalog → Products** — create one product per paid plan (tax category: **SaaS**).
+2. In each product, create **monthly** recurring price and **annual** recurring price (annual = 20% off 12× monthly).
+3. Copy each **`pri_*` Price ID** into `.env.local` and Vercel Production (see `.env.example`).
+4. Webhook URL: **`https://dreamos86.com/api/webhooks/paddle`** — include `transaction.completed`, `subscription.*`, past due / payment failed if available.
+5. Checkout settings: saving payment methods **ON**; marketing consent **ON** (optional opt-in; see Privacy Policy); discounts optional for coupons.
+6. **Do not** use Paddle’s manual **Create subscription** for self-serve users — that is for billing an existing customer manually. DreamOS86 checkout uses Products + Prices.
+7. Redeploy after env changes; run sandbox checkout test.
+8. Admin status: **`/admin/billing/paddle`** (no secrets shown).
+
+Legacy: `PADDLE_INFINITY_MONTHLY_PRICE_ID` maps to **Infinity I** if `PADDLE_INFINITY_I_MONTHLY_PRICE_ID` is unset. Plan slug `infinity` in API maps to `infinity_i`.
+
+Run: `npm run verify:paddle-integration` and `npm run typecheck`.
+
+**Production go-live checklist**
+
+1. Set Vercel Production: `PADDLE_ENVIRONMENT=production`, live `PADDLE_API_KEY` (`pdl_live…`), `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` (`live_…`), `PADDLE_WEBHOOK_SECRET`, all 18 `pri_*` price IDs, optional `pro_*` product IDs, `PADDLE_PUBLIC_CHECKOUT_ENABLED=false`.
+2. Redeploy production.
+3. Open `https://dreamos86.com/admin/billing/paddle` — env consistency green, all price IDs configured. Click **Verify via Paddle API**.
+4. Paddle webhook destination: `https://dreamos86.com/api/webhooks/paddle` (Usage type: **Both**).
+5. Run Notification Simulations (`transaction.paid`, `transaction.completed`, `subscription.activated`, `subscription.updated`, `transaction.payment_failed`) — confirm events appear in admin; simulations must **not** upgrade random users.
+6. Owner live test: `/admin/billing/paddle/test-checkout` (real charge in production).
+7. Confirm webhook updates plan + credits; replay event — no double grant.
+8. Set `PADDLE_PUBLIC_CHECKOUT_ENABLED=true` and redeploy only after step 7 passes.
+
+If `supabase db push` fails with migration history mismatch, apply `scripts/manual-sql/infinity-tier-plan-ids.sql` in SQL Editor (idempotent).
+
 After changing any env var → **Redeploy** Production (Deployments → ⋯ → Redeploy).
 
 ---

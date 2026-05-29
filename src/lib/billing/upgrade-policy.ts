@@ -1,5 +1,11 @@
 import type { PlanId } from "@/lib/supabase/types";
 import { normalizePlanId, PLAN_DISPLAY } from "@/lib/billing/plans";
+import { normalizeBillablePlanId } from "@/lib/billing/plan-billing-catalog";
+import {
+  catalogAmountUsd,
+  fromUpgradePolicyInterval,
+  type BillablePlanId,
+} from "@/lib/billing/plan-billing-catalog";
 
 /** Paddle subscription updates for plan upgrades — never prorate. */
 export const PADDLE_UPGRADE_PRORATION_MODE = "full_immediately" as const;
@@ -20,6 +26,13 @@ const PLAN_RANK: Record<PlanId, number> = {
   pro: 2,
   business: 2,
   infinity: 3,
+  infinity_i: 3,
+  infinity_ii: 4,
+  infinity_iii: 5,
+  infinity_iv: 6,
+  infinity_v: 7,
+  infinity_vi: 8,
+  infinity_vii: 9,
   enterprise: 3,
 };
 
@@ -45,11 +58,9 @@ export function billingPeriodEndFromNow(interval: BillingInterval, from = new Da
   return end.toISOString();
 }
 
-export function fullPlanPriceUsd(plan: PlanId, interval: BillingInterval): number | null {
-  const monthly = PLAN_DISPLAY[normalizePlanId(plan) as PlanId]?.priceMonthlyUsd;
-  if (monthly == null) return null;
-  if (interval === "yearly") {
-    return Math.round(monthly * 12 * (1 - 0.2));
-  }
-  return monthly;
+export function fullPlanPriceUsd(plan: string, interval: BillingInterval): number | null {
+  const billable = normalizeBillablePlanId(plan) ?? normalizeBillablePlanId(normalizePlanId(plan));
+  if (!billable) return null;
+  const catalogInterval = fromUpgradePolicyInterval(interval);
+  return catalogAmountUsd(billable, catalogInterval);
 }

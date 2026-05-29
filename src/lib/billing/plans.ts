@@ -1,4 +1,5 @@
 import type { PlanId } from "@/lib/supabase/types";
+import { BILLABLE_PLAN_DEFINITIONS, monthlyPriceUsd } from "@/lib/billing/billable-plans";
 import { BUILD_CREDITS_BY_PLAN } from "@/lib/billing/plan-credit-economics";
 import { normalizePlanId as normalizePlanIdCore } from "@/lib/billing/normalize-plan-id";
 
@@ -7,17 +8,41 @@ export const PLAN_MONTHLY_TOKENS: Record<PlanId, number> = BUILD_CREDITS_BY_PLAN
 
 export { normalizePlanIdCore as normalizePlanId };
 
-export const PLAN_DISPLAY: Record<
+function buildPlanDisplay(): Record<
   PlanId,
   { name: string; priceMonthlyUsd: number | null; description: string }
-> = {
-  free: { name: "Free", priceMonthlyUsd: 0, description: "30 credits / month" },
-  starter: { name: "Starter", priceMonthlyUsd: 20, description: "200 credits / month" },
-  pro: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month" },
-  business: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month (legacy id)" },
-  infinity: { name: "Infinity", priceMonthlyUsd: 100, description: "1,000 credits / month" },
-  enterprise: { name: "Infinity", priceMonthlyUsd: null, description: "Enterprise tier" },
-};
+> {
+  const base: Record<
+    PlanId,
+    { name: string; priceMonthlyUsd: number | null; description: string }
+  > = {
+    free: { name: "Free", priceMonthlyUsd: 0, description: "30 credits / month" },
+    starter: { name: "Starter", priceMonthlyUsd: 20, description: "200 credits / month" },
+    pro: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month" },
+    business: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month (legacy id)" },
+    infinity: { name: "Infinity I", priceMonthlyUsd: 100, description: "1,000 credits / month" },
+    enterprise: { name: "Infinity I", priceMonthlyUsd: 100, description: "Enterprise tier" },
+    infinity_i: { name: "Infinity I", priceMonthlyUsd: 100, description: "1,000 credits / month" },
+    infinity_ii: { name: "Infinity II", priceMonthlyUsd: 200, description: "2,000 credits / month" },
+    infinity_iii: { name: "Infinity III", priceMonthlyUsd: 300, description: "3,000 credits / month" },
+    infinity_iv: { name: "Infinity IV", priceMonthlyUsd: 380, description: "4,000 credits / month" },
+    infinity_v: { name: "Infinity V", priceMonthlyUsd: 570, description: "6,000 credits / month" },
+    infinity_vi: { name: "Infinity VI", priceMonthlyUsd: 855, description: "9,000 credits / month" },
+    infinity_vii: { name: "Infinity VII", priceMonthlyUsd: 1235, description: "13,000 credits / month" },
+  };
+
+  for (const p of BILLABLE_PLAN_DEFINITIONS.filter((d) => d.id.startsWith("infinity_"))) {
+    base[p.storagePlanId] = {
+      name: p.label,
+      priceMonthlyUsd: monthlyPriceUsd(p),
+      description: `${p.buildCredits.toLocaleString()} credits / month`,
+    };
+  }
+
+  return base;
+}
+
+export const PLAN_DISPLAY = buildPlanDisplay();
 
 /** Paid plans available via Stripe Checkout (not manual one-click). */
 export const STRIPE_CHECKOUT_PLANS = ["starter", "pro", "infinity"] as const;

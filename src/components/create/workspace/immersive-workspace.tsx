@@ -836,7 +836,13 @@ export function ImmersiveWorkspace({
         setProjectDataRefresh((n) => n + 1);
         const pid = projectIdRef.current;
         if (pid) invalidateProjectFilesCache(pid);
-        applyTerminalBuildSummary(terminal, projectFiles.length);
+        const terminalFiles =
+          typeof terminal.latest?.metadata?.file_count === "number"
+            ? terminal.latest.metadata.file_count
+            : typeof terminal.latest?.metadata?.files_persisted === "number"
+              ? terminal.latest.metadata.files_persisted
+              : projectFiles.length;
+        applyTerminalBuildSummary(terminal, terminalFiles);
         setLastMessageCost({ state: "final", credits: 0 });
         if (uid) {
           void refreshCredits({ reason: "charge" }).then(() => {

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { monthlyTokensForPlan, normalizePlanId, PLAN_DISPLAY, isStripeCheckoutPlan } from "@/lib/billing/plans";
+import { billablePlanDefinition, billablePlanToPlanId } from "@/lib/billing/plan-billing-catalog";
+import { validateCheckoutPlanInterval } from "@/lib/billing/paddle-billing";
+import { monthlyTokensForPlan, normalizePlanId, PLAN_DISPLAY } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
 import {
   billingPeriodEndFromNow,
@@ -13,8 +15,8 @@ import {
 import type { PlanId } from "@/lib/supabase/types";
 
 const schema = z.object({
-  planId: z.enum(["starter", "pro", "infinity"]),
-  interval: z.enum(["monthly", "yearly"]).optional().default("monthly"),
+  planId: z.string(),
+  interval: z.enum(["monthly", "yearly", "annual"]).optional().default("monthly"),
 });
 
 export async function GET(request: Request) {
@@ -33,10 +35,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
-  const targetPlan = parsed.data.planId;
-  if (!isStripeCheckoutPlan(targetPlan)) {
-    return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+  const catalogInterval = parsed.data.interval === "annual" ? "annual" : "monthly";
+  const validated = validateCheckoutPlanInterval(parsed.data.planId, catalogInterval);
+  if (!validated.ok) {
+    return NextResponse.json({ error: validated.error }, { status: 400 });
   }
+  const targetPlan = validated.plan;
+  const targetStoragePlan = billablePlanToPlanId(targetPlan);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -45,25 +50,26 @@ export async function GET(request: Request) {
     .single();
 
   const currentPlan = normalizePlanId(profile?.plan_id ?? "free") as PlanId;
-  const interval = parsed.data.interval as BillingInterval;
+  const interval = (parsed.data.interval === "annual" ? "yearly" : parsed.data.interval) as BillingInterval;
 
-  if (!isPlanUpgrade(currentPlan, targetPlan) && currentPlan !== targetPlan) {
+  if (!isPlanUpgrade(currentPlan, targetStoragePlan) && currentPlan !== targetStoragePlan) {
     return NextResponse.json(
       { error: "Use downgrade flow for lower plans. Downgrades apply at next renewal." },
       { status: 400 },
     );
   }
 
-  const amountDueTodayUsd = fullPlanPriceUsd(targetPlan, interval);
+  const amountDueTodayUsd = fullPlanPriceUsd(validated.plan, interval);
   const newRenewalDate = billingPeriodEndFromNow(interval);
 
   return NextResponse.json({
     currentPlan: { id: currentPlan, name: PLAN_DISPLAY[currentPlan].name },
     newPlan: {
-      id: targetPlan,
-      name: PLAN_DISPLAY[targetPlan].name,
-      buildCredits: monthlyTokensForPlan(targetPlan),
-      actionCredits: monthlyActionCreditsForPlan(targetPlan),
+      id: targetStoragePlan,
+      billableSlug: targetPlan,
+      name: billablePlanDefinition(targetPlan).label,
+      buildCredits: monthlyTokensForPlan(targetStoragePlan),
+      actionCredits: monthlyActionCreditsForPlan(targetStoragePlan),
     },
     amountDueTodayUsd,
     proratedAmountUsd: null,

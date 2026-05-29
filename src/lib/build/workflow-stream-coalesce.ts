@@ -18,6 +18,9 @@ const GENERIC_TITLES = new Set([
   "Build needs repair",
 ]);
 
+const INTERNAL_LABEL_RE =
+  /worker_claim|premium_ui_repair|ui_quality_\d|score\s*\d+\s*\/\s*85|code_repair_hard|code_repair_soft|planner_model|execution_instance/i;
+
 function parseLineCounts(detail: string | null | undefined): {
   added?: number;
   removed?: number;
@@ -81,12 +84,19 @@ function stableKeyForRow(
   return `${category}:${title.trim().toLowerCase()}:${filePath ?? ""}`;
 }
 
+function sanitizeInternalLabel(text: string): string | null {
+  const t = text.trim();
+  if (!t || INTERNAL_LABEL_RE.test(t)) return null;
+  return t;
+}
+
 function preferTitle(row: BuildJobEventRow): string {
   const meta = row.metadata ?? {};
   if (typeof meta.display_title === "string" && meta.display_title.trim()) {
-    return meta.display_title.trim();
+    const display = sanitizeInternalLabel(meta.display_title);
+    if (display) return display;
   }
-  const title = row.title?.trim() ?? "";
+  const title = sanitizeInternalLabel(row.title?.trim() ?? "") ?? "";
   if (title && !GENERIC_TITLES.has(title)) return title;
   if (row.detail?.trim() && row.detail.length < 120 && !GENERIC_TITLES.has(row.detail.trim())) {
     return row.detail.trim();

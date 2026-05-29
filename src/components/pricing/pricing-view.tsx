@@ -17,6 +17,13 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/lib/toast";
 import { BUILD_CREDIT_HINTS, CREDIT_PACKAGE_EXAMPLES, USER_CREDITS_PER_USD } from "@/lib/pricing";
 import { planPricingCardCopy } from "@/lib/billing/plan-credit-economics";
+import { catalogAmountUsd } from "@/lib/billing/plan-billing-catalog";
+import { infinityTierIdToBillablePlan } from "@/lib/billing/billable-plans";
+import {
+  usePaddleBillingReady,
+  usePaddleCheckout,
+  type PaddleCheckoutPlan,
+} from "@/components/billing/use-paddle-checkout";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -128,6 +135,10 @@ const FAQS = [
   {
     q: "Can I cancel anytime?",
     a: "Absolutely. You can cancel your subscription at any time. Your plan stays active until the end of the current billing period, then reverts to Free. No lock-ins, no cancellation fees.",
+  },
+  {
+    q: "Will DreamOS86 send marketing emails?",
+    a: "Only if you opt in at checkout or in settings. Optional marketing may include product updates, onboarding tips, and offers. You can unsubscribe anytime. We still send transactional emails for billing, security, and account support.",
   },
   {
     q: "What is your refund policy?",
@@ -444,7 +455,8 @@ function PlanCard({
 }: PlanCardProps) {
   const isCurrent = currentPlanId === id;
   const displayPrice = annual && annualPrice != null ? annualPrice : price;
-  const originalPrice = annual && annualPrice != null ? price : null;
+  const originalPrice =
+    annual && annualPrice != null ? Math.round(price! * 12) : null;
 
   return (
     <motion.div
@@ -497,7 +509,9 @@ function PlanCard({
                     ${originalPrice}
                   </span>
                 )}
-                <span className="text-[12px] text-muted-foreground pb-1">/mo</span>
+                <span className="text-[12px] text-muted-foreground pb-1">
+                  {annual && annualPrice != null ? "/yr" : "/mo"}
+                </span>
               </>
             )}
           </div>
@@ -824,6 +838,8 @@ export function PricingView({ publicMode = false }: { publicMode?: boolean }) {
   const [paidLockedOpen, setPaidLockedOpen] = React.useState(false);
   const [contactKind, setContactKind] = React.useState<"sales" | "support">("support");
   const [contactModalKey, setContactModalKey] = React.useState(0);
+  const { configured: paddleReady, publicCheckoutEnabled } = usePaddleBillingReady();
+  const { startCheckout, busy: checkoutBusy } = usePaddleCheckout();
 
   const planId = profile?.plan_id ?? null;
   const prettyPlan = planId ? planId.charAt(0).toUpperCase() + planId.slice(1) : "Free";
@@ -840,12 +856,23 @@ export function PricingView({ publicMode = false }: { publicMode?: boolean }) {
 
   const signupNext = encodeURIComponent("/pricing");
   const publicPaidCtaHref = publicMode ? `/auth/signup?next=${signupNext}` : undefined;
-  const paidCtaHandler = publicMode ? undefined : openPaidLocked;
 
-  const starterMonthly = 20;
-  const proMonthly = 50;
-  const starterAnnual = Math.round(starterMonthly * (1 - ANNUAL_DISCOUNT));
-  const proAnnual = Math.round(proMonthly * (1 - ANNUAL_DISCOUNT));
+  function paidCtaHandler(plan: PaddleCheckoutPlan) {
+    if (publicMode) return undefined;
+    if (!paddleReady) return openPaidLocked;
+    if (!publicCheckoutEnabled) {
+      return () =>
+        toast.error(
+          "Public checkout is disabled while live billing is verified. Owner can test at /admin/billing/paddle/test-checkout.",
+        );
+    }
+    return () => void startCheckout(plan, annual, { source: "pricing" });
+  }
+
+  const starterMonthly = catalogAmountUsd("starter", "monthly");
+  const proMonthly = catalogAmountUsd("pro", "monthly");
+  const starterAnnual = catalogAmountUsd("starter", "annual");
+  const proAnnual = catalogAmountUsd("pro", "annual");
 
   const pageMotion = reduceMotion
     ? { initial: false, animate: false }
@@ -958,7 +985,7 @@ export function PricingView({ publicMode = false }: { publicMode?: boolean }) {
           cta="Get Starter"
           currentPlanId={publicMode ? null : planId}
           ctaHref={publicPaidCtaHref}
-          ctaOnClick={paidCtaHandler}
+          ctaOnClick={paidCtaHandler("starter")}
         />
 
         <PlanCard
@@ -987,7 +1014,7 @@ export function PricingView({ publicMode = false }: { publicMode?: boolean }) {
           cta="Get Pro"
           currentPlanId={publicMode ? null : planId}
           ctaHref={publicPaidCtaHref}
-          ctaOnClick={paidCtaHandler}
+          ctaOnClick={paidCtaHandler("pro")}
         />
 
         <PlanCard
@@ -1022,7 +1049,16 @@ export function PricingView({ publicMode = false }: { publicMode?: boolean }) {
           cta="Get Infinity"
           currentPlanId={publicMode ? null : planId}
           ctaHref={publicPaidCtaHref}
-          ctaOnClick={paidCtaHandler}
+          ctaOnClick={
+            (() => {
+              const billable = infinityTierIdToBillablePlan(infTier.id);
+              if (billable && paddleReady && !publicMode) {
+                return paidCtaHandler(billable);
+              }
+              if (billable && !paddleReady && !publicMode) return openPaidLocked;
+              return openPaidLocked;
+            })()
+          }
         >
           <InfinityDropdown
             annual={annual}

@@ -1,7 +1,7 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/providers/theme-provider";
 import { IconButton } from "@/components/ui/icon-button";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 

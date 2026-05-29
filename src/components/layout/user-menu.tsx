@@ -125,11 +125,12 @@ export function UserMenu() {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="hidden cursor-pointer items-center gap-2 rounded-[var(--radius-md)] px-2 py-1 transition hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex"
+        className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] px-1.5 py-1 transition hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-2"
         aria-label="Account menu"
         aria-expanded={open}
+        data-testid="mobile-profile-menu-trigger"
       >
-        <div className="flex max-w-[200px] min-w-0 items-center gap-2 text-right leading-tight">
+        <div className="hidden max-w-[200px] min-w-0 items-center gap-2 text-right leading-tight sm:flex">
           <p className="truncate text-[12px] font-medium tracking-[-0.01em]">{dreamLabel}</p>
           {hydrated ? <PlanBadge planId={effectivePlanId} size="xs" className="shrink-0" /> : null}
         </div>
@@ -148,7 +149,8 @@ export function UserMenu() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-0 top-full z-50 mt-2 flex w-[320px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-background shadow-2xl ring-1 ring-border/80"
+            className="absolute right-0 top-full z-50 mt-2 flex max-h-[min(85dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-3.5rem))] w-[min(320px,calc(100vw-1.5rem))] flex-col overflow-hidden overflow-y-auto rounded-[var(--radius-xl)] bg-background pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-border/80"
+            data-testid="account-menu-dropdown"
           >
             <div className="shrink-0 border-b border-border/60 bg-gradient-to-br from-accent/[0.06] via-background to-background px-4 py-3">
               <div className="flex items-start gap-3">
@@ -175,7 +177,7 @@ export function UserMenu() {
                 action={action}
                 planId={effectivePlanId}
                 isConfirmed={isConfirmed}
-                loading={loading && !isConfirmed}
+                loading={loading || !isConfirmed}
                 error={error}
                 variant="popover"
                 onRetry={() => void syncFromDB({ force: true, reason: "manual" })}

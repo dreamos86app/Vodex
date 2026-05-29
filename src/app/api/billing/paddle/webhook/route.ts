@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifyPaddleWebhookSignature } from "@/lib/billing/paddle-api";
-import {
-  handlePaddleSubscriptionEvent,
-  handlePaddleTransactionCompleted,
-} from "@/lib/billing/paddle-webhook-handlers";
+import { storePaddleWebhookEvent } from "@/lib/billing/paddle-event-store";
+import { paddleEnvironment } from "@/lib/billing/paddle-billing";
+import { processPaddleWebhookPayload } from "@/lib/billing/paddle-webhook-processor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +17,25 @@ export async function POST(request: Request) {
   const signature = request.headers.get("paddle-signature");
 
   if (!verifyPaddleWebhookSignature(rawBody, signature, secret)) {
+    const eventId = `paddle:invalid:${Date.now()}`;
+    await storePaddleWebhookEvent({
+      paddleEventId: eventId,
+      eventType: "signature_invalid",
+      environment: paddleEnvironment(),
+      isSimulation: false,
+      userId: null,
+      workspaceId: null,
+      paddleCustomerId: null,
+      paddleSubscriptionId: null,
+      paddleTransactionId: null,
+      paddlePriceId: null,
+      plan: null,
+      interval: null,
+      processingStatus: "signature_invalid",
+      error: "Invalid Paddle-Signature",
+      payloadSafe: {},
+    }).catch(() => undefined);
+
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
@@ -32,20 +50,13 @@ export async function POST(request: Request) {
   const eventId = payload.event_id ?? `paddle:${Date.now()}`;
   const data = payload.data ?? {};
 
-  if (eventType === "transaction.completed") {
-    await handlePaddleTransactionCompleted({
-      data,
-      paddleEventId: eventId,
-    });
-  }
+  const result = await processPaddleWebhookPayload({ eventType, eventId, data });
 
-  if (eventType.startsWith("subscription.")) {
-    await handlePaddleSubscriptionEvent({
-      eventType,
-      data,
-      paddleEventId: eventId,
-    });
-  }
-
-  return NextResponse.json({ received: true });
+  return NextResponse.json({
+    received: result.received,
+    eventId: result.eventId,
+    eventType: result.eventType,
+    processingStatus: result.processingStatus,
+    duplicate: result.duplicate,
+  });
 }

@@ -29,7 +29,7 @@ import {
   Building,
   Plus,
 } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/providers/theme-provider";
 import { cn } from "@/lib/utils";
 import { runFullSignOut } from "@/lib/auth/sign-out-client";
 import { DreamTemplatesNavIcon } from "@/components/ui/dream-templates-nav-icon";

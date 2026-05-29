@@ -1,5 +1,9 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import { getPaddlePriceId } from "@/lib/billing/paddle-billing";
+import {
+  fromUpgradePolicyInterval,
+  normalizeBillablePlanId,
+  resolvePaddlePriceId,
+} from "@/lib/billing/plan-billing-catalog";
 import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
 import { sumExplicitBuildGrants } from "@/lib/credits/canonical-credits";
@@ -116,10 +120,12 @@ export async function applyImmediatePlanUpgrade(
   });
 
   if (input.paddleSubscriptionId) {
+    const billable = normalizeBillablePlanId(newPlan);
+    const catalogInterval = fromUpgradePolicyInterval(
+      input.billingInterval === "yearly" ? "yearly" : "monthly",
+    );
     const priceId =
-      getPaddlePriceId(
-        newPlan === "starter" || newPlan === "pro" || newPlan === "infinity" ? newPlan : "pro",
-      ) ?? "paddle";
+      (billable ? resolvePaddlePriceId(billable, catalogInterval) : null) ?? "paddle";
     await admin.from("subscriptions").upsert(
       {
         user_id: input.userId,

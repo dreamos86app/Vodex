@@ -695,7 +695,7 @@ export async function runStagedBuildPipeline(input: {
   let allFiles: BuildFile[] = [];
 
   if (hasFullScaffoldTree(archetype.id)) {
-    const preScaffold = applyArchetypeScaffoldFallback(archetype.id, []);
+    const preScaffold = applyArchetypeScaffoldFallback(archetype.id, [], appName);
     allFiles = preScaffold.files;
     if (input.buildTrace) {
       traceBuildWorkerStage(input.buildTrace, "scaffold_fallback_applied", String(preScaffold.afterCount));
@@ -839,7 +839,7 @@ export async function runStagedBuildPipeline(input: {
     };
   }
 
-  let scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, allFiles);
+  let scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, allFiles, appName);
   if (scaffoldFallback.usedFallback) {
     track(events, "validating", "Strengthening the app structure…", "weak_output_detected");
     track(
@@ -971,7 +971,7 @@ export async function runStagedBuildPipeline(input: {
 
   track(events, "validating", "Checking the interface…");
 
-  scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, allFiles);
+  scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, allFiles, appName);
   if (scaffoldFallback.usedFallback) {
     track(events, "writing", "Adding the required pages…", `${scaffoldFallback.afterCount} files`);
     allFiles = scaffoldFallback.files;
@@ -1051,7 +1051,7 @@ export async function runStagedBuildPipeline(input: {
   );
 
   if (!enforced.contract.passed && hasFullScaffoldTree(archetype.id)) {
-    scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, enforced.files);
+    scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, enforced.files, resolvedAppName);
     if (scaffoldFallback.usedFallback) {
       track(events, "repairing", "Strengthening the app structure…");
       const retry = enforcePostBuildContractWithRepair(

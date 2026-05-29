@@ -2,7 +2,10 @@ import type { Metadata, Viewport } from "next";
 
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { ThemeProvider } from "@/components/providers/theme-provider";
+import {
+  DREAMOS_THEME_STORAGE_KEY,
+  ThemeProvider,
+} from "@/components/providers/theme-provider";
 
 import { AppProvider } from "@/components/providers/app-provider";
 
@@ -211,6 +214,14 @@ export default function RootLayout({
       suppressHydrationWarning
 
     >
+
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var k=${JSON.stringify(DREAMOS_THEME_STORAGE_KEY)};var t=localStorage.getItem(k);var r=document.documentElement;if(t==="dark")r.classList.add("dark");else r.classList.remove("dark")}catch(e){}})();`,
+          }}
+        />
+      </head>
 
       <body className="min-h-full" suppressHydrationWarning>
 

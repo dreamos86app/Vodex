@@ -64,7 +64,7 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
       layout
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2 rounded-lg bg-surface/80 px-2.5 py-1.5 ring-1 ring-border/60"
+      className="ml-0 mr-8 flex items-center gap-2 rounded-2xl bg-surface/90 px-3 py-2 ring-1 ring-border/60 sm:mr-12"
       data-testid="workflow-file-card"
     >
       <Icon className="size-3.5 shrink-0 text-accent/85" strokeWidth={1.75} />
@@ -94,16 +94,16 @@ function TimelineRow({ event, reducedMotion }: { event: AgentWorkflowEvent; redu
       initial={reducedMotion ? false : { opacity: 0, x: -6 }}
       animate={{ opacity: 1, x: 0 }}
       className={cn(
-        "rounded-lg px-2.5 py-1.5 text-[10.5px] ring-1",
+        "ml-0 mr-8 max-w-[min(100%,28rem)] rounded-2xl px-3 py-2 text-[11px] ring-1 sm:mr-12",
         isAssistant
-          ? "bg-accent/[0.06] ring-accent/20"
+          ? "bg-accent/[0.08] ring-accent/25"
           : failed
             ? "bg-destructive/5 ring-destructive/25"
             : event.status === "done"
-              ? "bg-surface/60 ring-border/50"
+              ? "bg-surface/70 ring-border/50"
               : "bg-surface/90 ring-border/70",
       )}
-      data-testid={`workflow-event-${event.category}`}
+      data-testid={isAssistant ? "workflow-chat-assistant" : `workflow-event-${event.category}`}
     >
       <div className="flex items-start gap-2">
         {isAssistant ? (
@@ -156,7 +156,7 @@ export function AgentWorkflowStream({
   const partialDone = progress.done && progress.latest?.type === "partial_credit_stop";
 
   return (
-    <div className={cn("space-y-2 px-2", className)} data-testid="agent-workflow-stream">
+    <div className={cn("space-y-3", className)} data-testid="agent-workflow-stream">
       <div
         className={cn(
           "rounded-xl px-3 py-2.5 ring-1",

@@ -13,7 +13,20 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type PlanId = "free" | "starter" | "pro" | "business" | "infinity" | "enterprise";
+export type PlanId =
+  | "free"
+  | "starter"
+  | "pro"
+  | "business"
+  | "infinity"
+  | "infinity_i"
+  | "infinity_ii"
+  | "infinity_iii"
+  | "infinity_iv"
+  | "infinity_v"
+  | "infinity_vi"
+  | "infinity_vii"
+  | "enterprise";
 
 export interface Database {
   public: {

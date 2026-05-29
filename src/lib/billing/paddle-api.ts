@@ -1,32 +1,49 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
-  getPaddlePriceId,
+  isKnownPaddlePriceId,
+  resolvePaddlePriceId,
+  toUpgradePolicyInterval,
+  type BillablePlanId,
+  type CatalogBillingInterval,
+} from "@/lib/billing/plan-billing-catalog";
+import { logPaddleCheckoutAttempt } from "@/lib/billing/paddle-event-store";
+import { assertPaddleCheckoutEnvironment } from "@/lib/billing/paddle-env-consistency";
+import {
   missingPaddleEnvVars,
   paddleBillingConfigured,
-  type PaddleCheckoutPlan,
+  paddleEnvironment,
+  validateCheckoutPlanInterval,
 } from "@/lib/billing/paddle-billing";
 import { PADDLE_UPGRADE_PRORATION_MODE } from "@/lib/billing/upgrade-policy";
 
-const PADDLE_API_BASE =
-  process.env.PADDLE_API_ENV === "sandbox"
-    ? "https://sandbox-api.paddle.com"
-    : "https://api.paddle.com";
+function paddleApiBase(): string {
+  return paddleEnvironment() === "production"
+    ? "https://api.paddle.com"
+    : "https://sandbox-api.paddle.com";
+}
 
 export type PaddleCheckoutResult =
   | { ok: true; checkoutUrl: string; transactionId?: string }
-  | { ok: false; code: "setup_required" | "api_error"; error: string; missing?: string[] };
+  | { ok: false; code: "setup_required" | "api_error" | "invalid_price"; error: string; missing?: string[] };
 
 export type PaddleBillingIntent = "new_subscription" | "upgrade" | "interval_change";
 
 export async function createPaddleCheckoutSession(input: {
-  planId: PaddleCheckoutPlan;
+  planId: BillablePlanId;
+  interval?: CatalogBillingInterval;
   userId: string;
   email: string;
   successUrl: string;
   cancelUrl: string;
   billingIntent?: PaddleBillingIntent;
-  billingInterval?: "monthly" | "yearly";
+  source?: "pricing" | "admin_test_checkout" | "settings";
+  testMode?: boolean;
 }): Promise<PaddleCheckoutResult> {
+  const envGate = assertPaddleCheckoutEnvironment();
+  if (!envGate.ok) {
+    return { ok: false, code: "setup_required", error: envGate.error, missing: envGate.errors };
+  }
+
   if (!paddleBillingConfigured()) {
     return {
       ok: false,
@@ -36,20 +53,25 @@ export async function createPaddleCheckoutSession(input: {
     };
   }
 
-  const priceId = getPaddlePriceId(input.planId);
-  if (!priceId) {
+  const interval = input.interval ?? "monthly";
+  const validated = validateCheckoutPlanInterval(input.planId, interval);
+  if (!validated.ok) {
+    return { ok: false, code: "invalid_price", error: validated.error };
+  }
+
+  const priceId = resolvePaddlePriceId(validated.plan, validated.interval);
+  if (!priceId || !isKnownPaddlePriceId(priceId)) {
     return {
       ok: false,
-      code: "setup_required",
-      error: `Paddle price ID missing for plan ${input.planId}`,
-      missing: [`PADDLE_${input.planId.toUpperCase()}_PRICE_ID`],
+      code: "invalid_price",
+      error: "Price ID is not in the DreamOS86 catalog",
     };
   }
 
   const apiKey = process.env.PADDLE_API_KEY!.trim();
 
   try {
-    const res = await fetch(`${PADDLE_API_BASE}/transactions`, {
+    const res = await fetch(`${paddleApiBase()}/transactions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -60,9 +82,12 @@ export async function createPaddleCheckoutSession(input: {
         customer: { email: input.email },
         custom_data: {
           user_id: input.userId,
-          plan_id: input.planId,
+          workspace_id: input.userId,
+          plan_id: validated.plan,
           billing_intent: input.billingIntent ?? "new_subscription",
-          billing_interval: input.billingInterval ?? "monthly",
+          billing_interval: toUpgradePolicyInterval(validated.interval),
+          source: input.source ?? "pricing",
+          test_mode: input.testMode ?? false,
         },
         checkout: {
           url: input.successUrl,
@@ -88,6 +113,16 @@ export async function createPaddleCheckoutSession(input: {
       return { ok: false, code: "api_error", error: "Paddle did not return a checkout URL" };
     }
 
+    await logPaddleCheckoutAttempt({
+      userId: input.userId,
+      plan: validated.plan,
+      interval: validated.interval,
+      priceId,
+      source: input.source ?? "pricing",
+      transactionId: json.data?.id,
+      testMode: input.testMode,
+    });
+
     return { ok: true, checkoutUrl, transactionId: json.data?.id };
   } catch (e) {
     return {
@@ -100,18 +135,17 @@ export async function createPaddleCheckoutSession(input: {
 
 export type PaddleSubscriptionUpdateResult =
   | { ok: true; subscriptionId: string }
-  | { ok: false; code: "setup_required" | "api_error"; error: string; missing?: string[] };
+  | { ok: false; code: "setup_required" | "api_error" | "invalid_price"; error: string; missing?: string[] };
 
 /**
  * Upgrade an existing Paddle subscription — full plan charge, no proration.
- * @see https://developer.paddle.com/api-reference/subscriptions/update-subscription
  */
 export async function updatePaddleSubscriptionPlan(input: {
   subscriptionId: string;
-  planId: PaddleCheckoutPlan;
+  planId: BillablePlanId;
+  interval?: CatalogBillingInterval;
   userId: string;
   billingIntent?: PaddleBillingIntent;
-  billingInterval?: "monthly" | "yearly";
 }): Promise<PaddleSubscriptionUpdateResult> {
   if (!paddleBillingConfigured()) {
     return {
@@ -122,19 +156,21 @@ export async function updatePaddleSubscriptionPlan(input: {
     };
   }
 
-  const priceId = getPaddlePriceId(input.planId);
-  if (!priceId) {
-    return {
-      ok: false,
-      code: "setup_required",
-      error: `Paddle price ID missing for plan ${input.planId}`,
-    };
+  const interval = input.interval ?? "monthly";
+  const validated = validateCheckoutPlanInterval(input.planId, interval);
+  if (!validated.ok) {
+    return { ok: false, code: "invalid_price", error: validated.error };
+  }
+
+  const priceId = resolvePaddlePriceId(validated.plan, validated.interval);
+  if (!priceId || !isKnownPaddlePriceId(priceId)) {
+    return { ok: false, code: "invalid_price", error: "Price ID is not in the DreamOS86 catalog" };
   }
 
   const apiKey = process.env.PADDLE_API_KEY!.trim();
 
   try {
-    const res = await fetch(`${PADDLE_API_BASE}/subscriptions/${input.subscriptionId}`, {
+    const res = await fetch(`${paddleApiBase()}/subscriptions/${input.subscriptionId}`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -145,9 +181,9 @@ export async function updatePaddleSubscriptionPlan(input: {
         proration_billing_mode: PADDLE_UPGRADE_PRORATION_MODE,
         custom_data: {
           user_id: input.userId,
-          plan_id: input.planId,
+          plan_id: validated.plan,
           billing_intent: input.billingIntent ?? "upgrade",
-          billing_interval: input.billingInterval ?? "monthly",
+          billing_interval: toUpgradePolicyInterval(validated.interval),
         },
       }),
     });
@@ -171,6 +207,64 @@ export async function updatePaddleSubscriptionPlan(input: {
       ok: false,
       code: "api_error",
       error: e instanceof Error ? e.message : "Paddle request failed",
+    };
+  }
+}
+
+export type PaddleCancelSubscriptionResult =
+  | { ok: true; cancelAtPeriodEnd: true; currentPeriodEnd: string | null }
+  | { ok: false; code: "setup_required" | "api_error"; error: string; missing?: string[] };
+
+/** Cancel renewal at end of current billing period (default Paddle behavior). */
+export async function cancelPaddleSubscriptionAtPeriodEnd(subscriptionId: string): Promise<PaddleCancelSubscriptionResult> {
+  if (!paddleBillingConfigured()) {
+    return {
+      ok: false,
+      code: "setup_required",
+      error: "Paddle billing is not configured yet.",
+      missing: missingPaddleEnvVars(),
+    };
+  }
+
+  const apiKey = process.env.PADDLE_API_KEY!.trim();
+
+  try {
+    const res = await fetch(`${paddleApiBase()}/subscriptions/${subscriptionId}/cancel`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ effective_from: "next_billing_period" }),
+    });
+
+    const json = (await res.json()) as {
+      data?: {
+        current_billing_period?: { ends_at?: string };
+        scheduled_change?: { effective_at?: string };
+      };
+      error?: { detail?: string };
+    };
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        code: "api_error",
+        error: json.error?.detail ?? `Paddle API ${res.status}`,
+      };
+    }
+
+    const periodEnd =
+      json.data?.current_billing_period?.ends_at ??
+      json.data?.scheduled_change?.effective_at ??
+      null;
+
+    return { ok: true, cancelAtPeriodEnd: true, currentPeriodEnd: periodEnd };
+  } catch (e) {
+    return {
+      ok: false,
+      code: "api_error",
+      error: e instanceof Error ? e.message : "Paddle cancel request failed",
     };
   }
 }

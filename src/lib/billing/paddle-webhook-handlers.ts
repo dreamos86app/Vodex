@@ -3,15 +3,26 @@ import { syncPlanCreditsForUser } from "@/lib/billing/sync-plan-credits";
 import { applyImmediatePlanUpgrade } from "@/lib/billing/apply-immediate-plan-upgrade";
 import { claimBillingEvent } from "@/lib/billing/billing-event-idempotency";
 import { normalizePlanId } from "@/lib/billing/plans";
+import {
+  billablePlanToPlanId,
+  planFromPaddlePriceId,
+} from "@/lib/billing/plan-billing-catalog";
+import { syncPaddleMarketingConsent } from "@/lib/billing/paddle-marketing-consent";
 import type { BillingInterval } from "@/lib/billing/upgrade-policy";
 import type { PlanId } from "@/lib/supabase/types";
 
-function planFromPaddlePrice(priceId: string | undefined): PlanId {
-  if (!priceId) return "free";
-  if (priceId === process.env.PADDLE_STARTER_PRICE_ID?.trim()) return "starter";
-  if (priceId === process.env.PADDLE_PRO_PRICE_ID?.trim()) return "pro";
-  if (priceId === process.env.PADDLE_INFINITY_PRICE_ID?.trim()) return "infinity";
-  return "pro";
+function planFromPaddlePrice(priceId: string | undefined): PlanId | null {
+  const mapped = planFromPaddlePriceId(priceId);
+  if (!mapped) return null;
+  return billablePlanToPlanId(mapped.plan);
+}
+
+function resolveEntitlementPlan(
+  custom: ReturnType<typeof readCustomData>,
+  priceId: string | undefined,
+): PlanId | null {
+  if (custom.planId) return normalizePlanId(custom.planId);
+  return planFromPaddlePrice(priceId);
 }
 
 function periodEndFromEvent(data: Record<string, unknown>): string {
@@ -78,7 +89,11 @@ export async function handlePaddleTransactionCompleted(input: {
   const priceId =
     (input.data.items as Array<{ price?: { id?: string } }> | undefined)?.[0]?.price?.id ??
     (input.data.price_id as string | undefined);
-  const newPlan = normalizePlanId(custom.planId ?? planFromPaddlePrice(priceId));
+  const newPlan = resolveEntitlementPlan(custom, priceId);
+  if (!newPlan) return;
+
+  await syncPaddleMarketingConsent(userId, input.data);
+
   const interval = custom.billingInterval ?? "monthly";
   const subscriptionId = String(
     (input.data.subscription_id as string | undefined) ??
@@ -148,20 +163,70 @@ export async function handlePaddleSubscriptionEvent(input: {
   const priceId =
     (input.data.items as Array<{ price?: { id?: string } }> | undefined)?.[0]?.price?.id ??
     (input.data.price_id as string | undefined);
-  const planId = normalizePlanId(custom.planId ?? planFromPaddlePrice(priceId));
+  const planId = resolveEntitlementPlan(custom, priceId);
+  if (!planId && input.eventType !== "subscription.canceled") return;
+
+  const resolvedPlan = planId ?? "free";
   const periodEnd = periodEndFromEvent(input.data);
   const subscriptionId = String(input.data.id ?? "");
+
+  if (status === "past_due" || input.eventType === "subscription.past_due") {
+    await admin
+      .from("profiles")
+      .update({ subscription_status: "past_due" } as never)
+      .eq("id", userId);
+    await claimBillingEvent(admin, {
+      eventId: input.paddleEventId,
+      userId,
+      eventType: `paddle.${input.eventType}`,
+      subscriptionId: subscriptionId || null,
+    });
+    return;
+  }
+
+  const scheduledChange = input.data.scheduled_change as
+    | { action?: string; effective_at?: string }
+    | null
+    | undefined;
+  const cancelScheduled = scheduledChange?.action === "cancel";
 
   if (
     input.eventType === "subscription.activated" ||
     input.eventType === "subscription.created" ||
     input.eventType === "subscription.updated"
   ) {
+    if (cancelScheduled) {
+      const effectiveAt = scheduledChange?.effective_at ?? periodEnd;
+      await admin
+        .from("profiles")
+        .update({
+          cancel_at_period_end: true,
+          current_period_end: effectiveAt,
+        } as never)
+        .eq("id", userId);
+
+      await admin
+        .from("subscriptions")
+        .update({
+          cancel_at_period_end: true,
+          current_period_end: effectiveAt,
+        } as never)
+        .eq("stripe_subscription_id", subscriptionId);
+
+      await claimBillingEvent(admin, {
+        eventId: input.paddleEventId,
+        userId,
+        eventType: `paddle.${input.eventType}:cancel_scheduled`,
+        subscriptionId: subscriptionId || null,
+      });
+      return;
+    }
+
     if (status === "active" || status === "trialing") {
       await upsertPaddleSubscriptionRow({
         userId,
         subscriptionId,
-        planId,
+        planId: resolvedPlan,
         periodEnd,
         status,
       });
@@ -194,7 +259,7 @@ export async function handlePaddleSubscriptionEvent(input: {
           await applyImmediatePlanUpgrade({
             userId,
             oldPlan: normalizePlanId(profile?.plan_id ?? "free"),
-            newPlan: planId,
+            newPlan: resolvedPlan,
             billingInterval: custom.billingInterval ?? "monthly",
             paddleSubscriptionId: subscriptionId,
             paddleTransactionId: txnId || null,
@@ -207,11 +272,6 @@ export async function handlePaddleSubscriptionEvent(input: {
   }
 
   if (input.eventType === "subscription.canceled" || status === "canceled") {
-    await admin
-      .from("profiles")
-      .update({ plan_id: "free", stripe_subscription_id: null })
-      .eq("id", userId);
-
     const claimed = await claimBillingEvent(admin, {
       eventId: input.paddleEventId,
       userId,
@@ -219,14 +279,29 @@ export async function handlePaddleSubscriptionEvent(input: {
       subscriptionId: subscriptionId || null,
     });
 
-    if (claimed) {
-      await syncPlanCreditsForUser({
-        userId,
-        planId: "free",
-        periodEndIso: periodEnd,
-        source: `paddle:${input.eventType}`,
-        metadata: { paddle_event_id: input.paddleEventId },
-      });
-    }
+    if (!claimed) return;
+
+    await admin
+      .from("profiles")
+      .update({
+        plan_id: "free",
+        stripe_subscription_id: null,
+        cancel_at_period_end: false,
+        subscription_status: "canceled",
+      } as never)
+      .eq("id", userId);
+
+    await admin
+      .from("subscriptions")
+      .update({ status: "canceled", cancel_at_period_end: false })
+      .eq("stripe_subscription_id", subscriptionId);
+
+    await syncPlanCreditsForUser({
+      userId,
+      planId: "free",
+      periodEndIso: periodEnd,
+      source: `paddle:${input.eventType}`,
+      metadata: { paddle_event_id: input.paddleEventId },
+    });
   }
 }

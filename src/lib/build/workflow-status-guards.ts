@@ -94,8 +94,24 @@ export function deriveBuildStatusFacts(input: {
 }): BuildStatusFacts {
   const terminal = input.terminal;
   const events = terminal?.events ?? [];
+  const failureKindMeta = terminal?.latest?.metadata?.failure_kind;
   const metaFileCount = eventFileCount(events);
-  const fileCount = Math.max(input.projectFileCount ?? 0, metaFileCount);
+  const terminalMetaCount =
+    typeof terminal?.latest?.metadata?.file_count === "number"
+      ? terminal.latest.metadata.file_count
+      : typeof terminal?.latest?.metadata?.files_persisted === "number"
+        ? terminal.latest.metadata.files_persisted
+        : null;
+  const fromProject = input.projectFileCount ?? 0;
+  let fileCount = fromProject;
+  if (terminal?.done && terminalMetaCount != null) {
+    fileCount = Math.max(fromProject, terminalMetaCount);
+  } else if (!terminal?.done) {
+    fileCount = Math.max(fromProject, metaFileCount);
+  }
+  if (failureKindMeta === "failed_before_generation") {
+    fileCount = fromProject;
+  }
   const hasFiles = fileCount > 0;
   const partialBuild =
     terminal?.latest?.type === "partial_credit_stop" ||
@@ -109,7 +125,6 @@ export function deriveBuildStatusFacts(input: {
     terminal?.latest?.type === "completed" ||
     events.some((e) => e.type === "completed");
 
-  const failureKindMeta = terminal?.latest?.metadata?.failure_kind;
   const failureKind =
     typeof failureKindMeta === "string"
       ? (failureKindMeta as BuildStatusFacts["failureKind"])

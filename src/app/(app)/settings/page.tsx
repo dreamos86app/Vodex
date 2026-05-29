@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/providers/theme-provider";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   textareaCls,
 } from "@/components/settings/shared";
 import { cn } from "@/lib/utils";
-import { Sun, Moon, Monitor, ImagePlus, Trash2, AlertTriangle, Loader2, Zap, Sparkles } from "lucide-react";
+import { Sun, Moon, ImagePlus, Trash2, AlertTriangle, Loader2, Zap, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { createClient } from "@/lib/supabase/client";
@@ -127,13 +127,16 @@ export default function SettingsGeneralPage() {
     description.trim() !== baselineDesc.trim() ||
     (workspaceIconUrl ?? null) !== (baselineIcon ?? null);
 
-  const themeOptions: { value: string; label: string; icon: React.ReactNode }[] = [
+  const themeOptions: {
+    value: "light" | "dark";
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
     { value: "light", label: "Light", icon: <Sun className="size-4" strokeWidth={1.6} /> },
     { value: "dark", label: "Dark", icon: <Moon className="size-4" strokeWidth={1.6} /> },
-    { value: "system", label: "System", icon: <Monitor className="size-4" strokeWidth={1.6} /> },
   ];
 
-  const activeTheme = hydrated ? (theme ?? "system") : "system";
+  const activeTheme = hydrated ? (theme ?? "light") : "light";
 
   async function handleIconChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
