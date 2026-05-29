@@ -10,6 +10,7 @@ import { AppearanceProvider } from "@/components/providers/appearance-provider";
 
 import { Toaster } from "@/components/ui/toaster";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { OAuthCodeLandingRedirect } from "@/components/auth/oauth-code-landing-redirect";
 
 import "./globals.css";
 
@@ -221,6 +222,7 @@ export default function RootLayout({
 
               {children}
 
+              <OAuthCodeLandingRedirect />
               <Toaster />
               <SpeedInsights />
 

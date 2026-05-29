@@ -91,6 +91,13 @@ export async function authSignInWithOAuth(
     provider,
   );
 
+  if (prepared.invalidRedirect) {
+    return {
+      data: { provider, url: null },
+      error: new Error(prepared.invalidRedirect.code),
+    };
+  }
+
   if (prepared.blocked) {
     return {
       data: { provider, url: null },
@@ -131,7 +138,17 @@ export async function authSignInWithOAuth(
       : await client.auth.signInWithOAuth({ provider, options: oauthOptions });
 
   if (result.data?.url) {
-    logSupabaseAuthorizeUrl(provider, result.data.url, redirectTo);
+    const authorizeOk = logSupabaseAuthorizeUrl(
+      provider,
+      result.data.url,
+      redirectTo,
+    );
+    if (!authorizeOk) {
+      return {
+        data: { provider, url: null },
+        error: new Error("oauth_authorize_redirect_mismatch"),
+      };
+    }
   }
 
   return result;
@@ -275,6 +292,15 @@ export function humanizeAuthError(
   if (message === "oauth_blocked_signed_in") {
     return "You are already signed in.";
   }
+  if (message === "oauth_authorize_redirect_mismatch") {
+    return CALLBACK_ERROR_MESSAGES.oauth_authorize_redirect_mismatch;
+  }
+  if (message === "oauth_redirect_localhost_on_production") {
+    return CALLBACK_ERROR_MESSAGES.oauth_redirect_localhost_on_production;
+  }
+  if (message === "oauth_redirect_host_mismatch") {
+    return CALLBACK_ERROR_MESSAGES.oauth_redirect_host_mismatch;
+  }
   if (message.startsWith("supabase_project_mismatch:")) {
     return message.slice("supabase_project_mismatch:".length);
   }
@@ -319,6 +345,14 @@ export const CALLBACK_ERROR_MESSAGES: Record<string, string> = {
     "Sign-in session cookie was missing (often caused by blocked cookies or opening the link in a different browser). Try again in the same browser.",
   auth_cookie_project_mismatch:
     "Stale sign-in cookies from an old DreamOS86 environment were detected. Clear site data for this host and try Google sign-in again.",
+  supabase_site_url_localhost:
+    "Google sign-in returned to localhost instead of dreamos86.com. In Supabase → Authentication → URL configuration, set Site URL to https://dreamos86.com and add https://dreamos86.com/auth/callback under Redirect URLs, then sign in again from https://dreamos86.com.",
+  oauth_authorize_redirect_mismatch:
+    "Supabase did not accept the app callback URL. Set Site URL to https://dreamos86.com and add https://dreamos86.com/auth/callback to Redirect URLs (exact match, no trailing slash).",
+  oauth_redirect_localhost_on_production:
+    "This build would send OAuth back to localhost while you are on dreamos86.com. Set NEXT_PUBLIC_APP_URL=https://dreamos86.com on Vercel Production and redeploy.",
+  oauth_redirect_host_mismatch:
+    "Sign-in redirect does not match this site. Open https://dreamos86.com and try again.",
 };
 
 /** Safe provider error_description for display (no tokens/codes). */

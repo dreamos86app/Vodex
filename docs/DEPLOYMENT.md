@@ -155,6 +155,7 @@ After changing any env var → **Redeploy** Production (Deployments → ⋯ → 
 | “Sign in” while UI looks logged in | Stale client profile | Hard refresh; sign out/in; check session |
 | AI Chat/Create 503 | No LLM keys on server | Add provider keys in Vercel; redeploy |
 | OAuth redirect wrong | `NEXT_PUBLIC_APP_URL` or Supabase URLs | Fix env + Supabase redirect URLs |
+| After Google sign-in, browser opens `localhost:3000/?code=…` | Supabase **Site URL** still `http://localhost:3000`, or production callback not in **Redirect URLs** | Supabase → Auth → URL configuration: Site URL `https://dreamos86.com`; Redirect URLs include `https://dreamos86.com/auth/callback` (exact). Sign in from `https://dreamos86.com`, not localhost. Vercel Production: `NEXT_PUBLIC_APP_URL=https://dreamos86.com` |
 
 ### Vercel project settings checklist
 

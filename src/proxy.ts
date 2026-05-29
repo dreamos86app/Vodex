@@ -142,7 +142,11 @@ export async function proxy(request: NextRequest) {
     searchParams,
     request.url,
   );
-  if (oauthRedirect && (pathname === "/" || pathname === "")) {
+  if (
+    oauthRedirect &&
+    pathname !== "/auth/callback" &&
+    !pathname.startsWith("/auth/callback/")
+  ) {
     return NextResponse.redirect(new URL(oauthRedirect, request.url));
   }
 

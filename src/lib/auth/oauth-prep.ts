@@ -16,6 +16,7 @@ import {
   formatAuthCookieDirective,
   getAuthCookieOptions,
 } from "@/lib/auth/auth-cookie-options";
+import { validateOAuthRedirectForBrowser } from "@/lib/auth/oauth-origin-guard";
 import { isLocalhostOrigin } from "@/lib/url/app-origin";
 
 export const DREAMOS_AUTH_RETURN_TO_STORAGE = "dreamos_auth_return_to";
@@ -96,6 +97,7 @@ export type OAuthSignInPrepared = {
   returnTo: string | null;
   referralCode: string | null;
   blocked?: boolean;
+  invalidRedirect?: { code: string; message: string };
 };
 
 export type PrepareOAuthSignInOptions = {
@@ -111,11 +113,36 @@ export function prepareClientOAuthSignIn(
   options: PrepareOAuthSignInOptions = {},
   provider: "google" | "github" | "unknown" = "unknown",
 ): OAuthSignInPrepared {
-  const redirectTo = getCanonicalOAuthRedirectTo();
+  const liveOrigin =
+    typeof window !== "undefined" ? window.location.origin : undefined;
+  const redirectTo = getCanonicalOAuthRedirectTo(liveOrigin);
   assertCanonicalOAuthRedirectTo(redirectTo);
 
   if (typeof window === "undefined") {
     return { redirectTo, returnTo: null, referralCode: null };
+  }
+
+  const redirectCheck = validateOAuthRedirectForBrowser(redirectTo);
+  if (!redirectCheck.ok) {
+    logOAuthStartDiagnostics(provider, {
+      redirectTo,
+      oauthStartOrigin: window.location.origin,
+      returnTo: null,
+      referralCodeDetected: null,
+      currentPath: `${window.location.pathname}${window.location.search}`,
+      isAuthenticated: false,
+      blocked: true,
+    });
+    return {
+      redirectTo,
+      returnTo: null,
+      referralCode: null,
+      blocked: true,
+      invalidRedirect: {
+        code: redirectCheck.code,
+        message: redirectCheck.message,
+      },
+    };
   }
 
   const isAuthenticated = options.isAuthenticated === true;
@@ -237,9 +264,7 @@ export function logSupabaseAuthorizeUrl(
   provider: "google" | "github",
   authorizeUrl: string,
   expectedRedirectTo: string,
-): void {
-  if (process.env.NODE_ENV === "production") return;
-
+): boolean {
   const parsed = parseRedirectToFromAuthorizeUrl(authorizeUrl);
   const polluted =
     !parsed ||
@@ -263,6 +288,8 @@ export function logSupabaseAuthorizeUrl(
     },
     polluted ? "warn" : "info",
   );
+
+  return !polluted;
 }
 
 export function isSafeReturnPathForOrigin(
