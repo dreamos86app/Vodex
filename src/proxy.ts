@@ -13,8 +13,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { buildAuthCallbackRedirectFromSearchParams } from "@/lib/auth/oauth-redirect";
 import { safeAuthReturnPath } from "@/lib/auth/oauth-prep";
-import { DREAMOS_REF_COOKIE } from "@/lib/auth/ref-cookie";
+import {
+  clearReferralCookieOnResponse,
+  DREAMOS_REF_COOKIE,
+  sanitizeReferralCode,
+} from "@/lib/auth/ref-cookie";
+import { REFERRAL_NOTICE_QUERY } from "@/lib/referrals/referral-messages";
 import { classifyUrlHostname } from "@/lib/network/safe-fetch";
+import { applyAuthCookieOptions } from "@/lib/auth/auth-cookie-options";
 
 const PROXY_AUTH_WARN_MS = 30_000;
 const PROXY_AUTH_TIMEOUT_MS = 2_500;
@@ -90,17 +96,30 @@ const PROTECTED_PATHS = [
 /** Routes that should redirect authenticated users to home */
 const AUTH_PATHS = ["/auth/login", "/auth/signup", "/auth/sign-up", "/auth/waitlist"];
 
+function extractReferralCode(request: NextRequest): string | null {
+  const fromQuery = sanitizeReferralCode(request.nextUrl.searchParams.get("ref"));
+  if (fromQuery) return fromQuery;
+  const m = request.nextUrl.pathname.match(/^\/r\/([^/]+)\/?$/);
+  if (m) return sanitizeReferralCode(m[1]);
+  return null;
+}
+
 function attachReferralCookieIfPresent(request: NextRequest, response: NextResponse): void {
-  const ref = request.nextUrl.searchParams.get("ref");
-  if (!ref?.trim()) return;
-  const code = ref.trim().toUpperCase();
-  if (code.length < 4 || code.length > 16) return;
-  response.cookies.set(DREAMOS_REF_COOKIE, encodeURIComponent(code), {
-    path: "/",
-    maxAge: 3600,
-    sameSite: "lax",
-    secure: request.nextUrl.protocol === "https:",
-  });
+  const code = extractReferralCode(request);
+  if (!code) return;
+  response.cookies.set(
+    DREAMOS_REF_COOKIE,
+    encodeURIComponent(code),
+    applyAuthCookieOptions({}, request, 3600),
+  );
+}
+
+function redirectLoggedInReferralAttempt(request: NextRequest): NextResponse {
+  const url = new URL("/", request.url);
+  url.searchParams.set(REFERRAL_NOTICE_QUERY, "existing_user");
+  const response = NextResponse.redirect(url);
+  clearReferralCookieOnResponse(response);
+  return response;
 }
 
 export async function proxy(request: NextRequest) {
@@ -184,6 +203,11 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
+  const referralCode = extractReferralCode(request);
+  if (user && referralCode) {
+    return redirectLoggedInReferralAttempt(request);
+  }
+
   if (user && AUTH_PATHS.some((p) => pathname.startsWith(p))) {
     const next = searchParams.get("next");
     const dest =
@@ -202,7 +226,10 @@ export async function proxy(request: NextRequest) {
     return redirect;
   }
 
-  attachReferralCookieIfPresent(request, supabaseResponse);
+  if (!user) {
+    attachReferralCookieIfPresent(request, supabaseResponse);
+  }
+
   return supabaseResponse;
 }
 

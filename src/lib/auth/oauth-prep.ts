@@ -1,23 +1,27 @@
 import {
   DREAMOS_REF_COOKIE,
   DREAMOS_REF_STORAGE_KEY,
+  clearPendingReferralForBrowser,
   persistReferralCodeForBrowser,
   readRefCodeFromCookieHeader,
+  sanitizeReferralCode,
 } from "@/lib/auth/ref-cookie";
-import { getCanonicalOAuthCallbackUrl } from "@/lib/auth/oauth-redirect";
+import {
+  assertCanonicalOAuthRedirectTo,
+  getCanonicalOAuthRedirectTo,
+  parseRedirectToFromAuthorizeUrl,
+} from "@/lib/auth/oauth-redirect";
 import { logAuthEvent } from "@/lib/auth/auth-diagnostics";
+import {
+  formatAuthCookieDirective,
+  getAuthCookieOptions,
+} from "@/lib/auth/auth-cookie-options";
 
-/** Client sessionStorage key for post-OAuth return path (mirrors cookie). */
 export const DREAMOS_AUTH_RETURN_TO_STORAGE = "dreamos_auth_return_to";
-
-/** Short-lived cookie so /auth/callback can redirect without ?next= on redirectTo. */
 export const DREAMOS_RETURN_TO_COOKIE = "dreamos_auth_return_to";
 
 const OAUTH_PREP_KEYS = new Set(["ref", "referral", "referral_code"]);
 
-/**
- * Allow only same-origin relative paths. Strips referral query params from return URLs.
- */
 export function safeAuthReturnPath(raw: string | null | undefined): string | null {
   if (!raw?.trim()) return null;
   const trimmed = raw.trim();
@@ -69,17 +73,18 @@ export function persistAuthReturnToForBrowser(path: string): void {
     /* ignore */
   }
 
-  const secure = window.location.protocol === "https:";
-  document.cookie = `${DREAMOS_RETURN_TO_COOKIE}=${encodeURIComponent(safe)}; Path=/; Max-Age=3600; SameSite=Lax${secure ? "; Secure" : ""}`;
+  const flags = formatAuthCookieDirective(getAuthCookieOptions());
+  document.cookie = `${DREAMOS_RETURN_TO_COOKIE}=${encodeURIComponent(safe)}; ${flags}`;
 }
 
 export function captureReferralFromLocationSearch(search: string): string | null {
   if (!search) return null;
   try {
     const ref = new URLSearchParams(search.startsWith("?") ? search : `?${search}`).get("ref");
-    if (!ref?.trim()) return null;
-    persistReferralCodeForBrowser(ref);
-    return ref.trim().toUpperCase();
+    const code = sanitizeReferralCode(ref);
+    if (!code) return null;
+    persistReferralCodeForBrowser(code);
+    return code;
   } catch {
     return null;
   }
@@ -89,92 +94,174 @@ export type OAuthSignInPrepared = {
   redirectTo: string;
   returnTo: string | null;
   referralCode: string | null;
+  blocked?: boolean;
+};
+
+export type PrepareOAuthSignInOptions = {
+  returnTo?: string | null;
+  isAuthenticated?: boolean;
 };
 
 /**
- * Client-only: persist referral + return path, return canonical OAuth redirectTo (no query).
+ * Client-only: persist referral + return path; return canonical OAuth redirectTo (no query).
+ * When already signed in, clears pending referral and blocks OAuth start.
  */
 export function prepareClientOAuthSignIn(
-  returnTo?: string | null,
+  options: PrepareOAuthSignInOptions = {},
   provider: "google" | "github" | "unknown" = "unknown",
 ): OAuthSignInPrepared {
-  let referralCode: string | null = null;
-  let safeReturn: string | null = safeAuthReturnPath(returnTo ?? null);
+  const redirectTo = getCanonicalOAuthRedirectTo();
+  assertCanonicalOAuthRedirectTo(redirectTo);
 
-  if (typeof window !== "undefined") {
-    referralCode = captureReferralFromLocationSearch(window.location.search);
-    if (!referralCode) {
-      try {
-        const stored = window.localStorage.getItem(DREAMOS_REF_STORAGE_KEY);
-        if (stored?.trim()) referralCode = stored.trim().toUpperCase();
-      } catch {
-        /* ignore */
-      }
-    }
-    if (!referralCode) {
-      referralCode = readRefCodeFromCookieHeader(document.cookie);
-    }
-
-    if (!safeReturn) {
-      try {
-        const fromStorage = window.sessionStorage.getItem(DREAMOS_AUTH_RETURN_TO_STORAGE);
-        safeReturn = safeAuthReturnPath(fromStorage);
-      } catch {
-        /* ignore */
-      }
-    }
-
-    if (!safeReturn) {
-      const fromUrl = new URLSearchParams(window.location.search).get("next");
-      safeReturn = safeAuthReturnPath(fromUrl);
-    }
-
-    if (safeReturn) {
-      persistAuthReturnToForBrowser(safeReturn);
-    }
-
-    logOAuthStartDiagnostics(provider, {
-      redirectTo: getCanonicalOAuthCallbackUrl(),
-      returnTo: safeReturn,
-      referralCodeDetected: referralCode,
-      callbackOrigin: window.location.origin,
-    });
+  if (typeof window === "undefined") {
+    return { redirectTo, returnTo: null, referralCode: null };
   }
 
-  return {
-    redirectTo: getCanonicalOAuthCallbackUrl(),
+  const isAuthenticated = options.isAuthenticated === true;
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+
+  if (isAuthenticated) {
+    clearPendingReferralForBrowser();
+    logOAuthStartDiagnostics(provider, {
+      redirectTo,
+      oauthStartOrigin: window.location.origin,
+      returnTo: null,
+      referralCodeDetected: null,
+      currentPath,
+      isAuthenticated: true,
+      blocked: true,
+    });
+    return { redirectTo, returnTo: null, referralCode: null, blocked: true };
+  }
+
+  let referralCode: string | null = captureReferralFromLocationSearch(window.location.search);
+  if (!referralCode) {
+    try {
+      referralCode = sanitizeReferralCode(
+        window.localStorage.getItem(DREAMOS_REF_STORAGE_KEY),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!referralCode) {
+    referralCode = readRefCodeFromCookieHeader(document.cookie);
+  }
+
+  let safeReturn = safeAuthReturnPath(options.returnTo ?? null);
+  if (!safeReturn) {
+    try {
+      safeReturn = safeAuthReturnPath(
+        window.sessionStorage.getItem(DREAMOS_AUTH_RETURN_TO_STORAGE),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!safeReturn) {
+    safeReturn = safeAuthReturnPath(
+      new URLSearchParams(window.location.search).get("next"),
+    );
+  }
+  if (safeReturn) {
+    persistAuthReturnToForBrowser(safeReturn);
+  }
+
+  logOAuthStartDiagnostics(provider, {
+    redirectTo,
+    oauthStartOrigin: window.location.origin,
     returnTo: safeReturn,
-    referralCode,
-  };
+    referralCodeDetected: referralCode,
+    currentPath,
+    isAuthenticated: false,
+    blocked: false,
+  });
+
+  return { redirectTo, returnTo: safeReturn, referralCode };
 }
 
 export function logOAuthStartDiagnostics(
   provider: "google" | "github" | "unknown",
   meta: {
     redirectTo: string;
+    oauthStartOrigin: string;
     returnTo: string | null;
     referralCodeDetected: string | null;
-    callbackOrigin: string;
+    currentPath: string;
+    isAuthenticated: boolean;
+    blocked?: boolean;
   },
 ): void {
   if (process.env.NODE_ENV === "production") return;
 
-  const redirect = meta.redirectTo.replace(/\?.*$/, "");
-  if (meta.redirectTo !== redirect) {
-    logAuthEvent(
-      "auth_redirect_mismatch",
-      { reason: "redirectTo_must_not_include_query", oauth_start_redirect_to: redirect },
-      "warn",
-    );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
+  let supabaseProjectRef: string | null = null;
+  try {
+    supabaseProjectRef = supabaseUrl ? new URL(supabaseUrl).hostname.split(".")[0] : null;
+  } catch {
+    supabaseProjectRef = null;
   }
+
+  const cookieOpts = getAuthCookieOptions(meta.oauthStartOrigin);
 
   logAuthEvent("oauth_started", {
     provider,
     oauth_start_redirect_to: meta.redirectTo,
-    return_to: meta.returnTo,
+    oauth_start_origin: meta.oauthStartOrigin,
+    auth_return_to: meta.returnTo,
     referral_code_detected: meta.referralCodeDetected,
-    callback_origin: meta.callbackOrigin,
+    current_path: meta.currentPath,
+    is_authenticated: meta.isAuthenticated,
+    oauth_blocked: meta.blocked ?? false,
+    supabase_project_ref: supabaseProjectRef,
+    expected_google_redirect_uri: supabaseProjectRef
+      ? `https://${supabaseProjectRef}.supabase.co/auth/v1/callback`
+      : null,
+    cookie_names_set: meta.blocked
+      ? []
+      : [
+          ...(meta.referralCodeDetected ? [DREAMOS_REF_COOKIE] : []),
+          ...(meta.returnTo ? [DREAMOS_RETURN_TO_COOKIE] : []),
+        ],
+    cookie_options: {
+      domain: cookieOpts.domain ?? null,
+      secure: cookieOpts.secure,
+      sameSite: cookieOpts.sameSite,
+      path: cookieOpts.path,
+    },
   });
+}
+
+export function logSupabaseAuthorizeUrl(
+  provider: "google" | "github",
+  authorizeUrl: string,
+  expectedRedirectTo: string,
+): void {
+  if (process.env.NODE_ENV === "production") return;
+
+  const parsed = parseRedirectToFromAuthorizeUrl(authorizeUrl);
+  const polluted =
+    !parsed ||
+    parsed !== expectedRedirectTo ||
+    parsed.includes("?") ||
+    /\bref=|\bnext=|returnTo=/i.test(parsed);
+
+  logAuthEvent(
+    polluted ? "auth_redirect_mismatch" : "oauth_started",
+    {
+      provider,
+      supabase_authorize_redirect_to: parsed,
+      expected_redirect_to: expectedRedirectTo,
+      authorize_url_host: (() => {
+        try {
+          return new URL(authorizeUrl).host;
+        } catch {
+          return null;
+        }
+      })(),
+    },
+    polluted ? "warn" : "info",
+  );
 }
 
 export function resolvePostAuthDestination(
@@ -190,5 +277,4 @@ export function resolvePostAuthDestination(
   return "/";
 }
 
-/** Cookie names cleared after successful OAuth callback redirect. */
 export const OAUTH_EPHEMERAL_COOKIES = [DREAMOS_REF_COOKIE, DREAMOS_RETURN_TO_COOKIE] as const;

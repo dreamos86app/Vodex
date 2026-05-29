@@ -145,7 +145,10 @@ export async function bootstrapProfileFromOAuth(
     await ensureWelcomeNotification(admin, user.id, displayName);
 
     if (refCodeFromCookie) {
-      await attachReferralByCode(user.id, refCodeFromCookie);
+      const attached = await attachReferralByCode(user.id, refCodeFromCookie);
+      if (!attached.ok && process.env.NODE_ENV !== "production") {
+        console.info("[auth/bootstrap] referral:", attached.error);
+      }
     }
 
     return { onboardingCompleted: false };
@@ -177,8 +180,13 @@ export async function bootstrapProfileFromOAuth(
     await (admin.from("profiles") as any).update(updates).eq("id", user.id);
   }
 
-  if (refCodeFromCookie && !(existing.referred_by ?? "").trim()) {
-    await attachReferralByCode(user.id, refCodeFromCookie);
+  const canAcceptReferral =
+    existing.onboarding_completed !== true && !(existing.referred_by ?? "").trim();
+  if (refCodeFromCookie && canAcceptReferral) {
+    const attached = await attachReferralByCode(user.id, refCodeFromCookie);
+    if (!attached.ok && process.env.NODE_ENV !== "production") {
+      console.info("[auth/bootstrap] referral:", attached.error);
+    }
   }
 
   return { onboardingCompleted: existing.onboarding_completed === true };

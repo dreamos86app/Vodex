@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DreamOS86BrandLockup } from "@/components/brand/dreamos86-brand-lockup";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Check, AlertCircle, Loader2, WifiOff } from "lucide-react";
@@ -19,6 +19,8 @@ import {
 } from "@/lib/auth";
 import { logAuthEvent } from "@/lib/auth/auth-diagnostics";
 import { persistReferralCodeForBrowser } from "@/lib/auth/ref-cookie";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { hasActiveSession } from "@/lib/auth/client-identity";
 import { cn } from "@/lib/utils";
 
 function PasswordStrength({ password }: { password: string }) {
@@ -65,7 +67,9 @@ function PasswordStrength({ password }: { password: string }) {
 }
 
 export function SignupView() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, session } = useAuthStore();
   const [showPassword, setShowPassword] = React.useState(false);
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -140,7 +144,16 @@ export function SignupView() {
     setError(null);
 
     const returnTo = safeAuthReturnPath(searchParams.get("next"));
-    const { error: oauthError } = await authSignInWithOAuth(provider, { returnTo });
+    const { error: oauthError } = await authSignInWithOAuth(provider, {
+      returnTo,
+      isAuthenticated: hasActiveSession(session, user),
+    });
+
+    if (oauthError?.message === "oauth_blocked_signed_in") {
+      router.replace("/?referral_notice=existing_user");
+      setOauthLoading(null);
+      return;
+    }
 
     if (oauthError) {
       const msg = humanizeAuthError(oauthError.message, provider);

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireDreamosOwner } from "@/lib/admin/require-owner";
 import { getAppUrl } from "@/lib/app-url";
-import { getCanonicalOAuthCallbackUrl } from "@/lib/auth/oauth-redirect";
+import { getCanonicalOAuthRedirectTo } from "@/lib/auth/oauth-redirect";
 import { usesDefaultSupabaseProjectHost, getSupabasePublicUrl } from "@/lib/supabase/auth-domain";
 import { safeFetch } from "@/lib/network/safe-fetch";
 
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   const appUrlEnv = process.env.NEXT_PUBLIC_APP_URL ?? getAppUrl();
-  const callbackUrl = getCanonicalOAuthCallbackUrl();
+  const callbackUrl = getCanonicalOAuthRedirectTo();
 
   // ?probe=google|github — re-check just one provider for the test button
   const url = new URL(request.url);

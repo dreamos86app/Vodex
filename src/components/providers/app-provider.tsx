@@ -18,6 +18,8 @@ import { useCreditsSync } from "@/hooks/use-credits-sync";
 import { useNotificationsStore } from "@/lib/stores/notifications-store";
 import type { Notification } from "@/lib/supabase/types";
 import { ReferralCapture } from "@/components/referrals/referral-capture";
+import { ReferralGuard } from "@/components/referrals/referral-guard";
+import { ReferralNoticeHandler } from "@/components/referrals/referral-notice-handler";
 import { CommandCenter } from "@/components/command/command-center";
 import { RecentPagesTracker } from "@/components/navigation/recent-pages-tracker";
 import { NavigationProgress } from "@/components/layout/navigation-progress";
@@ -334,6 +336,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <>
       <NavigationProgress />
       <RecentPagesTracker />
+      <React.Suspense fallback={null}>
+        <ReferralGuard />
+        <ReferralNoticeHandler />
+      </React.Suspense>
       <ReferralCapture />
       <CommandCenter />
       <AuthStateDebug />

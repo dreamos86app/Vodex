@@ -2,31 +2,41 @@
  * DreamOS86 — Centralized Auth Service
  *
  * Single source of truth for every auth operation.
- * OAuth redirect URLs use live browser origin in the client.
+ * OAuth redirectTo is always canonical: `${origin}/auth/callback` (no query).
  */
 
 import { createClient } from "@/lib/supabase/client";
 import { getAppUrl } from "@/lib/app-url";
 import { CONNECTION_SETUP_USER_MESSAGE } from "@/lib/network/ssl-diagnostics-store";
 import {
-  getCallbackUrl as buildCallbackUrl,
-  getCanonicalOAuthCallbackUrl,
+  getCanonicalOAuthRedirectTo,
   getPasswordResetUrl as buildPasswordResetUrl,
 } from "@/lib/auth/oauth-redirect";
-import { prepareClientOAuthSignIn } from "@/lib/auth/oauth-prep";
+import {
+  logSupabaseAuthorizeUrl,
+  prepareClientOAuthSignIn,
+} from "@/lib/auth/oauth-prep";
+import {
+  extractSupabaseProjectRefFromUrl,
+  expectedGoogleOAuthRedirectUri,
+} from "@/lib/supabase/supabase-project-config";
+import { getSupabaseOAuthBlockReason } from "@/lib/supabase/supabase-oauth-guard";
 
 export { getAppUrl } from "@/lib/app-url";
 export {
   getCallbackUrl,
+  getCanonicalOAuthRedirectTo,
   getCanonicalOAuthCallbackUrl,
   getPasswordResetUrl,
   getOAuthBaseUrl,
+  assertCanonicalOAuthRedirectTo,
 } from "@/lib/auth/oauth-redirect";
 export {
   safeAuthReturnPath,
   prepareClientOAuthSignIn,
   captureReferralFromLocationSearch,
 } from "@/lib/auth/oauth-prep";
+export { clearPendingReferralForBrowser, sanitizeReferralCode } from "@/lib/auth/ref-cookie";
 
 export async function authSignIn(email: string, password: string) {
   return createClient().auth.signInWithPassword({ email, password });
@@ -42,42 +52,84 @@ export async function authSignUp(
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: getCanonicalOAuthCallbackUrl(),
+      emailRedirectTo: getCanonicalOAuthRedirectTo(),
     },
   });
 }
 
 export type OAuthSignInOptions = {
-  /** Relative in-app path only (e.g. /create). Referral codes use cookies, not redirectTo. */
   returnTo?: string | null;
+  isAuthenticated?: boolean;
 };
 
 export async function authSignInWithOAuth(
   provider: "google" | "github",
   options?: OAuthSignInOptions | string | null,
 ) {
-  const client = createClient();
-  const returnTo =
-    typeof options === "string" ? options : (options?.returnTo ?? null);
-  const { redirectTo } = prepareClientOAuthSignIn(returnTo, provider);
+  const oauthBlock = getSupabaseOAuthBlockReason();
+  if (oauthBlock) {
+    return {
+      data: { provider, url: null },
+      error: new Error(`supabase_project_mismatch:${oauthBlock.message}`),
+    };
+  }
 
-  if (provider === "google") {
-    return client.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: {
-          prompt: "select_account",
-          access_type: "offline",
-        },
-      },
+  const client = createClient();
+  const opts: OAuthSignInOptions =
+    typeof options === "string" ? { returnTo: options } : (options ?? {});
+
+  const prepared = prepareClientOAuthSignIn(
+    {
+      returnTo: opts.returnTo ?? null,
+      isAuthenticated: opts.isAuthenticated,
+    },
+    provider,
+  );
+
+  if (prepared.blocked) {
+    return {
+      data: { provider, url: null },
+      error: new Error("oauth_blocked_signed_in"),
+    };
+  }
+
+  const redirectTo = prepared.redirectTo;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
+  const supabaseProjectRef = extractSupabaseProjectRefFromUrl(supabaseUrl);
+
+  if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+    console.info("[DreamOS86][oauth-start]", {
+      appOrigin: window.location.origin,
+      supabaseProjectRef,
+      redirectTo,
+      expectedGoogleRedirectUri: supabaseProjectRef
+        ? expectedGoogleOAuthRedirectUri(supabaseProjectRef)
+        : null,
     });
   }
 
-  return client.auth.signInWithOAuth({
-    provider,
-    options: { redirectTo },
-  });
+  const oauthOptions = {
+    redirectTo,
+    ...(provider === "google"
+      ? {
+          queryParams: {
+            prompt: "select_account",
+            access_type: "offline",
+          },
+        }
+      : {}),
+  };
+
+  const result =
+    provider === "google"
+      ? await client.auth.signInWithOAuth({ provider: "google", options: oauthOptions })
+      : await client.auth.signInWithOAuth({ provider, options: oauthOptions });
+
+  if (result.data?.url) {
+    logSupabaseAuthorizeUrl(provider, result.data.url, redirectTo);
+  }
+
+  return result;
 }
 
 export async function authSignOut() {
@@ -215,6 +267,12 @@ export function humanizeAuthError(
   message: string,
   provider?: "google" | "github",
 ): string {
+  if (message === "oauth_blocked_signed_in") {
+    return "You are already signed in.";
+  }
+  if (message.startsWith("supabase_project_mismatch:")) {
+    return message.slice("supabase_project_mismatch:".length);
+  }
   for (const [pattern, replacement] of ERROR_MAP) {
     if (pattern.test(message)) {
       if (replacement === "__LOGIN_INVALID__") {
@@ -227,7 +285,7 @@ export function humanizeAuthError(
             : provider === "github"
               ? "GitHub"
               : "OAuth";
-        return `${name} sign-in failed (unsupported provider). Check Supabase Auth URL config includes ${getCanonicalOAuthCallbackUrl()} and matches this origin.`;
+        return `${name} sign-in failed (unsupported provider). Check Supabase Auth URL config includes ${getCanonicalOAuthRedirectTo()} and matches this origin.`;
       }
       if (replacement === "__CONNECTION_SETUP__") {
         return CONNECTION_SETUP_USER_MESSAGE;

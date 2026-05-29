@@ -6,6 +6,9 @@ import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authSignInWithOAuth, captureReferralFromLocationSearch, humanizeAuthError } from "@/lib/auth";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { hasActiveSession } from "@/lib/auth/client-identity";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -35,6 +38,8 @@ const oauthBtnClass =
   "flex min-h-[54px] w-full items-center justify-center gap-3 rounded-xl border-2 border-border bg-background px-5 py-3.5 text-[15px] font-semibold text-foreground shadow-md transition hover:border-accent/40 hover:bg-surface active:scale-[0.99] disabled:opacity-60 sm:min-h-[52px] sm:max-w-[280px]";
 
 export function PublicSignupSection() {
+  const router = useRouter();
+  const { user, session } = useAuthStore();
   const [oauthLoading, setOauthLoading] = React.useState<"google" | "github" | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -42,7 +47,14 @@ export function PublicSignupSection() {
     setOauthLoading(provider);
     setError(null);
     captureReferralFromLocationSearch(window.location.search);
-    const { error: oauthError } = await authSignInWithOAuth(provider);
+    const { error: oauthError } = await authSignInWithOAuth(provider, {
+      isAuthenticated: hasActiveSession(session, user),
+    });
+    if (oauthError?.message === "oauth_blocked_signed_in") {
+      router.replace("/?referral_notice=existing_user");
+      setOauthLoading(null);
+      return;
+    }
     if (oauthError) {
       setError(humanizeAuthError(oauthError.message, provider));
       setOauthLoading(null);

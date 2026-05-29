@@ -21,10 +21,13 @@ import {
 import { persistReferralCodeForBrowser } from "@/lib/auth/ref-cookie";
 import { logAuthEvent } from "@/lib/auth/auth-diagnostics";
 import { ensureProfileAfterLogin } from "@/lib/auth/post-login";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { hasActiveSession } from "@/lib/auth/client-identity";
 
 export function LoginView() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, session } = useAuthStore();
 
   function safeInternalPath(raw: string | null): string {
     return safeAuthReturnPath(raw) ?? "/";
@@ -154,7 +157,16 @@ export function LoginView() {
     setError(null);
     setAccountExistsHint(false);
     const returnTo = safeAuthReturnPath(searchParams.get("next"));
-    const { error: oauthError } = await authSignInWithOAuth(provider, { returnTo });
+    const { error: oauthError } = await authSignInWithOAuth(provider, {
+      returnTo,
+      isAuthenticated: hasActiveSession(session, user),
+    });
+
+    if (oauthError?.message === "oauth_blocked_signed_in") {
+      router.replace("/?referral_notice=existing_user");
+      setOauthLoading(null);
+      return;
+    }
 
     if (oauthError) {
       const msg = humanizeAuthError(oauthError.message, provider);

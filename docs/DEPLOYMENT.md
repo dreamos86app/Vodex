@@ -98,6 +98,31 @@ Supabase → **Authentication** → **URL configuration**:
 - Site URL: `https://dreamos86.com`
 - Redirect URLs include: `https://dreamos86.com/auth/callback`
 
+### Google OAuth (must match Supabase project)
+
+`NEXT_PUBLIC_SUPABASE_URL`, anon key, and service role **must all be from the same project**.
+
+Canonical production project: **`wciioegiczwqlmlroley`**
+
+Google Cloud → OAuth client → **Authorized redirect URIs** (exactly one Supabase callback per project in use):
+
+```text
+https://wciioegiczwqlmlroley.supabase.co/auth/v1/callback
+```
+
+If production accidentally points at another project (e.g. `xycqutvqxtkbszytaxbe`), either:
+
+1. **Fix Vercel env** back to `wciioegiczwqlmlroley` and matching keys (recommended), or
+2. Add that project’s callback URL to Google and enable Google in that Supabase project’s Auth providers.
+
+After deploy, verify (dev: open while logged out; production: owner session):
+
+```text
+GET /api/dev/auth-config
+```
+
+Confirm `supabaseProjectRef` equals `wciioegiczwqlmlroley` and `consistencyOk` is true.
+
 ---
 
 ## C. Environment variables (Vercel Production)
