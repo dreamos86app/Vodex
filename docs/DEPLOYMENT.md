@@ -143,12 +143,12 @@ Set in **Vercel → Project → Settings → Environment Variables → Productio
 
 ### Paddle (DreamOS86 subscriptions)
 
-DreamOS86 paid plans bill through **Paddle** (Starter, Pro, Infinity I–VII). Generated apps may use their own payment providers separately. See `.env.example` for the full list.
+DreamOS86 paid plans bill through **Paddle** (Starter, Pro, Infinity I–VII). Generated apps may use their own payment providers separately (e.g. Stripe on `/api/projects/[id]/payments/*`) — that is **not** DreamOS86 platform billing. Legacy `/api/billing/checkout` Stripe routes return `410` with “DreamOS86 billing uses Paddle.” unless `DREAMOS_STRIPE_SUBSCRIPTION_BILLING_ENABLED=true`. Profile billing IDs: `paddle_customer_id`, `paddle_subscription_id`, `paddle_price_id` — apply `scripts/manual-sql/paddle-customer-fields.sql` if needed. See `.env.example` for the full list.
 
 | Variable | Notes |
 |----------|--------|
 | `PADDLE_ENVIRONMENT` | `sandbox` locally; `production` on Vercel Production |
-| `PADDLE_API_KEY` | Server only |
+| `PADDLE_API_KEY` | Server only — include **Customer portal sessions: Write** (`customer_portal_session.write`) for “Manage subscription” |
 | `PADDLE_WEBHOOK_SECRET` | Server only |
 | `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` | Only public Paddle token (client checkout) |
 | `PADDLE_CHECKOUT_URL` | Production: approved checkout domain (e.g. `https://dreamos86.com`) or leave empty for Paddle default payment link. Never localhost in live mode. |

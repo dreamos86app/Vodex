@@ -148,7 +148,7 @@ export function BuildRunSummaryCard({
               Repair build
             </button>
           ) : null}
-          {partial || (failed && !showPreviewActions) ? (
+          {partial || (failed && status === "insufficient_credits_before_start") ? (
             <>
               <Link
                 href="/pricing"

@@ -213,6 +213,7 @@ function QuickCreateBar({
         const msg = data.userMessage ?? data.error ?? "Could not start your build. Try again.";
         setLaunchError(msg);
         onChange(q);
+        setCreating(false);
         return;
       }
 
@@ -229,10 +230,10 @@ function QuickCreateBar({
 
       setLaunchError("Could not open the builder. Try again.");
       onChange(q);
+      setCreating(false);
     } catch {
       setLaunchError("Network error — check your connection and try again.");
       onChange(q);
-    } finally {
       setCreating(false);
     }
   }

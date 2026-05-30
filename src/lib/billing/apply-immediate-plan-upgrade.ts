@@ -8,6 +8,11 @@ import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
 import { sumExplicitBuildGrants } from "@/lib/credits/canonical-credits";
 import { claimBillingEvent } from "@/lib/billing/billing-event-idempotency";
+import { logPaddleEntitlementAudit } from "@/lib/billing/paddle-entitlement-audit";
+import {
+  updateProfilePaddleBilling,
+  upsertPaddleSubscriptionMirror,
+} from "@/lib/billing/paddle-subscription-legacy-store";
 import type { BillingInterval } from "@/lib/billing/upgrade-policy";
 import { billingPeriodEndFromNow } from "@/lib/billing/upgrade-policy";
 import type { PlanId } from "@/lib/supabase/types";
@@ -19,6 +24,9 @@ export type ApplyImmediatePlanUpgradeInput = {
   billingInterval: BillingInterval;
   paddleSubscriptionId?: string | null;
   paddleTransactionId?: string | null;
+  paddlePriceId?: string | null;
+  paddleCustomerId?: string | null;
+  paddleEventId?: string | null;
   effectiveAt?: string;
   /** Idempotent webhook / transaction id */
   idempotencyKey: string;
@@ -81,17 +89,15 @@ export async function applyImmediatePlanUpgrade(
     .eq("id", input.userId)
     .maybeSingle();
 
-  await admin
-    .from("profiles")
-    .update({
-      plan_id: newPlan,
-      credits_remaining: buildCredits,
-      credits_reset_at: periodEndIso,
-      ...(input.paddleSubscriptionId
-        ? { stripe_subscription_id: input.paddleSubscriptionId }
-        : {}),
-    })
-    .eq("id", input.userId);
+  await updateProfilePaddleBilling(admin, input.userId, {
+    customerId: input.paddleCustomerId,
+    subscriptionId: input.paddleSubscriptionId,
+    priceId: input.paddlePriceId,
+    planId: newPlan,
+    subscriptionStatus: "active",
+    creditsRemaining: buildCredits,
+    creditsResetAt: periodEndIso,
+  });
 
   await admin.from("action_credit_balances" as never).upsert(
     {
@@ -126,23 +132,35 @@ export async function applyImmediatePlanUpgrade(
     );
     const priceId =
       (billable ? resolvePaddlePriceId(billable, catalogInterval) : null) ?? "paddle";
-    await admin.from("subscriptions").upsert(
-      {
-        user_id: input.userId,
-        stripe_subscription_id: input.paddleSubscriptionId,
-        stripe_customer_id: "paddle",
-        stripe_price_id: priceId,
-        plan_id: newPlan,
-        plan_interval: input.billingInterval === "yearly" ? "yearly" : "monthly",
-        credits_per_period: buildAllowance,
-        status: "active",
-        current_period_start: effectiveAt,
-        current_period_end: periodEndIso,
-        pending_downgrade_plan: null,
-      } as never,
-      { onConflict: "stripe_subscription_id" },
-    );
+    await upsertPaddleSubscriptionMirror(admin, {
+      userId: input.userId,
+      subscriptionId: input.paddleSubscriptionId,
+      customerId: input.paddleCustomerId,
+      priceId: priceId.startsWith("pri_") ? priceId : null,
+      planId: newPlan,
+      planInterval: input.billingInterval === "yearly" ? "yearly" : "monthly",
+      creditsPerPeriod: buildAllowance,
+      status: "active",
+      periodStart: effectiveAt,
+      periodEnd: periodEndIso,
+      pendingDowngradePlan: null,
+    });
   }
+
+  await logPaddleEntitlementAudit({
+    userId: input.userId,
+    previousPlan: oldPlan,
+    newPlan,
+    buildCreditsBefore: profileBefore?.credits_remaining ?? null,
+    buildCreditsAfter: buildCredits,
+    actionCreditsAfter: actionCredits,
+    paddleEventId: input.paddleEventId ?? null,
+    paddleTransactionId: input.paddleTransactionId ?? null,
+    paddleSubscriptionId: input.paddleSubscriptionId ?? null,
+    paddlePriceId: input.paddlePriceId ?? null,
+    source: input.source,
+    idempotencyKey: input.idempotencyKey,
+  });
 
   await admin.from("notifications").insert({
     user_id: input.userId,

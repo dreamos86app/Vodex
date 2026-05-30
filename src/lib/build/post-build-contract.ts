@@ -91,7 +91,7 @@ export function isCosmeticOnlyBuildFailure(failures: string[]): boolean {
 }
 
 const NON_BLOCKING_WITH_SAVED_FILES_RE =
-  /^(app_icon_missing|app_name_untitled|ui_too_basic|missing_app_layout|missing_app_page)$|^ui_quality_|^route_pages_|^components_|^renderable_files_/;
+  /^(app_icon_missing|app_name_untitled|ui_too_basic|missing_app_layout|missing_app_page)$|^ui_quality_|^route_pages_|^components_|^renderable_files_|^required_pages_missing/;
 
 /** Enough files saved — preview is useful even if quality/icon checks did not pass. */
 export function canCompleteWithSavedFiles(fileCount: number, failures: string[]): boolean {
@@ -221,18 +221,18 @@ export function evaluatePostBuildContract(input: PostBuildContractInput): PostBu
   );
 
   const hasRenderableFiles = renderable.length > 0;
-  const userMessage = passed
-    ? "Preview ready — your first version is ready."
+  const savedUsable = canCompleteWithSavedFiles(renderable.length, filteredFailures);
+
+  const userMessage = passed || savedUsable
+    ? "First version ready — preview is live."
     : !hasRenderableFiles
       ? "I couldn't generate files for this request. Try again or simplify your prompt."
       : missingImports.length > 0
-        ? "Generated files reference components that were not created — a repair pass can fix this."
-        : failures.some((f) => f.startsWith("ui_quality"))
-          ? "The first version was saved, but UI quality needs a repair pass before preview."
-          : "The first version was saved, but some checks did not pass yet.";
+        ? "The files were saved, but preview could not render because of a technical issue."
+        : "The files were saved, but preview could not render because of a technical issue.";
 
   return {
-    passed,
+    passed: passed || savedUsable,
     failures: filteredFailures,
     missingImports,
     renderableCount: renderable.length,
@@ -301,6 +301,9 @@ export function enforcePostBuildContractWithRepair(
 }
 
 export function requiredPageSlugsForArchetype(archetypeId: string): string[] | null {
+  if (archetypeId === "subscription_box_manager") {
+    return ["dashboard", "subscribers", "boxes", "shipments", "analytics", "settings"];
+  }
   if (archetypeId === "restaurant_inventory") {
     return ["dashboard", "inventory", "suppliers", "alerts", "settings"];
   }

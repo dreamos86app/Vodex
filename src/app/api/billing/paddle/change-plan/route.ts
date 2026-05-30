@@ -17,6 +17,14 @@ import {
 import { billablePlanDefinition, billablePlanToPlanId } from "@/lib/billing/plan-billing-catalog";
 import { monthlyTokensForPlan, normalizePlanId, PLAN_DISPLAY } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
+import {
+  PROFILE_PADDLE_BILLING_SELECT,
+  readProfilePaddleSubscriptionId,
+} from "@/lib/billing/paddle-profile-fields";
+import {
+  fetchSubscriptionByPaddleId,
+  updateSubscriptionByPaddleId,
+} from "@/lib/billing/paddle-subscription-legacy-store";
 
 const schema = z.object({
   plan: z.string(),
@@ -55,27 +63,26 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan_id, stripe_subscription_id")
+    .select(`plan_id, ${PROFILE_PADDLE_BILLING_SELECT}`)
     .eq("id", user.id)
     .single();
 
   const currentPlan = normalizePlanId(profile?.plan_id ?? "free");
-  const existingSubId = profile?.stripe_subscription_id?.trim();
+  const existingSubId = readProfilePaddleSubscriptionId(profile ?? undefined);
 
   if (isPlanDowngrade(currentPlan, targetStoragePlan)) {
     if (!existingSubId) {
       return NextResponse.json({ error: "No active subscription to downgrade" }, { status: 400 });
     }
-    const { data: subRow } = await supabase
-      .from("subscriptions")
-      .select("current_period_end")
-      .eq("stripe_subscription_id", existingSubId)
-      .maybeSingle();
+    const subRow = await fetchSubscriptionByPaddleId(
+      supabase,
+      existingSubId,
+      "current_period_end",
+    );
 
-    await supabase
-      .from("subscriptions")
-      .update({ pending_downgrade_plan: targetStoragePlan })
-      .eq("stripe_subscription_id", existingSubId);
+    await updateSubscriptionByPaddleId(supabase, existingSubId, {
+      pending_downgrade_plan: targetStoragePlan,
+    });
 
     return NextResponse.json({
       mode: "scheduled_downgrade",

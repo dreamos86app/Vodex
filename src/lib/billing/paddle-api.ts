@@ -16,6 +16,7 @@ import {
 } from "@/lib/billing/paddle-billing";
 import { PADDLE_UPGRADE_PRORATION_MODE } from "@/lib/billing/upgrade-policy";
 import { resolvePaddleTransactionCheckoutUrl } from "@/lib/billing/paddle-checkout-url";
+import { buildPaddleCheckoutCustomData } from "@/lib/billing/paddle-checkout-custom-data";
 
 function paddleApiBase(): string {
   return paddleEnvironment() === "production"
@@ -86,18 +87,21 @@ export async function createPaddleCheckoutSession(input: {
 
   const apiKey = process.env.PADDLE_API_KEY!.trim();
 
+  const customData = buildPaddleCheckoutCustomData({
+    userId: input.userId,
+    workspaceId: input.userId,
+    planId: validated.plan,
+    interval: validated.interval,
+    priceId,
+    source: input.source ?? "pricing",
+    billingIntent: input.billingIntent ?? "new_subscription",
+    testMode: input.testMode ?? false,
+  });
+
   const transactionBody: Record<string, unknown> = {
     items: [{ price_id: priceId, quantity: 1 }],
     customer: { email: input.email },
-    custom_data: {
-      user_id: input.userId,
-      workspace_id: input.userId,
-      plan_id: validated.plan,
-      billing_intent: input.billingIntent ?? "new_subscription",
-      billing_interval: toUpgradePolicyInterval(validated.interval),
-      source: input.source ?? "pricing",
-      test_mode: input.testMode ?? false,
-    },
+    custom_data: customData,
   };
 
   if (checkoutUrlResolution.url) {

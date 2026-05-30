@@ -167,6 +167,15 @@ export function billablePlanToPlanId(plan: BillablePlanId): PlanId {
   return billablePlanToStoragePlanId(plan);
 }
 
+export function billablePlanFromStoragePlanId(planId: string): BillablePlanId | null {
+  const normalized = normalizeBillablePlanId(planId);
+  if (normalized) return normalized;
+  const n = planId.trim().toLowerCase();
+  if (n === "business") return "pro";
+  if (n === "infinity" || n === "enterprise") return "infinity_i";
+  return null;
+}
+
 export function maskId(id: string | null): string {
   if (!id) return "—";
   if (id.length <= 8) return id;

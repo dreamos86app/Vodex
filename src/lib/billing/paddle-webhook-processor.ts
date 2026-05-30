@@ -1,5 +1,6 @@
 import {
   detectPaddleSimulation,
+  parseWebhookCustomData,
   readWebhookIds,
   readWebhookUserId,
   storePaddleWebhookEvent,
@@ -9,6 +10,7 @@ import {
   handlePaddleSubscriptionEvent,
   handlePaddleTransactionCompleted,
 } from "@/lib/billing/paddle-webhook-handlers";
+import { storagePlanIdFromCustomData, readPaddleCheckoutCustomData } from "@/lib/billing/paddle-checkout-custom-data";
 import { planFromPaddlePriceId } from "@/lib/billing/plan-billing-catalog";
 import { paddleEnvironment } from "@/lib/billing/paddle-billing";
 
@@ -54,6 +56,13 @@ export type ProcessPaddleWebhookResult = {
   duplicate: boolean;
 };
 
+function canResolvePlanFromWebhook(data: Record<string, unknown>, priceId: string | null): boolean {
+  const custom = readPaddleCheckoutCustomData(data);
+  if (storagePlanIdFromCustomData(custom)) return true;
+  if (priceId && planFromPaddlePriceId(priceId)) return true;
+  return false;
+}
+
 export async function processPaddleWebhookPayload(input: {
   eventType: string;
   eventId: string;
@@ -65,6 +74,8 @@ export async function processPaddleWebhookPayload(input: {
   const userId = readWebhookUserId(data);
   const ids = readWebhookIds(data);
   const mapped = ids.priceId ? planFromPaddlePriceId(ids.priceId) : null;
+  const hasCustomData = parseWebhookCustomData(data) != null;
+  const planResolvable = canResolvePlanFromWebhook(data, ids.priceId);
 
   let processingStatus: PaddleWebhookProcessingStatus = "received";
   let error: string | null = null;
@@ -80,7 +91,7 @@ export async function processPaddleWebhookPayload(input: {
     paddleSubscriptionId: ids.subscriptionId,
     paddleTransactionId: ids.transactionId,
     paddlePriceId: ids.priceId,
-    plan: mapped?.plan ?? null,
+    plan: mapped?.plan ?? readPaddleCheckoutCustomData(data).planId ?? null,
     interval: mapped?.interval ?? null,
     error: null as string | null,
     payloadSafe: data,
@@ -97,8 +108,8 @@ export async function processPaddleWebhookPayload(input: {
   }
 
   if (!userId) {
-    processingStatus = "received_simulation_or_unlinked";
-    error = isSimulation ? "simulation" : "missing_user_id";
+    processingStatus = hasCustomData ? "missing_custom_data" : "received_simulation_or_unlinked";
+    error = hasCustomData ? "missing_user_id" : "missing_user_id";
     const { duplicate } = await storePaddleWebhookEvent({
       ...storeBase,
       processingStatus,
@@ -107,7 +118,7 @@ export async function processPaddleWebhookPayload(input: {
     return { received: true, eventId, eventType, processingStatus, duplicate };
   }
 
-  if (ids.priceId && !mapped) {
+  if (ids.priceId && !mapped && !planResolvable) {
     processingStatus = "unknown_price_id";
     error = "unknown_price_id";
     const { duplicate } = await storePaddleWebhookEvent({
@@ -132,23 +143,32 @@ export async function processPaddleWebhookPayload(input: {
   }
 
   if (ENTITLEMENT_EVENTS.has(eventType)) {
-    const status = String(data.status ?? "");
-    if (status === "completed" || status === "paid" || eventType === "transaction.paid") {
-      await handlePaddleTransactionCompleted({ data, paddleEventId: eventId });
-      processingStatus = "processed";
-    } else {
-      processingStatus = "received";
+    try {
+      if (shouldProcessEntitlementTransaction(eventType, data)) {
+        await handlePaddleTransactionCompleted({
+          data,
+          paddleEventId: eventId,
+          eventType,
+        });
+        processingStatus = "processed";
+      } else {
+        processingStatus = "received";
+      }
+    } catch (handlerErr) {
+      processingStatus = "failed";
+      error =
+        handlerErr instanceof Error ? handlerErr.message.slice(0, 200) : "handler_failed";
     }
     const { duplicate } = await storePaddleWebhookEvent({
       ...storeBase,
       processingStatus,
-      error: null,
+      error,
     });
     return { received: true, eventId, eventType, processingStatus, duplicate };
   }
 
   if (SUBSCRIPTION_EVENTS.has(eventType) || eventType.startsWith("subscription.")) {
-    if (userId && mapped) {
+    if (userId && planResolvable) {
       try {
         await handlePaddleSubscriptionEvent({ eventType, data, paddleEventId: eventId });
         processingStatus = "processed";
@@ -158,7 +178,7 @@ export async function processPaddleWebhookPayload(input: {
           handlerErr instanceof Error ? handlerErr.message.slice(0, 200) : "handler_failed";
       }
     } else {
-      processingStatus = userId ? "unknown_price_id" : "received_simulation_or_unlinked";
+      processingStatus = userId ? "unknown_price_id" : "missing_custom_data";
       error = userId ? "unknown_price_id" : "missing_user_id";
     }
     const { duplicate } = await storePaddleWebhookEvent({
@@ -185,4 +205,13 @@ export async function processPaddleWebhookPayload(input: {
     error: null,
   });
   return { received: true, eventId, eventType, processingStatus, duplicate };
+}
+
+function shouldProcessEntitlementTransaction(
+  eventType: string,
+  data: Record<string, unknown>,
+): boolean {
+  if (eventType === "transaction.paid") return true;
+  const status = String(data.status ?? "").toLowerCase();
+  return status === "completed" || status === "paid";
 }

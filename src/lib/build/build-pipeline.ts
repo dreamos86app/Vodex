@@ -134,6 +134,8 @@ export type StagedBuildResult = {
   complexity: number;
   uiQualityScore: number;
   buildContract: BuildSuccessContractResult;
+  /** Full post-build contract failures (includes ui_quality, routes, imports). */
+  postBuildFailures: string[];
   appArchetype: string;
   errorMessage?: string;
   scaffoldFallbackUsed?: boolean;
@@ -315,6 +317,7 @@ export async function runStagedBuildPipeline(input: {
         userMessage: "Build failed.",
       },
       appArchetype: "unknown",
+      postBuildFailures: ["missing_project_id"],
     };
   }
 
@@ -677,6 +680,7 @@ export async function runStagedBuildPipeline(input: {
       },
       errorMessage: "build_budget_precheck",
       appArchetype: archetype.id,
+      postBuildFailures: ["build_budget_precheck"],
     };
   }
 
@@ -834,6 +838,7 @@ export async function runStagedBuildPipeline(input: {
       },
       errorMessage: "partial_credit_stop",
       appArchetype: archetype.id,
+      postBuildFailures: ["partial_credit_stop"],
     };
   }
 
@@ -1020,6 +1025,7 @@ export async function runStagedBuildPipeline(input: {
       },
       errorMessage: "restaurant_scaffold_not_applied",
       appArchetype: archetype.id,
+      postBuildFailures: ["restaurant_scaffold_not_applied"],
     };
   }
 
@@ -1206,6 +1212,7 @@ export async function runStagedBuildPipeline(input: {
     complexity,
     uiQualityScore: uiQuality.score,
     buildContract,
+    postBuildFailures: postContract.failures,
     appArchetype: archetype.id,
     errorMessage: ok ? undefined : buildContract.failures.join("; ") || summaryText,
     scaffoldFallbackUsed: scaffoldFallback.usedFallback,

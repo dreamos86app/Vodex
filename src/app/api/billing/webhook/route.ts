@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
 import type { PlanId } from "@/lib/supabase/types";
+import { dreamosStripeBillingDisabledResponse } from "@/lib/billing/dreamos-billing-provider";
 
 function planFromStripePrice(priceId: string): PlanId {
   if (priceId && priceId === process.env.STRIPE_STARTER_PRICE_ID) return "starter";
@@ -67,6 +68,9 @@ async function upsertSubscriptionRow(
 }
 
 export async function POST(request: Request) {
+  const blocked = dreamosStripeBillingDisabledResponse();
+  if (blocked) return blocked;
+
   if (!process.env.STRIPE_SECRET_KEY?.trim() || !process.env.STRIPE_WEBHOOK_SECRET?.trim()) {
     return NextResponse.json({ error: "Billing not configured" }, { status: 503 });
   }

@@ -17,6 +17,22 @@ import {
 } from "@/lib/billing/paddle-public-checkout";
 import { monthlyTokensForPlan } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
+import { buildPaddleCheckoutCustomData } from "@/lib/billing/paddle-checkout-custom-data";
+import { assertPaddleCheckoutSupabaseConsistency } from "@/lib/billing/paddle-local-testing";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizePlanId } from "@/lib/billing/plans";
+import {
+  resolvePlanChange,
+  type PlanChangeSource,
+} from "@/lib/billing/plan-change-router";
+import { logPlanChangeAttempt } from "@/lib/billing/plan-change-audit";
+import type { CatalogBillingInterval } from "@/lib/billing/plan-billing-catalog";
+import {
+  PROFILE_PADDLE_BILLING_SELECT,
+  readProfilePaddleSubscriptionId,
+} from "@/lib/billing/paddle-profile-fields";
+import { fetchSubscriptionByPaddleId } from "@/lib/billing/paddle-subscription-legacy-store";
+import type { PaddleBillingIntent } from "@/lib/billing/paddle-api";
 
 const schema = z
   .object({
@@ -103,6 +119,121 @@ export async function POST(request: Request) {
   const priceId = resolvePaddlePriceId(validated.plan, validated.interval)!;
   const tier = resolveCatalogTier(validated.plan, validated.interval);
 
+  const admin = createSupabaseAdmin();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select(`plan_id, ${PROFILE_PADDLE_BILLING_SELECT}`)
+    .eq("id", user.id)
+    .maybeSingle();
+
+  let currentInterval: CatalogBillingInterval | null = null;
+  const paddleSubId = readProfilePaddleSubscriptionId(profile ?? undefined);
+  if (paddleSubId) {
+    const sub = await fetchSubscriptionByPaddleId(admin, paddleSubId, "plan_interval");
+    if (sub?.plan_interval === "yearly") currentInterval = "annual";
+    else if (sub?.plan_interval === "monthly") currentInterval = "monthly";
+  }
+
+  const planChangeSource: PlanChangeSource =
+    source === "admin_test_checkout"
+      ? "owner_test_checkout"
+      : source === "settings"
+        ? "billing_page"
+        : "pricing_page";
+
+  const planChange = resolvePlanChange({
+    currentPlanId: normalizePlanId(profile?.plan_id ?? "free"),
+    currentInterval,
+    targetPlan: validated.plan,
+    targetInterval: validated.interval,
+  });
+
+  await logPlanChangeAttempt({
+    userId: user.id,
+    previousPlan: normalizePlanId(profile?.plan_id ?? "free"),
+    targetPlan: validated.plan,
+    targetInterval: validated.interval,
+    billingIntent: planChange.billingIntent,
+    source: planChangeSource,
+    action: planChange.action,
+    blockedReason: planChange.action !== "checkout" ? planChange.action : null,
+  });
+
+  if (planChange.action === "same_plan") {
+    return NextResponse.json(
+      {
+        error: "You are already on this plan.",
+        code: "same_plan",
+        message: planChange.description,
+        planChange,
+      },
+      { status: 409 },
+    );
+  }
+
+  if (planChange.action === "highest_plan") {
+    return NextResponse.json(
+      {
+        error: planChange.description,
+        code: "highest_plan",
+        planChange,
+      },
+      { status: 409 },
+    );
+  }
+
+  if (planChange.action === "portal") {
+    return NextResponse.json(
+      {
+        error: planChange.description,
+        code: "use_portal",
+        message: planChange.label,
+        planChange,
+        usePortal: true,
+      },
+      { status: 409 },
+    );
+  }
+
+  if (planChange.action === "schedule_downgrade") {
+    return NextResponse.json(
+      {
+        error: planChange.description,
+        code: "schedule_downgrade",
+        message: planChange.confirmationMessage ?? planChange.description,
+        planChange,
+        requiresConfirmation: true,
+      },
+      { status: 409 },
+    );
+  }
+
+  const paddleBillingIntent: PaddleBillingIntent =
+    planChange.billingIntent === "upgrade"
+      ? "upgrade"
+      : planChange.billingIntent === "interval_change"
+        ? "interval_change"
+        : "new_subscription";
+
+  const supabaseGate = assertPaddleCheckoutSupabaseConsistency();
+  if (!supabaseGate.ok) {
+    return NextResponse.json(
+      { error: supabaseGate.error, code: "supabase_project_mismatch" },
+      { status: 400 },
+    );
+  }
+
+  const customDataPreview = buildPaddleCheckoutCustomData({
+    userId: user.id,
+    workspaceId: user.id,
+    planId: validated.plan,
+    interval: validated.interval,
+    priceId,
+    source,
+    billingIntent: paddleBillingIntent,
+    testMode,
+  });
+
   const result = await createPaddleCheckoutSession({
     planId: validated.plan,
     interval: validated.interval,
@@ -110,7 +241,7 @@ export async function POST(request: Request) {
     email,
     successUrl: `${appUrl}/settings/billing?paddle=success&txn=pending`,
     cancelUrl: `${appUrl}/settings/billing?paddle=canceled`,
-    billingIntent: "new_subscription",
+    billingIntent: paddleBillingIntent,
     source,
     testMode,
   });
@@ -138,14 +269,7 @@ export async function POST(request: Request) {
     priceId,
     priceIdMasked: priceId.length > 8 ? `…${priceId.slice(-4)}` : priceId,
     expectedAmountUsd: tier.amountUsd,
-    customDataPreview: {
-      user_id: user.id,
-      workspace_id: user.id,
-      plan_id: validated.plan,
-      billing_interval: validated.interval === "annual" ? "yearly" : "monthly",
-      source,
-      test_mode: testMode,
-    },
+    customDataPreview,
     plan: {
       id: validated.plan,
       storagePlanId: storagePlan,

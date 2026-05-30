@@ -1,33 +1,33 @@
 {
-  "operationId": "0f0f4474-c093-4a82-93c7-caa7497a4380",
-  "executionInstanceId": "0f0f4474-c093-4a82-93c7-caa7497a4380:ee03c64a-f240-4685-9c14-5dd01b394f04",
-  "projectId": "209e29e9-5c84-4d27-992a-75994c166940",
+  "operationId": "57d4b92b-0f9f-43a1-a5c1-0862094a341c",
+  "executionInstanceId": "57d4b92b-0f9f-43a1-a5c1-0862094a341c:83d76b50-557b-4180-b3c3-087bab62aabe",
+  "projectId": "24d63fb2-7668-45d5-b32f-ca28283b4080",
   "ownerId": "d026ba49-4de5-489d-ace7-12ec78d98e70",
   "before": {
-    "generatedCount": 11,
-    "routeCount": 5,
-    "componentCount": 3,
-    "totalBytes": 8013,
+    "generatedCount": 17,
+    "routeCount": 8,
+    "componentCount": 5,
+    "totalBytes": 10812,
     "samplePaths": [
       "app/layout.tsx",
       "app/login/page.tsx",
       "app/globals.css",
       "app/page.tsx",
       "app/dashboard/page.tsx",
-      "app/records/page.tsx",
-      "app/settings/page.tsx",
-      "lib/mock-data.ts",
-      "components/MetricCard.tsx",
-      "components/PageHeader.tsx"
+      "app/subscribers/page.tsx",
+      "app/boxes/page.tsx",
+      "app/shipments/page.tsx",
+      "app/analytics/page.tsx",
+      "app/settings/page.tsx"
     ]
   },
   "upsert": {
     "ok": true,
-    "rowCount": 11
+    "rowCount": 17
   },
   "after": {
-    "serviceRoleCount": 11,
-    "generatedSourceCount": 11,
-    "visibleCount": 11
+    "serviceRoleCount": 17,
+    "generatedSourceCount": 17,
+    "visibleCount": 17
   }
 }

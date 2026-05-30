@@ -50,6 +50,10 @@ export interface Database {
           default_model_id: string;
           use_case: string | null;
           experience_level: string | null;
+          paddle_customer_id: string | null;
+          paddle_subscription_id: string | null;
+          paddle_price_id: string | null;
+          billing_provider: string | null;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           email_verified: boolean;

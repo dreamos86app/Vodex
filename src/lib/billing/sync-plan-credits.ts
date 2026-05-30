@@ -22,7 +22,8 @@ export async function syncPlanCreditsForUser(input: {
       plan_id: planId,
       credits_remaining: buildCredits,
       credits_reset_at: input.periodEndIso,
-    })
+      subscription_status: planId === "free" ? "free" : "active",
+    } as never)
     .eq("id", input.userId);
 
   await admin.from("action_credit_balances" as never).upsert(

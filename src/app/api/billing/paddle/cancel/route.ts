@@ -4,6 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { cancelPaddleSubscriptionAtPeriodEnd } from "@/lib/billing/paddle-api";
 import { getPaddleBillingStatus } from "@/lib/billing/paddle-billing";
+import {
+  PROFILE_PADDLE_BILLING_SELECT,
+  readProfilePaddleSubscriptionId,
+} from "@/lib/billing/paddle-profile-fields";
+import { updateSubscriptionByPaddleId } from "@/lib/billing/paddle-subscription-legacy-store";
 
 const schema = z.object({ confirmed: z.literal(true) });
 
@@ -29,15 +34,16 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("stripe_subscription_id")
+    .select(PROFILE_PADDLE_BILLING_SELECT)
     .eq("id", user.id)
     .single();
 
-  if (!profile?.stripe_subscription_id) {
+  const paddleSubscriptionId = readProfilePaddleSubscriptionId(profile ?? undefined);
+  if (!paddleSubscriptionId) {
     return NextResponse.json({ error: "No active subscription" }, { status: 400 });
   }
 
-  const result = await cancelPaddleSubscriptionAtPeriodEnd(profile.stripe_subscription_id);
+  const result = await cancelPaddleSubscriptionAtPeriodEnd(paddleSubscriptionId);
   if (!result.ok) {
     return NextResponse.json({ error: result.error, code: result.code }, { status: 502 });
   }
@@ -47,10 +53,10 @@ export async function POST(request: Request) {
 
   const periodEndUpdate = periodEndIso ?? undefined;
 
-  await admin
-    .from("subscriptions")
-    .update({ cancel_at_period_end: true, current_period_end: periodEndUpdate } as never)
-    .eq("stripe_subscription_id", profile.stripe_subscription_id);
+  await updateSubscriptionByPaddleId(admin, paddleSubscriptionId, {
+    cancel_at_period_end: true,
+    current_period_end: periodEndUpdate,
+  });
 
   await admin
     .from("profiles")

@@ -7,7 +7,7 @@ DreamOS86 subscriptions (not generated-app payments) use **Paddle Billing** with
 Copy from `.env.example` into `.env.local` and Vercel Production:
 
 - `PADDLE_ENVIRONMENT` — `sandbox` or `production`
-- `PADDLE_API_KEY` — server only
+- `PADDLE_API_KEY` — server only (must include **Customer portal sessions: Write** / `customer_portal_session.write`)
 - `PADDLE_WEBHOOK_SECRET` — server only
 - `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` — safe for Paddle.js
 - Monthly + annual `pri_*` IDs for Starter, Pro, and Infinity I–VII

@@ -2365,7 +2365,7 @@ export function ImmersiveWorkspace({
             ref={scrollRef}
             onScroll={onChatScroll}
             className={cn(
-              "min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]",
+              "scrollbar-workflow min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]",
               mode === "build" && "bg-gradient-to-b from-accent/[0.04] to-transparent",
             )}
           >

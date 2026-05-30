@@ -43,6 +43,25 @@ const planActionResolver = read("src/lib/billing/plan-action-resolver.ts");
 const adminLayout = read("src/app/(app)/admin/layout.tsx");
 const ownerLayout = read("src/app/(app)/admin/(owner)/layout.tsx");
 const userMenu = read("src/components/layout/user-menu.tsx");
+const paddleCheckoutCustomData = read("src/lib/billing/paddle-checkout-custom-data.ts");
+const paddleEntitlementAudit = read("src/lib/billing/paddle-entitlement-audit.ts");
+const applyUpgrade = read("src/lib/billing/apply-immediate-plan-upgrade.ts");
+const paddleLocalTesting = read("src/lib/billing/paddle-local-testing.ts");
+const planChangeRouter = read("src/lib/billing/plan-change-router.ts");
+const planChangeAudit = read("src/lib/billing/plan-change-audit.ts");
+const paddleCustomerPortal = read("src/lib/billing/paddle-customer-portal.ts");
+const customerPortalRoute = read("src/app/api/billing/paddle/customer-portal-session/route.ts");
+const billingSubscriptionPanel = read("src/components/billing/billing-subscription-panel.tsx");
+const persistPaddleCustomer = read("src/lib/billing/persist-paddle-customer-id.ts");
+const paddleProfileFields = read("src/lib/billing/paddle-profile-fields.ts");
+const paddleSubscriptionLegacy = read("src/lib/billing/paddle-subscription-legacy-store.ts");
+const paddleProfileMigration = read("supabase/migrations/20260709120000_paddle_profile_billing_fields.sql");
+const paddleCustomerManualSql = read("scripts/manual-sql/paddle-customer-fields.sql");
+const dreamosBillingProvider = read("src/lib/billing/dreamos-billing-provider.ts");
+const stripeCheckoutRoute = read("src/app/api/billing/checkout/route.ts");
+const stripePortalRoute = read("src/app/api/billing/portal/route.ts");
+const fullRuntimeRepair = read("scripts/full-runtime-schema-repair.sql");
+const projectPaymentsProviders = read("src/app/api/projects/[id]/payments/providers/[provider]/save/route.ts");
 const manualSql = read("scripts/manual-sql/infinity-tier-plan-ids.sql");
 const migration = read("supabase/migrations/20260529120000_infinity_tier_plan_ids.sql");
 
@@ -397,6 +416,278 @@ const suites = {
     if (!paddleCheckoutUrl.includes('mode: "default"')) throw new Error("default mode");
     if (!paddleApi.includes("if (checkoutUrlResolution.url)")) throw new Error("omit checkout when null");
     if (!envExample.includes("PADDLE_CHECKOUT_URL")) throw new Error("env example");
+  },
+  "paddle-checkout-custom-data": () => {
+    if (!paddleCheckoutCustomData.includes("buildPaddleCheckoutCustomData")) throw new Error("builder");
+    if (!paddleCheckoutCustomData.includes("price_id")) throw new Error("price_id");
+    if (!paddleApi.includes("buildPaddleCheckoutCustomData")) throw new Error("api uses builder");
+  },
+  "paddle-checkout-server-resolved-price": () => {
+    if (!checkout.includes("resolvePaddlePriceId")) throw new Error("server price resolve");
+    if (!checkout.includes("buildPaddleCheckoutCustomData")) throw new Error("custom data builder");
+  },
+  "paddle-owner-test-checkout-custom-data-preview": () => {
+    if (!testCheckoutComponent.includes("buildPaddleCheckoutCustomData")) throw new Error("preview builder");
+    if (!testCheckoutComponent.includes("price_id")) throw new Error("price_id in preview");
+  },
+  "paddle-webhook-processes-transaction-completed": () => {
+    if (!webhookProcessor.includes("transaction.completed")) throw new Error("txn completed");
+    if (!handlers.includes("handlePaddleTransactionCompleted")) throw new Error("handler");
+    if (!handlers.includes("eventType === \"transaction.paid\"")) throw new Error("paid event type");
+  },
+  "paddle-webhook-processes-transaction-paid": () => {
+    if (!webhookProcessor.includes("transaction.paid")) throw new Error("txn paid event");
+    if (!handlers.includes("shouldProcessPaidTransaction")) throw new Error("paid processor");
+  },
+  "paddle-webhook-processes-subscription-activated": () => {
+    if (!handlers.includes("subscription.activated")) throw new Error("sub activated");
+    if (!handlers.includes("applyImmediatePlanUpgrade")) throw new Error("upgrade fallback");
+  },
+  "paddle-webhook-idempotent-no-double-credit": () => {
+    if (!applyUpgrade.includes("claimBillingEvent")) throw new Error("claim event");
+    if (!handlers.includes("paddle:txn:")) throw new Error("txn idempotency key");
+  },
+  "paddle-webhook-missing-custom-data-no-upgrade": () => {
+    if (!webhookProcessor.includes("missing_custom_data")) throw new Error("missing custom status");
+    if (!handlers.includes("readPaddleCheckoutCustomData")) throw new Error("read custom");
+  },
+  "paddle-entitlement-updates-profile": () => {
+    if (!applyUpgrade.includes("plan_id: newPlan")) throw new Error("profile plan");
+    if (!applyUpgrade.includes('subscription_status: "active"')) throw new Error("subscription status");
+  },
+  "paddle-plan-credits-reset": () => {
+    if (!applyUpgrade.includes("monthlyTokensForPlan")) throw new Error("build allowance");
+    if (!applyUpgrade.includes("monthlyActionCreditsForPlan")) throw new Error("action allowance");
+  },
+  "paddle-bonus-credits-preserved": () => {
+    if (!applyUpgrade.includes("sumExplicitBuildGrants")) throw new Error("explicit bonus");
+    if (!applyUpgrade.includes("explicit_build_bonus_preserved")) throw new Error("bonus preserved");
+  },
+  "paddle-upgrade-starts-new-cycle": () => {
+    if (!applyUpgrade.includes("full_cycle_restart")) throw new Error("cycle restart");
+    if (!applyUpgrade.includes("credits_reset_at")) throw new Error("reset at");
+  },
+  "paddle-billing-audit-log": () => {
+    if (!paddleEntitlementAudit.includes("paddle.entitlement.applied")) throw new Error("audit event");
+    if (!applyUpgrade.includes("logPaddleEntitlementAudit")) throw new Error("audit called");
+  },
+  "paddle-owner-checkout-polls-status": () => {
+    if (!testCheckoutComponent.includes("/api/billing/status")) throw new Error("status poll");
+    if (!testCheckoutComponent.includes("transactionId")) throw new Error("txn param");
+    if (!testCheckoutComponent.includes("refreshCredits")) throw new Error("credits refresh");
+  },
+  "billing-status-refresh-after-checkout": () => {
+    if (!billingSettings.includes("Refresh billing status")) throw new Error("refresh button");
+    if (!billingSettings.includes("/api/billing/status")) throw new Error("status api");
+  },
+  "credits-refresh-after-checkout": () => {
+    if (!billingSettings.includes("refreshCredits")) throw new Error("billing refresh credits");
+    if (!testCheckoutComponent.includes("refreshCredits")) throw new Error("owner refresh credits");
+  },
+  "user-menu-refreshes-plan-after-checkout": () => {
+    if (!userMenu.includes("syncFromDB")) throw new Error("user menu sync");
+    if (!userMenu.includes("popover-open")) throw new Error("popover sync");
+  },
+  "paddle-local-production-warning": () => {
+    if (!paddleLocalTesting.includes("localDevWithProductionPaddle")) throw new Error("local prod flag");
+    if (!testCheckoutComponent.includes("testingContext")) throw new Error("testing context UI");
+  },
+  "paddle-supabase-project-consistency-before-checkout": () => {
+    if (!checkout.includes("assertPaddleCheckoutSupabaseConsistency")) throw new Error("supabase gate");
+    if (!paddleLocalTesting.includes("supabaseMismatchError")) throw new Error("mismatch error");
+  },
+  "paddle-owner-test-shows-webhook-url": () => {
+    if (!testCheckoutComponent.includes("https://dreamos86.com/api/webhooks/paddle")) {
+      throw new Error("production webhook URL");
+    }
+    if (!testCheckoutComponent.includes("Diagnostics")) throw new Error("diagnostics section");
+  },
+  "paddle-owner-test-shows-custom-data": () => {
+    if (!testCheckoutComponent.includes("custom_data preview")) throw new Error("custom_data preview");
+    if (!testCheckoutComponent.includes("billingIntent")) throw new Error("billing intent in preview flow");
+    if (!testCheckoutComponent.includes("resolvePlanChange")) throw new Error("plan change router in test");
+  },
+  "paddle-owner-test-polls-webhook-status": () => {
+    if (!testCheckoutComponent.includes("Waiting for webhook")) throw new Error("waiting label");
+    if (!testCheckoutComponent.includes("processing_status")) throw new Error("processing status");
+    if (!testCheckoutComponent.includes("entitlementApplied")) throw new Error("entitlement flag");
+  },
+  "paddle-no-checkout-for-same-plan": () => {
+    if (!checkout.includes('code: "same_plan"')) throw new Error("same_plan response");
+    if (!checkout.includes("resolvePlanChange")) throw new Error("router in checkout");
+    if (!testCheckoutComponent.includes("You are already on this plan")) throw new Error("owner test block");
+  },
+  "paddle-plan-change-target-deterministic": () => {
+    if (!planChangeRouter.includes("resolvePlanChange")) throw new Error("router");
+    if (!checkout.includes("planChange.billingIntent")) throw new Error("intent from router");
+    if (!paddleCheckoutCustomData.includes("billing_intent")) throw new Error("custom_data intent");
+  },
+  "paddle-upgrade-does-not-bounce-through-free": () => {
+    if (!handlers.includes("resolveEntitlementPlan")) throw new Error("entitlement resolver");
+    if (!handlers.includes('intent === "upgrade" || intent === "interval_change"')) {
+      throw new Error("upgrade intent path");
+    }
+    if (!applyUpgrade.includes("normalizePlanId(input.newPlan)")) throw new Error("direct target plan");
+  },
+  "paddle-downgrade-requires-confirmation": () => {
+    if (!planChangeRouter.includes("schedule_downgrade")) throw new Error("schedule downgrade action");
+    if (!planChangeRouter.includes("requiresConfirmation: true")) throw new Error("confirmation");
+    if (!billingSubscriptionPanel.includes("Confirm downgrade to")) throw new Error("confirm UI");
+  },
+  "paddle-plan-change-audit-log": () => {
+    if (!planChangeAudit.includes("paddle.plan_change.attempt")) throw new Error("audit event");
+    if (!checkout.includes("logPlanChangeAttempt")) throw new Error("checkout audit");
+  },
+  "billing-ui-no-button-soup": () => {
+    if (billingSettings.includes("Confirm Downgrade to Starter")) {
+      throw new Error("old downgrade chip copy");
+    }
+    if (billingSettings.includes("Change plan")) throw new Error("button soup header");
+    if (!billingSettings.includes("BillingSubscriptionPanel")) throw new Error("subscription panel");
+  },
+  "billing-current-plan-card": () => {
+    if (!billingSubscriptionPanel.includes("Current plan")) throw new Error("current plan card");
+    if (!billingSubscriptionPanel.includes("Build Credits")) throw new Error("build credits");
+    if (!billingSubscriptionPanel.includes("Manage subscription")) throw new Error("manage CTA");
+  },
+  "billing-recommended-next-plan-card": () => {
+    if (!billingSubscriptionPanel.includes("recommendedUpgradeTarget")) throw new Error("recommended fn");
+    if (!billingSubscriptionPanel.includes("Upgrade to")) throw new Error("upgrade CTA");
+  },
+  "billing-cycle-switch-card": () => {
+    if (!billingSubscriptionPanel.includes("Switch to annual")) throw new Error("annual switch");
+    if (!billingSubscriptionPanel.includes("save 20%")) throw new Error("save copy");
+  },
+  "billing-downgrade-collapsed": () => {
+    if (!billingSubscriptionPanel.includes("Need a smaller plan?")) throw new Error("collapsed header");
+    if (!billingSubscriptionPanel.includes("showDowngrade")) throw new Error("collapsed state");
+  },
+  "billing-compare-all-plans-modal": () => {
+    if (!billingSubscriptionPanel.includes("Compare all plans")) throw new Error("compare link");
+    if (!billingSubscriptionPanel.includes("Compare plans")) throw new Error("modal title");
+  },
+  "billing-infinity-vii-highest-plan": () => {
+    if (!billingSubscriptionPanel.includes("Infinity VII")) throw new Error("infinity vii copy");
+    if (!billingSubscriptionPanel.includes("isHighestPaidPlan")) throw new Error("highest check");
+  },
+  "billing-copy-professional": () => {
+    if (!billingSubscriptionPanel.includes("Current plan")) throw new Error("current plan copy");
+    if (!billingSubscriptionPanel.includes("Schedule downgrade")) throw new Error("schedule downgrade");
+    if (billingSettings.includes("my.paddle.com")) throw new Error("generic paddle link in settings");
+  },
+  "owner-test-copy-technical-clear": () => {
+    if (!testCheckoutComponent.includes("Diagnostics")) throw new Error("diagnostics");
+    if (!testCheckoutComponent.includes("custom_data preview")) throw new Error("custom data");
+  },
+  "no-generic-paddle-signup-link": () => {
+    if (billingSettings.includes("my.paddle.com")) throw new Error("settings generic link");
+    if (billingSubscriptionPanel.includes("my.paddle.com")) throw new Error("panel generic link");
+  },
+  "paddle-customer-portal-session-route": () => {
+    if (!customerPortalRoute.includes("createPaddleCustomerPortalSession")) throw new Error("portal fn");
+    if (!customerPortalRoute.includes("POST")) throw new Error("POST route");
+  },
+  "paddle-customer-portal-auth-required": () => {
+    if (!customerPortalRoute.includes("Unauthorized")) throw new Error("auth gate");
+  },
+  "paddle-customer-portal-uses-stored-customer-id": () => {
+    if (!customerPortalRoute.includes("profile?.paddle_customer_id")) throw new Error("paddle_customer_id read");
+    if (!customerPortalRoute.includes("PROFILE_PADDLE_BILLING_SELECT")) throw new Error("paddle select");
+    if (!paddleCustomerPortal.includes("/portal-sessions")) throw new Error("portal sessions API");
+  },
+  "paddle-customer-id-column": () => {
+    if (!paddleProfileMigration.includes("paddle_customer_id")) throw new Error("migration column");
+    if (!paddleCustomerManualSql.includes("paddle_customer_id")) throw new Error("manual sql");
+    if (!paddleProfileFields.includes("paddle_customer_id")) throw new Error("types/helper");
+  },
+  "paddle-customer-portal-uses-paddle-customer-id": () => {
+    if (!customerPortalRoute.includes("profile?.paddle_customer_id")) throw new Error("paddle_customer_id");
+    if (customerPortalRoute.includes("stripe_customer_id")) throw new Error("stripe read in portal");
+    if (!paddleProfileFields.includes("paddle_customer_id")) throw new Error("helper");
+  },
+  "paddle-webhook-persists-paddle-customer-id": () => {
+    suites["paddle-webhook-writes-paddle-fields-only"]();
+  },
+  "paddle-webhook-writes-paddle-fields-only": () => {
+    if (!persistPaddleCustomer.includes("buildProfilePaddleBillingUpdate")) throw new Error("profile update");
+    if (/\.update\(\s*\{[^}]*stripe_customer_id/s.test(persistPaddleCustomer)) {
+      throw new Error("writes stripe profile col");
+    }
+    if (!paddleProfileFields.includes("paddle_customer_id")) throw new Error("paddle fields");
+  },
+  "no-stripe-customer-id-required-for-paddle": () => {
+    suites["paddle-billing-does-not-read-stripe-customer-id"]();
+  },
+  "paddle-billing-does-not-read-stripe-customer-id": () => {
+    if (paddleProfileFields.includes("stripe_customer_id")) throw new Error("stripe in profile select");
+    if (customerPortalRoute.includes("stripe_customer_id")) throw new Error("portal reads stripe");
+    if (!customerPortalRoute.includes("paddle_customer_id")) throw new Error("portal paddle only");
+  },
+  "paddle-sql-no-stripe-backfill": () => {
+    for (const sql of [paddleCustomerManualSql, paddleProfileMigration]) {
+      if (/stripe_customer_id|stripe_subscription_id|stripe_price_id/i.test(sql)) {
+        throw new Error("stripe column reference in paddle SQL");
+      }
+    }
+    if (fullRuntimeRepair.includes("paddle_customer_id = stripe_customer_id")) {
+      throw new Error("stripe backfill in runtime repair");
+    }
+    if (!paddleCustomerManualSql.includes("notify pgrst")) throw new Error("pgrst reload");
+  },
+  "dreamos-billing-paddle-only": () => {
+    if (!dreamosBillingProvider.includes("DreamOS86 billing uses Paddle")) throw new Error("message");
+    if (!stripeCheckoutRoute.includes("dreamosStripeBillingDisabledResponse")) throw new Error("checkout block");
+    if (!stripePortalRoute.includes("dreamosStripeBillingDisabledResponse")) throw new Error("portal block");
+    if (!billingSettings.includes("BillingSubscriptionPanel")) throw new Error("paddle billing UI");
+    if (billingSettings.includes("stripe:")) throw new Error("stripe in billing settings type");
+  },
+  "stripe-only-generated-app-integration-boundary": () => {
+    if (!projectPaymentsProviders.includes('"stripe"')) throw new Error("app stripe provider");
+    if (paddleProfileFields.includes("generated_app")) throw new Error("mixed into paddle profile");
+    if (persistPaddleCustomer.includes("profiles.paddle_customer_id") || persistPaddleCustomer.includes("paddle_customer_id")) {
+      // ok — platform paddle on profiles
+    }
+    if (projectPaymentsProviders.includes("profiles.paddle")) throw new Error("app uses profile paddle");
+  },
+  "no-user-facing-stripe-copy-for-dreamos-billing": () => {
+    if (billingSettings.match(/Stripe/i)) throw new Error("stripe in billing settings");
+    if (billingSubscriptionPanel.match(/Stripe/i)) throw new Error("stripe in subscription panel");
+    if (testCheckoutComponent.match(/Stripe subscription/i)) throw new Error("stripe in owner test");
+  },
+  "paddle-customer-portal-no-generic-signup-url": () => {
+    if (billingSubscriptionPanel.includes("my.paddle.com")) throw new Error("generic url");
+    if (!billingSubscriptionPanel.includes("customer-portal-session")) throw new Error("portal API call");
+  },
+  "paddle-customer-portal-safe-missing-customer": () => {
+    if (!customerPortalRoute.includes("missing_customer")) throw new Error("missing code");
+    if (!customerPortalRoute.includes("Complete checkout first")) throw new Error("safe message");
+  },
+  "paddle-customer-portal-no-secret-leak": () => {
+    if (customerPortalRoute.includes("PADDLE_API_KEY")) throw new Error("key in route");
+    if (billingSubscriptionPanel.includes("PADDLE_API_KEY")) throw new Error("key in UI");
+  },
+  "plan-change-router": () => {
+    if (!planChangeRouter.includes('action: "checkout"')) throw new Error("checkout action");
+    if (!planChangeRouter.includes('action: "portal"')) throw new Error("portal action");
+    if (!planChangeRouter.includes("recommendedUpgradeTarget")) throw new Error("recommended");
+  },
+  "plan-change-paid-upgrade-safe": () => {
+    if (!planChangeRouter.includes("billingIntent: current === \"free\" ? \"new_subscription\" : \"upgrade\"")) {
+      throw new Error("upgrade intent");
+    }
+  },
+  "plan-change-downgrade-uses-confirmation": () => {
+    if (!planChangeRouter.includes("schedule_downgrade")) throw new Error("downgrade action");
+    if (!planChangeRouter.includes("confirmationMessage")) throw new Error("confirmation message");
+  },
+  "plan-change-cancel-uses-portal": () => {
+    if (!billingSubscriptionPanel.includes("openCustomerPortal")) throw new Error("portal for manage");
+    if (!planChangeRouter.includes("Manage subscription")) throw new Error("portal label");
+  },
+  "plan-change-interval-change-not-duplicate-subscription": () => {
+    if (!planChangeRouter.includes("interval_change")) throw new Error("interval change intent");
+    if (!planChangeRouter.includes('action: "portal"')) throw new Error("portal for interval");
+    if (!planChangeRouter.includes("duplicate subscriptions")) throw new Error("duplicate warning");
   },
 };
 

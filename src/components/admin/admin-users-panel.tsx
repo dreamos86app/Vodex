@@ -1162,19 +1162,27 @@ export function AdminUsersPanel() {
                   </td>
 
                   <td className="px-4 py-3 tabular-nums">
-                    {u.tokens_remaining.toLocaleString()}
+                    <span>
+                      {u.tokens_remaining.toLocaleString()}/
+                      {(u.monthly_token_limit + Math.max(u.bonus_credits, 0)).toLocaleString()}
+                    </span>
                     {u.bonus_credits > 0 ? (
-                      <span className="ml-1 text-[10px] font-medium text-violet-500">+{u.bonus_credits} bonus</span>
+                      <span className="ml-1 text-[10px] font-medium text-violet-500">
+                        +{u.bonus_credits.toLocaleString()}
+                      </span>
                     ) : null}
-                    <span className="block text-[10px] text-muted-foreground">/{u.monthly_token_limit} plan</span>
                   </td>
 
                   <td className="px-4 py-3 tabular-nums">
-                    {u.action_credits_remaining.toLocaleString()}
+                    <span>
+                      {u.action_credits_remaining.toLocaleString()}/
+                      {(u.action_credits_plan_allowance + Math.max(u.action_credits_bonus, 0)).toLocaleString()}
+                    </span>
                     {u.action_credits_bonus > 0 ? (
-                      <span className="ml-1 text-[10px] font-medium text-violet-500">+{u.action_credits_bonus} bonus</span>
+                      <span className="ml-1 text-[10px] font-medium text-violet-500">
+                        +{u.action_credits_bonus.toLocaleString()}
+                      </span>
                     ) : null}
-                    <span className="block text-[10px] text-muted-foreground">/{u.action_credits_plan_allowance} plan</span>
                   </td>
 
                   <td className="px-4 py-3 text-muted-foreground">

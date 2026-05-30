@@ -6,6 +6,7 @@ import {
 } from "@/lib/build/generated-file-utils";
 import { countComponentFiles } from "@/lib/build/import-graph";
 import { mergeRestaurantInventoryScaffold } from "@/lib/build/restaurant-inventory-scaffold";
+import { mergeSubscriptionBoxScaffold } from "@/lib/build/subscription-box-scaffold";
 import { mergeGenericSaaSScaffold } from "@/lib/build/generic-saas-scaffold";
 import { mergeNonprofitCrmScaffold } from "@/lib/build/nonprofit-crm-scaffold";
 import {
@@ -33,6 +34,7 @@ export type ScaffoldFallbackResult = {
 };
 
 const KNOWN_SCAFFOLD_ARCHETYPES = new Set<AppArchetypeId>([
+  "subscription_box_manager",
   "restaurant_inventory",
   "saas_dashboard",
   "crm",
@@ -49,6 +51,7 @@ const KNOWN_SCAFFOLD_ARCHETYPES = new Set<AppArchetypeId>([
 
 /** Archetypes with a full deterministic file tree in-repo (expand over time). */
 const FULL_SCAFFOLD_ARCHETYPES = new Set<AppArchetypeId>([
+  "subscription_box_manager",
   "restaurant_inventory",
   "saas_dashboard",
   "crm",
@@ -73,6 +76,9 @@ export function mergeScaffoldForArchetype(
   files: BuildFile[],
   appName = "Dream App",
 ): BuildFile[] {
+  if (archetypeId === "subscription_box_manager") {
+    return mergeSubscriptionBoxScaffold(files, appName);
+  }
   if (archetypeId === "restaurant_inventory") {
     return mergeRestaurantInventoryScaffold(files);
   }

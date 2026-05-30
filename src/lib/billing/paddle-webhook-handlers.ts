@@ -1,6 +1,13 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { syncPlanCreditsForUser } from "@/lib/billing/sync-plan-credits";
 import { applyImmediatePlanUpgrade } from "@/lib/billing/apply-immediate-plan-upgrade";
+import { persistPaddleCustomerId } from "@/lib/billing/persist-paddle-customer-id";
+import { buildProfilePaddleSubscriptionClear } from "@/lib/billing/paddle-profile-fields";
+import {
+  updateSubscriptionByPaddleId,
+  updateProfilePaddleBilling,
+  upsertPaddleSubscriptionMirror,
+} from "@/lib/billing/paddle-subscription-legacy-store";
 import { claimBillingEvent } from "@/lib/billing/billing-event-idempotency";
 import { normalizePlanId } from "@/lib/billing/plans";
 import {
@@ -8,6 +15,11 @@ import {
   planFromPaddlePriceId,
 } from "@/lib/billing/plan-billing-catalog";
 import { syncPaddleMarketingConsent } from "@/lib/billing/paddle-marketing-consent";
+import {
+  readPaddleCheckoutCustomData,
+  storagePlanIdFromCustomData,
+} from "@/lib/billing/paddle-checkout-custom-data";
+import { readWebhookIds } from "@/lib/billing/paddle-event-store";
 import type { BillingInterval } from "@/lib/billing/upgrade-policy";
 import type { PlanId } from "@/lib/supabase/types";
 
@@ -18,10 +30,11 @@ function planFromPaddlePrice(priceId: string | undefined): PlanId | null {
 }
 
 function resolveEntitlementPlan(
-  custom: ReturnType<typeof readCustomData>,
+  custom: ReturnType<typeof readPaddleCheckoutCustomData>,
   priceId: string | undefined,
 ): PlanId | null {
-  if (custom.planId) return normalizePlanId(custom.planId);
+  const fromCustom = storagePlanIdFromCustomData(custom);
+  if (fromCustom) return fromCustom;
   return planFromPaddlePrice(priceId);
 }
 
@@ -31,19 +44,15 @@ function periodEndFromEvent(data: Record<string, unknown>): string {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function readCustomData(data: Record<string, unknown>): {
-  userId?: string;
-  planId?: string;
-  billingIntent?: string;
-  billingInterval?: BillingInterval;
-} {
-  const custom = (data.custom_data ?? {}) as Record<string, string>;
-  return {
-    userId: custom.user_id,
-    planId: custom.plan_id,
-    billingIntent: custom.billing_intent,
-    billingInterval: custom.billing_interval === "yearly" ? "yearly" : "monthly",
-  };
+function transactionPriceId(data: Record<string, unknown>): string | undefined {
+  const ids = readWebhookIds(data);
+  return ids.priceId ?? undefined;
+}
+
+function shouldProcessPaidTransaction(eventType: string, data: Record<string, unknown>): boolean {
+  if (eventType === "transaction.paid") return true;
+  const status = String(data.status ?? "").toLowerCase();
+  return status === "completed" || status === "paid";
 }
 
 async function upsertPaddleSubscriptionRow(input: {
@@ -55,58 +64,71 @@ async function upsertPaddleSubscriptionRow(input: {
 }): Promise<void> {
   const admin = createSupabaseAdmin();
   const now = new Date().toISOString();
-  await admin.from("subscriptions").upsert(
-    {
-      user_id: input.userId,
-      stripe_subscription_id: input.subscriptionId,
-      plan_id: input.planId,
-      status: input.status === "trialing" ? "trialing" : "active",
-      current_period_start: now,
-      current_period_end: input.periodEnd,
-      credits_per_period: 0,
-    } as never,
-    { onConflict: "stripe_subscription_id" },
-  );
-
-  await admin
-    .from("profiles")
-    .update({ stripe_subscription_id: input.subscriptionId, plan_id: input.planId })
-    .eq("id", input.userId);
+  const subStatus = input.status === "trialing" ? "trialing" : "active";
+  await upsertPaddleSubscriptionMirror(admin, {
+    userId: input.userId,
+    subscriptionId: input.subscriptionId,
+    planId: input.planId,
+    planInterval: "monthly",
+    status: subStatus,
+    periodStart: now,
+    periodEnd: input.periodEnd,
+    creditsPerPeriod: 0,
+  });
+  await updateProfilePaddleBilling(admin, input.userId, {
+    subscriptionId: input.subscriptionId,
+    planId: input.planId,
+    subscriptionStatus: subStatus,
+  });
 }
 
-/** Grant credits only after confirmed payment (transaction.completed). */
+/** Grant credits after confirmed payment (transaction.completed / transaction.paid). */
 export async function handlePaddleTransactionCompleted(input: {
   data: Record<string, unknown>;
   paddleEventId: string;
+  eventType?: string;
 }): Promise<void> {
-  const status = String(input.data.status ?? "");
-  if (status !== "completed" && status !== "paid") return;
+  const eventType = input.eventType ?? "";
+  if (!shouldProcessPaidTransaction(eventType, input.data)) return;
 
-  const custom = readCustomData(input.data);
+  const custom = readPaddleCheckoutCustomData(input.data);
   const userId = custom.userId;
   if (!userId) return;
 
-  const priceId =
-    (input.data.items as Array<{ price?: { id?: string } }> | undefined)?.[0]?.price?.id ??
-    (input.data.price_id as string | undefined);
+  await persistPaddleCustomerId({
+    userId,
+    data: input.data,
+    subscriptionId: String(
+      (input.data.subscription_id as string | undefined) ??
+        (input.data.subscription as { id?: string } | undefined)?.id ??
+        "",
+    ) || null,
+    priceId: custom.priceId ?? transactionPriceId(input.data) ?? null,
+  });
+
+  const priceId = custom.priceId ?? transactionPriceId(input.data);
   const newPlan = resolveEntitlementPlan(custom, priceId);
   if (!newPlan) return;
 
   await syncPaddleMarketingConsent(userId, input.data);
 
-  const interval = custom.billingInterval ?? "monthly";
+  const interval: BillingInterval = custom.billingInterval ?? "monthly";
   const subscriptionId = String(
     (input.data.subscription_id as string | undefined) ??
       (input.data.subscription as { id?: string } | undefined)?.id ??
       "",
   );
+  const customerId =
+    (input.data.customer_id as string | undefined) ??
+    (input.data.customer as { id?: string } | undefined)?.id ??
+    null;
   const transactionId = String(input.data.id ?? input.paddleEventId);
   const intent = custom.billingIntent ?? "new_subscription";
 
   const admin = createSupabaseAdmin();
   const { data: profile } = await admin
     .from("profiles")
-    .select("plan_id")
+    .select("plan_id, credits_remaining")
     .eq("id", userId)
     .maybeSingle();
 
@@ -120,8 +142,11 @@ export async function handlePaddleTransactionCompleted(input: {
       billingInterval: interval,
       paddleSubscriptionId: subscriptionId || null,
       paddleTransactionId: transactionId,
+      paddlePriceId: priceId ?? null,
+      paddleCustomerId: customerId,
+      paddleEventId: input.paddleEventId,
       idempotencyKey: `paddle:txn:${transactionId}`,
-      source: `paddle:transaction.completed:${intent}`,
+      source: `paddle:${eventType || "transaction.completed"}:${intent}`,
     });
     return;
   }
@@ -146,8 +171,7 @@ export async function handlePaddleTransactionCompleted(input: {
 }
 
 /**
- * Subscription lifecycle — metadata only unless canceled.
- * Credits are granted via transaction.completed (payment confirmed).
+ * Subscription lifecycle — metadata + fallback entitlement when txn webhook is delayed.
  */
 export async function handlePaddleSubscriptionEvent(input: {
   eventType: string;
@@ -155,14 +179,18 @@ export async function handlePaddleSubscriptionEvent(input: {
   paddleEventId: string;
 }): Promise<void> {
   const admin = createSupabaseAdmin();
-  const custom = readCustomData(input.data);
+  const custom = readPaddleCheckoutCustomData(input.data);
   const userId = custom.userId;
   if (!userId) return;
 
+  await persistPaddleCustomerId({
+    userId,
+    data: input.data,
+    subscriptionId: String(input.data.id ?? ""),
+  });
+
   const status = String(input.data.status ?? "");
-  const priceId =
-    (input.data.items as Array<{ price?: { id?: string } }> | undefined)?.[0]?.price?.id ??
-    (input.data.price_id as string | undefined);
+  const priceId = custom.priceId ?? transactionPriceId(input.data);
   const planId = resolveEntitlementPlan(custom, priceId);
   if (!planId && input.eventType !== "subscription.canceled") return;
 
@@ -193,7 +221,8 @@ export async function handlePaddleSubscriptionEvent(input: {
   if (
     input.eventType === "subscription.activated" ||
     input.eventType === "subscription.created" ||
-    input.eventType === "subscription.updated"
+    input.eventType === "subscription.updated" ||
+    input.eventType === "subscription.resumed"
   ) {
     if (cancelScheduled) {
       const effectiveAt = scheduledChange?.effective_at ?? periodEnd;
@@ -205,13 +234,10 @@ export async function handlePaddleSubscriptionEvent(input: {
         } as never)
         .eq("id", userId);
 
-      await admin
-        .from("subscriptions")
-        .update({
-          cancel_at_period_end: true,
-          current_period_end: effectiveAt,
-        } as never)
-        .eq("stripe_subscription_id", subscriptionId);
+      await updateSubscriptionByPaddleId(admin, subscriptionId, {
+        cancel_at_period_end: true,
+        current_period_end: effectiveAt,
+      });
 
       await claimBillingEvent(admin, {
         eventId: input.paddleEventId,
@@ -239,8 +265,11 @@ export async function handlePaddleSubscriptionEvent(input: {
         metadata: { note: "subscription_metadata_sync" },
       });
 
-      // Fallback if transaction.completed webhook is delayed — same idempotency key as txn handler.
-      if (input.eventType === "subscription.activated" || input.eventType === "subscription.created") {
+      if (
+        input.eventType === "subscription.activated" ||
+        input.eventType === "subscription.created" ||
+        input.eventType === "subscription.resumed"
+      ) {
         const txnId = String(
           (input.data.transaction_id as string | undefined) ??
             (input.data.latest_transaction as { id?: string } | undefined)?.id ??
@@ -250,12 +279,16 @@ export async function handlePaddleSubscriptionEvent(input: {
 
         const { data: profile } = await admin
           .from("profiles")
-          .select("plan_id")
+          .select("plan_id, credits_remaining")
           .eq("id", userId)
           .maybeSingle();
 
         const intent = custom.billingIntent ?? "new_subscription";
         if (intent !== "renewal") {
+          const customerId =
+            (input.data.customer_id as string | undefined) ??
+            (input.data.customer as { id?: string } | undefined)?.id ??
+            null;
           await applyImmediatePlanUpgrade({
             userId,
             oldPlan: normalizePlanId(profile?.plan_id ?? "free"),
@@ -263,12 +296,29 @@ export async function handlePaddleSubscriptionEvent(input: {
             billingInterval: custom.billingInterval ?? "monthly",
             paddleSubscriptionId: subscriptionId,
             paddleTransactionId: txnId || null,
+            paddlePriceId: priceId ?? null,
+            paddleCustomerId: customerId,
+            paddleEventId: input.paddleEventId,
             idempotencyKey,
             source: `paddle:${input.eventType}:fallback`,
           });
         }
       }
     }
+  }
+
+  if (input.eventType === "subscription.paused") {
+    await admin
+      .from("profiles")
+      .update({ subscription_status: "paused" } as never)
+      .eq("id", userId);
+    await claimBillingEvent(admin, {
+      eventId: input.paddleEventId,
+      userId,
+      eventType: `paddle.${input.eventType}`,
+      subscriptionId: subscriptionId || null,
+    });
+    return;
   }
 
   if (input.eventType === "subscription.canceled" || status === "canceled") {
@@ -285,16 +335,16 @@ export async function handlePaddleSubscriptionEvent(input: {
       .from("profiles")
       .update({
         plan_id: "free",
-        stripe_subscription_id: null,
+        ...buildProfilePaddleSubscriptionClear(),
         cancel_at_period_end: false,
         subscription_status: "canceled",
       } as never)
       .eq("id", userId);
 
-    await admin
-      .from("subscriptions")
-      .update({ status: "canceled", cancel_at_period_end: false })
-      .eq("stripe_subscription_id", subscriptionId);
+    await updateSubscriptionByPaddleId(admin, subscriptionId, {
+      status: "canceled",
+      cancel_at_period_end: false,
+    });
 
     await syncPlanCreditsForUser({
       userId,

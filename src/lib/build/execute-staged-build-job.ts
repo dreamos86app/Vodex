@@ -262,6 +262,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
             previewReady: false,
             userMessage: "Build timed out before completion.",
           },
+          postBuildFailures: ["build_pipeline_hard_cap"],
           appArchetype: "unknown",
           errorMessage: msg,
         } satisfies Awaited<typeof pipelinePromise>;
@@ -297,9 +298,12 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     }
 
     const saveableFileCount = filterRenderableBuildFiles(pr.files).length;
+    const allContractFailures = [
+      ...new Set([...pr.buildContract.failures, ...(pr.postBuildFailures ?? [])]),
+    ];
     const buildSucceeded =
       (pr.ok && pr.buildContract.passed) ||
-      canCompleteWithSavedFiles(saveableFileCount, pr.buildContract.failures);
+      canCompleteWithSavedFiles(saveableFileCount, allContractFailures);
     const partialCreditStop =
       ("partialCreditStop" in pr && pr.partialCreditStop === true) ||
       pr.errorMessage === "partial_credit_stop";
@@ -471,9 +475,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
           metadata: {
             ...prevMetaSaved,
             ...lifecyclePatch("needs_attention", {
-              build_contract_failures: pr.buildContract.failures,
+              build_contract_failures: allContractFailures,
               files_ready: true,
-              credits_refunded: true,
+              credits_refunded: false,
             }),
             file_count: savedCount,
             ui_quality_score: pr.uiQualityScore,
@@ -498,28 +502,46 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         skipJobStatusUpdate: true,
       });
 
+      if (!alreadyCharged && input.reservedCredits && input.reservedCredits > 0) {
+        const chargeCalc = calculateCreditsForStagedBuild({
+          providerCostUsd: pr.totalProviderCostUsd,
+          complexity: pr.complexity,
+          inputTokens: pr.totalInputTokens,
+          outputTokens: pr.totalOutputTokens,
+          primaryModelId: pr.primaryModelId,
+          fileCount: savedCount,
+        });
+        const profitable = assertProfitableCharge(
+          chargeCalc.creditsToCharge,
+          chargeCalc.estimatedProviderCostUsd,
+        );
+        if (profitable.ok) {
+          await reconcileGenerationReservation(input.writer, {
+            userId: input.userId,
+            generationId: input.operationId,
+            reservedCredits: input.reservedCredits,
+            actualUserCredits: Math.min(input.reservedCredits, chargeCalc.creditsToCharge),
+            providerCostUsd: chargeCalc.estimatedProviderCostUsd,
+            success: true,
+            projectId: input.projectId,
+          });
+        }
+      }
+
       await persistBuildJobEvent(input.writer, {
         ...eventCtx,
         type: "failed",
-        title: userSafeFailureTitle(postKind),
-        detail: userSafeFailureDetail(postKind, pr.buildContract.userMessage),
+        title: "Build needs attention",
+        detail:
+          "The files were saved, but preview could not render because of a technical issue. Fix in chat to continue.",
         progressPercent: 100,
         metadata: {
-          failures: pr.buildContract.failures,
+          failures: allContractFailures,
           failure_kind: postKind,
           file_count: savedCount,
           files_persisted: savedCount,
           execution_instance_id: workerCtx.executionInstanceId,
         },
-      });
-
-      await persistBuildJobEvent(input.writer, {
-        ...eventCtx,
-        type: "refunded",
-        title: "Credits were returned",
-        detail: "Credits were returned for this attempt.",
-        progressPercent: 100,
-        metadata: { stream_category: "assistant_message" },
       });
 
       await logServerOperation({

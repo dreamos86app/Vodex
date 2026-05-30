@@ -32,6 +32,14 @@ export type GeneratedDesignSystem = {
 };
 
 const PALETTES: Record<AppArchetypeId, GeneratedDesignSystem["palette"]> = {
+  subscription_box_manager: {
+    primary: "#7c3aed",
+    accent: "#06b6d4",
+    background: "bg-slate-50",
+    surface: "bg-white",
+    muted: "text-slate-500",
+    border: "border-slate-200",
+  },
   saas_dashboard: {
     primary: "#2563eb",
     accent: "#0ea5e9",

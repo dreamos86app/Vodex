@@ -4,6 +4,7 @@
 import { resolveAppTypeFromPrompt } from "@/lib/generation/app-type-ui-requirements";
 
 export type AppArchetypeId =
+  | "subscription_box_manager"
   | "saas_dashboard"
   | "crm"
   | "restaurant_inventory"
@@ -36,6 +37,13 @@ export type AppArchetype = {
 };
 
 const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: number }> = [
+  {
+    id: "subscription_box_manager",
+    patterns: [
+      /subscription box|subscriber list|monthly box|curation|churn analytics|shipping labels? export/i,
+      /subscription manager|box manager|curate.*box/i,
+    ],
+  },
   { id: "restaurant_inventory", patterns: [/restaurant|food inventory|kitchen|pantry|supplier|waste|stock|ingredient/i] },
   {
     id: "event_ticketing",
@@ -59,6 +67,20 @@ const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: 
 ];
 
 const ARCHETYPE_DEFS: Record<AppArchetypeId, Omit<AppArchetype, "id" | "confidence">> = {
+  subscription_box_manager: {
+    label: "Subscription box manager",
+    navigationStyle: "sidebar",
+    coreRoutes: ["/dashboard", "/subscribers", "/boxes", "/shipments", "/analytics", "/settings"],
+    primarySections: [
+      "subscriber table",
+      "monthly box curation",
+      "shipping label export",
+      "churn metrics",
+      "MRR overview",
+    ],
+    visualTone: "modern subscription SaaS, clean logistics + analytics",
+    terminology: ["subscribers", "boxes", "shipments", "churn", "MRR", "curation"],
+  },
   saas_dashboard: {
     label: "SaaS dashboard",
     navigationStyle: "sidebar",
@@ -273,6 +295,7 @@ export function classifyAppArchetype(buildIntent: string): AppArchetype {
 
 export function archetypeToLegacyAppType(id: AppArchetypeId): string {
   const map: Partial<Record<AppArchetypeId, string>> = {
+    subscription_box_manager: "saas_dashboard",
     saas_dashboard: "saas_dashboard",
     crm: "crm",
     restaurant_inventory: "saas_dashboard",

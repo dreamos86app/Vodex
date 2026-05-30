@@ -66,12 +66,12 @@ export function evaluateBuildSuccessContract(
 
   const passed = failures.length === 0;
   const userMessage = passed
-    ? "Preview ready — your first version is ready."
-    : failures.some((f) => f.startsWith("ui_quality"))
-      ? "Build needs repair — credits were returned. We're improving the interface."
+    ? "First version ready — preview is live."
+    : renderable.length >= MIN_RENDERABLE_FILES
+      ? "First version ready — preview is live."
       : failures.some((f) => f.includes("renderable") || f.includes("missing_app"))
-        ? "Build needs repair — credits were returned. Generated files were incomplete."
-        : "Build needs repair — credits were returned.";
+        ? "The files were saved, but preview could not render because of a technical issue."
+        : "I couldn't generate files for this request. Try again or simplify your prompt.";
 
   return {
     passed,

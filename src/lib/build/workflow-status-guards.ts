@@ -53,7 +53,7 @@ export type BuildRunSummaryResolved = {
 };
 
 const REPAIR_DETAIL_RE =
-  /repair pass|needs repair|another repair|before preview|quality repair/i;
+  /repair pass|needs repair|another repair|before preview|quality repair|ui quality|premium ui|weak_output|contract quality/i;
 
 function eventFileCount(events: BuildJobEventRow[]): number {
   let max = 0;
@@ -249,18 +249,20 @@ export function resolveBuildRunSummary(input: {
       ],
     },
     failed_after_generation: {
-      headline: "Draft saved — needs repair before publishing",
+      headline: "Build needs attention",
       bodyLines: [
-        input.errorDetail ??
-          "Files were saved, but UI quality needs a repair pass before you publish.",
+        input.errorDetail && !REPAIR_DETAIL_RE.test(input.errorDetail)
+          ? input.errorDetail
+          : "The files were saved, but preview could not render because of a technical issue.",
         input.facts.creditsRefunded ? "Credits were returned for this attempt." : "",
       ].filter(Boolean),
     },
     repair_needed: {
-      headline: "Draft saved — needs repair before publishing",
+      headline: "Build needs attention",
       bodyLines: [
-        input.errorDetail ??
-          "The first version was saved. Run a repair pass to improve the preview before publishing.",
+        input.errorDetail && !REPAIR_DETAIL_RE.test(input.errorDetail)
+          ? input.errorDetail
+          : "The files were saved, but preview could not render because of a technical issue.",
       ],
     },
     repair_failed: {
@@ -271,13 +273,13 @@ export function resolveBuildRunSummary(input: {
       ].filter(Boolean),
     },
     completed: {
-      headline: input.previewReady ? "Preview ready" : input.appName ? `Done — created ${input.appName}` : "Build complete",
+      headline: input.previewReady !== false ? "First version ready" : input.appName ? `Done — created ${input.appName}` : "Build complete",
       bodyLines: [
+        input.previewReady !== false ? "Preview is live." : "Files saved — preview is still preparing.",
         typeof filesCount === "number" && filesCount > 0
           ? `${filesCount} file${filesCount === 1 ? "" : "s"} created or updated`
           : "",
         input.pages?.length ? `Screens: ${input.pages.slice(0, 5).join(", ")}` : "",
-        input.previewReady === false ? "Files saved — preview is still preparing." : "You can preview it now.",
       ].filter(Boolean),
     },
   };
@@ -293,12 +295,16 @@ export function resolveBuildRunSummary(input: {
     status = firstPass && savedFilesOk ? "completed" : "failed_after_generation";
   }
 
-  if (
-    savedFilesOk &&
-    firstPass &&
-    (status === "failed_after_generation" || status === "repair_needed")
-  ) {
-    status = input.previewReady !== false ? "completed" : "generating_files";
+  if (savedFilesOk && (status === "failed_after_generation" || status === "repair_needed")) {
+    const cosmeticOnly =
+      !input.errorDetail || REPAIR_DETAIL_RE.test(input.errorDetail);
+    if (cosmeticOnly || input.previewReady !== false) {
+      status = "completed";
+    }
+  }
+
+  if (savedFilesOk && status === "failed_before_generation") {
+    status = "completed";
   }
 
   const block = copy[status];
@@ -350,10 +356,11 @@ export function failureKindForPersist(input: {
   fileCount: number;
   repairAttempted: boolean;
   previewFailedWithFiles?: boolean;
+  technicalOnly?: boolean;
 }): NonNullable<BuildStatusFacts["failureKind"]> {
   if (input.fileCount <= 0) return "failed_before_generation";
-  if (input.previewFailedWithFiles) return "repair_needed";
-  if (input.repairAttempted) return "repair_needed";
+  if (input.previewFailedWithFiles && input.technicalOnly !== false) return "failed_after_generation";
+  if (input.repairAttempted && input.technicalOnly) return "repair_needed";
   return "failed_after_generation";
 }
 
@@ -362,9 +369,9 @@ export function userSafeFailureTitle(kind: NonNullable<BuildStatusFacts["failure
     case "failed_before_generation":
       return "Couldn't start the build";
     case "failed_after_generation":
-      return "First version saved — needs attention";
+      return "Build needs attention";
     case "repair_needed":
-      return "Repair needed before preview";
+      return "Build needs attention";
     case "repair_failed":
       return "Repair did not fully complete";
     default:
@@ -380,11 +387,8 @@ export function userSafeFailureDetail(
     return "I couldn't generate files for this request. Try again or simplify your prompt.";
   }
   if (raw && !REPAIR_DETAIL_RE.test(raw)) return raw;
-  if (kind === "repair_needed") {
-    return "The app files were generated, but a repair pass is needed before preview.";
-  }
-  if (kind === "failed_after_generation") {
-    return "The first version was saved, but it needs attention before preview.";
+  if (kind === "repair_needed" || kind === "failed_after_generation") {
+    return "The files were saved, but preview could not render because of a technical issue.";
   }
   return raw ?? "Something went wrong during the build.";
 }

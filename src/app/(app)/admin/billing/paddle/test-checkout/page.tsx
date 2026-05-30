@@ -4,6 +4,7 @@ import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { buildPaddleAdminConfigStatus } from "@/lib/billing/paddle-config-status";
 import { paddleOwnerTestCheckoutEnabled } from "@/lib/billing/paddle-public-checkout";
 import { getAppUrl } from "@/lib/app-url";
+import { buildPaddleCheckoutTestingContext } from "@/lib/billing/paddle-local-testing";
 import { AdminPaddleTestCheckout } from "@/components/admin/admin-paddle-test-checkout";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,9 @@ export default async function AdminPaddleTestCheckoutPage() {
     );
   }
 
-  const config = buildPaddleAdminConfigStatus(getAppUrl());
+  const appUrl = getAppUrl();
+  const config = buildPaddleAdminConfigStatus(appUrl);
+  const testingContext = buildPaddleCheckoutTestingContext(appUrl);
 
   return (
     <div className="dashboard-shell mx-auto max-w-2xl space-y-6 py-8">
@@ -73,6 +76,7 @@ export default async function AdminPaddleTestCheckoutPage() {
         userId={user.id}
         userEmail={user.email ?? ""}
         config={config}
+        testingContext={testingContext}
       />
     </div>
   );

@@ -9,6 +9,7 @@ import {
   monthlyTokensForPlan,
   PLAN_DISPLAY,
 } from "@/lib/billing/plans";
+import { dreamosStripeBillingDisabledResponse } from "@/lib/billing/dreamos-billing-provider";
 
 const schema = z.object({
   planId: z.string(),
@@ -16,6 +17,9 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const blocked = dreamosStripeBillingDisabledResponse();
+  if (blocked) return blocked;
+
   const missing = missingStripeEnvVars();
   if (missing.length > 0) {
     return NextResponse.json(

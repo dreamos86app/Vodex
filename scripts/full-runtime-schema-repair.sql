@@ -86,9 +86,15 @@ alter table public.profiles add column if not exists suspended_at timestamptz;
 alter table public.profiles add column if not exists suspended_reason text;
 alter table public.profiles add column if not exists suspension_reason text;
 alter table public.profiles add column if not exists last_active_at timestamptz;
-alter table public.profiles add column if not exists stripe_customer_id text;
-alter table public.profiles add column if not exists stripe_subscription_id text;
-alter table public.profiles add column if not exists stripe_price_id text;
+-- DreamOS86 platform billing: Paddle-only (see scripts/manual-sql/paddle-customer-fields.sql)
+alter table public.profiles add column if not exists paddle_customer_id text;
+alter table public.profiles add column if not exists paddle_subscription_id text;
+alter table public.profiles add column if not exists paddle_price_id text;
+alter table public.profiles add column if not exists billing_provider text default 'paddle';
+
+update public.profiles
+set billing_provider = 'paddle'
+where billing_provider is null or trim(billing_provider) = '';
 alter table public.profiles add column if not exists onboarding_completed boolean default false;
 alter table public.profiles add column if not exists onboarding_completed_at timestamptz;
 alter table public.profiles add column if not exists onboarding_step integer default 1;

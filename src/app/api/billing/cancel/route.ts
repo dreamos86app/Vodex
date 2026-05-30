@@ -3,10 +3,14 @@ import Stripe from "stripe";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { missingStripeEnvVars } from "@/lib/billing/plans";
+import { dreamosStripeBillingDisabledResponse } from "@/lib/billing/dreamos-billing-provider";
 
 const schema = z.object({ confirmed: z.literal(true) });
 
 export async function POST(request: Request) {
+  const blocked = dreamosStripeBillingDisabledResponse();
+  if (blocked) return blocked;
+
   const missing = missingStripeEnvVars();
   if (missing.length > 0) {
     return NextResponse.json({ error: "Stripe not configured", missingEnv: missing }, { status: 503 });

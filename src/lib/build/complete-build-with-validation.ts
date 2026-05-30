@@ -92,8 +92,8 @@ export async function completeBuildWithValidation(input: {
     buildTier: createCfg.buildTier,
   });
 
-  const uiOk = !uiQualityBlocksGenerated(uiReview);
-  const validationOk = validation.ok && uiOk;
+  const uiOk = fileRows.length >= MIN_RENDERABLE_FILES || !uiQualityBlocksGenerated(uiReview);
+  const validationOk = validation.ok && (fileRows.length >= MIN_RENDERABLE_FILES || uiOk);
   const validationReasons = [
     ...validation.reasons,
     ...(uiOk
@@ -156,7 +156,7 @@ export async function completeBuildWithValidation(input: {
     validationOk,
     validationReasons,
     fileCount,
-    canPreview: validationOk && fileCount > 0,
+    canPreview: fileCount >= MIN_RENDERABLE_FILES && validation.ok,
     canPublish: Boolean(prevMeta.preview_ready) && validationOk && fileCount > 0,
     uiQualityScore: uiReview.overall,
     needsUiPolish: uiReview.needsPolish,

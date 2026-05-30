@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { dreamosStripeBillingDisabledResponse } from "@/lib/billing/dreamos-billing-provider";
 
 export const dynamic = "force-dynamic";
 
 export async function POST() {
+  const blocked = dreamosStripeBillingDisabledResponse();
+  if (blocked) return blocked;
+
   const cookieStore = await cookies();
 
   const supabase = createServerClient(

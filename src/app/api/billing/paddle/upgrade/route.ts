@@ -16,6 +16,10 @@ import {
 } from "@/lib/billing/upgrade-policy";
 import { monthlyTokensForPlan, normalizePlanId, PLAN_DISPLAY } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
+import {
+  PROFILE_PADDLE_BILLING_SELECT,
+  readProfilePaddleSubscriptionId,
+} from "@/lib/billing/paddle-profile-fields";
 
 const schema = z.object({
   planId: z.string(),
@@ -58,7 +62,7 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan_id, stripe_subscription_id")
+    .select(`plan_id, ${PROFILE_PADDLE_BILLING_SELECT}`)
     .eq("id", user.id)
     .single();
 
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Account email required for checkout" }, { status: 400 });
   }
 
-  const existingSubId = profile?.stripe_subscription_id?.trim();
+  const existingSubId = readProfilePaddleSubscriptionId(profile ?? undefined);
 
   if (existingSubId) {
     const updated = await updatePaddleSubscriptionPlan({

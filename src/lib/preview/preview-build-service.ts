@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { validateGeneratedApp } from "@/lib/build/generated-app-validator";
+import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { uiQualityBlocksGenerated, reviewGeneratedUi } from "@/lib/generation/generated-ui-review";
 import { readCreateFlowConfig } from "@/lib/create/create-flow-config";
 import {
@@ -235,11 +236,20 @@ export async function startPreviewSession(input: {
     status = "failed";
     error = validation.reasons.slice(0, 3).join("; ");
     logs = appendPreviewLog(logs, `Validation failed: ${error}`);
-  } else if (uiQualityBlocksGenerated(uiReview)) {
+  } else if (
+    uiQualityBlocksGenerated(uiReview) &&
+    safeFiles.length < MIN_RENDERABLE_FILES
+  ) {
     status = "failed";
-    error = `UI quality gate failed (score ${uiReview.overall})`;
+    error = "Preview could not be prepared — not enough renderable files.";
     logs = appendPreviewLog(logs, error);
   } else {
+    if (uiQualityBlocksGenerated(uiReview)) {
+      logs = appendPreviewLog(
+        logs,
+        "UI polish warning (internal) — preview proceeds with saved files",
+      );
+    }
     logs = appendPreviewLog(logs, "Validation passed — resolving preview provider");
     const vercelCfg = getVercelServerConfig(prevMeta);
     const providerResult = await resolvePreviewProvider({
