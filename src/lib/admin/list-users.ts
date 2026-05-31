@@ -1,12 +1,8 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
-import { creditCap, normalizeAvailableCredits } from "@/lib/credits/normalize-credit-balance";
-import { adminFieldsFromCanonical, buildCanonicalBucket } from "@/lib/credits/canonical-credits";
-import {
-  batchExplicitCreditBonuses,
-  impliedActionBonus,
-} from "@/lib/admin/batch-user-credit-bonuses";
+import { creditCap } from "@/lib/credits/normalize-credit-balance";
+import { loadCanonicalCredits, adminFieldsFromCanonical } from "@/lib/credits/canonical-credits";
 import type { PlanId } from "@/lib/supabase/types";
 
 export type AdminUserListRow = {
@@ -228,13 +224,22 @@ export async function listAdminUsers(options: {
     "user_id",
   );
 
-  const profileCreditsInputs = slice.map((au) => ({
-    id: au.id,
-    credits_reset_at: str(profileMap.get(au.id)?.credits_reset_at),
-  }));
-  const { buildBonus, actionGrantBonus } = await batchExplicitCreditBonuses(
-    admin,
-    profileCreditsInputs,
+  const canonicalByUser = new Map(
+    await Promise.all(
+      slice.map(async (au) => {
+        const p = profileMap.get(au.id);
+        const planId = normalizePlanId(str(p?.plan_id) ?? "free");
+        const canonical = await loadCanonicalCredits({
+          userId: au.id,
+          planId,
+          creditsResetAt: str(p?.credits_reset_at),
+          buildAvailable:
+            typeof p?.credits_remaining === "number" ? p.credits_remaining : undefined,
+          skipLedger: true,
+        });
+        return [au.id, canonical] as const;
+      }),
+    ),
   );
 
   const rows: AdminUserListRow[] = [];
@@ -246,50 +251,39 @@ export async function listAdminUsers(options: {
 
     const planId = normalizePlanId(str(p?.plan_id) ?? "free");
     const sub = subByUser.get(au.id);
-    const resetDate = str(p?.credits_reset_at);
-    const buildPlanAllowance = monthlyTokensForPlan(planId);
-    const actionPlanAllowance = monthlyActionCreditsForPlan(planId);
-    const buildAvailable = num(p?.credits_remaining, buildPlanAllowance);
-    const actionAvailable = actionBalanceByUser.has(au.id)
-      ? actionBalanceByUser.get(au.id)!
-      : actionPlanAllowance;
+    const canonical = canonicalByUser.get(au.id);
+    const canonicalFields = canonical
+      ? adminFieldsFromCanonical(canonical)
+      : adminFieldsFromCanonical({
+          build: {
+            available: num(p?.credits_remaining, monthlyTokensForPlan(planId)),
+            planAllowance: monthlyTokensForPlan(planId),
+            usedThisPeriod: 0,
+            bonusActive: 0,
+            bonusLabel: null,
+            bonusExpiresAt: null,
+            resetDate: str(p?.credits_reset_at),
+            reserved: 0,
+            source: "canonical_balance" as const,
+          },
+          action: {
+            available: actionBalanceByUser.get(au.id) ?? monthlyActionCreditsForPlan(planId),
+            planAllowance: monthlyActionCreditsForPlan(planId),
+            usedThisPeriod: 0,
+            bonusActive: 0,
+            bonusLabel: null,
+            bonusExpiresAt: null,
+            resetDate: str(p?.credits_reset_at),
+            reserved: 0,
+            source: "canonical_balance" as const,
+          },
+          planId,
+        });
 
-    const explicitBuildBonus = buildBonus.get(au.id) ?? 0;
-    const explicitActionBonus = impliedActionBonus(
-      actionAvailable,
-      actionPlanAllowance,
-      actionGrantBonus.get(au.id) ?? 0,
-    );
-
-    const buildNorm = normalizeAvailableCredits({
-      rawAvailable: buildAvailable,
-      planAllowance: buildPlanAllowance,
-      explicitBonus: explicitBuildBonus,
-      ledgerUsed: 0,
-    });
-
-    const actionNorm = normalizeAvailableCredits({
-      rawAvailable: actionAvailable,
-      planAllowance: actionPlanAllowance,
-      explicitBonus: explicitActionBonus,
-      ledgerUsed: 0,
-    });
-
-    const canonicalFields = adminFieldsFromCanonical({
-      build: buildCanonicalBucket({
-        available: buildNorm.available,
-        planAllowance: buildPlanAllowance,
-        explicitBonus: explicitBuildBonus,
-        resetDate,
-      }),
-      action: buildCanonicalBucket({
-        available: actionNorm.available,
-        planAllowance: actionPlanAllowance,
-        explicitBonus: explicitActionBonus,
-        resetDate,
-      }),
-      planId,
-    });
+    const buildPlanAllowance = canonicalFields.monthly_token_limit;
+    const explicitBuildBonus = canonicalFields.bonus_credits;
+    const actionPlanAllowance = canonicalFields.action_credits_plan_allowance;
+    const explicitActionBonus = canonicalFields.action_credits_bonus;
 
     rows.push({
       id: au.id,

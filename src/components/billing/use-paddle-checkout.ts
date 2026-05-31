@@ -16,6 +16,7 @@ type PaddleStatusResponse = {
 export type PaddleBillingActionResponse = {
   url?: string;
   transactionId?: string;
+  billingAttemptId?: string;
   mode?: string;
   error?: string;
   code?: string;
@@ -96,9 +97,13 @@ export function usePaddleCheckout() {
       }
 
       if (json.mode === "paddle_subscription_update") {
-        toast.success(
+        if (json.billingAttemptId && typeof window !== "undefined") {
+          window.location.href = `/settings/billing?paddle=success&attemptId=${encodeURIComponent(json.billingAttemptId)}`;
+          return json;
+        }
+        toast.info(
           json.message ??
-            "Subscription updated in Paddle. Plan and credits refresh after webhook confirmation.",
+            "Subscription updated in Paddle. Open Settings → Billing to track webhook confirmation.",
         );
         return json;
       }

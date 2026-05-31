@@ -879,6 +879,7 @@
     "verify:paddle-cancel-resume": "node scripts/verify-paddle-billing.mjs",
     "verify:paddle-no-fake-success": "node scripts/verify-paddle-billing.mjs",
     "verify:paddle-integration": "node scripts/verify-paddle-integration.mjs",
+    "verify:paddle-upgrade-entitlement-trace": "node scripts/verify-paddle-upgrade-entitlement-trace.mjs",
     "verify:paddle-env-schema": "node scripts/verify-paddle-integration.mjs paddle-env-schema",
     "verify:paddle-price-map-complete": "node scripts/verify-paddle-integration.mjs paddle-price-map-complete",
     "verify:paddle-no-secret-client-leak": "node scripts/verify-paddle-integration.mjs paddle-no-secret-client-leak",

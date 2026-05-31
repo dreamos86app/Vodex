@@ -32,6 +32,11 @@ import {
   type UnifiedBillingResolution,
 } from "@/lib/billing/unified-billing-action";
 import type { PlanChangeSource } from "@/lib/billing/plan-change-router";
+import {
+  captureBillingSnapshot,
+  createBillingAttempt,
+  patchBillingAttempt,
+} from "@/lib/billing/billing-attempt-trace";
 
 export type ExecutePaddleBillingInput = {
   ctx: PaddleBillingContext;
@@ -51,6 +56,7 @@ export type ExecutePaddleBillingResult =
       transactionId?: string;
       resolution: UnifiedBillingResolution;
       customDataPreview: ReturnType<typeof buildPaddleCheckoutCustomData>;
+      billingAttemptId: string;
     }
   | {
       ok: true;
@@ -59,6 +65,7 @@ export type ExecutePaddleBillingResult =
       message: string;
       resolution: UnifiedBillingResolution;
       preview: PlanChangePreview;
+      billingAttemptId: string;
     }
   | {
       ok: true;
@@ -66,6 +73,7 @@ export type ExecutePaddleBillingResult =
       pendingDowngradePlan: string;
       currentPeriodEnd: string | null;
       resolution: UnifiedBillingResolution;
+      billingAttemptId: string;
     }
   | {
       ok: false;
@@ -203,16 +211,32 @@ export async function executePaddleBillingAction(
     };
   }
 
+  const before = await captureBillingSnapshot(input.ctx.userId);
+  const billingAttemptId = await createBillingAttempt({
+    userId: input.ctx.userId,
+    targetPlan: validated.plan,
+    endpointCalled: `/api/billing/paddle/action:${resolution.unifiedAction}`,
+    resolvedAction: resolution.unifiedAction,
+    before,
+  });
+
   const { getAppUrl } = await import("@/lib/app-url");
   const appUrl = getAppUrl();
   const successUrl =
-    input.successUrl ?? `${appUrl}/settings/billing?paddle=success&txn=pending`;
-  const cancelUrl = input.cancelUrl ?? `${appUrl}/settings/billing?paddle=canceled`;
+    input.successUrl ??
+    `${appUrl}/settings/billing?paddle=success&attemptId=${billingAttemptId}`;
+  const cancelUrl =
+    input.cancelUrl ?? `${appUrl}/settings/billing?paddle=canceled&attemptId=${billingAttemptId}`;
   const preview = buildPreview(input.ctx, validated.plan, validated.interval);
   const priceId = resolvePaddlePriceId(validated.plan, validated.interval)!;
   const billingIntent: PaddleBillingIntent = paddleBillingIntentForUnified(
     resolution,
   ) as PaddleBillingIntent;
+
+  await patchBillingAttempt(billingAttemptId, {
+    paddle_price_id: priceId,
+    paddle_subscription_id: input.ctx.paddleSubscriptionId,
+  });
 
   if (resolution.unifiedAction === "downgrade") {
     const subId = input.ctx.paddleSubscriptionId;
@@ -236,6 +260,7 @@ export async function executePaddleBillingAction(
       pendingDowngradePlan: resolution.targetStoragePlanId,
       currentPeriodEnd: subRow?.current_period_end ?? null,
       resolution,
+      billingAttemptId,
     };
   }
 
@@ -257,6 +282,7 @@ export async function executePaddleBillingAction(
         userId: input.ctx.userId,
         billingIntent:
           resolution.unifiedAction === "switch_interval" ? "interval_change" : "upgrade",
+        billingAttemptId,
       });
 
       if (!updated.ok) {
@@ -277,6 +303,7 @@ export async function executePaddleBillingAction(
           "Subscription updated in Paddle. Plan and credits refresh only after a verified webhook (transaction.completed / subscription.updated).",
         resolution,
         preview,
+        billingAttemptId,
       };
     }
   }
@@ -294,6 +321,7 @@ export async function executePaddleBillingAction(
           ? "settings"
           : "pricing",
     billingIntent,
+    billingAttemptId,
     testMode: input.testMode,
   });
 
@@ -305,6 +333,7 @@ export async function executePaddleBillingAction(
     successUrl,
     cancelUrl,
     billingIntent,
+    billingAttemptId,
     source:
       input.source === "owner_test_checkout"
         ? "admin_test_checkout"
@@ -324,6 +353,12 @@ export async function executePaddleBillingAction(
     };
   }
 
+  if (checkout.transactionId) {
+    await patchBillingAttempt(billingAttemptId, {
+      paddle_transaction_id: checkout.transactionId,
+    });
+  }
+
   return {
     ok: true,
     mode: "paddle_checkout",
@@ -331,5 +366,6 @@ export async function executePaddleBillingAction(
     transactionId: checkout.transactionId,
     resolution,
     customDataPreview,
+    billingAttemptId,
   };
 }

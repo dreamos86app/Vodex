@@ -14,6 +14,10 @@ import { storagePlanIdFromCustomData, readPaddleCheckoutCustomData } from "@/lib
 import { planFromPaddlePriceId } from "@/lib/billing/plan-billing-catalog";
 import { paddleEnvironment } from "@/lib/billing/paddle-billing";
 import { logPaddleWebhook } from "@/lib/billing/paddle-webhook-log";
+import {
+  readBillingAttemptIdFromCustom,
+  touchBillingAttemptWebhook,
+} from "@/lib/billing/billing-attempt-trace";
 
 const ENTITLEMENT_EVENTS = new Set([
   "transaction.completed",
@@ -77,8 +81,11 @@ export async function processPaddleWebhookPayload(input: {
   const mapped = ids.priceId ? planFromPaddlePriceId(ids.priceId) : null;
   const hasCustomData = parseWebhookCustomData(data) != null;
   const planResolvable = canResolvePlanFromWebhook(data, ids.priceId);
-  const targetPlan =
-    mapped?.plan ?? readPaddleCheckoutCustomData(data).planId ?? null;
+  const customParsed = readPaddleCheckoutCustomData(data);
+  const targetPlan = mapped?.plan ?? customParsed.planId ?? null;
+  const billingAttemptId =
+    customParsed.billingAttemptId ??
+    readBillingAttemptIdFromCustom(parseWebhookCustomData(data) ?? undefined);
 
   logPaddleWebhook({
     event_type: eventType,
@@ -125,6 +132,13 @@ export async function processPaddleWebhookPayload(input: {
   if (!userId) {
     processingStatus = hasCustomData ? "missing_custom_data" : "received_simulation_or_unlinked";
     error = hasCustomData ? "missing_user_id" : "missing_user_id";
+    await touchBillingAttemptWebhook(billingAttemptId, {
+      webhook_verified: true,
+      webhook_event_type: eventType,
+      webhook_processing_status: processingStatus,
+      failure_code: "missing_user_id",
+      failure_message: error,
+    });
     const { duplicate } = await storePaddleWebhookEvent({
       ...storeBase,
       processingStatus,
@@ -133,9 +147,22 @@ export async function processPaddleWebhookPayload(input: {
     return { received: true, eventId, eventType, processingStatus, duplicate };
   }
 
+  await touchBillingAttemptWebhook(billingAttemptId, {
+    webhook_verified: true,
+    webhook_event_type: eventType,
+    paddle_transaction_id: ids.transactionId,
+    paddle_subscription_id: ids.subscriptionId,
+    paddle_price_id: ids.priceId,
+  });
+
   if (ids.priceId && !mapped && !planResolvable) {
     processingStatus = "unknown_price_id";
     error = "unknown_price_id";
+    await touchBillingAttemptWebhook(billingAttemptId, {
+      webhook_processing_status: processingStatus,
+      failure_code: "unknown_price_id",
+      failure_message: error,
+    });
     const { duplicate } = await storePaddleWebhookEvent({
       ...storeBase,
       processingStatus,
@@ -182,6 +209,11 @@ export async function processPaddleWebhookPayload(input: {
       error =
         handlerErr instanceof Error ? handlerErr.message.slice(0, 200) : "handler_failed";
     }
+    await touchBillingAttemptWebhook(billingAttemptId, {
+      webhook_processing_status: processingStatus,
+      failure_code: processingStatus === "failed" ? "paddle_action_failed" : null,
+      failure_message: error,
+    });
     const { duplicate } = await storePaddleWebhookEvent({
       ...storeBase,
       processingStatus,

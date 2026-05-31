@@ -6,7 +6,12 @@ import {
 } from "@/lib/billing/plan-billing-catalog";
 import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
-import { sumExplicitBuildGrants } from "@/lib/credits/canonical-credits";
+import { sumExplicitActionGrants, sumExplicitBuildGrants } from "@/lib/credits/canonical-credits";
+import {
+  finalizeBillingAttemptEntitlement,
+  patchBillingAttempt,
+  touchBillingAttemptWebhook,
+} from "@/lib/billing/billing-attempt-trace";
 import { claimBillingEvent } from "@/lib/billing/billing-event-idempotency";
 import { logPaddleEntitlementAudit } from "@/lib/billing/paddle-entitlement-audit";
 import {
@@ -31,6 +36,10 @@ export type ApplyImmediatePlanUpgradeInput = {
   /** Idempotent webhook / transaction id */
   idempotencyKey: string;
   source: string;
+  billingAttemptId?: string | null;
+  /** Authoritative period end from Paddle when available */
+  periodEndIso?: string | null;
+  periodStartIso?: string | null;
 };
 
 export type ApplyImmediatePlanUpgradeResult = {
@@ -50,8 +59,10 @@ export async function applyImmediatePlanUpgrade(
   const admin = createSupabaseAdmin();
   const newPlan = normalizePlanId(input.newPlan) as PlanId;
   const oldPlan = normalizePlanId(input.oldPlan) as PlanId;
-  const effectiveAt = input.effectiveAt ?? new Date().toISOString();
-  const periodEndIso = billingPeriodEndFromNow(input.billingInterval, new Date(effectiveAt));
+  const effectiveAt = input.periodStartIso ?? input.effectiveAt ?? new Date().toISOString();
+  const periodEndIso =
+    input.periodEndIso?.trim() ||
+    billingPeriodEndFromNow(input.billingInterval, new Date(effectiveAt));
 
   const buildAllowance = monthlyTokensForPlan(newPlan);
   const actionAllowance = monthlyActionCreditsForPlan(newPlan);
@@ -60,13 +71,17 @@ export async function applyImmediatePlanUpgrade(
     .select("credits_reset_at")
     .eq("id", input.userId)
     .maybeSingle();
-  const explicitBuildBonus = await sumExplicitBuildGrants(
-    admin,
-    input.userId,
-    profileRow?.credits_reset_at ?? null,
-  );
+  const resetAt = profileRow?.credits_reset_at ?? null;
+  const explicitBuildBonus = await sumExplicitBuildGrants(admin, input.userId, resetAt);
+  const explicitActionBonus = await sumExplicitActionGrants(admin, input.userId, resetAt);
   const buildCredits = buildAllowance + explicitBuildBonus;
-  const actionCredits = actionAllowance;
+  const actionCredits = actionAllowance + explicitActionBonus;
+
+  if (input.billingAttemptId) {
+    await touchBillingAttemptWebhook(input.billingAttemptId, {
+      entitlement_apply_started: true,
+    });
+  }
 
   const claimed = await claimBillingEvent(admin, {
     eventId: input.idempotencyKey,
@@ -89,6 +104,11 @@ export async function applyImmediatePlanUpgrade(
   });
 
   if (!claimed) {
+    await finalizeBillingAttemptEntitlement(input.billingAttemptId, {
+      userId: input.userId,
+      applied: false,
+      failureMessage: "Duplicate entitlement event (already processed).",
+    });
     return { applied: false, buildCredits, actionCredits, periodEndIso };
   }
 
@@ -130,6 +150,7 @@ export async function applyImmediatePlanUpgrade(
       full_cycle_restart: true,
       paddle_transaction_id: input.paddleTransactionId ?? null,
       explicit_build_bonus_preserved: explicitBuildBonus,
+      explicit_action_bonus_preserved: explicitActionBonus,
       prior_build_balance: profileBefore?.credits_remaining ?? null,
     },
   });
@@ -179,5 +200,40 @@ export async function applyImmediatePlanUpgrade(
     action_url: "/settings/billing",
   });
 
-  return { applied: true, buildCredits, actionCredits, periodEndIso };
+  const { data: profileAfter } = await admin
+    .from("profiles")
+    .select("plan_id, credits_remaining")
+    .eq("id", input.userId)
+    .maybeSingle();
+
+  const planOk = normalizePlanId(profileAfter?.plan_id ?? "free") === newPlan;
+  const buildOk =
+    typeof profileAfter?.credits_remaining === "number" &&
+    profileAfter.credits_remaining >= buildCredits - 0.5;
+
+  const applied = planOk && buildOk;
+
+  await finalizeBillingAttemptEntitlement(input.billingAttemptId, {
+    userId: input.userId,
+    applied,
+    failureCode: !planOk
+      ? "plan_not_updated"
+      : !buildOk
+        ? "build_credits_not_updated"
+        : null,
+    failureMessage: !planOk
+      ? `Profile plan is ${profileAfter?.plan_id ?? "unknown"}, expected ${newPlan}.`
+      : !buildOk
+        ? `Build credits are ${profileAfter?.credits_remaining ?? "unknown"}, expected ${buildCredits}.`
+        : null,
+  });
+
+  if (input.billingAttemptId) {
+    await patchBillingAttempt(input.billingAttemptId, {
+      period_start_after: effectiveAt,
+      period_end_after: periodEndIso,
+    });
+  }
+
+  return { applied, buildCredits, actionCredits, periodEndIso };
 }

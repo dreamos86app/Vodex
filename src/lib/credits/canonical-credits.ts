@@ -6,6 +6,7 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
 import type { PlanId } from "@/lib/supabase/types";
+import { batchUserLevelActionBalances } from "@/lib/admin/batch-action-balances";
 import { creditCap, normalizeAvailableCredits, repairProfileCreditsIfInflated } from "@/lib/credits/normalize-credit-balance";
 import { isE2eCreditTestAccount } from "@/lib/credits/e2e-credit-account";
 import {
@@ -163,17 +164,9 @@ async function readActionBalance(
   userId: string,
   planAllowance: number,
 ): Promise<number> {
-  const { data: existing } = await admin
-    .from("action_credit_balances" as never)
-    .select("balance")
-    .eq("owner_user_id" as never, userId)
-    .is("project_id" as never, null)
-    .maybeSingle();
-
-  const row = existing as { balance?: number } | null;
-  if (row && typeof row.balance === "number") {
-    return Number(row.balance);
-  }
+  const map = await batchUserLevelActionBalances(admin, [userId]);
+  const bal = map.get(userId);
+  if (bal != null) return bal;
   return planAllowance;
 }
 
@@ -284,9 +277,7 @@ export async function loadCanonicalCredits(
       ? input.actionAvailable
       : await readActionBalance(admin, input.userId, actionPlanAllowance);
 
-  const actionGrantBonus = await sumExplicitActionGrants(admin, input.userId, resetDate);
-  const actionImpliedBonus = Math.max(0, actionAvailableRaw - actionPlanAllowance);
-  const explicitActionBonus = capExplicitBonus(Math.max(actionGrantBonus, actionImpliedBonus));
+  const explicitActionBonus = await sumExplicitActionGrants(admin, input.userId, resetDate);
 
   const actionNorm = normalizeAvailableCredits({
     rawAvailable: actionAvailableRaw,

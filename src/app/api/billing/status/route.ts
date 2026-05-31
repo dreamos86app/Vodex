@@ -8,6 +8,8 @@ import { loadCanonicalCredits } from "@/lib/credits/canonical-credits";
 import { buildPlanChangeDiagnostics } from "@/lib/billing/plan-change-diagnostics";
 import { loadPaddleBillingContextForUser } from "@/lib/billing/paddle-billing-context";
 import { paddleEnvironment } from "@/lib/billing/paddle-billing";
+import { diagnoseBillingAttempt } from "@/lib/billing/diagnose-billing-attempt";
+import { loadBillingAttemptTrace } from "@/lib/billing/billing-attempt-trace";
 
 export type BillingProcessingState =
   | "idle"
@@ -25,6 +27,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const txn = url.searchParams.get("transactionId");
+  const attemptId = url.searchParams.get("attemptId");
 
   const email = user.email?.trim() ?? "";
   const billingCtx = email
@@ -158,6 +161,9 @@ export async function GET(request: Request) {
     recentEventTypes: rows.map((e) => String(e.event_type ?? "")),
   });
 
+  const attemptDiagnosis = attemptId ? await diagnoseBillingAttempt(attemptId) : null;
+  const attemptTrace = attemptId ? await loadBillingAttemptTrace(attemptId) : null;
+
   return NextResponse.json({
     planId,
     currentPlan: planId,
@@ -201,5 +207,41 @@ export async function GET(request: Request) {
       publicCheckoutEnabled: paddlePublicCheckoutEnabled(),
     },
     failureReasons: active && entitlementApplied ? [] : failureReasons,
+    billingAttemptId: attemptId,
+    attemptDiagnosis: attemptDiagnosis
+      ? {
+          code: attemptDiagnosis.code,
+          message: attemptDiagnosis.message,
+          success: attemptDiagnosis.success,
+          live: attemptDiagnosis.live,
+        }
+      : null,
+    attemptTrace: attemptTrace
+      ? {
+          billing_attempt_id: attemptTrace.billing_attempt_id,
+          endpoint_called: attemptTrace.endpoint_called,
+          resolved_action: attemptTrace.resolved_action,
+          webhook_received: attemptTrace.webhook_received,
+          webhook_verified: attemptTrace.webhook_verified,
+          webhook_event_type: attemptTrace.webhook_event_type,
+          webhook_processing_status: attemptTrace.webhook_processing_status,
+          entitlement_apply_started: attemptTrace.entitlement_apply_started,
+          entitlement_apply_completed: attemptTrace.entitlement_apply_completed,
+          plan_before: attemptTrace.current_plan_before,
+          plan_after: attemptTrace.plan_after,
+          build_before: attemptTrace.current_build_credits_before,
+          build_after: attemptTrace.build_credits_after,
+          action_before: attemptTrace.current_action_credits_before,
+          action_after: attemptTrace.action_credits_after,
+          period_end_before: attemptTrace.current_period_end_before,
+          period_end_after: attemptTrace.period_end_after,
+          paddle_transaction_id: attemptTrace.paddle_transaction_id,
+          paddle_subscription_id: attemptTrace.paddle_subscription_id,
+          paddle_price_id: attemptTrace.paddle_price_id,
+          failure_code: attemptTrace.failure_code,
+          failure_message: attemptTrace.failure_message,
+        }
+      : null,
+    upgradeComplete: attemptDiagnosis?.success ?? false,
   });
 }

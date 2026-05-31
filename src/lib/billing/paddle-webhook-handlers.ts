@@ -23,6 +23,7 @@ import { readWebhookIds } from "@/lib/billing/paddle-event-store";
 import type { BillingInterval } from "@/lib/billing/upgrade-policy";
 import type { PlanId } from "@/lib/supabase/types";
 import { logPaddleWebhook } from "@/lib/billing/paddle-webhook-log";
+import { touchBillingAttemptWebhook } from "@/lib/billing/billing-attempt-trace";
 
 function planFromPaddlePrice(priceId: string | undefined): PlanId | null {
   const mapped = planFromPaddlePriceId(priceId);
@@ -93,8 +94,22 @@ export async function handlePaddleTransactionCompleted(input: {
   if (!shouldProcessPaidTransaction(eventType, input.data)) return;
 
   const custom = readPaddleCheckoutCustomData(input.data);
+  const billingAttemptId = custom.billingAttemptId;
   const userId = custom.userId;
   if (!userId) return;
+
+  const periodEndIso = periodEndFromEvent(input.data);
+
+  await touchBillingAttemptWebhook(billingAttemptId, {
+    webhook_event_type: eventType || "transaction.completed",
+    paddle_transaction_id: String(input.data.id ?? input.paddleEventId),
+    paddle_subscription_id: String(
+      (input.data.subscription_id as string | undefined) ??
+        (input.data.subscription as { id?: string } | undefined)?.id ??
+        "",
+    ) || null,
+    paddle_price_id: custom.priceId ?? transactionPriceId(input.data) ?? null,
+  });
 
   await persistPaddleCustomerId({
     userId,
@@ -163,6 +178,8 @@ export async function handlePaddleTransactionCompleted(input: {
       paddleEventId: input.paddleEventId,
       idempotencyKey: `paddle:txn:${transactionId}`,
       source: `paddle:${eventType || "transaction.completed"}:${intent}`,
+      billingAttemptId,
+      periodEndIso,
     });
     logPaddleWebhook({
       event_type: eventType || "transaction.completed",
@@ -209,8 +226,15 @@ export async function handlePaddleSubscriptionEvent(input: {
 }): Promise<void> {
   const admin = createSupabaseAdmin();
   const custom = readPaddleCheckoutCustomData(input.data);
+  const billingAttemptId = custom.billingAttemptId;
   const userId = custom.userId;
   if (!userId) return;
+
+  await touchBillingAttemptWebhook(billingAttemptId, {
+    webhook_event_type: input.eventType,
+    paddle_subscription_id: String(input.data.id ?? ""),
+    paddle_price_id: custom.priceId ?? transactionPriceId(input.data) ?? null,
+  });
 
   await persistPaddleCustomerId({
     userId,
@@ -330,6 +354,8 @@ export async function handlePaddleSubscriptionEvent(input: {
             paddleEventId: input.paddleEventId,
             idempotencyKey,
             source: `paddle:${input.eventType}:fallback`,
+            billingAttemptId,
+            periodEndIso: periodEnd,
           });
         }
       }

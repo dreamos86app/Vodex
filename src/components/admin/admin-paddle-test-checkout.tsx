@@ -23,6 +23,7 @@ import type { CatalogBillingInterval } from "@/lib/billing/plan-billing-catalog"
 
 const EXPECTED_PRODUCTION_WEBHOOK_URL = "https://dreamos86.com/api/webhooks/paddle";
 import { refreshCredits } from "@/lib/stores/credits-store";
+import { BillingUpgradeStatusPanel } from "@/components/billing/billing-upgrade-status-panel";
 
 const TEST_PRESETS: { plan: BillablePlanId; interval: "monthly" | "annual"; label: string }[] = [
   { plan: "starter", interval: "monthly", label: "Starter monthly" },
@@ -52,6 +53,7 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
   const [currentInterval, setCurrentInterval] = React.useState<CatalogBillingInterval | null>(null);
   const [paddleSubscriptionId, setPaddleSubscriptionId] = React.useState<string | null>(null);
   const [pendingTransactionId, setPendingTransactionId] = React.useState<string | null>(null);
+  const [billingAttemptId, setBillingAttemptId] = React.useState<string | null>(null);
   const [planChangeBlocked, setPlanChangeBlocked] = React.useState<string | null>(null);
 
   const tier = resolveCatalogTier(plan, interval);
@@ -115,9 +117,11 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
     let attempts = 0;
     const poll = async () => {
       attempts += 1;
-      const statusUrl = pendingTransactionId
-        ? `/api/billing/status?transactionId=${encodeURIComponent(pendingTransactionId)}`
-        : "/api/billing/status";
+      const statusUrl = billingAttemptId
+        ? `/api/billing/status?attemptId=${encodeURIComponent(billingAttemptId)}`
+        : pendingTransactionId
+          ? `/api/billing/status?transactionId=${encodeURIComponent(pendingTransactionId)}`
+          : "/api/billing/status";
       const [statusRes] = await Promise.all([
         fetch(statusUrl, { credentials: "include" }),
         refreshCredits({ reason: "plan-change" }),
@@ -136,7 +140,7 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
       const webhookReceived = Boolean(
         json.lastWebhookEventType || json.lastWebhookStatus || json.webhookPending === false,
       );
-      if (json.active || json.entitlementApplied) {
+      if (json.upgradeComplete || json.active || json.entitlementApplied) {
         setCheckoutState("active");
         void refreshCredits({ force: true, reason: "plan-change" });
         return;
@@ -154,7 +158,7 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
     return () => {
       cancelled = true;
     };
-  }, [checkoutState, pendingTransactionId]);
+  }, [checkoutState, pendingTransactionId, billingAttemptId]);
 
   async function startCheckout() {
     if (testingContext.supabaseMismatchError) {
@@ -212,6 +216,10 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
           [json.error, json.planChange?.description].filter(Boolean).join(" — ") +
             reasons || "Billing action failed",
         );
+      }
+
+      if (json.billingAttemptId) {
+        setBillingAttemptId(String(json.billingAttemptId));
       }
 
       if (json.mode === "paddle_subscription_update") {
@@ -510,6 +518,17 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
           <p className="text-[11px] text-muted-foreground">
             Paddle transaction ID: <span className="font-mono">{pendingTransactionId}</span>
           </p>
+        ) : null}
+
+        {billingAttemptId ? (
+          <section className="rounded-lg border border-border p-3">
+            <h3 className="text-[13px] font-semibold mb-2">Billing attempt inspector</h3>
+            <p className="text-[11px] font-mono text-muted-foreground mb-2">{billingAttemptId}</p>
+            <BillingUpgradeStatusPanel
+              attemptId={billingAttemptId}
+              onComplete={() => setCheckoutState("active")}
+            />
+          </section>
         ) : null}
 
         {checkoutState === "waiting_webhook" ? (

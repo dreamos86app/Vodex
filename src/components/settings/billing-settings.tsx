@@ -11,6 +11,7 @@ import { refreshCredits, useCreditsStore } from "@/lib/stores/credits-store";
 import { Button } from "@/components/ui/button";
 import { PLAN_DISPLAY } from "@/lib/billing/plans";
 import { BillingSubscriptionPanel } from "@/components/billing/billing-subscription-panel";
+import { BillingUpgradeStatusPanel } from "@/components/billing/billing-upgrade-status-panel";
 
 type BillingState = {
   planId: string;
@@ -63,37 +64,8 @@ export function BillingSettings() {
 
   const searchParams = useSearchParams();
   const paddleReturn = searchParams.get("paddle");
+  const attemptId = searchParams.get("attemptId");
   const cancelIntent = searchParams.get("cancel") === "1";
-  const [activationMessage, setActivationMessage] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (paddleReturn !== "success") return;
-    let cancelled = false;
-    let attempts = 0;
-    const poll = async () => {
-      attempts += 1;
-      const res = await fetch("/api/billing/status", { credentials: "include" });
-      const json = (await res.json()) as {
-        message?: string;
-        active?: boolean;
-        webhookPending?: boolean;
-        entitlementApplied?: boolean;
-      };
-      if (cancelled) return;
-      setActivationMessage(json.message ?? "Activating your plan…");
-      await refreshCredits({ force: true, reason: "plan-change" });
-      if (json.active || json.entitlementApplied) {
-        void loadBilling();
-        return;
-      }
-      if (attempts >= 36) return;
-      window.setTimeout(() => void poll(), 2500);
-    };
-    void poll();
-    return () => {
-      cancelled = true;
-    };
-  }, [paddleReturn, loadBilling]);
 
   React.useEffect(() => {
     let focusTimer: ReturnType<typeof setTimeout> | undefined;
@@ -124,16 +96,15 @@ export function BillingSettings() {
       animate="show"
       className="dashboard-shell space-y-6 overflow-x-hidden"
     >
-      {paddleReturn === "success" && activationMessage ? (
-        <motion.div
-          variants={variants.fadeUp}
-          className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-[13px]"
-        >
-          <p className="font-medium text-foreground">Payment received — activating your plan</p>
-          <p className="mt-1 text-muted-foreground">{activationMessage}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Credits update only after Paddle webhook confirmation.
-          </p>
+      {paddleReturn === "success" && attemptId ? (
+        <motion.div variants={variants.fadeUp}>
+          <BillingUpgradeStatusPanel
+            attemptId={attemptId}
+            onComplete={() => {
+              void loadBilling();
+              void refreshCredits({ force: true, reason: "plan-change" });
+            }}
+          />
         </motion.div>
       ) : null}
 

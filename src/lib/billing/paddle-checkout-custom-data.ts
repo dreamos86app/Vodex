@@ -22,6 +22,7 @@ export type PaddleCheckoutCustomData = {
   price_id: string;
   source: string;
   billing_intent: PaddleCheckoutBillingIntent;
+  billing_attempt_id?: string;
   test_mode?: boolean;
 };
 
@@ -34,6 +35,7 @@ export function buildPaddleCheckoutCustomData(input: {
   priceId: string;
   source: string;
   billingIntent?: PaddleCheckoutBillingIntent;
+  billingAttemptId?: string;
   testMode?: boolean;
 }): PaddleCheckoutCustomData {
   if (!input.userId?.trim()) {
@@ -54,6 +56,7 @@ export function buildPaddleCheckoutCustomData(input: {
     price_id: input.priceId,
     source: input.source,
     billing_intent: input.billingIntent ?? "new_subscription",
+    ...(input.billingAttemptId ? { billing_attempt_id: input.billingAttemptId } : {}),
     ...(input.testMode ? { test_mode: true } : {}),
   };
 }
@@ -67,6 +70,7 @@ export type ParsedPaddleCheckoutCustomData = {
   source?: string;
   billingIntent?: string;
   testMode?: boolean;
+  billingAttemptId?: string;
 };
 
 export function readPaddleCheckoutCustomData(
@@ -94,6 +98,7 @@ export function readPaddleCheckoutCustomData(
     source,
     billingIntent,
     testMode: custom.test_mode === true || custom.testMode === true,
+    billingAttemptId: pickString(custom, "billing_attempt_id", "billingAttemptId"),
   };
 }
 

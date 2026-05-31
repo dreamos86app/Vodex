@@ -44,6 +44,7 @@ export async function createPaddleCheckoutSession(input: {
   successUrl: string;
   cancelUrl: string;
   billingIntent?: PaddleBillingIntent;
+  billingAttemptId?: string;
   source?: "pricing" | "admin_test_checkout" | "settings";
   testMode?: boolean;
 }): Promise<PaddleCheckoutResult> {
@@ -95,6 +96,7 @@ export async function createPaddleCheckoutSession(input: {
     priceId,
     source: input.source ?? "pricing",
     billingIntent: input.billingIntent ?? "new_subscription",
+    billingAttemptId: input.billingAttemptId,
     testMode: input.testMode ?? false,
   });
 
@@ -175,6 +177,7 @@ export async function updatePaddleSubscriptionPlan(input: {
   interval?: CatalogBillingInterval;
   userId: string;
   billingIntent?: PaddleBillingIntent;
+  billingAttemptId?: string;
 }): Promise<PaddleSubscriptionUpdateResult> {
   if (!paddleBillingConfigured()) {
     return {
@@ -208,12 +211,16 @@ export async function updatePaddleSubscriptionPlan(input: {
       body: JSON.stringify({
         items: [{ price_id: priceId, quantity: 1 }],
         proration_billing_mode: PADDLE_UPGRADE_PRORATION_MODE,
-        custom_data: {
-          user_id: input.userId,
-          plan_id: validated.plan,
-          billing_intent: input.billingIntent ?? "upgrade",
-          billing_interval: toUpgradePolicyInterval(validated.interval),
-        },
+        custom_data: buildPaddleCheckoutCustomData({
+          userId: input.userId,
+          workspaceId: input.userId,
+          planId: validated.plan,
+          interval: validated.interval,
+          priceId,
+          source: "settings",
+          billingIntent: input.billingIntent ?? "upgrade",
+          billingAttemptId: input.billingAttemptId,
+        }),
       }),
     });
 
