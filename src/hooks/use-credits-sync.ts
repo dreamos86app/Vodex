@@ -37,12 +37,7 @@ export function useCreditsSync(enabled: boolean) {
     lastEnabled.current = true;
     if (!shouldBootstrap) return;
     bootstrapped.current = true;
-    void syncFromDB({ reason: "bootstrap" }).then((payload) => {
-      if (!payload) {
-        void syncFromDB({ force: true, reason: "bootstrap" });
-      }
-    });
-  }, [syncEnabled, enabled, syncFromDB]);
+  }, [syncEnabled, enabled]);
 
   useEffect(() => {
     if (!syncEnabled) return;

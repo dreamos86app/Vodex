@@ -29,10 +29,16 @@ function bucketFromProfile(
 /** Instant credits from profile row — background /api/credits refines balances. */
 export function seedCreditsFromProfile(profile: Partial<Profile>): void {
   const planId = normalizePlanId(profile.plan_id ?? "free") as CanonicalCreditsPayload["planId"];
-  const buildAllowance = monthlyTokensForPlan(planId);
+  const creditsLimit = (profile as { credits_limit?: number | null }).credits_limit;
+  const buildAllowance =
+    typeof creditsLimit === "number" && creditsLimit > 0
+      ? creditsLimit
+      : monthlyTokensForPlan(planId);
   const actionAllowance = monthlyActionCreditsForPlan(planId);
   const buildAvailable =
-    typeof profile.credits_remaining === "number" ? profile.credits_remaining : buildAllowance;
+    typeof profile.credits_remaining === "number"
+      ? profile.credits_remaining
+      : buildAllowance;
   const resetDate =
     typeof profile.credits_reset_at === "string" ? profile.credits_reset_at : null;
 

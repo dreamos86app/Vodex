@@ -18,7 +18,7 @@ import {
   type SourceIntegrityReport,
 } from "@/lib/build/source-integrity-validator";
 import { mergePortfolioScaffold } from "@/lib/build/portfolio-scaffold";
-import { repairRootPageContent } from "@/lib/build/root-page-repair";
+import { repairRootPageContent, rootPageContentOk } from "@/lib/build/root-page-repair";
 import type { AppArchetypeId } from "@/lib/build/app-archetype-classifier";
 
 export type PostPersistReconcileInput = {
@@ -109,17 +109,26 @@ export async function reconcilePostPersistBuildStatus(
     }
   }
 
-  if (!sourceIntegrity.sourceIntegrityOk) {
-    const appName = input.appName ?? "Your app";
+  const appName = input.appName ?? "Your app";
+  const needsRootRepair =
+    !rootPageContentOk(files) ||
+    sourceIntegrity.blockedReason?.includes("missing_root_page") ||
+    !sourceIntegrity.sourceIntegrityOk;
+
+  if (needsRootRepair) {
     if (isPortfolioBuildPrompt(input.userPrompt ?? "")) {
       files = filterRenderableBuildFiles(mergePortfolioScaffold(files, appName));
     } else {
-      const repaired = repairRootPageContent(
-        (input.archetypeId ?? "generic_app") as AppArchetypeId,
+      let repaired = repairRootPageContent(
+        (input.archetypeId ?? "dashboard") as AppArchetypeId,
         files,
         appName,
       );
       files = filterRenderableBuildFiles(repaired.files);
+      if (!rootPageContentOk(files)) {
+        repaired = repairRootPageContent("generic_app", files, appName);
+        files = filterRenderableBuildFiles(repaired.files);
+      }
     }
     sourceIntegrity = evaluateSourceIntegrity(files, {
       previewSessionOk: input.previewSessionOk,

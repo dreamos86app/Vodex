@@ -52,20 +52,28 @@ export function AnimatedLineDelta({
   active?: boolean;
   className?: string;
 }) {
-  const addedN = useAnimatedCount(added, active ? 320 : 420);
-  const removedN = useAnimatedCount(removed, active ? 320 : 420);
+  const addedN = useAnimatedCount(added, active ? 280 : 420);
+  const removedN = useAnimatedCount(removed, active ? 280 : 420);
+  const [bump, setBump] = React.useState(0);
+  React.useEffect(() => {
+    if (added == null && removed == null) return;
+    setBump((b) => b + 1);
+  }, [added, removed]);
+
   if (added == null && removed == null) return null;
 
   return (
     <span
       className={cn("shrink-0 font-mono text-[10px] tabular-nums", className)}
       data-testid="animated-line-delta"
+      key={bump}
     >
       {addedN != null ? (
         <span
           className={cn(
-            "text-emerald-500/90 transition-transform",
+            "inline-block text-emerald-500/90 transition-transform",
             active && "animate-[pulse_1.2s_ease-in-out_infinite]",
+            bump > 0 && "animate-[delta-bump_0.35s_ease-out]",
           )}
         >
           +{addedN}

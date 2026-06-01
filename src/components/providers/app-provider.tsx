@@ -26,9 +26,7 @@ import {
   invalidateBootstrapCache,
   setCachedBootstrap,
 } from "@/lib/cache/session-bootstrap-cache";
-import { seedCreditsFromProfile } from "@/lib/credits/seed-credits-from-profile";
-import { hydrateCreditsFromLocalCache } from "@/lib/stores/credits-store";
-import { markCreditsFirstPaint } from "@/lib/credits/credits-local-cache";
+import { runCreditsBootstrap, resetCreditsBootstrap } from "@/lib/credits/credits-bootstrap";
 import {
   loadUserProfileCoreDeduped,
 } from "@/lib/supabase/load-user-profile";
@@ -60,17 +58,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const creditsSyncEnabled = Boolean(user?.id ?? profile?.id) && !lightweightPublic;
   useCreditsSync(creditsSyncEnabled);
 
+  const profileId = profile?.id;
+  const profilePlanId = profile?.plan_id;
+  const profileCreditsRemaining = profile?.credits_remaining;
+
   React.useEffect(() => {
-    if (lightweightPublic) {
-      setLoading(false);
-      return;
-    }
-    if (!profile?.id) return;
-    hydrateCreditsFromLocalCache(profile.id);
-    const { isConfirmed } = useCreditsStore.getState();
-    if (!isConfirmed) seedCreditsFromProfile(profile);
-    markCreditsFirstPaint(profile.id);
-  }, [profile?.id, profile?.plan_id, profile]);
+    if (lightweightPublic) return;
+    if (!profileId) return;
+    runCreditsBootstrap(profileId, profile);
+  }, [lightweightPublic, profileId, profilePlanId, profileCreditsRemaining]);
 
   React.useEffect(() => {
     void useAuthStore.persist.rehydrate();
@@ -133,11 +129,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const current = useAuthStore.getState().profile;
         const merged = mergeProfileOnboardingStatus(current, cached.profile) as Profile;
         setProfile(merged);
-        seedCreditsFromProfile(merged);
+        runCreditsBootstrap(userId, merged);
         if (isProfileOnboardingComplete(merged) || hasSessionOnboardingComplete(userId)) {
           setLoading(false);
         }
-        void useCreditsStore.getState().syncFromDB({ reason: "bootstrap" });
       }
       if (cached?.notifications.length) {
         setNotifications(cached.notifications);
@@ -168,7 +163,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const current = useAuthStore.getState().profile;
         const profile = mergeProfileOnboardingStatus(current, coreProfile) as Profile;
         setProfile(profile);
-        seedCreditsFromProfile(profile);
+        runCreditsBootstrap(userId, profile);
         setCachedBootstrap(userId, {
           profile,
           notifications: cached?.notifications ?? [],
@@ -336,6 +331,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         } catch { /* ignore in SSR */ }
         resetAuth();
         resetCredits();
+        resetCreditsBootstrap();
         resetNotifications();
         if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
           router.push("/auth/login");
@@ -343,7 +339,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === "TOKEN_REFRESHED" && session?.user) {
-        void useCreditsStore.getState().syncFromDB({ reason: "bootstrap" });
+        void useCreditsStore.getState().syncFromDB({ reason: "manual", force: false });
       }
 
       if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {

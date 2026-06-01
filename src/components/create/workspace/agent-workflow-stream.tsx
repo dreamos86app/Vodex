@@ -20,6 +20,7 @@ import { WorkflowStepCard, type WorkflowStepCardStatus } from "@/components/crea
 import { useStaggeredWorkflowEvents } from "@/hooks/use-staggered-workflow-events";
 import { BuildDiagnosticsCenter } from "@/components/create/workspace/build-diagnostics-center";
 import type { BuildDiagnosticsPayload } from "@/lib/build/build-diagnostics";
+import { shouldAutoOpenOwnerDiagnostics } from "@/lib/build/owner-diagnostics-auto-open";
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { userMessageForPreviewFailure, isPreviewFailureCode } from "@/lib/preview/preview-failure-codes";
@@ -243,6 +244,23 @@ export function AgentWorkflowStream({
       .catch(() => undefined);
   }, [failed, adminDiagnostics, projectId, progress?.jobId]);
 
+  const autoOpenFailure = Boolean(
+    failed &&
+      shouldAutoOpenOwnerDiagnostics({
+        failureCode:
+          typeof progress?.latest?.metadata?.preview_failure_code === "string"
+            ? progress.latest.metadata.preview_failure_code
+            : null,
+        blockedReason: progress?.error,
+        errorMessage: progress?.error,
+      }),
+  );
+
+  React.useEffect(() => {
+    if (!adminDiagnostics || !autoOpenFailure) return;
+    if (diagPayload) setDiagOpen(true);
+  }, [adminDiagnostics, autoOpenFailure, diagPayload]);
+
   if (!progress) return null;
 
   const working = !progress.done;
@@ -267,39 +285,42 @@ export function AgentWorkflowStream({
   const merged = mergeEphemeralWithServerEvents(ephemeral, serverSequential);
   const grouped = groupFileEvents(merged);
   const timelineRaw = applySingleActiveWorkflowStep(grouped, working).slice(-24);
-  const timeline = useStaggeredWorkflowEvents(timelineRaw, working);
+  const timeline = useStaggeredWorkflowEvents(timelineRaw, false);
 
-  const active = timeline.find((e) => e.status === "active");
+  const active = [...timeline].reverse().find((e) => e.status === "active");
+  const completedTimeline = active
+    ? timeline.filter((ev) => ev.stableKey !== active.stableKey)
+    : timeline;
+
+  const streamRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!working || !active) return;
+    const el = streamRef.current;
+    if (!el) return;
+    el.scrollIntoView({ block: "end", behavior: reducedMotion ? "auto" : "smooth" });
+  }, [active?.stableKey, working, reducedMotion]);
 
   return (
-    <div className={cn("space-y-2.5", className)} data-testid="agent-workflow-stream">
+    <div ref={streamRef} className={cn("space-y-2.5", className)} data-testid="agent-workflow-stream">
       {progress.reconnecting ? (
         <p className="px-1 text-[10px] text-muted-foreground">Reconnecting to build status…</p>
-      ) : null}
-
-      {active ? (
-        <div data-testid="workflow-active-step">
-          <WorkflowStepCard
-            status="active"
-            label={active.title}
-            sublabel={active.subtitle}
-            progress={active.progress}
-          />
-        </div>
       ) : null}
 
       {showAnalyzing ? <AnalyzingRequestBubble /> : null}
 
       <ul className="space-y-2">
         <AnimatePresence initial={false}>
-          {timeline
-            .filter((ev) => ev.stableKey !== active?.stableKey)
-            .map((ev) => (
-              <li key={ev.stableKey}>
-                <TimelineRow event={ev} reducedMotion={Boolean(reducedMotion)} />
-              </li>
-            ))}
+          {completedTimeline.map((ev) => (
+            <li key={ev.stableKey}>
+              <TimelineRow event={ev} reducedMotion={Boolean(reducedMotion)} />
+            </li>
+          ))}
         </AnimatePresence>
+        {active ? (
+          <li data-testid="workflow-active-step">
+            <TimelineRow event={active} reducedMotion={Boolean(reducedMotion)} />
+          </li>
+        ) : null}
       </ul>
 
       {failed ? (

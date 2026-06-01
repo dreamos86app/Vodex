@@ -7,6 +7,11 @@ import {
   markCreditsFirstPaint,
   saveCreditsLocalCache,
 } from "@/lib/credits/credits-local-cache";
+import {
+  CREDITS_LITE_TTL_MS,
+  markLiteCreditsFetched,
+  shouldSkipLiteCreditsFetch,
+} from "@/lib/credits/credits-bootstrap";
 
 export type { CanonicalCreditBucket, CanonicalCreditsPayload };
 
@@ -188,6 +193,22 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
     const force = options?.force ?? false;
     const reason = options?.reason;
     const { lastSyncedAt, loading, isConfirmed } = get();
+    const userId =
+      typeof window !== "undefined" ? sessionStorage.getItem("vodex:last-user-id") : null;
+
+    if (
+      !force &&
+      reason === "bootstrap" &&
+      userId &&
+      shouldSkipLiteCreditsFetch(userId)
+    ) {
+      const s = get();
+      return {
+        build: s.build,
+        action: s.action,
+        planId: normalizePlanId(s.planId) as CanonicalCreditsPayload["planId"],
+      };
+    }
 
     if (!force && isConfirmed && lastSyncedAt && Date.now() - lastSyncedAt < CREDITS_STALE_MS) {
       logCreditSync(reason, "skipped — fresh cache");
@@ -263,6 +284,12 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         const uid = typeof window !== "undefined" ? sessionStorage.getItem("vodex:last-user-id") : null;
         if (uid) saveCreditsLocalCache(uid, payload);
         dispatchCreditUpdated(payload);
+        if (userId) markLiteCreditsFetched(userId);
+        if (process.env.NODE_ENV !== "development") {
+          /* noop */
+        } else {
+          console.info(`[credits] credits_lite_ms=${Math.round(Date.now() - loadStartedAt)}`);
+        }
         logCreditSync(reason, "fetched ok");
         return payload;
       } catch (err) {
@@ -274,7 +301,8 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
             : "Credit sync failed";
         set({
           loading: false,
-          syncing: true,
+          syncing: false,
+          isConfirmed: hadDisplay || aborted,
           error: hadDisplay || aborted ? null : msg,
         });
         logCreditSync(reason, `error — ${msg}`);
@@ -310,7 +338,7 @@ export function hydrateCreditsFromLocalCache(userId: string): void {
   if (!cached) return;
   const state = useCreditsStore.getState();
   if (state.isConfirmed) return;
-  useCreditsStore.getState().applyProfileSeed(cached);
+  useCreditsStore.getState().applyCanonical(cached);
   markCreditsFirstPaint(userId);
   if (typeof window !== "undefined") {
     try {

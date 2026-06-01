@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { AppProvider } from "@/components/providers/app-provider";
 import { AppearanceProvider } from "@/components/providers/appearance-provider";
+import { VodexSessionIntroGate } from "@/components/session/vodex-session-intro-gate";
 import { Toaster } from "@/components/ui/toaster";
 
 const AppChromeExtras = dynamic(
@@ -17,7 +18,7 @@ export function AppChromeProviders({ children }: { children: React.ReactNode }) 
     <AppProvider>
       <AppearanceProvider>
         <AppChromeExtras />
-        {children}
+        <VodexSessionIntroGate>{children}</VodexSessionIntroGate>
         <Toaster />
       </AppearanceProvider>
     </AppProvider>

@@ -16,7 +16,7 @@ function must(rel, needle, label) {
 must("src/components/create/workspace/build-diagnostics-center.tsx", "build-diagnostics-modal", "center modal");
 must("src/components/create/workspace/build-diagnostics-center.tsx", "items-center justify-center", "centered layout");
 must("src/components/create/workspace/build-diagnostics-center.tsx", "isDreamosOwnerEmail", "owner gate");
-must("src/components/create/workspace/admin-diagnostics-fab.tsx", "Open diagnostics", "prominent CTA");
+must("src/components/create/workspace/admin-diagnostics-fab.tsx", "admin-diagnostics-reopen", "reopen FAB after close");
 
 console.log("\n=== verify:owner-diagnostics-modal ===\n");
 ok.forEach((m) => console.log("✓", m));

@@ -11,10 +11,31 @@ export function loadCreditsLocalCache(userId: string): CanonicalCreditsPayload |
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedCredits;
     if (!parsed.build || !parsed.action) return null;
+    if (parsed.savedAt && Date.now() - parsed.savedAt > 7 * 24 * 60 * 60 * 1000) return null;
     return {
       build: parsed.build,
       action: parsed.action,
       planId: parsed.planId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function loadCreditsLocalCacheWithMeta(
+  userId: string,
+): (CanonicalCreditsPayload & { savedAt: number }) | null {
+  if (typeof window === "undefined" || !userId) return null;
+  try {
+    const raw = localStorage.getItem(`${KEY_PREFIX}${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedCredits;
+    if (!parsed.build || !parsed.action) return null;
+    return {
+      build: parsed.build,
+      action: parsed.action,
+      planId: parsed.planId,
+      savedAt: parsed.savedAt ?? 0,
     };
   } catch {
     return null;

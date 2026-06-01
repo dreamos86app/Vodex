@@ -27,6 +27,21 @@ const BRAND_POOL = [
   "Tidely",
   "Vantix",
   "Zephr",
+  "Pawly",
+  "VetNest",
+  "PetPulse",
+  "CareTail",
+  "Savorly",
+  "RecipeNest",
+  "PantryFlow",
+  "Cookora",
+  "Bookora",
+  "TimeNest",
+  "FitNest",
+  "Wellora",
+  "Calmly",
+  "Taskora",
+  "Flowmint",
 ];
 
 export async function loadRecentAppNames(

@@ -9,7 +9,7 @@ import {
 import { isThinGeneratedFile } from "@/lib/build/meaningful-file-guard";
 
 const PLACEHOLDER_CONTENT_RE =
-  /select a file from the tree|no generated files|lorem ipsum only|coming soon\.\.\.|your app routes stay connected|this screen was added automatically/i;
+  /select a file from the tree|no generated files|lorem ipsum only|coming soon\.\.\.|your app routes stay connected|this screen was added automatically|upgrade to a paid plan|upgrade to .* plan to edit/i;
 
 const TODO_ONLY_RE = /^\s*(\/\/\s*)?todo\b/i;
 

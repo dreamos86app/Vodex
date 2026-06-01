@@ -96,6 +96,8 @@ export function UserMenu() {
 
   React.useEffect(() => {
     if (!open) return;
+    const { lastSyncedAt, isConfirmed } = useCreditsStore.getState();
+    if (isConfirmed && lastSyncedAt && Date.now() - lastSyncedAt < 90_000) return;
     void syncFromDB({ reason: "popover-open" });
   }, [open, syncFromDB]);
 

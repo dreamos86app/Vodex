@@ -6,7 +6,9 @@ export type AppIdeaPrompt = {
   prompt: string;
 };
 
-export const APP_IDEA_POOL: AppIdeaPrompt[] = [
+import { ALL_EXPANDED_APP_IDEAS } from "@/lib/prompts/app-idea-pool";
+
+const CORE_APP_IDEA_POOL: AppIdeaPrompt[] = [
   { label: "Personal finance tracker", desc: "Budgets, goals, and spending alerts", gradient: "from-emerald-500/15 to-green-500/15", icon: "💰", prompt: "Build a personal finance tracker with budget categories, monthly goals, spending trends, and automated overspend alerts." },
   { label: "Gym motivation app", desc: "Streaks, PRs, and progress photos", gradient: "from-violet-500/15 to-indigo-500/15", icon: "💪", prompt: "Create a gym motivation app with workout streaks, personal record tracking, progress photos, and weekly achievement badges." },
   { label: "Restaurant inventory OS", desc: "Stock, waste, and supplier alerts", gradient: "from-amber-500/15 to-orange-500/15", icon: "🍽️", prompt: "Build a restaurant inventory system with stock tracking, waste analytics, low-stock alerts, and supplier reorder workflows." },
@@ -126,6 +128,8 @@ export const APP_IDEA_POOL: AppIdeaPrompt[] = [
   { label: "Personal knowledge base", desc: "SOPs, search, and versioning", gradient: "from-zinc-500/15 to-neutral-500/15", icon: "📚", prompt: "Create a personal knowledge base for SOPs with rich text pages, full-text search, version history, and pin favorites." },
   { label: "Smart appointment router", desc: "Intake, triage, and booking", gradient: "from-blue-500/15 to-teal-500/15", icon: "📅", prompt: "Build a smart appointment router with intake questionnaire, triage rules, specialist booking, and confirmation SMS." },
 ];
+
+export const APP_IDEA_POOL: AppIdeaPrompt[] = [...CORE_APP_IDEA_POOL, ...ALL_EXPANDED_APP_IDEAS];
 
 function hashSeed(input: string): number {
   let h = 2166136261;
