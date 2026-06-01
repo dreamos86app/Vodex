@@ -88,6 +88,11 @@ import { ComposerPromptQueue } from "@/components/create/workspace/composer-prom
 import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
 import { OptimisticAssistantRow } from "@/components/create/workspace/optimistic-assistant-row";
 import {
+  PREVIEW_POLL_INTERVAL_MS,
+  PREVIEW_POLL_MAX_ATTEMPTS,
+  previewStateFromPoll,
+} from "@/lib/preview/preview-readiness-poll";
+import {
   parseBuildPlanCard,
   taskProgressIndex,
 } from "@/lib/creation/parse-build-plan";
@@ -421,6 +426,8 @@ export function ImmersiveWorkspace({
   const [chatEngaged, setChatEngaged] = React.useState(false);
   const [pendingUserBubble, setPendingUserBubble] = React.useState<string | null>(null);
   const [showOptimisticAssistant, setShowOptimisticAssistant] = React.useState(false);
+  /** Locked at submit — UI labels/billing follow this, not the mode tab. */
+  const [lockedTaskMode, setLockedTaskMode] = React.useState<CreationMode | null>(null);
   const lastPlanPromptRef = React.useRef<string | null>(null);
   const [debugClicked, setDebugClicked] = React.useState(false);
   const [debugSubmitted, setDebugSubmitted] = React.useState(false);
@@ -696,6 +703,7 @@ export function ImmersiveWorkspace({
       setTimeout(() => drainPromptQueueRef.current(), 300);
     },
     onFinish: () => {
+      setLockedTaskMode(null);
       if (lastPlanPromptRef.current) {
         void loadBlueprintRef.current(lastPlanPromptRef.current);
         lastPlanPromptRef.current = null;
@@ -859,6 +867,7 @@ export function ImmersiveWorkspace({
     React.useCallback(
       (terminal: BuildJobPollState) => {
         clearBuildJob();
+        setLockedTaskMode(null);
         setProjectDataRefresh((n) => n + 1);
         const pid = projectIdRef.current;
         if (pid) invalidateProjectFilesCache(pid);
@@ -1540,8 +1549,17 @@ export function ImmersiveWorkspace({
     setAttachments([]);
 
     submitInFlightRef.current = true;
-    setBuildStarting(true);
-    buildStartedAtRef.current = Date.now();
+    let submitModeEarly = mode;
+    if (messages.length === 0 && mode !== "build") {
+      submitModeEarly = "build";
+    }
+    setLockedTaskMode(submitModeEarly);
+    if (submitModeEarly === "build") {
+      setBuildStarting(true);
+      buildStartedAtRef.current = Date.now();
+    } else {
+      setBuildStarting(false);
+    }
     const draft = text;
     setLastSubmitAt(Date.now());
     setSubmitBlocker(null);
@@ -1569,6 +1587,7 @@ export function ImmersiveWorkspace({
 
     try {
       let submitMode = mode;
+      setLockedTaskMode(submitMode);
       const activeProjectId = projectIdRef.current ?? effectiveProjectId;
       const isQuestion =
         !activeProjectId &&
@@ -1579,6 +1598,8 @@ export function ImmersiveWorkspace({
       if (submitMode === "build" && isQuestion) {
         submitMode = "discuss";
         setMode("discuss");
+        setLockedTaskMode("discuss");
+        setBuildStarting(false);
       }
       const planFirstPlanning =
         buildStrategyRef.current === "plan_first" && !blueprintApprovedRef.current;
@@ -2115,19 +2136,24 @@ export function ImmersiveWorkspace({
   }, [projectFiles, parsedSourceFiles]);
   const [previewStatus, setPreviewStatus] = React.useState<ProjectPreviewStatus | null>(null);
   React.useEffect(() => {
-    if (!effectiveProjectId) {
+    if (!effectiveProjectId || projectFiles.length === 0) {
       setPreviewStatus(null);
       return;
     }
     let cancelled = false;
-    void fetch(`/api/projects/${effectiveProjectId}/preview-html`, {
-      credentials: "include",
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body: ProjectPreviewStatus | null) => {
+    let attempts = 0;
+
+    const poll = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      try {
+        const r = await fetch(`/api/projects/${effectiveProjectId}/preview-html`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const body = (r.ok ? await r.json() : null) as ProjectPreviewStatus | null;
         if (cancelled) return;
-        if (body && body.previewRenderable) {
+        if (body?.previewRenderable) {
           setPreviewStatus({
             ready: Boolean(body.ready),
             previewRenderable: true,
@@ -2136,24 +2162,40 @@ export function ImmersiveWorkspace({
             previewHtmlLength: body.previewHtmlLength ?? 0,
             blockedReason: body.blockedReason ?? null,
           });
-        } else {
-          setPreviewStatus(
-            body
-              ? {
-                  ready: Boolean(body.ready),
-                  previewRenderable: false,
-                  fileCount: body.fileCount ?? 0,
-                  archetypeId: body.archetypeId ?? null,
-                  previewHtmlLength: body.previewHtmlLength ?? 0,
-                  blockedReason: body.blockedReason ?? null,
-                }
-              : null,
-          );
+          return;
         }
-      })
-      .catch(() => {
-        if (!cancelled) setPreviewStatus(null);
-      });
+        const state = previewStateFromPoll({
+          previewRenderable: false,
+          error: body?.blockedReason ?? null,
+          attempts,
+        });
+        setPreviewStatus(
+          body
+            ? {
+                ready: Boolean(body.ready),
+                previewRenderable: false,
+                fileCount: body.fileCount ?? 0,
+                archetypeId: body.archetypeId ?? null,
+                previewHtmlLength: body.previewHtmlLength ?? 0,
+                blockedReason:
+                  state === "timeout"
+                    ? "Preview is taking longer than expected. Files are saved. Retry preview or repair."
+                    : body.blockedReason ?? null,
+              }
+            : null,
+        );
+        if (state === "renderable" || state === "timeout" || state === "failed") return;
+        if (attempts < PREVIEW_POLL_MAX_ATTEMPTS) {
+          setTimeout(poll, PREVIEW_POLL_INTERVAL_MS);
+        }
+      } catch {
+        if (!cancelled && attempts < PREVIEW_POLL_MAX_ATTEMPTS) {
+          setTimeout(poll, PREVIEW_POLL_INTERVAL_MS);
+        }
+      }
+    };
+
+    void poll();
     return () => {
       cancelled = true;
     };
@@ -2163,8 +2205,10 @@ export function ImmersiveWorkspace({
     ? projectPreviewFrameUrl(effectiveProjectId, projectDataRefresh)
     : null;
   const previewSrcRenderable = previewStatus?.previewRenderable === true;
+  const activeMode = lockedTaskMode ?? mode;
   const buildActive =
-    mode === "build" && (buildJobActive || buildStarting || (isBusy && !previewSrcRenderable));
+    activeMode === "build" &&
+    (buildJobActive || buildStarting || (isBusy && !previewSrcRenderable));
 
   const [previewIssue, setPreviewIssue] = React.useState<PreviewBlockingIssue | null>(null);
   const [previewDismissed, setPreviewDismissed] = React.useState(false);
@@ -2525,13 +2569,21 @@ export function ImmersiveWorkspace({
 
               {showOptimisticAssistant &&
                 (pendingUserBubble || isBusy || buildStarting || buildJobActive) && (
-                <OptimisticAssistantRow mode={mode === "discuss" ? "discuss" : "build"} />
+                <OptimisticAssistantRow
+                  mode={
+                    (lockedTaskMode ?? mode) === "discuss"
+                      ? "discuss"
+                      : (lockedTaskMode ?? mode) === "edit"
+                        ? "edit"
+                        : "build"
+                  }
+                />
               )}
 
               {isBusy &&
                 !showOptimisticAssistant &&
                 (messages[messages.length - 1]?.role === "user" || pendingUserBubble) &&
-                !(mode === "build" && (buildJobActive || buildStarting)) && (
+                !(activeMode === "build" && (buildJobActive || buildStarting)) && (
                 <MessageBubble
                   message={{ id: "pending", role: "assistant", parts: [{ type: "text", text: "" }] } satisfies UIMessage}
                   userName="Vodex"
@@ -2540,7 +2592,7 @@ export function ImmersiveWorkspace({
                 />
               )}
 
-              {(buildJobActive || buildStarting) && mode === "build" && (
+              {(buildJobActive || buildStarting) && activeMode === "build" && (
                 <BuildLiveProgress
                   progress={buildJobProgress}
                   className="mt-1"

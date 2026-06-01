@@ -1,3 +1,7 @@
+import { buildPlanCreditsMarkdownTable } from "@/lib/docs/plan-credits-doc-table";
+
+const PLAN_CREDITS_TABLE = buildPlanCreditsMarkdownTable();
+
 /**
  * Vodex Help Center — article registry
  *
@@ -651,12 +655,7 @@ Monthly plan credits reset each billing cycle. They do not roll over.
 
 If you upgrade your plan, you pay the **full new plan price today** (no prorated upgrade charge). Your billing cycle restarts and you receive the **full** Build Credit and Action Credit allowance for the new plan — unused monthly allowance from the previous plan does not stack. Purchased credit packs and explicit bonus grants stay separate.
 
-| Plan | Build Credits / mo | Action Credits / mo |
-|------|-------------------|---------------------|
-| Free | 30 | 25 |
-| Starter | 200 | 500 |
-| Pro | 500 | 1,250 |
-| Infinity | 1,000 | 2,500 |
+${PLAN_CREDITS_TABLE}
 
 ## Credit packs
 

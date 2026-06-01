@@ -1,10 +1,10 @@
 /** Default display name from account email — never generic "My Workspace". */
 export function defaultWorkspaceNameFromEmail(email: string | null | undefined): string {
   const raw = (email ?? "").trim().toLowerCase();
-  if (!raw || !raw.includes("@")) return "Dream Space";
+  if (!raw || !raw.includes("@")) return "";
 
   const prefix = raw.split("@")[0]?.replace(/[^a-z0-9._-]/gi, "") ?? "";
-  if (!prefix) return "Dream Space";
+  if (!prefix) return "";
 
   return prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }

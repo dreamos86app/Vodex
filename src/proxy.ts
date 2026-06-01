@@ -21,6 +21,7 @@ import {
 import { REFERRAL_NOTICE_QUERY } from "@/lib/referrals/referral-messages";
 import { classifyUrlHostname } from "@/lib/network/safe-fetch";
 import { applyAuthCookieOptions } from "@/lib/auth/auth-cookie-options";
+import { isOnboardingExemptPath } from "@/lib/onboarding/exempt-paths";
 
 const PROXY_AUTH_WARN_MS = 30_000;
 const PROXY_AUTH_TIMEOUT_MS = 2_500;
@@ -231,6 +232,29 @@ export async function proxy(request: NextRequest) {
         ? next
         : "/create";
     return NextResponse.redirect(new URL(dest, request.url));
+  }
+
+  if (
+    user &&
+    pathname !== "/onboarding" &&
+    !pathname.startsWith("/onboarding/") &&
+    !isOnboardingExemptPath(pathname) &&
+    PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  ) {
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.onboarding_completed !== true) {
+        const onboardingUrl = new URL("/onboarding", request.url);
+        onboardingUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+        return NextResponse.redirect(onboardingUrl);
+      }
+    } catch {
+      /* fall through — client gate will retry */
+    }
   }
 
   if (!user && PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {

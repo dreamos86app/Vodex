@@ -251,21 +251,33 @@ export function resolveBuildRunSummary(input: {
       bodyLines: ["Add credits or upgrade to keep building."],
     },
     failed_before_generation: {
-      headline: "Couldn't start the build",
-      bodyLines: [
-        input.errorDetail ??
-          "Please try again or adjust your request.",
-        input.facts.creditsRefunded
-          ? "Credits were returned for this attempt."
-          : "No credits were charged.",
-      ],
+      headline: input.facts.hasFiles ? "Build saved — preview is still preparing" : "Couldn't start the build",
+      bodyLines: input.facts.hasFiles
+        ? [
+            input.errorDetail && !REPAIR_DETAIL_RE.test(input.errorDetail)
+              ? input.errorDetail
+              : "Your files were saved. Preview is still warming — retry preview or repair if it does not load.",
+            input.facts.creditsRefunded ? "Credits were returned for this attempt." : "",
+          ].filter(Boolean)
+        : [
+            input.errorDetail ?? "Please try again or adjust your request.",
+            input.facts.creditsRefunded
+              ? "Credits were returned for this attempt."
+              : "No credits were charged.",
+          ],
     },
     failed_after_generation: {
-      headline: input.previewReady === false ? "Preview needs a technical fix" : "Build needs attention",
+      headline: input.facts.hasFiles
+        ? input.previewReady === false
+          ? "Build saved — preview needs a fix"
+          : "Build saved — preview is still preparing"
+        : "Build needs attention",
       bodyLines: [
         input.errorDetail && !REPAIR_DETAIL_RE.test(input.errorDetail)
           ? input.errorDetail
-          : "The files were saved, but preview could not render yet.",
+          : input.facts.hasFiles
+            ? "Files are saved. Preview is not ready yet — use retry preview or repair for details."
+            : "Generation did not complete successfully.",
         input.facts.creditsRefunded ? "Credits were returned for this attempt." : "",
       ].filter(Boolean),
     },

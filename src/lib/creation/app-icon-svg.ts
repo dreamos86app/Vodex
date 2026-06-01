@@ -55,14 +55,13 @@ function categoryGlyph(category?: string): string {
 }
 
 function initialsGlyph(appName: string): string {
-  const initials = appName
-    .replace(/[^a-zA-Z0-9\s]/g, "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("") || "A";
-  const glyph = initials.length === 1 ? initials : initials.slice(0, 2);
+  const compact = appName.replace(/[^a-zA-Z0-9]/g, "");
+  let glyph = "A";
+  if (compact.length >= 2) {
+    glyph = compact.slice(0, 2).toUpperCase();
+  } else if (compact.length === 1) {
+    glyph = compact.toUpperCase();
+  }
   return `<text x="64" y="74" text-anchor="middle" font-family="system-ui,Segoe UI,sans-serif" font-size="44" font-weight="700" fill="#ffffff">${glyph}</text>`;
 }
 

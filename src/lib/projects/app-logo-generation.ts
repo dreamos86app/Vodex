@@ -60,11 +60,11 @@ export function buildLogoPrompt(input: {
   }
   return [
     `A premium modern app icon for ${input.appName}, ${purpose}.`,
-    "Use a clean abstract symbol that reflects the app's purpose and audience.",
-    "App-store-ready square icon, soft depth, crisp edges, modern SaaS style.",
-    "No readable text, no watermark, high contrast, minimal but memorable.",
-    "Clean background suitable for app cards and favicons.",
-    "Maskable-safe centered composition.",
+    "1024x1024 square, full-bleed circular-safe app icon.",
+    "Centered subject fills most of the frame (object-fit cover style).",
+    "No text, no letters, no watermark, no border, no white background, no padding frame.",
+    "Vivid gradient or rich color field edge-to-edge; works inside circular and rounded masks.",
+    "High contrast, minimal but memorable, app-store ready.",
   ].join(" ");
 }
 
@@ -148,7 +148,15 @@ async function uploadLogoDerivatives(
   if (!bucket.ok) throw new Error(bucket.error);
 
   const basePath = `${projectId}/${operationId}`;
-  const png1024 = await sharp(source).resize(1024, 1024, { fit: "cover" }).png().toBuffer();
+  const normalized = await sharp(source)
+    .flatten({ background: { r: 0, g: 0, b: 0 } })
+    .trim({ threshold: 12 })
+    .resize(1024, 1024, { fit: "cover", position: "centre" })
+    .png()
+    .toBuffer()
+    .catch(() => source);
+
+  const png1024 = await sharp(normalized).resize(1024, 1024, { fit: "cover", position: "centre" }).png().toBuffer();
   const png512 = await sharp(source).resize(512, 512, { fit: "cover" }).png().toBuffer();
   const png192 = await sharp(source).resize(192, 192, { fit: "cover" }).png().toBuffer();
   const png180 = await sharp(source).resize(180, 180, { fit: "cover" }).png().toBuffer();

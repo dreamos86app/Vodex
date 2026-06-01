@@ -79,7 +79,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!pathname) return;
     if (pathname.startsWith("/auth")) return;
     if (pathname.startsWith("/api")) return;
-    if (pathname === "/" || pathname === "/terms" || pathname === "/privacy" || pathname === "/contact") {
+    if (pathname === "/terms" || pathname === "/privacy" || pathname === "/contact") {
       return;
     }
 

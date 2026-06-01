@@ -1,37 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { getProjectAccess } from "@/lib/projects/project-access";
+import { cleanAppName, stripMarkdownNoise } from "@/lib/projects/clean-app-name";
+
+export { stripMarkdownNoise } from "@/lib/projects/clean-app-name";
 
 type Writer = SupabaseClient<Database>;
 
-const WEAK_NAME_RE =
-  /^(new app|new build|my app|untitled|app|application|evently|calcmaster|chatforge|socialsphere)$/i;
-
-/** Reject generic model names; derive from prompt when weak. */
-export function stripMarkdownNoise(text: string): string {
-  return text
-    .replace(/\*\*/g, "")
-    .replace(/^["'`]+|["'`]+$/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
+/** Reject generic model names; derive brandable name from prompt when weak. */
 export function refineAppName(candidate: string, userPrompt: string): string {
-  const trimmed = stripMarkdownNoise(candidate).slice(0, 80);
-  if (trimmed && !WEAK_NAME_RE.test(trimmed)) return trimmed;
-
-  const words = userPrompt
-    .replace(/[^\w\s-]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length > 3 && !/^(create|build|make|with|and|the|for|app)$/i.test(w))
-    .slice(0, 3);
-
-  if (words.length === 0) return "Dream App";
-
-  return words
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join("")
-    .slice(0, 48);
+  return cleanAppName(candidate, userPrompt);
 }
 
 export async function loadProjectContextBlock(

@@ -143,12 +143,45 @@ export function getUserSafeProjectBadges(
     return badges;
   }
 
-  const lifecycle = resolveLifecycle(project, options);
-  if (lifecycle) {
-    const st = lifecycleUserStatus(lifecycle, options.lifecycleLabel);
-    badges.push({ label: st.label, tone: st.tone, kind: "status" });
+  const buildStatus = String(meta.build_status ?? project.status ?? "").toLowerCase();
+  const previewState = String(meta.preview_state ?? "").toLowerCase();
+  const previewReady = meta.preview_ready === true && meta.preview_honest !== false;
+
+  if (buildStatus === "building" || buildStatus === "planning") {
+    badges.push({ label: "Building", tone: "building", kind: "status" });
+  } else if (
+    buildStatus === "preview_failed" ||
+    previewState === "failed" ||
+    buildStatus === "failed"
+  ) {
+    badges.push({ label: "Preview failed", tone: "destructive", kind: "status" });
+  } else if (
+    (buildStatus === "files_saved" ||
+      buildStatus === "preview_pending" ||
+      previewState === "warming" ||
+      previewState === "pending" ||
+      previewState === "timeout") &&
+    !previewReady
+  ) {
+    badges.push({ label: "Preview preparing", tone: "warning", kind: "status" });
   } else {
-    badges.push({ label: "Draft idea", tone: "default", kind: "status" });
+    const lifecycle = resolveLifecycle(project, options);
+    if (lifecycle) {
+      const st = lifecycleUserStatus(lifecycle, options.lifecycleLabel);
+      if (lifecycle === "generated" || lifecycle === "preview_ready") {
+        badges.push({
+          label: previewReady ? st.label : "Preview preparing",
+          tone: previewReady ? st.tone : "warning",
+          kind: "status",
+        });
+      } else {
+        badges.push({ label: st.label, tone: st.tone, kind: "status" });
+      }
+    } else if (previewReady || buildStatus === "ready" || buildStatus === "completed") {
+      badges.push({ label: "Ready", tone: "positive", kind: "status" });
+    } else {
+      badges.push({ label: "Draft idea", tone: "default", kind: "status" });
+    }
   }
 
   if (mode === "admin") {
