@@ -170,6 +170,34 @@ async function readActionBalance(
   return planAllowance;
 }
 
+/** Fast read for GET /api/credits?lite=1 — profile + balance rows only (no ledger/grant scans). */
+export function loadCanonicalCreditsLite(input: {
+  planId?: string | null;
+  creditsResetAt?: string | null;
+  buildAvailable: number;
+  actionAvailable: number;
+}): CanonicalCreditsPayload {
+  const planId = normalizePlanId(input.planId ?? "free") as PlanId;
+  const buildPlanAllowance = monthlyTokensForPlan(planId);
+  const actionPlanAllowance = monthlyActionCreditsForPlan(planId);
+  const resetDate = input.creditsResetAt ?? null;
+  const build = buildCanonicalBucket({
+    available: input.buildAvailable,
+    planAllowance: buildPlanAllowance,
+    explicitBonus: 0,
+    ledgerUsed: 0,
+    resetDate,
+  });
+  const action = buildCanonicalBucket({
+    available: input.actionAvailable,
+    planAllowance: actionPlanAllowance,
+    explicitBonus: 0,
+    ledgerUsed: 0,
+    resetDate,
+  });
+  return { build, action, planId };
+}
+
 export async function loadCanonicalCredits(
   input: LoadCanonicalCreditsOptions,
 ): Promise<CanonicalCreditsPayload> {

@@ -40,6 +40,7 @@ export function buildCopyFixPrompt(diag: BuildDiagnosticsPayload): string {
     diag.user_prompt ?? "(not recorded)",
     "",
     "## Build context",
+    `- route: ${typeof diag.metadata?.route === "string" ? diag.metadata.route : "unknown"}`,
     `- mode_at_submit: ${diag.mode_at_submit ?? "unknown"}`,
     `- build_job_id: ${diag.build_job_id}`,
     `- project_id: ${diag.project_id}`,

@@ -42,10 +42,22 @@ export function AdminDiagnosticsFab({
     <>
       {slowBanner ? (
         <div
-          className="fixed bottom-20 right-4 z-[75] max-w-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[10px] text-amber-200"
+          className="fixed inset-x-0 top-20 z-[85] mx-auto flex max-w-md items-center justify-center px-4"
           data-testid="admin-slow-build-banner"
         >
-          {slowBanner}
+          <div className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-[11px] text-amber-900 shadow-lg backdrop-blur dark:text-amber-100">
+            {slowBanner}
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(true);
+                void load();
+              }}
+              className="mt-2 block w-full rounded-lg bg-amber-500/20 py-1.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200"
+            >
+              Open diagnostics
+            </button>
+          </div>
         </div>
       ) : null}
       <button

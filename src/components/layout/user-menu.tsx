@@ -75,6 +75,7 @@ export function UserMenu() {
   const loading = useCreditsStore((s) => s.loading);
   const error = useCreditsStore((s) => s.error);
   const isConfirmed = useCreditsStore((s) => s.isConfirmed);
+  const syncing = useCreditsStore((s) => s.syncing);
   const syncFromDB = useCreditsStore((s) => s.syncFromDB);
   const hydrated = useHydrated();
   const [open, setOpen] = React.useState(false);
@@ -178,6 +179,7 @@ export function UserMenu() {
                 action={action}
                 planId={effectivePlanId}
                 isConfirmed={isConfirmed}
+                syncing={syncing}
                 loading={!isConfirmed && loading}
                 error={error}
                 variant="popover"

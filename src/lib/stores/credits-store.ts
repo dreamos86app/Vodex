@@ -46,12 +46,15 @@ interface CreditsState {
   action: CanonicalCreditBucket;
   planId: string;
   loading: boolean;
+  syncing: boolean;
   error: string | null;
   lastSyncedAt: number | null;
   isConfirmed: boolean;
 
   applyCanonical: (payload: CanonicalCreditsPayload) => void;
-  /** Profile/bootstrap hint — not confirmed until /api/credits succeeds. */
+  /** Profile/bootstrap instant values — confirmed after /api/credits?lite=1. */
+  applyProfileSeed: (payload: CanonicalCreditsPayload) => void;
+  /** @deprecated use applyProfileSeed */
   applyProfileHint: (payload: CanonicalCreditsPayload) => void;
   syncFromDB: (options?: CreditSyncOptions) => Promise<CanonicalCreditsPayload | null>;
   deductOptimistic: (amount: number) => void;
@@ -86,6 +89,7 @@ function withLegacyFields(state: {
   action: CanonicalCreditBucket;
   planId: string;
   loading: boolean;
+  syncing: boolean;
   error: string | null;
   lastSyncedAt: number | null;
   isConfirmed: boolean;
@@ -115,6 +119,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
     action: { ...EMPTY_BUCKET, planAllowance: 25 },
     planId: "free",
     loading: false,
+    syncing: false,
     error: null,
     lastSyncedAt: null,
     isConfirmed: false,
@@ -127,6 +132,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         action: payload.action,
         planId: payload.planId,
         loading: false,
+        syncing: false,
         error: null,
         lastSyncedAt: Date.now(),
         isConfirmed: true,
@@ -134,21 +140,25 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
     );
   },
 
+  /** Instant display from profile/bootstrap — refined by /api/credits?lite=1. */
+  applyProfileSeed: (payload) => {
+    set(
+      withLegacyFields({
+        build: payload.build,
+        action: payload.action,
+        planId: payload.planId,
+        loading: false,
+        syncing: true,
+        error: null,
+        lastSyncedAt: Date.now(),
+        isConfirmed: false,
+      }),
+    );
+  },
+
   /** Plan-only hint from profile — never overwrites confirmed credit balances. */
   applyProfileHint: (payload) => {
-    set((s) => {
-      if (s.isConfirmed) {
-        return withLegacyFields({ ...s, planId: payload.planId });
-      }
-      return withLegacyFields({
-        ...s,
-        planId: payload.planId,
-        loading: true,
-        error: null,
-        lastSyncedAt: null,
-        isConfirmed: false,
-      });
-    });
+    get().applyProfileSeed(payload);
   },
 
   deductOptimistic: (amount) =>
@@ -162,6 +172,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         action: s.action,
         planId: s.planId,
         loading: s.loading,
+        syncing: s.syncing,
         error: s.error,
         lastSyncedAt: s.lastSyncedAt,
         isConfirmed: s.isConfirmed,
@@ -187,17 +198,22 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
       return inFlightRequest;
     }
 
-    const hadConfirmedSnapshot = isConfirmed;
-    if (!hadConfirmedSnapshot) {
-      set({ loading: true, error: null });
+    const hadDisplay =
+      isConfirmed || get().build.available > 0 || get().action.available > 0 || get().syncing;
+    if (!hadDisplay) {
+      set({ loading: true, error: null, syncing: false });
+    } else {
+      set({ syncing: true, error: null });
     }
 
     const loadStartedAt = Date.now();
+    const slowSyncTimer = setTimeout(() => {
+      if (!get().isConfirmed) set({ syncing: true, loading: false });
+    }, 1000);
 
     inFlightRequest = (async () => {
       try {
-        const lite = reason === "bootstrap" ? "?lite=1" : "";
-        const res = await fetch(`/api/credits${lite}`, {
+        const res = await fetch("/api/credits?lite=1", {
           credentials: "include",
           cache: "no-store",
           headers: { "X-Credit-Sync-Reason": reason ?? "sync" },
@@ -220,11 +236,6 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
           planId: normalizePlanId(data.plan_id ?? "free") as CanonicalCreditsPayload["planId"],
         };
 
-        if (!hadConfirmedSnapshot) {
-          const elapsed = Date.now() - loadStartedAt;
-          const waitMs = Math.max(0, CREDITS_MIN_LOADING_MS - elapsed);
-          if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
-        }
         const prev = get();
         const unchanged =
           prev.isConfirmed &&
@@ -235,24 +246,22 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         if (!unchanged) {
           get().applyCanonical(payload);
         } else {
-          set({ loading: false, lastSyncedAt: Date.now(), error: null });
+          set({ loading: false, syncing: false, lastSyncedAt: Date.now(), error: null, isConfirmed: true });
         }
         dispatchCreditUpdated(payload);
         logCreditSync(reason, "fetched ok");
         return payload;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Credit sync failed";
-        if (!hadConfirmedSnapshot) {
-          const elapsed = Date.now() - loadStartedAt;
-          const waitMs = Math.max(0, CREDITS_MIN_LOADING_MS - elapsed);
-          if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
-          set({ loading: false, error: msg });
-        } else {
-          set({ error: msg });
-        }
+        set({
+          loading: false,
+          syncing: hadDisplay,
+          error: hadDisplay ? null : msg,
+        });
         logCreditSync(reason, `error — ${msg}`);
         return null;
       } finally {
+        clearTimeout(slowSyncTimer);
         inFlightRequest = null;
       }
     })();
@@ -267,6 +276,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         action: { ...EMPTY_BUCKET, planAllowance: 25 },
         planId: "free",
         loading: false,
+        syncing: false,
         error: null,
         lastSyncedAt: null,
         isConfirmed: false,

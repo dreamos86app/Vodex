@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizePlanId } from "@/lib/billing/plans";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
-import { loadCanonicalCredits, serializeCanonicalCredits } from "@/lib/credits/canonical-credits";
+import {
+  loadCanonicalCredits,
+  loadCanonicalCreditsLite,
+  serializeCanonicalCredits,
+} from "@/lib/credits/canonical-credits";
 import {
   applyE2eCreditBypassDisplay,
   shouldApplyE2eCreditBypass,
@@ -57,15 +61,22 @@ export async function GET(req: Request) {
   const actionBalance = (actionRow as { balance: number } | null)?.balance;
   const actionAvailable = typeof actionBalance === "number" ? actionBalance : actionPlanAllowance;
 
-  let canonical = await loadCanonicalCredits({
-    userId: user.id,
-    planId: profile.plan_id,
-    email: profile.email,
-    creditsResetAt: profile.credits_reset_at,
-    buildAvailable: profile.credits_remaining,
-    actionAvailable,
-    skipLedger: true,
-  });
+  let canonical = lite
+    ? loadCanonicalCreditsLite({
+        planId: profile.plan_id,
+        creditsResetAt: profile.credits_reset_at,
+        buildAvailable: profile.credits_remaining,
+        actionAvailable,
+      })
+    : await loadCanonicalCredits({
+        userId: user.id,
+        planId: profile.plan_id,
+        email: profile.email,
+        creditsResetAt: profile.credits_reset_at,
+        buildAvailable: profile.credits_remaining,
+        actionAvailable,
+        skipLedger: false,
+      });
 
   if (shouldApplyE2eCreditBypass(user.id, profile.email)) {
     canonical = applyE2eCreditBypassDisplay(
@@ -88,10 +99,17 @@ export async function GET(req: Request) {
 
   const chargeProbe = lite ? { ok: true, lastError: null } : await getChargeTokensProbeCached();
   const tDone = performance.now();
+  const timingMs = Math.round(tDone - t0);
+
+  if (process.env.NODE_ENV === "development") {
+    const label = lite ? "credits_lite_ms" : "credits_full_ms";
+    console.info(`[credits] ${label}=${timingMs}`);
+  }
 
   return NextResponse.json(
     {
       ...serializeCanonicalCredits(canonical),
+      lite,
       actionCreditWarning: actionWarning,
       charging_enabled: chargeProbe.ok,
       charging_error: chargeProbe.ok ? null : chargeProbe.lastError,
@@ -103,7 +121,7 @@ export async function GET(req: Request) {
                 db_parallel: Math.round(tDb - tAuth),
                 canonical_compute: Math.round(tCanonical - tDb),
                 charge_probe: Math.round(tDone - tCanonical),
-                total: Math.round(tDone - t0),
+                total: timingMs,
               },
             },
           }
@@ -112,7 +130,8 @@ export async function GET(req: Request) {
     {
       headers: {
         "Cache-Control": "private, no-store",
-        "X-Credits-Timing-Ms": String(Math.round(tDone - t0)),
+        "X-Credits-Timing-Ms": String(timingMs),
+        ...(lite ? { "X-Credits-Lite": "1" } : {}),
       },
     },
   );

@@ -112,9 +112,7 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
       animate={{ opacity: 1, y: 0 }}
       className={cn(
         "mr-6 flex max-w-md items-center gap-2 rounded-2xl bg-surface/90 px-3 py-2 sm:mr-10",
-        event.status === "active"
-          ? "animate-[workflow-gold-pulse_2s_ease-in-out_infinite] ring-1 ring-amber-400/55 shadow-[0_0_12px_-4px_rgba(251,191,36,0.35)]"
-          : "ring-1 ring-border/60",
+        event.status === "active" ? "file-active-ring ring-1 ring-amber-400/55" : "ring-1 ring-border/60",
       )}
       data-testid="workflow-file-card"
     >

@@ -41,5 +41,5 @@ export function seedCreditsFromProfile(profile: Partial<Profile>): void {
     build: bucketFromProfile(buildAvailable, buildAllowance, resetDate),
     action: bucketFromProfile(actionAllowance, actionAllowance, resetDate),
   };
-  useCreditsStore.getState().applyCanonical(payload);
+  useCreditsStore.getState().applyProfileSeed(payload);
 }

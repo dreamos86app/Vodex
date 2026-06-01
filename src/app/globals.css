@@ -16,6 +16,23 @@
   }
 }
 
+.workflow-active-ring {
+  animation: workflow-gold-pulse 2s ease-in-out infinite;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.2),
+    0 0 20px -2px rgba(251, 191, 36, 0.45);
+}
+
+.file-active-ring {
+  animation: workflow-gold-pulse 2s ease-in-out infinite;
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.35),
+    0 0 14px -3px rgba(251, 191, 36, 0.4);
+  outline: 1px solid rgba(251, 191, 36, 0.5);
+  outline-offset: 0;
+}
+
 /* Vodex — atmospheric white × blue (calm, cinematic, OS-grade) */
 :root {
   --background: #f4f7fd;

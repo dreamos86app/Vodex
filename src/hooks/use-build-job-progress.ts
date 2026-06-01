@@ -16,6 +16,8 @@ export type BuildJobPollState = {
 };
 
 const MAX_404_ATTEMPTS = 5;
+/** Cap client-side event buffer to avoid React freeze during long builds. */
+const MAX_CLIENT_EVENTS = 240;
 
 export function useBuildJobProgress(
   job: { jobId: string; eventsUrl: string } | null,
@@ -166,18 +168,22 @@ export function useBuildJobProgress(
 
         setState((prev) => {
           const merged = [...(prev?.events ?? []), ...incoming];
-          const latest = merged[merged.length - 1] ?? null;
+          const capped =
+            merged.length > MAX_CLIENT_EVENTS
+              ? merged.slice(merged.length - MAX_CLIENT_EVENTS)
+              : merged;
+          const latest = capped[capped.length - 1] ?? null;
           const fromJob = body.job?.progress;
           const fromEvent = latest?.progress_percent;
           const progressPercent = Math.max(
             1,
-            fromJob ?? fromEvent ?? (isTerminal ? 100 : Math.min(90, 5 + merged.length * 3)),
+            fromJob ?? fromEvent ?? (isTerminal ? 100 : Math.min(90, 5 + capped.length * 3)),
           );
           const next: BuildJobPollState = {
             jobId: job.jobId,
             eventsUrl: job.eventsUrl,
             status: jobStatus,
-            events: merged,
+            events: capped,
             latest,
             progressPercent,
             error: body.job?.error_message ?? null,

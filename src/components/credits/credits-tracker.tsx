@@ -379,6 +379,7 @@ export type CreditsTrackerProps = {
   loading?: boolean;
   error?: string | null;
   isConfirmed?: boolean;
+  syncing?: boolean;
   variant?: CreditsTrackerVariant;
   onRetry?: () => void;
   showUpgrade?: boolean;
@@ -392,6 +393,7 @@ export function CreditsTracker({
   loading,
   error,
   isConfirmed,
+  syncing,
   variant = "full",
   onRetry,
   showUpgrade,
@@ -402,7 +404,13 @@ export function CreditsTracker({
   const isCompact = variant === "compact";
   const isFull = variant === "full";
 
-  if (!isConfirmed) {
+  const hasDisplayValues =
+    build.available > 0 ||
+    action.available > 0 ||
+    build.planAllowance > 0 ||
+    action.planAllowance > 0;
+
+  if (!isConfirmed && !hasDisplayValues && loading) {
     return (
       <div className={cn(className)} data-testid="credits-loading">
         {isPopover || isCompact ? (
@@ -435,9 +443,21 @@ export function CreditsTracker({
   const lowBalance =
     build.available < build.planAllowance * 0.2 || action.available < action.planAllowance * 0.2;
 
+  const syncingBadge =
+    syncing && !isConfirmed ? (
+      <p
+        className="mb-1.5 flex items-center justify-center gap-1 text-[9px] font-medium text-amber-600/90"
+        data-testid="credits-syncing-badge"
+      >
+        <RefreshCw className="size-2.5 animate-spin" />
+        Syncing
+      </p>
+    ) : null;
+
   if (isMini) {
     return (
       <div className={cn("space-y-2.5", className)}>
+        {syncingBadge}
         <CreditRow kind="build" bucket={build} density="mini" planId={planId} isConfirmed={isConfirmed} />
         <CreditRow kind="action" bucket={action} density="mini" planId={planId} isConfirmed={isConfirmed} />
       </div>
@@ -447,6 +467,7 @@ export function CreditsTracker({
   if (isPopover || isCompact) {
     return (
       <div className={cn(className)}>
+        {syncingBadge}
         <UnifiedCreditsCard
           build={build}
           action={action}

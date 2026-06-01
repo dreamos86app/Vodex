@@ -699,22 +699,82 @@ export function ImmersiveWorkspace({
 
   React.useEffect(() => {
     const pid = effectiveProjectId;
-    if (!pid || activeBuildJob) return;
+    if (!pid) return;
     const cached = readWorkspaceTask(pid);
     if (cached?.buildJobId && cached.eventsUrl) {
       buildJobActiveRef.current = true;
-      setActiveBuildJob({
-        jobId: cached.buildJobId,
-        eventsUrl: cached.eventsUrl,
-        operationId: cached.operationId ?? "",
-      });
+      setActiveBuildJob((prev) =>
+        prev ?? {
+          jobId: cached.buildJobId!,
+          eventsUrl: cached.eventsUrl!,
+          operationId: cached.operationId ?? "",
+        },
+      );
       if (cached.lockedMode) {
         setLockedTaskMode(cached.lockedMode);
         lockedTaskModeRef.current = cached.lockedMode;
       }
       if (cached.buildStartedAtMs) buildStartedAtRef.current = cached.buildStartedAtMs;
     }
-  }, [effectiveProjectId, activeBuildJob]);
+  }, [effectiveProjectId]);
+
+  React.useEffect(() => {
+    const pid = effectiveProjectId;
+    if (!pid) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/projects/${pid}/active-build`, { credentials: "include" });
+        if (cancelled || !res.ok) return;
+        const body = (await res.json()) as {
+          ok?: boolean;
+          active?: boolean;
+          job?: {
+            id: string;
+            events_url: string;
+            prompt?: string | null;
+            mode_at_submit?: string | null;
+            conversation_id?: string | null;
+          };
+        };
+        if (!body.active || !body.job?.id || cancelled) return;
+        buildJobActiveRef.current = true;
+        setActiveBuildJob((prev) => {
+          if (prev?.jobId === body.job!.id) return prev;
+          return {
+            jobId: body.job!.id,
+            eventsUrl: body.job!.events_url,
+            operationId: prev?.operationId ?? `resume:${body.job!.id}`,
+          };
+        });
+        if (body.job.mode_at_submit === "discuss" || body.job.mode_at_submit === "edit" || body.job.mode_at_submit === "build") {
+          setLockedTaskMode(body.job.mode_at_submit);
+          lockedTaskModeRef.current = body.job.mode_at_submit;
+        }
+        if (body.job.prompt?.trim()) {
+          setInput((prev) => (prev.trim() ? prev : body.job!.prompt!.trim()));
+        }
+        persistWorkspaceTask({
+          projectId: pid,
+          buildJobId: body.job.id,
+          eventsUrl: body.job.events_url,
+          lockedMode:
+            body.job.mode_at_submit === "discuss" ||
+            body.job.mode_at_submit === "edit" ||
+            body.job.mode_at_submit === "build"
+              ? body.job.mode_at_submit
+              : undefined,
+        });
+      } catch {
+        /* session cache fallback only */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveProjectId]);
 
   const drainPromptQueueRef = React.useRef<() => void>(() => {});
   const pipelineBusyForQueueRef = React.useRef(false);

@@ -68,6 +68,22 @@ export function buildLogoPrompt(input: {
   ].join(" ");
 }
 
+/** Trim near-white edge pixels and flatten corners before circular mask. */
+async function normalizeIconBuffer(buffer: Buffer): Promise<Buffer> {
+  const trimmed = await sharp(buffer)
+    .trim({ threshold: 12 })
+    .resize(1024, 1024, { fit: "cover", position: "centre" })
+    .flatten({ background: { r: 15, g: 23, b: 42 } })
+    .png()
+    .toBuffer()
+    .catch(() => buffer);
+
+  return sharp(trimmed)
+    .ensureAlpha()
+    .png()
+    .toBuffer();
+}
+
 async function applyCircularMask(buffer: Buffer): Promise<Buffer> {
   const size = 1024;
   const mask = Buffer.from(
@@ -160,14 +176,8 @@ async function uploadLogoDerivatives(
   if (!bucket.ok) throw new Error(bucket.error);
 
   const basePath = `${projectId}/${operationId}`;
-  const flattened = await sharp(source)
-    .flatten({ background: { r: 15, g: 23, b: 42 } })
-    .resize(1024, 1024, { fit: "cover", position: "centre" })
-    .png()
-    .toBuffer()
-    .catch(() => source);
-
-  const normalized = await applyCircularMask(flattened).catch(() => flattened);
+  const prepped = await normalizeIconBuffer(source);
+  const normalized = await applyCircularMask(prepped).catch(() => prepped);
 
   const png1024 = normalized;
   const png512 = await sharp(source).resize(512, 512, { fit: "cover" }).png().toBuffer();

@@ -19,7 +19,6 @@ import {
 import { cn } from "@/lib/utils";
 import { YourAppsSection, type YourAppsProject } from "@/components/os-home/your-apps-section";
 import { useHomeRecentProjects } from "@/components/os-home/use-home-recent-projects";
-import { ModelUsageDonut } from "@/components/dashboard/model-usage-donut";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { storeAutostartHandoff } from "@/lib/create/autostart-handoff";
 import { useCreditsStore } from "@/lib/stores/credits-store";
@@ -555,10 +554,6 @@ export function OsHome() {
 
         <div className="mx-auto w-full max-w-5xl">
           <YourAppsSection projects={recentProjects} />
-        </div>
-
-        <div className="mx-auto w-full max-w-5xl">
-          <ModelUsageDonut />
         </div>
 
         {/* App inspiration feed */}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useIdleReady } from "@/lib/hooks/use-idle-ready";
 import { subscribeCreditUpdated } from "@/lib/credits/credit-events-client";
 import {
   CREDITS_BACKGROUND_STALE_MS,
@@ -13,12 +12,11 @@ import {
  * multiple components each subscribing and refetching independently.
  */
 export function useCreditsSync(enabled: boolean) {
-  const idleReady = useIdleReady(180);
   const applyCanonical = useCreditsStore((s) => s.applyCanonical);
   const syncFromDB = useCreditsStore((s) => s.syncFromDB);
   const bootstrapped = useRef(false);
   const lastEnabled = useRef(false);
-  const syncEnabled = enabled && idleReady;
+  const syncEnabled = enabled;
 
   useEffect(() => {
     return subscribeCreditUpdated((payload) => {

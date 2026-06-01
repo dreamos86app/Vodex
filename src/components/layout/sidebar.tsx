@@ -110,6 +110,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const planId = useCreditsStore((s) => s.planId);
   const isConfirmed = useCreditsStore((s) => s.isConfirmed);
   const loading = useCreditsStore((s) => s.loading);
+  const syncing = useCreditsStore((s) => s.syncing);
   const hydrated = useHydrated();
 
   const ownerEmail = user?.email ?? profile?.email;
@@ -268,6 +269,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   action={action}
                   planId={effectivePlanId}
                   isConfirmed={isConfirmed}
+                  syncing={syncing}
                   loading={!isConfirmed && loading}
                   variant="mini"
                 />
