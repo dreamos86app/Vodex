@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { GlobalErrorDiagnostics } from "@/components/dev/global-error-diagnostics";
 
 export default function GlobalError({
   error,
@@ -32,15 +33,9 @@ export default function GlobalError({
             padding: 1.5rem;
           }
           .container {
-            max-width: 440px;
+            max-width: 720px;
             width: 100%;
             text-align: center;
-          }
-          .orb {
-            position: fixed;
-            inset: 0;
-            background: radial-gradient(circle at 60% 20%, rgba(99,102,241,0.06) 0%, transparent 60%);
-            pointer-events: none;
           }
           .icon {
             display: inline-flex;
@@ -54,81 +49,32 @@ export default function GlobalError({
             margin-bottom: 1.5rem;
             font-size: 26px;
           }
-          h1 {
-            font-size: 20px;
-            font-weight: 600;
-            letter-spacing: -0.03em;
-            margin: 0 0 0.5rem;
-          }
-          p {
-            font-size: 13.5px;
-            color: #94a3b8;
-            line-height: 1.6;
-            margin: 0 0 1.75rem;
-          }
-          .actions {
-            display: flex;
-            gap: 0.625rem;
-            justify-content: center;
-            flex-wrap: wrap;
-          }
+          h1 { font-size: 20px; font-weight: 600; margin: 0 0 0.5rem; }
+          p { font-size: 13.5px; color: #94a3b8; line-height: 1.6; margin: 0 0 1.25rem; }
+          .actions { display: flex; gap: 0.625rem; justify-content: center; flex-wrap: wrap; }
           button, a {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 0.625rem 1.25rem;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            transition: opacity 0.15s;
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 0.625rem 1.25rem; border-radius: 10px;
+            font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none;
           }
-          button:hover, a:hover { opacity: 0.85; }
-          .primary {
-            background: #6366f1;
-            color: #fff;
-            border: none;
-          }
-          .secondary {
-            background: transparent;
-            color: #94a3b8;
-            border: 1px solid #1e293b;
-          }
-          .digest {
-            margin-top: 1.5rem;
-            padding: 0.5rem 0.75rem;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid #1e293b;
-            font-family: monospace;
-            font-size: 11px;
-            color: #475569;
-            word-break: break-all;
-          }
+          .primary { background: #6366f1; color: #fff; border: none; }
+          .secondary { background: transparent; color: #94a3b8; border: 1px solid #1e293b; }
         `}</style>
       </head>
       <body>
-        <div className="orb" />
         <div className="container">
           <div className="icon">⚠️</div>
           <h1>Vodex crashed</h1>
-          <p>
-            A critical runtime error prevented the platform from loading.
-            This has been logged. Retry to recover, or return home.
-          </p>
+          <p>A critical runtime error prevented the platform from loading.</p>
           <div className="actions">
-            <button className="primary" onClick={() => unstable_retry()}>
-              ↻ &nbsp;Retry
+            <button type="button" className="primary" onClick={() => unstable_retry()}>
+              ↻ Retry
             </button>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a className="secondary" href="/">
-              ← &nbsp;Return home
+              ← Home
             </a>
           </div>
-          {error.digest && (
-            <div className="digest">Error ID: {error.digest}</div>
-          )}
+          <GlobalErrorDiagnostics error={error} />
         </div>
       </body>
     </html>

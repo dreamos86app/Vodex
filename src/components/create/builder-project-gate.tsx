@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { ImmersiveWorkspace } from "@/components/create/workspace/immersive-workspace";
 import type { CreateWorkspaceProject } from "@/components/create/workspace/immersive-workspace";
 import type { BuildStrategy } from "@/lib/create/autostart-handoff";
+import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
+import { isUuid } from "@/lib/utils/uuid";
 
 const VALID_MODES = ["discuss", "edit", "build"] as const;
 type Mode = (typeof VALID_MODES)[number];
@@ -70,7 +72,7 @@ export function BuilderProjectGate({
     const row = data as CreateWorkspaceProject & { app_name?: string | null };
     setProject({
       ...row,
-      name: row.app_name?.trim() || row.name,
+      name: resolveProjectDisplayName({ app_name: row.app_name, name: row.name }),
     });
     setFailureReason(null);
     setPhase("ready");
@@ -180,6 +182,11 @@ export function BuilderProjectGate({
     );
   }
 
+  const safeConversationId =
+    initialConversationId && isUuid(initialConversationId)
+      ? initialConversationId
+      : undefined;
+
   return (
     <ImmersiveWorkspace
       initialPrompt={initialPrompt}
@@ -188,7 +195,7 @@ export function BuilderProjectGate({
       initialBuildStrategy={initialBuildStrategy}
       initialModelId={initialModelId}
       initialJobId={initialJobId ?? undefined}
-      initialConversationId={initialConversationId ?? undefined}
+      initialConversationId={safeConversationId}
       project={project}
     />
   );

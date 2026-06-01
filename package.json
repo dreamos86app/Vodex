@@ -32,6 +32,8 @@
     "verify:file-write-live-events": "node scripts/verify-p0-workflow-diagnostics.mjs file-write-live-events",
     "verify:project-lifecycle-status": "node scripts/verify-p0-workflow-diagnostics.mjs project-lifecycle-status",
     "verify:home-card-status": "node scripts/verify-home-card-status.mjs",
+    "verify:error-boundary-diagnostics": "node scripts/verify-error-boundary-diagnostics.mjs",
+    "verify:builder-autostart-crash": "node scripts/verify-builder-autostart-crash.mjs",
     "verify:discuss-fast-pipeline": "node scripts/verify-p0-workflow-diagnostics.mjs discuss-fast-pipeline",
     "verify:project-icon-generation": "node scripts/verify-project-icon-generation.mjs",
     "verify:app-naming": "node scripts/verify-app-naming.mjs",

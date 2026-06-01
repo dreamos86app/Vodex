@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BuilderProjectGate } from "@/components/create/builder-project-gate";
+import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
+import { isUuid } from "@/lib/utils/uuid";
 import { Loader2 } from "lucide-react";
 
 const VALID_MODES = ["discuss", "edit", "build"] as const;
@@ -67,11 +69,16 @@ export default async function AppBuilderPage({
     .eq("owner_id", user.id)
     .maybeSingle();
 
+  const conversationId =
+    sp.conversationId && isUuid(sp.conversationId) ? sp.conversationId : null;
+
   const row = project
     ? {
         ...project,
-        name:
-          (typeof project.app_name === "string" && project.app_name.trim()) || project.name,
+        name: resolveProjectDisplayName({
+          app_name: project.app_name,
+          name: project.name,
+        }),
       }
     : null;
 
@@ -93,7 +100,7 @@ export default async function AppBuilderPage({
         initialBuildStrategy={initialBuildStrategy}
         initialModelId={sp.model ?? undefined}
         initialJobId={sp.jobId ?? null}
-        initialConversationId={sp.conversationId ?? null}
+        initialConversationId={conversationId}
         loadError={error?.message ?? null}
       />
     </Suspense>

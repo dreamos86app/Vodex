@@ -129,6 +129,7 @@ import {
 import { pushRuntimeDiagnostic } from "@/lib/dev/runtime-diagnostics";
 import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
 import { notifyProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
+import { isUuid } from "@/lib/utils/uuid";
 import {
   projectPreviewFrameUrl,
   type ProjectPreviewStatus,
@@ -398,8 +399,12 @@ export function ImmersiveWorkspace({
     showRepairActions?: boolean;
     showPreviewActions?: boolean;
   } | null>(null);
+  const safeInitialConversationId =
+    initialConversationId && isUuid(initialConversationId)
+      ? initialConversationId
+      : null;
   const [conversationId, setConversationId] = React.useState<string | null>(
-    initialConversationId ?? null,
+    safeInitialConversationId,
   );
   const [localProjectId, setLocalProjectId] = React.useState<string | null>(null);
   const [autoStartFailed, setAutoStartFailed] = React.useState<string | null>(null);
@@ -451,15 +456,15 @@ export function ImmersiveWorkspace({
   useComposerClickCapture("create", composerRootRef);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
-  const conversationIdRef = React.useRef<string | null>(initialConversationId ?? null);
+  const conversationIdRef = React.useRef<string | null>(safeInitialConversationId);
   conversationIdRef.current = conversationId;
 
   React.useEffect(() => {
-    if (initialConversationId) {
-      setConversationId(initialConversationId);
-      conversationIdRef.current = initialConversationId;
+    if (safeInitialConversationId) {
+      setConversationId(safeInitialConversationId);
+      conversationIdRef.current = safeInitialConversationId;
     }
-  }, [initialConversationId]);
+  }, [safeInitialConversationId]);
 
   const projectIdRef = React.useRef<string | null>(null);
   const effectiveProjectId = localProjectId ?? project?.id ?? null;
@@ -1896,6 +1901,23 @@ export function ImmersiveWorkspace({
   const runSubmitRef = React.useRef(runSubmit);
   runSubmitRef.current = runSubmit;
 
+  const invokeAutostartSubmit = React.useCallback((source: "url-auto", text: string) => {
+    const fn = runSubmitRef.current;
+    if (typeof fn !== "function") {
+      pushRuntimeDiagnostic("handoff_failed", { reason: "submit_not_ready" });
+      setAutoStartFailed("Builder is still starting. Tap retry below.");
+      autoStartedRef.current = false;
+      autostartConsumedRef.current = false;
+      return;
+    }
+    void fn(source, text).catch(() => {
+      autoStartedRef.current = false;
+      autostartConsumedRef.current = false;
+      pushRuntimeDiagnostic("handoff_failed", { reason: "autostart_submit_failed" });
+      setAutoStartFailed("Could not start automatically. Tap retry below.");
+    });
+  }, []);
+
   const drainPromptQueue = React.useCallback(() => {
     if (streamActiveRef.current || buildJobActiveRef.current || submitInFlightRef.current) return;
     const credits = useCreditsStore.getState().build.available;
@@ -1961,6 +1983,7 @@ export function ImmersiveWorkspace({
     if (!hydrated || !initialAutoStart) return;
     if (autostartConsumedRef.current || autoStartedRef.current) return;
 
+    try {
     const urlPrompt = initialPrompt.trim();
     const peeked = peekPendingAutostartHandoff();
     if (!urlPrompt && !peeked?.text) return;
@@ -1988,11 +2011,7 @@ export function ImmersiveWorkspace({
         }
         if (retry.modelId) setModelId(retry.modelId);
         cleanAutostartUrl();
-        void runSubmitRef.current("url-auto", retry.text).catch(() => {
-          autoStartedRef.current = false;
-          autostartConsumedRef.current = false;
-          setAutoStartFailed("Could not start automatically. Tap retry below.");
-        });
+        invokeAutostartSubmit("url-auto", retry.text);
       }
       return;
     }
@@ -2004,9 +2023,9 @@ export function ImmersiveWorkspace({
     if (effectiveProjectId && uid) {
       convHydratedRef.current = `${effectiveProjectId}:${uid}`;
     }
-    if (initialConversationId) {
-      setConversationId(initialConversationId);
-      conversationIdRef.current = initialConversationId;
+    if (safeInitialConversationId) {
+      setConversationId(safeInitialConversationId);
+      conversationIdRef.current = safeInitialConversationId;
     }
 
     setChatEngaged(true);
@@ -2022,14 +2041,21 @@ export function ImmersiveWorkspace({
     }
     cleanAutostartUrl();
 
-    void runSubmitRef.current("url-auto", handoff.text).catch(() => {
+    invokeAutostartSubmit("url-auto", handoff.text);
+    } catch (err) {
       autoStartedRef.current = false;
       autostartConsumedRef.current = false;
-      pushRuntimeDiagnostic("handoff_failed", { id: handoff.id });
+      pushRuntimeDiagnostic("handoff_failed", {
+        reason: "autostart_effect_throw",
+        message: err instanceof Error ? err.message : String(err),
+      });
       setAutoStartFailed("Could not start automatically. Tap retry below.");
-    });
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[create-workspace] autostart failed", err);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot autostart
-  }, [hydrated, initialAutoStart, initialPrompt, mode, cleanAutostartUrl]);
+  }, [hydrated, initialAutoStart, initialPrompt, mode, cleanAutostartUrl, invokeAutostartSubmit, safeInitialConversationId]);
 
   React.useEffect(() => {
     if (!hydrated) return;
