@@ -29,6 +29,8 @@ import {
 } from "@/lib/projects/user-safe-project-badges";
 import { projectIconSrc } from "@/lib/projects/ensure-project-icon";
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
+import { subscribeProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
+import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
 import type { ProjectCardStatus } from "@/lib/projects/project-card-status";
 
 type ProjectRow = Omit<Project, "metadata"> & {
@@ -94,12 +96,15 @@ function ProjectCard({
     project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
       ? (project.metadata as Record<string, unknown>)
       : {};
-  const appName =
-    (typeof (project as Project & { app_name?: string }).app_name === "string"
-      ? (project as Project & { app_name: string }).app_name
-      : null) ||
-    (typeof meta.app_name === "string" ? meta.app_name : null) ||
-    project.name;
+  const appName = resolveProjectDisplayName({
+    app_name:
+      (typeof (project as Project & { app_name?: string }).app_name === "string"
+        ? (project as Project & { app_name: string }).app_name
+        : null) ||
+      (typeof meta.app_name === "string" ? meta.app_name : null) ||
+      null,
+    name: project.name,
+  });
   const shortDesc =
     (project as Project & { short_description?: string }).short_description ||
     project.description;
@@ -357,9 +362,14 @@ export function ProjectsView() {
       loadProjects(true);
     };
     window.addEventListener("dreamos:projects-invalidate", onProjectsInvalidate);
+    const unsubCatalog = subscribeProjectCatalogUpdated(() => {
+      lastLoadRef.current = 0;
+      loadProjects(true);
+    });
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("dreamos:projects-invalidate", onProjectsInvalidate);
+      unsubCatalog();
     };
   }, [ownerId, authLoading, loadProjects]);
 

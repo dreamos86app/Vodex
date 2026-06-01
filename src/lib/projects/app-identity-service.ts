@@ -18,6 +18,7 @@ import {
 } from "@/lib/projects/app-logo-generation";
 import { refundActionCredit } from "@/lib/action-credits/refund-action-credit";
 import { logServerOperation } from "@/lib/ops/server-ops-log";
+import { isProvisionalAppName } from "@/lib/projects/provisional-app-name";
 
 type Writer = SupabaseClient<Database>;
 
@@ -154,7 +155,7 @@ export async function persistAppIdentity(
 
   const prevMeta = metaRecord(cur?.metadata);
   const curName = cur?.name?.trim() ?? "";
-  const shouldRename = !curName || /^new app$/i.test(curName) || /^new build$/i.test(curName) || /^untitled/i.test(curName);
+  const shouldRename = !curName || isProvisionalAppName(curName);
 
   const identityMeta = {
     build_operation_id: buildOperationId,

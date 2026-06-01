@@ -127,6 +127,8 @@ import {
   wasOperationSubmitted,
 } from "@/lib/create/autostart-handoff";
 import { pushRuntimeDiagnostic } from "@/lib/dev/runtime-diagnostics";
+import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
+import { notifyProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
 import {
   projectPreviewFrameUrl,
   type ProjectPreviewStatus,
@@ -176,7 +178,7 @@ export type CreateWorkspaceProject = Pick<
   | "metadata"
   | "published_subdomain"
 > &
-  Partial<Pick<Tables<"projects">, "build_status">>;
+  Partial<Pick<Tables<"projects">, "build_status" | "app_name" | "icon_svg">>;
 
 /** Display names for the next tier (DB `plan_id` is free | pro | business | enterprise). */
 const PLAN_NEXT_LABEL: Record<string, string> = {
@@ -1223,8 +1225,14 @@ export function ImmersiveWorkspace({
         const patch = data as CreateWorkspaceProject & { app_name?: string | null };
         setRemoteProjectPatch({
           ...patch,
-          name: patch.app_name?.trim() || patch.name,
+          name: resolveProjectDisplayName({
+            app_name: patch.app_name,
+            name: patch.name,
+          }),
+          icon_svg: patch.icon_svg,
+          icon_url: patch.icon_url,
         });
+        notifyProjectCatalogUpdated(id);
       }
     })();
     return () => {
@@ -2398,7 +2406,10 @@ export function ImmersiveWorkspace({
           effectiveProject
             ? {
                 id: effectiveProject.id,
-                name: effectiveProject.name,
+                name: resolveProjectDisplayName({
+                  app_name: (effectiveProject as { app_name?: string | null }).app_name,
+                  name: effectiveProject.name,
+                }),
                 icon_url: effectiveProject.icon_url,
                 gradient: effectiveProject.gradient,
                 preview_url: effectiveProject.preview_url,
@@ -3145,7 +3156,12 @@ export function ImmersiveWorkspace({
             {rightTab === "mobile" && effectiveProject?.id && (
               <MobileWrapperStudio
                 projectId={effectiveProject.id}
-                projectName={effectiveProject.name ?? "App"}
+                projectName={
+                  resolveProjectDisplayName({
+                    app_name: (effectiveProject as { app_name?: string | null }).app_name,
+                    name: effectiveProject.name,
+                  })
+                }
                 planId={profile?.plan_id}
                 fileCount={codeFiles.length}
                 hasPreview={Boolean(effectiveProject.preview_url)}

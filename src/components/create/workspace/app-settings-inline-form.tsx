@@ -4,6 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import { Loader2, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { notifyProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
 
 type AppSettingsInlineFormProps = {
   projectId: string;
@@ -64,6 +65,7 @@ export function AppSettingsInlineForm({
       if (!res.ok) throw new Error(body.error ?? "Logo regeneration failed");
       if (body.iconUrl) setIconSrc(`${body.iconUrl}?t=${Date.now()}`);
       toast.success("App logo regenerated");
+      notifyProjectCatalogUpdated(projectId);
       onSaved?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Logo regeneration failed");

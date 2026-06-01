@@ -99,6 +99,22 @@ const EVENT_CATEGORY: Partial<Record<RuntimeDiagnosticEvent, import("@/lib/diagn
   publish_readiness: "publish",
 };
 
+function mirrorFailedDiagnosticToOwner(
+  event: RuntimeDiagnosticEvent,
+  detail?: Record<string, unknown>,
+): void {
+  if (typeof window === "undefined") return;
+  if (!event.includes("failed") && event !== "error_boundary") return;
+  void import("@/lib/dev/owner-incident-store").then(({ pushOwnerIncident }) => {
+    pushOwnerIncident({
+      kind: event === "error_boundary" ? "render" : "diagnostic",
+      title: event.replace(/_/g, " "),
+      message: detail ? JSON.stringify(detail).slice(0, 2000) : undefined,
+      meta: detail,
+    });
+  });
+}
+
 export function pushRuntimeDiagnostic(
   event: RuntimeDiagnosticEvent,
   detail?: Record<string, unknown>,
@@ -119,6 +135,8 @@ export function pushRuntimeDiagnostic(
       typeof safeDetail?.conversationId === "string" ? safeDetail.conversationId : null,
     buildId: typeof safeDetail?.buildJobId === "string" ? safeDetail.buildJobId : null,
   });
+
+  mirrorFailedDiagnosticToOwner(event, safeDetail);
 
   if (typeof sessionStorage === "undefined") return;
   try {

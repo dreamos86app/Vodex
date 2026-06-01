@@ -6,8 +6,8 @@ import {
   type ProjectLifecycleStatus,
 } from "@/lib/projects/project-lifecycle";
 import { slugifyAppName } from "@/lib/publish/app-slug";
-import { deriveAppNameFromPrompt } from "@/lib/projects/derive-app-name";
-import { appIconSvgDataUrl } from "@/lib/creation/app-icon-svg";
+import { UNTITLED_APP_NAME } from "@/lib/projects/provisional-app-name";
+import { buildFallbackIconSvg } from "@/lib/projects/app-logo-generation";
 import {
   buildCreateIdempotencyKey,
   findProjectByCreateIdempotency,
@@ -182,9 +182,9 @@ export async function createProjectFromPrompt(
     }
   }
 
-  const name = deriveAppNameFromPrompt(prompt);
+  const name = UNTITLED_APP_NAME;
   const slug = uniqueSlug(name);
-  const iconSvg = appIconSvgDataUrl(name);
+  const iconSvg = buildFallbackIconSvg(UNTITLED_APP_NAME, "productivity");
   const lifecycle: ProjectLifecycleStatus = intentResult.shouldFullBuild
     ? "blueprint_generating"
     : intentResult.intent === "app_idea" || intentResult.intent === "design_request"

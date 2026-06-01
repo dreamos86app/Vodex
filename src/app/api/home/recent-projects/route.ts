@@ -4,6 +4,7 @@ import { readBannerSvg, buildBannerForProject } from "@/lib/projects/backfill-pr
 import { ensureProjectIconSvg } from "@/lib/projects/ensure-project-icon";
 import { isUserVisibleProject } from "@/lib/projects/user-visible-projects";
 import { computeProjectCardStatus } from "@/lib/projects/project-card-status";
+import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +36,10 @@ export async function GET() {
         row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
           ? (row.metadata as Record<string, unknown>)
           : {};
-      const displayName =
-        (typeof row.app_name === "string" && row.app_name.trim()) || row.name;
+      const displayName = resolveProjectDisplayName({
+        app_name: row.app_name,
+        name: row.name,
+      });
       const cardStatus = computeProjectCardStatus({
         build_status: row.build_status,
         metadata: meta,

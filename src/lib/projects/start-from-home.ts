@@ -137,7 +137,7 @@ export async function startProjectFromHome(
     writer: input.writer,
     user: input.user,
     projectId,
-    title: prompt.slice(0, 60) || "New app",
+    title: "Untitled App",
     modelId,
     mode: "build",
   });

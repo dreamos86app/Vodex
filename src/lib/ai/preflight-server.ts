@@ -17,6 +17,7 @@ import { getChargeTokensProbeCached } from "@/lib/db/charge-probe-cache";
 import { classifyCreateIntent } from "@/lib/intent/create-intent-classifier";
 import { lifecyclePatch } from "@/lib/projects/project-lifecycle";
 import { resolveBuildCreditAllowance } from "@/lib/billing/partial-build-credits";
+import { UNTITLED_APP_NAME } from "@/lib/projects/provisional-app-name";
 
 const DEFAULT_MODEL_ID = "automatic";
 
@@ -96,7 +97,7 @@ async function ensureProject(
     return { id: data.id };
   }
 
-  const name = prompt.slice(0, 80) || "New app";
+  const name = UNTITLED_APP_NAME;
   const slug = `${slugFromTitle(name)}-${Date.now().toString(36)}`;
   const intent = classifyCreateIntent(prompt, false);
   const lifecycle = intent.shouldFullBuild ? "blueprint_generating" : "intent_review";

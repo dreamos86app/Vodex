@@ -5,6 +5,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { AlertTriangle, RotateCcw, Home, Sparkles, ArrowRight } from "lucide-react";
 import { isChunkLoadError, safeChunkReloadOnce } from "@/lib/navigation/chunk-load-recovery";
+import { reportOwnerIncident } from "@/components/dev/owner-incident-console";
+import { pushRuntimeDiagnostic } from "@/lib/dev/runtime-diagnostics";
 
 export default function AppError({
   error,
@@ -17,7 +19,13 @@ export default function AppError({
 
   useEffect(() => {
     console.error("[Vodex] App error:", error);
-  }, [error]);
+    pushRuntimeDiagnostic("error_boundary", {
+      message: error.message,
+      digest: error.digest,
+      chunkError,
+    });
+    reportOwnerIncident(chunkError ? "Chunk load error" : "App route error", error, "render");
+  }, [error, chunkError]);
 
   const isDev = process.env.NODE_ENV === "development";
 
