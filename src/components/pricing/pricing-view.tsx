@@ -1195,11 +1195,12 @@ export function PricingView({ publicMode = false }: { publicMode?: boolean }) {
                 and custom deployment needs.
               </p>
               <p className="mt-3 text-[14px] font-medium text-foreground">
-                Pricing range: starting from $499/month
+                Custom / Enterprise plans start at $1,500/month and may range from $1,500–$10,000+/month depending on
+                usage, credits, premium model access, team needs, support level, and infrastructure requirements.
               </p>
               <p className="mt-1 text-[13px] text-muted-foreground">
-                Typical range $499–$2,999+/month depending on usage, credits, support requirements, model usage, and
-                infrastructure needs. Final pricing is quoted per account.
+                Final pricing is quoted per account based on required credits, seats, model/runtime cost, and compliance
+                needs.
               </p>
               <p className="mt-3 text-[13px] text-muted-foreground">
                 For enterprise pricing, contact{" "}

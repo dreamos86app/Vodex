@@ -55,3 +55,8 @@ export function publishedAppExampleUrl(slug = "your-app"): string {
 
 /** Legal/marketing copy — published preview on vodex.dev subdomains */
 export const PUBLISHED_APP_EXAMPLE_HOST = `your-app.${APP_DOMAIN}`;
+
+/** Enterprise / custom plans (above self-serve Infinity VII ~$1,235/mo). */
+export const ENTERPRISE_PRICING_START_USD = 1_500;
+export const ENTERPRISE_PRICING_START_LABEL = "$1,500/month";
+export const ENTERPRISE_PRICING_RANGE_LABEL = "$1,500–$10,000+/month";

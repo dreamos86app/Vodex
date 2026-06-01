@@ -1,6 +1,8 @@
-# DreamOS86 — Production deployment
+# Vodex — Production deployment
 
-Production at **https://dreamos86.com** only updates when **code is committed, pushed, and Vercel builds successfully**. Database schema is updated **separately** in Supabase — Vercel never runs migrations.
+Production at **https://vodex.dev** only updates when **code is committed, pushed, and Vercel builds successfully**. Database schema is updated **separately** in Supabase — Vercel never runs migrations.
+
+> Legacy hostname `dreamos86.com` may redirect to `vodex.dev` — see `src/lib/brand/legacy-brand-allowlist.ts`.
 
 ---
 
@@ -26,7 +28,7 @@ git push origin main
 
 ### 3. Wait for Vercel
 
-1. Open [Vercel](https://vercel.com) → **DreamOS86** project → **Deployments**.
+1. Open [Vercel](https://vercel.com) → **Vodex** project → **Deployments**.
 2. Wait until the latest `main` deployment shows **Ready** (green).
 3. Confirm it is **Production · Current** (not only a Preview).
 4. Open the deployment → **Build Logs** if status is **Error** (an old good deploy stays live until a build succeeds).
@@ -222,7 +224,7 @@ npm run dev:fresh
 
 Use **http://localhost:3000** only. Do not run `npm run clean` while `npm run dev` is running.
 
-If Next warns about a parent `package-lock.json` on your Desktop, remove or move it — keep `dreamos-platform/package-lock.json`.
+If Next warns about a parent `package-lock.json` on your Desktop, remove or move it — keep `vodex-platform/package-lock.json`.
 
 ---
 

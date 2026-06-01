@@ -9,11 +9,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src");
 
-const SKIP = new Set([
-  path.normalize("src/lib/brand/legacy-brand-allowlist.ts"),
-  path.normalize("src/components/brand/dreamos86-brand-icon.tsx"),
-  path.normalize("src/components/brand/dreamos86-brand-lockup.tsx"),
-]);
+const SKIP = new Set([path.normalize("src/lib/brand/legacy-brand-allowlist.ts")]);
 
 const REPLACEMENTS = [
   [/https:\/\/dreamos86\.com/g, "https://vodex.dev"],

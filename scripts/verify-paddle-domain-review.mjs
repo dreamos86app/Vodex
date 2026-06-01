@@ -67,9 +67,9 @@ async function main() {
     fail("legal/pricing must not contain dreamos86.com");
   } else ok("no dreamos86.com in legal/pricing components");
 
-  if (!/\$499/.test(pricing) || !/Enterprise\s*\/\s*Custom/i.test(pricing)) {
-    fail("pricing page must show Enterprise section with $499 starting price");
-  } else ok("pricing enterprise range visible");
+  if (!/\$1,500/.test(pricing) || !/Enterprise\s*\/\s*Custom/i.test(pricing)) {
+    fail("pricing page must show Enterprise section with $1,500+ starting price");
+  } else ok("pricing enterprise range visible ($1,500+)");
 
   if (!/self-serve software platform/i.test(pricing)) {
     fail("pricing must disclose human-services (self-serve)");
@@ -78,9 +78,9 @@ async function main() {
   if (!/support@vodex\.dev/.test(pricing)) fail("pricing must show support@vodex.dev");
   else ok("pricing support email");
 
-  if (!/\$499/.test(sheet) || !/Vodex Labs/.test(sheet)) {
-    fail("enterprise pricing sheet incomplete");
-  } else ok("enterprise pricing sheet present");
+  if (!/\$1,500/.test(sheet) || !/\$10,000/.test(sheet) || !/Vodex Labs/.test(sheet)) {
+    fail("enterprise pricing sheet must show $1,500–$10,000+ range");
+  } else ok("enterprise pricing sheet present ($1,500+)");
 
   const brand = await read(files.brandConfig);
   if (!/vodex\.dev/.test(brand) || !/APP_URL/.test(brand)) {

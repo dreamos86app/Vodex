@@ -71,7 +71,7 @@ const checks = {
   "preview-build-loading-is-beautiful-logo": () => {
     const p = read("src/components/create/workspace/build-preview-surface.tsx");
     if (!p.includes("preview-build-loading-beautiful")) fail("missing testid");
-    if (!p.includes("DreamOS86BrandIcon")) fail("missing logo");
+    if (!p.includes("VodexBrandIcon")) fail("missing logo");
     pass("beautiful preview loading");
   },
   "preview-loading-hides-technical-stage-text": () => {

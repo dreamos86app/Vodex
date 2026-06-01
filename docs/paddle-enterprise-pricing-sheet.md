@@ -33,11 +33,13 @@
 
 | Item | Details |
 |------|---------|
-| **Starting price** | **$499/month** |
-| **Typical range** | **$499–$2,999+/month** (usage-dependent) |
+| **Starting price** | **$1,500/month** |
+| **Typical range** | **$1,500–$10,000+/month** (usage-dependent) |
 | **Includes (varies by quote)** | Higher Build & Action credit pools, premium AI model access, advanced workspace limits, priority or dedicated support, custom SLAs, optional white-label / SSO (where offered) |
 | **Pricing drivers** | Required monthly credits, seats, model/runtime cost, infrastructure, support level, compliance needs |
 | **Contact** | support@vodex.dev |
+
+Custom / Enterprise plans are priced above self-serve Infinity VII because they include bespoke limits, support, and contractual terms not available on standard checkout.
 
 ---
 
