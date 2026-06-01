@@ -785,6 +785,11 @@ export async function POST(request: Request) {
           shell_only: false,
           hide_from_list: false,
           hide_from_home: false,
+          visibility_status:
+            prevBuildMeta.visibility_status === "draft_pending"
+              ? "draft_pending"
+              : (prevBuildMeta.visibility_status ?? "draft"),
+          hide_from_home_main: prevBuildMeta.hide_from_home_main === true,
         },
       } as never)
       .eq("id", projectId);

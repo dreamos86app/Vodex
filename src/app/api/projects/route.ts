@@ -15,6 +15,7 @@ import {
 import { isWeakIconSvg } from "@/lib/projects/ensure-project-icon";
 import { isUserVisibleProject } from "@/lib/projects/user-visible-projects";
 import { computeProjectCardStatus } from "@/lib/projects/project-card-status";
+import { computeProjectCardUiState } from "@/lib/projects/project-visibility-status";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,13 @@ export async function GET(request: Request) {
       build_status: row.build_status,
       metadata: metaObj,
     });
+    const ui = computeProjectCardUiState({
+      id: row.id,
+      build_status: row.build_status,
+      metadata: metaObj,
+      published_subdomain: row.published_subdomain,
+      preview_url: row.preview_url,
+    });
     const meta = LIFECYCLE_META[lifecycle];
     projects.push({
       ...row,
@@ -100,6 +108,10 @@ export async function GET(request: Request) {
       lifecycle_status: lifecycle,
       lifecycle_label: meta.userLabel,
       card_status,
+      visibility_status: ui.visibility_status,
+      visibility_section: ui.visibility_section,
+      status_label: ui.status_label,
+      status_description: ui.status_description,
       public_url: resolveDisplayPublicUrl(row),
       show_in_dashboard: meta.showInDashboard,
       can_open_builder: meta.canOpenBuilder,

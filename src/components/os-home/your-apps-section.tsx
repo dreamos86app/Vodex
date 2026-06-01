@@ -25,6 +25,10 @@ export type YourAppsProject = ProjectCardInput & {
   updated_at: string;
   build_status?: string | null;
   card_status?: ProjectCardStatus;
+  visibility_section?: string;
+  visibility_status?: string;
+  status_label?: string;
+  published_subdomain?: string | null;
   icon_url?: string | null;
   icon_svg?: string | null;
   banner_svg?: string | null;

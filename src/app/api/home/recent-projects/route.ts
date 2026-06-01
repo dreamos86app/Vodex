@@ -4,6 +4,7 @@ import { readBannerSvg, buildBannerForProject } from "@/lib/projects/backfill-pr
 import { ensureProjectIconSvg } from "@/lib/projects/ensure-project-icon";
 import { isUserVisibleProject } from "@/lib/projects/user-visible-projects";
 import { computeProjectCardStatus } from "@/lib/projects/project-card-status";
+import { computeProjectCardUiState } from "@/lib/projects/project-visibility-status";
 import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
 import { createClient } from "@/lib/supabase/server";
 
@@ -44,6 +45,13 @@ export async function GET() {
         build_status: row.build_status,
         metadata: meta,
       });
+      const ui = computeProjectCardUiState({
+        id: row.id,
+        build_status: row.build_status,
+        metadata: meta,
+        published_subdomain: row.published_subdomain,
+        preview_url: row.preview_url,
+      });
       return {
         id: row.id,
         name: displayName,
@@ -57,6 +65,9 @@ export async function GET() {
         banner_svg: readBannerSvg(row.metadata) ?? buildBannerForProject(row),
         build_status: row.build_status,
         card_status: cardStatus,
+        visibility_status: ui.visibility_status,
+        visibility_section: ui.visibility_section,
+        status_label: ui.status_label,
         published_subdomain: row.published_subdomain,
         metadata: meta,
         is_favorite: row.is_favorite ?? false,

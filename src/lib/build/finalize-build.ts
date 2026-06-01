@@ -5,6 +5,7 @@ import { refineAppName } from "@/lib/projects/project-context";
 import { completeBuildWithValidation } from "@/lib/build/complete-build-with-validation";
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { lifecyclePatch, legacyProjectStatus } from "@/lib/projects/project-lifecycle";
+import { hasMeaningfulProjectFiles } from "@/lib/projects/project-visibility-status";
 
 type Writer = SupabaseClient<Database>;
 
@@ -82,6 +83,8 @@ export async function finalizeBuildSuccess(input: FinalizeBuildInput): Promise<v
     shell_only: false,
     hide_from_list: false,
     hide_from_home: false,
+    hide_from_home_main: false,
+    visibility_status: completion.validationOk && completion.fileCount >= MIN_RENDERABLE_FILES ? "draft" : "draft",
     last_build_at: now,
     ...(buildJobId ? { last_build_id: buildJobId } : {}),
     builder: {
@@ -169,6 +172,7 @@ export async function finalizeBuildFailed(input: {
       cur?.metadata && typeof cur.metadata === "object" && !Array.isArray(cur.metadata)
         ? (cur.metadata as Record<string, unknown>)
         : {};
+    const meaningful = hasMeaningfulProjectFiles(prevMeta);
     await input.writer
       .from("projects")
       .update({
@@ -177,8 +181,10 @@ export async function finalizeBuildFailed(input: {
         metadata: {
           ...prevMeta,
           ...lifecyclePatch("failed", { error: input.errorMessage.slice(0, 500) }),
-          hide_from_list: true,
-          hide_from_home: true,
+          visibility_status: meaningful ? "draft" : "failed_attempt",
+          hide_from_list: !meaningful,
+          hide_from_home: !meaningful,
+          hide_from_home_main: !meaningful,
           shell_only: false,
         },
       } as never)

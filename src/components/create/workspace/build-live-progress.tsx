@@ -19,6 +19,7 @@ export function BuildLiveProgress({
   openerText?: string;
   projectId?: string;
 }) {
+  if (!progress) return null;
   return (
     <AgentWorkflowStream
       progress={progress}

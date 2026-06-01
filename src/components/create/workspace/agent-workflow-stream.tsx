@@ -224,16 +224,37 @@ export function AgentWorkflowStream({
     return () => clearInterval(t);
   }, [progress]);
 
-  const working = Boolean(progress && !progress.done);
-  const serverRaw = coalesceWorkflowStreamEvents(progress?.events ?? [], {
-    terminal: progress?.done ?? false,
+  const failed = Boolean(
+    progress &&
+      progress.done &&
+      (progress.status === "failed" || progress.latest?.type === "failed"),
+  );
+
+  React.useEffect(() => {
+    if (!failed || !adminDiagnostics || !projectId || !progress?.jobId) return;
+    void fetch(
+      `/api/projects/${projectId}/build-jobs/${progress.jobId}/diagnostics`,
+      { credentials: "include" },
+    )
+      .then((r) => r.json())
+      .then((body: { ok?: boolean; diagnostics?: BuildDiagnosticsPayload }) => {
+        if (body.ok && body.diagnostics) setDiagPayload(body.diagnostics);
+      })
+      .catch(() => undefined);
+  }, [failed, adminDiagnostics, projectId, progress?.jobId]);
+
+  if (!progress) return null;
+
+  const working = !progress.done;
+  const serverRaw = coalesceWorkflowStreamEvents(progress.events ?? [], {
+    terminal: progress.done,
   });
   const serverCollapsed = collapseRedundantPhaseStarted(serverRaw);
   const serverSequential = applySingleActiveWorkflowStep(serverCollapsed, working);
 
   const startedAt =
     buildStartedAtMs ??
-    (Date.parse(progress?.events[0]?.created_at ?? "") || now - 500);
+    (Date.parse(progress.events?.[0]?.created_at ?? "") || now - 500);
   const showAnalyzing =
     working &&
     (openerText?.toLowerCase().startsWith("analyzing") ?? false) &&
@@ -248,25 +269,7 @@ export function AgentWorkflowStream({
   const timelineRaw = applySingleActiveWorkflowStep(grouped, working).slice(-24);
   const timeline = useStaggeredWorkflowEvents(timelineRaw, working);
 
-  if (!progress) return null;
-
   const active = timeline.find((e) => e.status === "active");
-  const failed =
-    progress.done &&
-    (progress.status === "failed" || progress.latest?.type === "failed");
-
-  React.useEffect(() => {
-    if (!failed || !adminDiagnostics || !projectId || !progress?.jobId) return;
-    void fetch(
-      `/api/projects/${projectId}/build-jobs/${progress.jobId}/diagnostics`,
-      { credentials: "include" },
-    )
-      .then((r) => r.json())
-      .then((body: { ok?: boolean; diagnostics?: BuildDiagnosticsPayload }) => {
-        if (body.ok && body.diagnostics) setDiagPayload(body.diagnostics);
-      })
-      .catch(() => undefined);
-  }, [failed, adminDiagnostics, projectId, progress?.jobId]);
 
   return (
     <div className={cn("space-y-2.5", className)} data-testid="agent-workflow-stream">

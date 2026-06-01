@@ -2,6 +2,11 @@ import { create } from "zustand";
 import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
 import type { CanonicalCreditBucket, CanonicalCreditsPayload } from "@/lib/credits/canonical-credits";
 import { dispatchCreditUpdated } from "@/lib/credits/credit-events-client";
+import {
+  loadCreditsLocalCache,
+  markCreditsFirstPaint,
+  saveCreditsLocalCache,
+} from "@/lib/credits/credits-local-cache";
 
 export type { CanonicalCreditBucket, CanonicalCreditsPayload };
 
@@ -212,12 +217,19 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
     }, 1000);
 
     inFlightRequest = (async () => {
+      const controller = new AbortController();
+      let abortTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort(), 1000);
       try {
         const res = await fetch("/api/credits?lite=1", {
           credentials: "include",
           cache: "no-store",
+          signal: controller.signal,
           headers: { "X-Credit-Sync-Reason": reason ?? "sync" },
         });
+        if (abortTimer) {
+          clearTimeout(abortTimer);
+          abortTimer = undefined;
+        }
         if (!res.ok) throw new Error(`Failed to fetch credits (${res.status})`);
 
         const data = (await res.json()) as CanonicalCreditsPayload & {
@@ -248,19 +260,27 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         } else {
           set({ loading: false, syncing: false, lastSyncedAt: Date.now(), error: null, isConfirmed: true });
         }
+        const uid = typeof window !== "undefined" ? sessionStorage.getItem("vodex:last-user-id") : null;
+        if (uid) saveCreditsLocalCache(uid, payload);
         dispatchCreditUpdated(payload);
         logCreditSync(reason, "fetched ok");
         return payload;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Credit sync failed";
+        const aborted = err instanceof Error && err.name === "AbortError";
+        const msg = aborted
+          ? "Credit sync slow — showing cached values"
+          : err instanceof Error
+            ? err.message
+            : "Credit sync failed";
         set({
           loading: false,
-          syncing: hadDisplay,
-          error: hadDisplay ? null : msg,
+          syncing: true,
+          error: hadDisplay || aborted ? null : msg,
         });
         logCreditSync(reason, `error — ${msg}`);
         return null;
       } finally {
+        if (abortTimer) clearTimeout(abortTimer);
         clearTimeout(slowSyncTimer);
         inFlightRequest = null;
       }
@@ -283,6 +303,23 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
       }),
     ),
 }));
+
+/** Hydrate from localStorage before profile/API (instant paint). */
+export function hydrateCreditsFromLocalCache(userId: string): void {
+  const cached = loadCreditsLocalCache(userId);
+  if (!cached) return;
+  const state = useCreditsStore.getState();
+  if (state.isConfirmed) return;
+  useCreditsStore.getState().applyProfileSeed(cached);
+  markCreditsFirstPaint(userId);
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem("vodex:last-user-id", userId);
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 /** Refresh credits after charge/admin/plan change — single forced fetch. */
 export function refreshCredits(options?: CreditSyncOptions) {

@@ -1,5 +1,6 @@
 import { readLifecycleFromMetadata } from "@/lib/projects/project-lifecycle";
 import { isZipImportProject, readImportMeta } from "@/lib/projects/imported-project-state";
+import { isFailedAttemptProject, type ProjectCardUiInput } from "@/lib/projects/project-visibility-status";
 
 export type UserVisibleProjectRow = {
   id: string;
@@ -58,14 +59,20 @@ export function isUserVisibleProject(row: UserVisibleProjectRow): boolean {
   if (row.is_favorite) return true;
 
   const meta = (row.metadata ?? {}) as Record<string, unknown>;
-  if (
-    meta.create_flow_state === "project_ready" &&
-    typeof meta.initial_prompt === "string" &&
-    meta.initial_prompt.trim().length > 0
-  ) {
-    return true;
-  }
   if (meta.hide_from_list === true || meta.hide_from_home === true) return false;
+  if (meta.hide_from_home_main === true) return false;
+  if (meta.visibility_status === "archived") return false;
+
+  const uiInput: ProjectCardUiInput = {
+    id: row.id,
+    build_status: row.build_status,
+    metadata: meta,
+    published_subdomain: row.published_subdomain,
+    preview_url: row.preview_url,
+  };
+  if (isFailedAttemptProject(uiInput) && readFileCount(meta) === 0) {
+    return false;
+  }
   if (meta.shell_only === true) return false;
   if (meta.source === "question_only" || meta.intent === "question_only") return false;
 

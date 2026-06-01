@@ -211,6 +211,9 @@ export async function createProjectFromPrompt(
         style_preset_id: input.stylePresetId ?? "minimal",
         build_tier: input.buildTier ?? "standard",
         create_flow_state: "project_ready",
+        visibility_status: "draft_pending",
+        hide_from_home_main: true,
+        first_prompt_at: new Date().toISOString(),
         ...(resolvedIdempotency ? idempotencyMetadataPatch(resolvedIdempotency) : {}),
       }),
     } as never)

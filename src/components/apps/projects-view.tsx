@@ -32,6 +32,7 @@ import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { subscribeProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
 import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
 import type { ProjectCardStatus } from "@/lib/projects/project-card-status";
+import { computeProjectCardUiState } from "@/lib/projects/project-visibility-status";
 
 type ProjectRow = Omit<Project, "metadata"> & {
   metadata?: Record<string, unknown> | null;
@@ -45,6 +46,9 @@ type ProjectRow = Omit<Project, "metadata"> & {
   lifecycle_status?: string;
   lifecycle_label?: string;
   card_status?: ProjectCardStatus;
+  visibility_section?: string;
+  visibility_status?: string;
+  status_label?: string;
   public_url?: string | null;
   banner_svg?: string | null;
   is_favorite?: boolean;
@@ -394,6 +398,31 @@ export function ProjectsView() {
   const showEmpty =
     hasFetchedOnce && !loading && !authLoading && !loadError && filtered.length === 0 && !search && statusFilter === "all";
 
+  const { readyList, draftList } = React.useMemo(() => {
+    const ready: ProjectRow[] = [];
+    const drafts: ProjectRow[] = [];
+    for (const p of filtered) {
+      const section =
+        p.visibility_section ??
+        computeProjectCardUiState({
+          id: p.id,
+          build_status: p.build_status,
+          metadata: p.metadata as Record<string, unknown> | null,
+          published_subdomain: p.published_subdomain,
+          preview_url: p.preview_url,
+        }).visibility_section;
+      if (section === "ready" || p.is_favorite) ready.push(p);
+      else drafts.push(p);
+    }
+    return { readyList: ready, draftList: drafts };
+  }, [filtered]);
+
+  const gridClass = cn(
+    view === "grid"
+      ? "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      : "space-y-2",
+  );
+
   return (
     <motion.div
       variants={variants.staggerContainer}
@@ -572,14 +601,31 @@ export function ProjectsView() {
             description="Try a different search term or clear the filter."
           />
       ) : (
-        <div className={cn(
-          view === "grid"
-            ? "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-            : "space-y-2",
-        )}>
-          {filtered.map((p) => (
-            <ProjectCard key={p.id} project={p} onToggleFavorite={toggleFavorite} isAdmin={isAdmin} />
-          ))}
+        <div className="space-y-8" data-testid="apps-sectioned-list">
+          {readyList.length > 0 ? (
+            <section data-testid="apps-ready-section">
+              <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                Ready apps
+              </h2>
+              <div className={gridClass}>
+                {readyList.map((p) => (
+                  <ProjectCard key={p.id} project={p} onToggleFavorite={toggleFavorite} isAdmin={isAdmin} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {draftList.length > 0 ? (
+            <section data-testid="apps-drafts-section">
+              <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                Drafts
+              </h2>
+              <div className={gridClass}>
+                {draftList.map((p) => (
+                  <ProjectCard key={p.id} project={p} onToggleFavorite={toggleFavorite} isAdmin={isAdmin} />
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       )}
     </motion.div>

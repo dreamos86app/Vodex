@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { YourAppsSection, type YourAppsProject } from "@/components/os-home/your-apps-section";
+import { DraftsSection } from "@/components/os-home/drafts-section";
 import { useHomeRecentProjects } from "@/components/os-home/use-home-recent-projects";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { storeAutostartHandoff } from "@/lib/create/autostart-handoff";
@@ -442,12 +443,16 @@ function PlatformStats({ appCount }: { appCount: number }) {
     <div className="flex items-center gap-4 text-[11.5px] text-muted-foreground/70">
       <span className="flex items-center gap-1.5">
         <LayoutGrid className="size-3" strokeWidth={1.75} />
-        {appCount} app{appCount !== 1 ? "s" : ""}
+        {appCount} ready app{appCount !== 1 ? "s" : ""}
       </span>
       {hydrated && (
         <span className="flex items-center gap-1.5">
           <Zap className="size-3 text-accent/70" strokeWidth={1.75} />
-          {isConfirmed ? `${credits} credits` : loading ? "Loading credits…" : "—"}
+          {credits > 0 || isConfirmed
+            ? `${credits} credits`
+            : loading
+              ? "Syncing credits…"
+              : "—"}
         </span>
       )}
     </div>
@@ -472,6 +477,27 @@ const heroItem = {
 export function OsHome() {
   const searchParams = useSearchParams();
   const { projects: recentProjects } = useHomeRecentProjects();
+  const { readyApps, draftApps } = React.useMemo(() => {
+    const ready: YourAppsProject[] = [];
+    const drafts: YourAppsProject[] = [];
+    for (const p of recentProjects) {
+      const section = (p as YourAppsProject & { visibility_section?: string }).visibility_section;
+      if (section === "drafts" || section === "failed_attempts") {
+        drafts.push(p);
+      } else if (section === "ready" || p.is_favorite) {
+        ready.push(p);
+      } else if (
+        p.card_status === "ready" ||
+        Boolean(p.published_subdomain) ||
+        Boolean((p.metadata as Record<string, unknown> | undefined)?.published_subdomain)
+      ) {
+        ready.push(p);
+      } else {
+        drafts.push(p);
+      }
+    }
+    return { readyApps: ready, draftApps: drafts };
+  }, [recentProjects]);
   const { profile, user } = useAuthStore();
   const display = resolveDisplayName(profile, user);
   const firstName = display !== "User" ? display.split(/\s+/)[0] : null;
@@ -543,7 +569,7 @@ export function OsHome() {
               What are you building today?
             </motion.p>
             <motion.div variants={heroItem} className="relative mt-5 flex justify-center">
-              <PlatformStats appCount={recentProjects.length} />
+              <PlatformStats appCount={readyApps.length} />
             </motion.div>
           </motion.div>
         </motion.div>
@@ -552,8 +578,9 @@ export function OsHome() {
           <QuickCreateBar value={quickPrompt} onChange={setQuickPrompt} inputRef={quickInputRef} />
         </div>
 
-        <div className="mx-auto w-full max-w-5xl">
-          <YourAppsSection projects={recentProjects} />
+        <div className="mx-auto w-full max-w-5xl space-y-10">
+          <YourAppsSection projects={readyApps} />
+          <DraftsSection projects={draftApps} />
         </div>
 
         {/* App inspiration feed */}

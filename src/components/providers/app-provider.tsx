@@ -27,6 +27,8 @@ import {
   setCachedBootstrap,
 } from "@/lib/cache/session-bootstrap-cache";
 import { seedCreditsFromProfile } from "@/lib/credits/seed-credits-from-profile";
+import { hydrateCreditsFromLocalCache } from "@/lib/stores/credits-store";
+import { markCreditsFirstPaint } from "@/lib/credits/credits-local-cache";
 import {
   loadUserProfileCoreDeduped,
 } from "@/lib/supabase/load-user-profile";
@@ -64,8 +66,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!profile?.id) return;
+    hydrateCreditsFromLocalCache(profile.id);
     const { isConfirmed } = useCreditsStore.getState();
     if (!isConfirmed) seedCreditsFromProfile(profile);
+    markCreditsFirstPaint(profile.id);
   }, [profile?.id, profile?.plan_id, profile]);
 
   React.useEffect(() => {
