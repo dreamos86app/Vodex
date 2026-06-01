@@ -120,22 +120,10 @@ function useSessionComposerIdeas(count: number) {
 
 function AmbientOrbs() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
-      <motion.div
-        className="absolute -top-32 -left-20 size-[600px] rounded-full bg-gradient-radial from-accent/[0.08] to-transparent blur-3xl"
-        animate={{ x: [0, 30, 0], y: [0, -20, 0], scale: [1, 1.05, 1] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute top-[40%] -right-32 size-[500px] rounded-full bg-gradient-radial from-sky-400/[0.06] to-transparent blur-3xl"
-        animate={{ x: [0, -25, 0], y: [0, 30, 0], scale: [1, 1.08, 1] }}
-        transition={{ duration: 28, repeat: Infinity, ease: "easeInOut", delay: 5 }}
-      />
-      <motion.div
-        className="absolute -bottom-20 left-1/3 size-[400px] rounded-full bg-gradient-radial from-blue-500/[0.06] to-transparent blur-3xl"
-        animate={{ x: [0, 20, 0], y: [0, -15, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-      />
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden motion-reduce:hidden" aria-hidden>
+      <div className="absolute -top-32 -left-20 size-[600px] rounded-full bg-accent/[0.06] blur-3xl" />
+      <div className="absolute top-[40%] -right-32 size-[500px] rounded-full bg-sky-400/[0.05] blur-3xl" />
+      <div className="absolute -bottom-20 left-1/3 size-[400px] rounded-full bg-blue-500/[0.05] blur-2xl" />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useIdleReady } from "@/lib/hooks/use-idle-ready";
 import { subscribeCreditUpdated } from "@/lib/credits/credit-events-client";
 import {
   CREDITS_BACKGROUND_STALE_MS,
@@ -12,10 +13,12 @@ import {
  * multiple components each subscribing and refetching independently.
  */
 export function useCreditsSync(enabled: boolean) {
+  const idleReady = useIdleReady(180);
   const applyCanonical = useCreditsStore((s) => s.applyCanonical);
   const syncFromDB = useCreditsStore((s) => s.syncFromDB);
   const bootstrapped = useRef(false);
   const lastEnabled = useRef(false);
+  const syncEnabled = enabled && idleReady;
 
   useEffect(() => {
     return subscribeCreditUpdated((payload) => {
@@ -28,8 +31,8 @@ export function useCreditsSync(enabled: boolean) {
   }, [applyCanonical, syncFromDB]);
 
   useEffect(() => {
-    if (!enabled) {
-      lastEnabled.current = false;
+    if (!syncEnabled) {
+      if (!enabled) lastEnabled.current = false;
       return;
     }
     const shouldBootstrap = !bootstrapped.current || !lastEnabled.current;
@@ -41,10 +44,10 @@ export function useCreditsSync(enabled: boolean) {
         void syncFromDB({ force: true, reason: "bootstrap" });
       }
     });
-  }, [enabled, syncFromDB]);
+  }, [syncEnabled, enabled, syncFromDB]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!syncEnabled) return;
 
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
@@ -56,5 +59,5 @@ export function useCreditsSync(enabled: boolean) {
 
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [enabled, syncFromDB]);
+  }, [syncEnabled, syncFromDB]);
 }

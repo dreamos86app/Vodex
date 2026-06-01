@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { PricingPageShell } from "@/components/pricing/pricing-page-shell";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Pricing",
   description:

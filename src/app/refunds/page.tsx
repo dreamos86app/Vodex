@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { LegalDocumentShell } from "@/components/marketing/legal-document-shell";
 import { RefundContent } from "@/components/marketing/legal/refund-content";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Refund Policy",
   description:

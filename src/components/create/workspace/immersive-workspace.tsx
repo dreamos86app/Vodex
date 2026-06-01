@@ -1597,7 +1597,6 @@ export function ImmersiveWorkspace({
 
       if (submitMode === "build" && isQuestion) {
         submitMode = "discuss";
-        setMode("discuss");
         setLockedTaskMode("discuss");
         setBuildStarting(false);
       }
@@ -1632,7 +1631,8 @@ export function ImmersiveWorkspace({
           // Defer URL replace until async build is enqueued — early navigation aborts submit.
         } else if (!created.ok && created.code === "question_only") {
           submitMode = "discuss";
-          setMode("discuss");
+          setLockedTaskMode("discuss");
+          setBuildStarting(false);
         }
       } else if (planFirstPlanning) {
         pushRuntimeDiagnostic("project_create_deferred_plan_first", { operationId: opId });
@@ -1745,9 +1745,10 @@ export function ImmersiveWorkspace({
           ],
           body: {
             modelId,
-            mode: "build",
-            strategy: "build_now",
-            forceBuildPipeline: true,
+            mode: submitMode,
+            mode_at_submit: submitMode,
+            strategy: submitMode === "build" ? "build_now" : undefined,
+            forceBuildPipeline: submitMode === "build",
             planFirstOnly: false,
             projectId: asyncProjectId,
             conversationId: conversationIdRef.current ?? undefined,

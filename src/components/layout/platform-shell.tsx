@@ -4,8 +4,11 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Compass, MessageSquare, Users, LayoutGrid } from "lucide-react";
-import { Sidebar } from "@/components/layout/sidebar";
-import { TopBar } from "@/components/layout/top-bar";
+import {
+  DeferredMobileNav,
+  DeferredSidebar,
+  DeferredTopBar,
+} from "@/components/layout/deferred-shell-chrome";
 import { AdminDiagnosticsDrawer } from "@/components/dev/admin-diagnostics-drawer";
 import { DiagnosticsBootstrap } from "@/components/dev/diagnostics-bootstrap";
 import { cn } from "@/lib/utils";
@@ -231,14 +234,14 @@ export function PlatformShell({
     // not the entire page — sidebar and topbar remain perfectly fixed.
     <div className="relative flex h-[100dvh] overflow-hidden bg-background">
       <AmbientOrbs />
-      <Sidebar
+      <DeferredSidebar
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
       />
 
       {/* Right column: topbar + scrollable content */}
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopBar
+        <DeferredTopBar
           mode={isCreateHome ? "create" : "standard"}
           title={meta.title}
           subtitle={meta.subtitle}

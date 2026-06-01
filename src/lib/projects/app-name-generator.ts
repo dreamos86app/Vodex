@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { callProviderStructured, parseJsonFromModel } from "@/lib/ai/provider-call";
 import { slugifyAppName } from "@/lib/creation/parse-builder-metadata";
-import { stripMarkdownNoise } from "@/lib/projects/project-context";
+import { cleanAppName, stripMarkdownNoise } from "@/lib/projects/clean-app-name";
 
 export type AppNameResult = {
   appName: string;
@@ -13,7 +13,9 @@ export type AppNameResult = {
 };
 
 const BAD_NAME_RE =
-  /^(my app|dashboard|saas app|untitled|new app|new build|app|application|dream app|viteapp|nextcrm|reactbuilder)$/i;
+  /^(my app|dashboard|saas app|untitled|new app|new build|app|application|dream app|viteapp|nextcrm|reactbuilder|platform|builder)$/i;
+const KEYWORD_SPAM_RE =
+  /\b(with|customizable|meditation|management|inventory)\b/i;
 const QUESTION_RE = /^(how|what|which|why|when|where|should|can|do|does|is|are)\b/i;
 const BUILD_VERB_RE = /^(build|create|make|develop|design)\s+(me\s+)?(a|an|the)\s+/i;
 
@@ -46,13 +48,13 @@ function normalizeBuildIntent(raw: string): string {
 }
 
 function isValidAppName(name: string, intent: string): boolean {
-  const trimmed = stripMarkdownNoise(name);
-  if (!trimmed || trimmed.length < 2 || trimmed.length > 24) return false;
+  const trimmed = cleanAppName(stripMarkdownNoise(name), intent);
+  if (!trimmed || trimmed.length < 3 || trimmed.length > 24) return false;
   if (BAD_NAME_RE.test(trimmed)) return false;
   if (QUESTION_RE.test(trimmed)) return false;
+  if (KEYWORD_SPAM_RE.test(trimmed)) return false;
   if (/react|next|vite|typescript|javascript|tailwind/i.test(trimmed)) return false;
-  const wordCount = trimmed.split(/\s+/).length;
-  if (wordCount > 3) return false;
+  if (/\b(app|platform|dashboard|builder)\b/i.test(trimmed)) return false;
   const intentNorm = intent.trim().toLowerCase();
   if (intentNorm.length > 12 && intentNorm.includes(trimmed.toLowerCase())) return false;
   return true;
@@ -111,12 +113,12 @@ export async function generateAppName(input: {
         'Return JSON: {"appName":"StockBite","shortDescription":"Restaurant inventory management","namingConfidence":0.92}',
         "",
         "Rules:",
-        "- 1-2 words max, 3-18 characters preferred",
-        "- Easy to pronounce, memorable, professional",
-        "- Match app purpose, audience, and tone",
+        "- Single brandable compound word (3-18 chars), like Zenora, Lumis, FlowDesk, Velora, Kairo",
+        "- Easy to pronounce, memorable, YC-startup quality",
+        "- Match niche and vibe — never copy raw prompt words",
+        "- Never use: App, Platform, Dashboard, Builder, With, Management",
         "- No generic names (My App, Dashboard, SaaS App)",
-        "- No raw user prompt, no question text, no framework names",
-        "- No offensive or trademark-looking names",
+        "- No question text, no framework names",
         "",
         `Build intent:\n${intent}`,
         input.planSummary ? `\nPlan summary:\n${input.planSummary.slice(0, 800)}` : "",
@@ -131,7 +133,7 @@ export async function generateAppName(input: {
     }>(res.text);
     const candidate = parsed?.appName?.trim() ?? "";
     if (isValidAppName(candidate, intent)) {
-      const appName = stripMarkdownNoise(candidate);
+      const appName = cleanAppName(stripMarkdownNoise(candidate), intent);
       const slug = await ensureUniqueSlug(input.writer, slugifyAppName(appName), input.projectId);
       return {
         appName,

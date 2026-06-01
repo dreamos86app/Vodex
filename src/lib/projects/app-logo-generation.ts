@@ -59,13 +59,25 @@ export function buildLogoPrompt(input: {
     ].join(" ");
   }
   return [
-    `A premium modern app icon for ${input.appName}, ${purpose}.`,
-    "1024x1024 square, full-bleed circular-safe app icon.",
-    "Centered subject fills most of the frame (object-fit cover style).",
-    "No text, no letters, no watermark, no border, no white background, no padding frame.",
-    "Vivid gradient or rich color field edge-to-edge; works inside circular and rounded masks.",
-    "High contrast, minimal but memorable, app-store ready.",
+    `A premium modern circular app icon for ${input.appName}, ${purpose}.`,
+    "1024x1024 square, centered symbol fills 88% of frame with safe padding for circular mask.",
+    "Perfect circle crop safe — no corners cut off, no white border, no empty margin ring.",
+    "Full-bleed vibrant gradient background edge-to-edge; maskable icon composition.",
+    "No text, no letters, no watermark, no square frame, no drop shadow outside circle.",
+    "iOS/Android app store style, high contrast, minimal, professional.",
   ].join(" ");
+}
+
+async function applyCircularMask(buffer: Buffer): Promise<Buffer> {
+  const size = 1024;
+  const mask = Buffer.from(
+    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg"><circle cx="512" cy="512" r="512" fill="white"/></svg>`,
+  );
+  return sharp(buffer)
+    .resize(size, size, { fit: "cover", position: "centre" })
+    .composite([{ input: mask, blend: "dest-in" }])
+    .png()
+    .toBuffer();
 }
 
 /** True when OpenAI image generation can run (key present, not kill-switched). */
@@ -148,15 +160,16 @@ async function uploadLogoDerivatives(
   if (!bucket.ok) throw new Error(bucket.error);
 
   const basePath = `${projectId}/${operationId}`;
-  const normalized = await sharp(source)
-    .flatten({ background: { r: 0, g: 0, b: 0 } })
-    .trim({ threshold: 12 })
+  const flattened = await sharp(source)
+    .flatten({ background: { r: 15, g: 23, b: 42 } })
     .resize(1024, 1024, { fit: "cover", position: "centre" })
     .png()
     .toBuffer()
     .catch(() => source);
 
-  const png1024 = await sharp(normalized).resize(1024, 1024, { fit: "cover", position: "centre" }).png().toBuffer();
+  const normalized = await applyCircularMask(flattened).catch(() => flattened);
+
+  const png1024 = normalized;
   const png512 = await sharp(source).resize(512, 512, { fit: "cover" }).png().toBuffer();
   const png192 = await sharp(source).resize(192, 192, { fit: "cover" }).png().toBuffer();
   const png180 = await sharp(source).resize(180, 180, { fit: "cover" }).png().toBuffer();

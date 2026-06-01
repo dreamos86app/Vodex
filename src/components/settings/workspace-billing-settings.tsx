@@ -93,7 +93,7 @@ export function WorkspaceBillingSettings({ workspaceId, canManage = false }: Pro
   return (
     <SectionCard
       title="Workspace AI billing"
-      description="Controls whose credits are used when teammates run AI in this workspace. Server-enforced — the UI cannot spoof billing targets."
+      description="Controls whose credits are used when teammates run AI in this workspace. Default: each member uses their own credits."
     >
       {loading ? (
         <div className="flex items-center gap-2 py-6 text-[13px] text-muted-foreground">

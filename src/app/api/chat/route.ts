@@ -253,6 +253,7 @@ export async function POST(request: Request) {
     modelId?: string;
     conversationId?: string;
     mode?: "discuss" | "edit" | "build";
+    mode_at_submit?: "discuss" | "edit" | "build";
     scope?: string | null;
     editTarget?: string | null;
     projectId?: string;
@@ -305,8 +306,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const mode: "discuss" | "edit" | "build" =
-    raw.mode === "edit" ? "edit" : raw.mode === "build" ? "build" : "discuss";
+  const modeAtSubmit: "discuss" | "edit" | "build" =
+    raw.mode_at_submit === "edit" || raw.mode_at_submit === "build" || raw.mode_at_submit === "discuss"
+      ? raw.mode_at_submit
+      : raw.mode === "edit"
+        ? "edit"
+        : raw.mode === "build"
+          ? "build"
+          : "discuss";
+  const mode = modeAtSubmit;
   const scope =
     typeof raw.editTarget === "string" && raw.editTarget.trim()
       ? raw.editTarget.trim()
@@ -441,6 +449,10 @@ export async function POST(request: Request) {
   }
   if (forceBuildPipeline && explicitStrategy === "build_now" && mode === "build" && userTextEarly.trim()) {
     startBuildPipeline = true;
+    planFirstOnly = false;
+  }
+  if (modeAtSubmit === "discuss") {
+    startBuildPipeline = false;
     planFirstOnly = false;
   }
   const firstCreateIntent =
@@ -792,6 +804,7 @@ export async function POST(request: Request) {
         error_message: null,
         meta: {
           model_id: modelId,
+          mode_at_submit: modeAtSubmit,
           intent: buildIntent?.intent,
           intent_confidence: buildIntent?.confidence,
           intent_reason: buildIntent?.reason,
@@ -823,7 +836,7 @@ export async function POST(request: Request) {
         credits_used: 0,
         model_id: modelId,
         attachments: attachmentsJson,
-        metadata: { operation_id: opId, mode } as never,
+        metadata: { operation_id: opId, mode: modeAtSubmit, mode_at_submit: modeAtSubmit } as never,
       })
       .select("id")
       .single();
@@ -1241,7 +1254,13 @@ export async function POST(request: Request) {
             finish_reason: event.finishReason,
             tokens_input: event.usage?.inputTokens ?? null,
             tokens_output: event.usage?.outputTokens ?? null,
-            metadata: { mode, scope, projectId, billing: "pending" } as never,
+            metadata: {
+              mode: modeAtSubmit,
+              mode_at_submit: modeAtSubmit,
+              scope,
+              projectId,
+              billing: "pending",
+            } as never,
           });
           if (asstErr) {
             outputSaved = false;

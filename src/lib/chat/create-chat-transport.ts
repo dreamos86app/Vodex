@@ -7,6 +7,8 @@ import { createChatFetch } from "@/lib/chat/create-chat-fetch";
 export type ChatTransportBody = {
   modelId: string;
   mode: "discuss" | "edit" | "build";
+  /** Frozen at submit — server uses this as authoritative task mode. */
+  mode_at_submit?: "discuss" | "edit" | "build";
   /** Explicit build strategy for server routing (never infer plan-first from prompt heuristics alone). */
   strategy?: "build_now" | "plan_first";
   /** When true with strategy=build_now, server must enqueue async build (not discuss/plan). */
