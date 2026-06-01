@@ -38,7 +38,7 @@ export function WorkflowStepCard({
       className={cn(
         "mr-6 max-w-md rounded-xl px-3 py-2 text-[11px] transition-all sm:mr-10",
         active &&
-          "border border-amber-400/55 bg-amber-500/[0.06] shadow-[0_0_0_1px_rgba(251,191,36,0.15),0_0_18px_-4px_rgba(251,191,36,0.35)]",
+          "animate-[workflow-gold-pulse_2s_ease-in-out_infinite] border border-amber-400/60 bg-amber-500/[0.07] shadow-[0_0_0_1px_rgba(251,191,36,0.2),0_0_20px_-2px_rgba(251,191,36,0.45)]",
         completed && "border border-transparent opacity-80",
         failed && "border border-destructive/45 bg-destructive/[0.06]",
         status === "pending" && "border border-transparent opacity-55",

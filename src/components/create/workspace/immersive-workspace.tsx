@@ -59,6 +59,12 @@ import { PreviewBlockedPopup, type PreviewBlockingIssue } from "@/components/pre
 import { RepairCenter } from "@/components/repair/repair-center";
 import { buildRepairChatPrompt } from "@/lib/repair/repair-chat-prompt";
 import { BuildLiveProgress } from "@/components/create/workspace/build-live-progress";
+import { AdminDiagnosticsFab } from "@/components/create/workspace/admin-diagnostics-fab";
+import {
+  persistWorkspaceTask,
+  readWorkspaceTask,
+  clearWorkspaceTask,
+} from "@/lib/create/workspace-task-persistence";
 import {
   deriveBuildStatusFacts,
   resolveBuildRunSummary,
@@ -384,6 +390,7 @@ export function ImmersiveWorkspace({
     creditsUsed?: number;
     remainingSummary?: string;
     errorMessage?: string;
+    failureCode?: string;
     refunded?: boolean;
     showRefundLine?: boolean;
     showRepairActions?: boolean;
@@ -508,9 +515,11 @@ export function ImmersiveWorkspace({
     }
   }, [effectiveProject?.id, effectiveProject?.metadata]);
   const modeRef = React.useRef(mode);
+  const lockedTaskModeRef = React.useRef<CreationMode | null>(null);
   const scopeRef = React.useRef<EditScope | null>(scope);
   const editTargetRef = React.useRef<string | null>(null);
   modeRef.current = mode;
+  lockedTaskModeRef.current = lockedTaskMode ?? mode;
   scopeRef.current = scope;
   editTargetRef.current = editTarget;
 
@@ -524,12 +533,15 @@ export function ImmersiveWorkspace({
     () =>
       createDreamChatTransport({
         label: "create",
-        getBody: () => ({
+        getBody: () => {
+          const taskMode = lockedTaskModeRef.current ?? modeRef.current;
+          return {
           modelId: modelIdRef.current,
-          mode: modeRef.current,
-          strategy: modeRef.current === "build" ? buildStrategyRef.current : undefined,
+          mode: taskMode,
+          mode_at_submit: taskMode,
+          strategy: taskMode === "build" ? buildStrategyRef.current : undefined,
           forceBuildPipeline:
-            modeRef.current === "build" && buildStrategyRef.current === "build_now",
+            taskMode === "build" && buildStrategyRef.current === "build_now",
           scope: scopeRef.current ?? undefined,
           editTarget: editTargetRef.current ?? undefined,
           projectId: projectIdRef.current ?? undefined,
@@ -540,8 +552,9 @@ export function ImmersiveWorkspace({
           planFirstOnly:
             buildStrategyRef.current === "plan_first" &&
             !blueprintApprovedRef.current &&
-            modeRef.current === "build",
-        }),
+            taskMode === "build",
+        };
+        },
         on402: () => setCreditError(true),
         onSuccess: () => setCreditError(false),
         onFetchStart: (url) => {
@@ -674,7 +687,27 @@ export function ImmersiveWorkspace({
   const clearBuildJob = React.useCallback(() => {
     buildJobActiveRef.current = false;
     setActiveBuildJob(null);
+    if (projectIdRef.current) clearWorkspaceTask(projectIdRef.current);
   }, []);
+
+  React.useEffect(() => {
+    const pid = effectiveProjectId;
+    if (!pid || activeBuildJob) return;
+    const cached = readWorkspaceTask(pid);
+    if (cached?.buildJobId && cached.eventsUrl) {
+      buildJobActiveRef.current = true;
+      setActiveBuildJob({
+        jobId: cached.buildJobId,
+        eventsUrl: cached.eventsUrl,
+        operationId: cached.operationId ?? "",
+      });
+      if (cached.lockedMode) {
+        setLockedTaskMode(cached.lockedMode);
+        lockedTaskModeRef.current = cached.lockedMode;
+      }
+      if (cached.buildStartedAtMs) buildStartedAtRef.current = cached.buildStartedAtMs;
+    }
+  }, [effectiveProjectId, activeBuildJob]);
 
   const drainPromptQueueRef = React.useRef<() => void>(() => {});
   const pipelineBusyForQueueRef = React.useRef(false);
@@ -846,6 +879,11 @@ export function ImmersiveWorkspace({
             : undefined,
         remainingSummary: terminal.latest?.detail ?? undefined,
         errorMessage: terminal.error ?? terminal.latest?.detail ?? undefined,
+        failureCode:
+          (typeof meta.preview_failure_code === "string" && meta.preview_failure_code) ||
+          (typeof meta.preview_error_code === "string" && meta.preview_error_code) ||
+          (typeof meta.code === "string" && meta.code) ||
+          undefined,
         refunded: summary.showRefundLine,
         showRefundLine: summary.showRefundLine,
         showRepairActions: summary.showRepairActions,
@@ -914,6 +952,7 @@ export function ImmersiveWorkspace({
               setBuildStarting(false);
             });
         }
+        if (pid) clearWorkspaceTask(pid);
         if (pid && uid) {
           void reconcileProjectBuildState(supabase, pid, uid).then(() => {
             setProjectDataRefresh((n) => n + 1);
@@ -1550,10 +1589,11 @@ export function ImmersiveWorkspace({
 
     submitInFlightRef.current = true;
     let submitModeEarly = mode;
-    if (messages.length === 0 && mode !== "build") {
+    if (messages.length === 0 && mode !== "build" && !effectiveProjectId) {
       submitModeEarly = "build";
     }
     setLockedTaskMode(submitModeEarly);
+    lockedTaskModeRef.current = submitModeEarly;
     if (submitModeEarly === "build") {
       setBuildStarting(true);
       buildStartedAtRef.current = Date.now();
@@ -1576,7 +1616,7 @@ export function ImmersiveWorkspace({
       return;
     }
 
-    if (messages.length === 0 && mode !== "build") {
+    if (messages.length === 0 && mode !== "build" && !effectiveProjectId) {
       setMode("build");
       failSubmit("first_prompt_build_only", "First prompt must use Build mode.");
       setSubmitStatusLabel("Use Build mode for your first prompt");
@@ -1588,6 +1628,7 @@ export function ImmersiveWorkspace({
     try {
       let submitMode = mode;
       setLockedTaskMode(submitMode);
+      lockedTaskModeRef.current = submitMode;
       const activeProjectId = projectIdRef.current ?? effectiveProjectId;
       const isQuestion =
         !activeProjectId &&
@@ -1763,10 +1804,19 @@ export function ImmersiveWorkspace({
           setConversationId(enqueued.conversationId);
         }
         buildJobActiveRef.current = true;
-        setActiveBuildJob({
+        const job = {
           jobId: enqueued.buildJobId!,
           eventsUrl: enqueued.eventsUrl!,
           operationId: enqueued.operationId ?? opId,
+        };
+        setActiveBuildJob(job);
+        persistWorkspaceTask({
+          projectId: asyncProjectId,
+          buildJobId: job.jobId,
+          eventsUrl: job.eventsUrl,
+          operationId: job.operationId,
+          lockedMode: submitMode,
+          buildStartedAtMs: buildStartedAtRef.current ?? Date.now(),
         });
         setLastApiStatus("ok");
         setChatState("ok");
@@ -2569,7 +2619,9 @@ export function ImmersiveWorkspace({
               </AnimatePresence>
 
               {showOptimisticAssistant &&
-                (pendingUserBubble || isBusy || buildStarting || buildJobActive) && (
+                (pendingUserBubble ||
+                  isBusy ||
+                  ((buildStarting || buildJobActive) && activeMode === "build")) && (
                 <OptimisticAssistantRow
                   mode={
                     (lockedTaskMode ?? mode) === "discuss"
@@ -2612,6 +2664,7 @@ export function ImmersiveWorkspace({
                   creditsUsed={buildRunSummary.creditsUsed}
                   remainingSummary={buildRunSummary.remainingSummary}
                   errorMessage={buildRunSummary.errorMessage}
+                  failureCode={buildRunSummary.failureCode}
                   refunded={buildRunSummary.refunded}
                   showRefundLine={buildRunSummary.showRefundLine}
                   showRepairActions={buildRunSummary.showRepairActions}
@@ -3109,6 +3162,18 @@ export function ImmersiveWorkspace({
           </div>
         </div>
       </div>
+
+      <AdminDiagnosticsFab
+        projectId={effectiveProjectId}
+        buildJobId={activeBuildJob?.jobId ?? null}
+        slowBanner={
+          buildJobActive && buildStartedAtRef.current
+            ? Date.now() - buildStartedAtRef.current > 120_000
+              ? `Slow build: ${Math.round((Date.now() - buildStartedAtRef.current) / 1000)}s — open diagnostics`
+              : null
+            : null
+        }
+      />
 
       {showFreeWatermark && (
         <div

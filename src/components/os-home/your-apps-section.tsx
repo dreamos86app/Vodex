@@ -7,17 +7,24 @@ import { cn } from "@/lib/utils";
 import { ProjectIcon } from "@/components/projects/project-icon";
 import { ProjectBanner } from "@/components/projects/project-banner";
 import {
+  getProjectCardActions,
   getProjectCardStatus,
   getUserSafeProjectBadges,
   isImportedAppWithoutPreview,
+  resolveProjectCardStatus,
   type ProjectCardInput,
 } from "@/lib/projects/user-safe-project-badges";
+import type { ProjectCardStatus } from "@/lib/projects/project-card-status";
+import { isDreamosOwnerEmail } from "@/lib/admin-owner";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { projectIconSrc } from "@/lib/projects/ensure-project-icon";
 
 export type YourAppsProject = ProjectCardInput & {
   name: string;
   gradient: string;
   updated_at: string;
+  build_status?: string | null;
+  card_status?: ProjectCardStatus;
   icon_url?: string | null;
   icon_svg?: string | null;
   banner_svg?: string | null;
@@ -25,6 +32,8 @@ export type YourAppsProject = ProjectCardInput & {
 };
 
 export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
+  const { user, profile } = useAuthStore();
+  const isAdmin = isDreamosOwnerEmail(user?.email ?? profile?.email);
   const hasApps = projects.length > 0;
 
   return (
@@ -52,8 +61,13 @@ export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
           {projects.slice(0, 12).map((p, i) => {
             const status = getProjectCardStatus(p);
             const badges = getUserSafeProjectBadges(p, { mode: "user" });
+            const actions = getProjectCardActions(p, { isAdmin });
             const iconSrc = projectIconSrc(p.id, p.icon_svg, p.icon_url);
             const importedPending = isImportedAppWithoutPreview(p);
+            const cardStatus = resolveProjectCardStatus(p);
+            const showPreview = cardStatus === "ready" && Boolean(p.preview_url);
+            const showStatusCtas =
+              cardStatus === "preview_failed" || cardStatus === "failed" || isAdmin;
             return (
               <motion.div
                 key={p.id}
@@ -61,18 +75,19 @@ export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.05 }}
+                className="flex h-full flex-col overflow-hidden rounded-xl bg-surface ring-1 ring-border/70 transition hover:ring-accent/30"
               >
                 <Link
                   href={`/apps/${p.id}/builder`}
-                  className="group flex h-full flex-col overflow-hidden rounded-xl bg-surface ring-1 ring-border/70 transition hover:ring-accent/30"
+                  className="group flex flex-1 flex-col"
                 >
                   <ProjectBanner
                     projectId={p.id}
                     bannerSvg={p.banner_svg}
-                    previewUrl={p.preview_url}
+                    previewUrl={showPreview ? p.preview_url : null}
                     title={p.name}
                     heightClass="h-[108px]"
-                    previewOnly={!p.preview_url}
+                    previewOnly={!showPreview}
                     importedPendingSetup={importedPending}
                     iconSrc={iconSrc}
                   />
@@ -119,6 +134,24 @@ export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
                     </div>
                   </div>
                 </Link>
+                {showStatusCtas ? (
+                  <div className="flex flex-wrap gap-1.5 border-t border-border/50 px-3 py-2">
+                    <Link
+                      href={actions.primary.href}
+                      className="rounded-md bg-accent/10 px-2 py-0.5 text-[9px] font-semibold text-accent ring-1 ring-accent/20"
+                    >
+                      {actions.primary.label}
+                    </Link>
+                    {actions.secondary ? (
+                      <Link
+                        href={actions.secondary.href}
+                        className="rounded-md bg-muted/80 px-2 py-0.5 text-[9px] font-medium text-muted-foreground"
+                      >
+                        {actions.secondary.label}
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
               </motion.div>
             );
           })}

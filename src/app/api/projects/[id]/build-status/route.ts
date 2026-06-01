@@ -10,6 +10,7 @@ import {
   isPreviewFailureCode,
   type PreviewFailureCode,
 } from "@/lib/preview/preview-failure-codes";
+import { computeProjectCardStatus } from "@/lib/projects/project-card-status";
 
 export const dynamic = "force-dynamic";
 
@@ -58,17 +59,15 @@ export async function GET(
     project.build_status === "preview_failed" || Boolean(meta.files_ready_preview_failed);
   const previewRenderable = integrity.previewRenderable && !previewFailed;
 
-  let cardStatus: "building" | "preview_preparing" | "preview_failed" | "ready" | "failed" =
-    "preview_preparing";
-  if (project.build_status === "running" || project.build_status === "queued") {
-    cardStatus = "building";
-  } else if (previewFailed) {
-    cardStatus = "preview_failed";
-  } else if (project.build_status === "failed") {
-    cardStatus = "failed";
-  } else if (previewRenderable && integrity.sourceIntegrityOk && hasRoot) {
-    cardStatus = "ready";
-  }
+  const cardStatus = computeProjectCardStatus({
+    build_status: project.build_status,
+    metadata: meta,
+    previewIntegrity: {
+      previewRenderable: integrity.previewRenderable,
+      sourceIntegrityOk: integrity.sourceIntegrityOk,
+      hasRootPage: hasRoot,
+    },
+  });
 
   return NextResponse.json({
     ok: true,

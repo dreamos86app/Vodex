@@ -62,6 +62,7 @@ import {
 import { runDeterministicPreviewRepair, isPreviewRepairEligible } from "@/lib/build/preview-deterministic-repair";
 import { persistGeneratedBuildFiles } from "@/lib/build/persist-generated-files";
 import { analyzePreviewHtml } from "@/lib/preview/preview-html-diagnostics";
+import { startValidationWatchdog } from "@/lib/build/validation-watchdog";
 
 type Writer = SupabaseClient<Database>;
 
@@ -561,11 +562,17 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       progressPercent: 88,
     });
 
+    const validationWatch = startValidationWatchdog({
+      writer: input.writer,
+      ctx: eventCtx,
+      label: "Validating generated files",
+    });
     const fileGate = await assertBuildFilesPersisted({
       writer: input.writer,
       projectId: input.projectId,
       archetypeId: pr.appArchetype,
     });
+    validationWatch.cancel();
 
     const { data: projRow } = await input.writer
       .from("projects")

@@ -48,6 +48,14 @@ import {
   normalizeProjectStatus,
   type ProjectLifecycleStatus,
 } from "@/lib/projects/project-lifecycle";
+import {
+  computeProjectCardStatus,
+  projectCardStatusCtas,
+  projectCardStatusDisplay,
+  type ProjectCardStatus,
+} from "@/lib/projects/project-card-status";
+import { isDreamosOwnerEmail } from "@/lib/admin-owner";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { useCreditsStore } from "@/lib/stores/credits-store";
 import {
   getDashboardSectionAccess,
@@ -251,7 +259,10 @@ export function AppDashboardPanel({
   const [buildStatus, setBuildStatus] = React.useState<string | null>(null);
   const [buildAt, setBuildAt] = React.useState<string | null>(null);
   const [fileCount, setFileCount] = React.useState(0);
+  const [cardStatus, setCardStatus] = React.useState<ProjectCardStatus | null>(null);
   const [publishReady, setPublishReady] = React.useState(false);
+  const { user, profile } = useAuthStore();
+  const isAdmin = isDreamosOwnerEmail(user?.email ?? profile?.email);
   const [publishBlockers, setPublishBlockers] = React.useState<string[]>([]);
   const [previewErrors, setPreviewErrors] = React.useState<
     Array<{ message: string; file?: string; line?: number }>
@@ -293,15 +304,20 @@ export function AppDashboardPanel({
       const rk = `${project.id}:${combinedRefreshKey}`;
       if (readinessFetchedRef.current === rk) return;
       readinessFetchedRef.current = rk;
-      const [readyJson, errJson] = await Promise.all([
+      const [readyJson, errJson, buildStatusJson] = await Promise.all([
         fetch(`/api/projects/${project.id}/publish/readiness`, { credentials: "include" }).then((r) =>
           r.ok ? r.json() : null,
         ),
         fetch(`/api/projects/${project.id}/preview-errors`, { credentials: "include" }).then((r) =>
           r.ok ? r.json() : null,
         ),
+        fetch(`/api/projects/${project.id}/build-status`, { credentials: "include" }).then((r) =>
+          r.ok ? r.json() : null,
+        ),
       ]);
       if (cancelled) return;
+      const bs = buildStatusJson as { card_status?: ProjectCardStatus } | null;
+      if (bs?.card_status) setCardStatus(bs.card_status);
       const ready = readyJson as { canPublish?: boolean; canPublishWeb?: boolean; blockers?: string[] } | null;
       setPublishReady(Boolean(ready?.canPublish ?? ready?.canPublishWeb));
       setPublishBlockers(ready?.blockers ?? []);
@@ -393,7 +409,6 @@ export function AppDashboardPanel({
     blueprintApproved,
     hasBlueprint: Boolean(meta.blueprint || meta.approved_blueprint),
   }) as ProjectLifecycleStatus;
-  const statusLabel = LIFECYCLE_META[normalizedLifecycle]?.userLabel ?? "Draft";
   const published = isProjectPublished(dashProject);
   const buildOk =
     hasFiles &&
@@ -402,7 +417,15 @@ export function AppDashboardPanel({
       dashProject.status === "live" ||
       dashProject.build_status === "imported" ||
       (isZipImport && fileCount > 0));
-  const previewReady = hasFiles && meta.preview_ready === true && meta.preview_honest === true;
+  const effectiveCardStatus =
+    cardStatus ??
+    computeProjectCardStatus({
+      build_status: dashProject.build_status,
+      metadata: meta,
+    });
+  const cardDisplay = projectCardStatusDisplay(effectiveCardStatus);
+  const statusCtas = projectCardStatusCtas(projectId, effectiveCardStatus, { isAdmin });
+  const previewReady = effectiveCardStatus === "ready";
   const importedReady = isZipImport && (hasFiles || (importMeta.file_count ?? 0) > 0);
   const buildDidNotComplete =
     !hasFiles &&
@@ -451,7 +474,7 @@ export function AppDashboardPanel({
                     : "bg-muted text-muted-foreground ring-border",
               )}
             >
-              {isBusy ? "Building" : statusLabel}
+              {isBusy && effectiveCardStatus === "building" ? "Building" : cardDisplay.label}
             </span>
           </div>
           {displayDesc ? (
@@ -504,12 +527,12 @@ export function AppDashboardPanel({
         </div>
       )}
 
-      {buildDidNotComplete && (
+      {(buildDidNotComplete || effectiveCardStatus === "failed") && (
         <div className="rounded-xl bg-destructive/5 px-4 py-3 ring-1 ring-destructive/20">
           <p className="text-[13px] font-semibold text-destructive">Build did not complete</p>
           <EmptyHint text="No app files were generated. Return to Build and try again." />
           <Link
-            href={`/apps/${projectId}/builder`}
+            href={`/apps/${projectId}/builder?retry=1`}
             className="mt-2 inline-flex rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white"
           >
             Retry build
@@ -517,28 +540,58 @@ export function AppDashboardPanel({
         </div>
       )}
 
+      {effectiveCardStatus === "preview_failed" && (
+        <div className="rounded-xl bg-destructive/5 px-4 py-3 ring-1 ring-destructive/20">
+          <p className="text-[13px] font-semibold text-destructive">Preview failed</p>
+          <EmptyHint text="Your files were saved but the live preview could not start. Try a repair pass." />
+          <div className="mt-2 flex flex-wrap gap-2">
+            {statusCtas.map((cta) => (
+              <Link
+                key={cta.href}
+                href={cta.href}
+                className="inline-flex rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white"
+              >
+                {cta.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <StatCard
           label="Build"
           value={
-            isBusy
-              ? "In progress"
-              : importedReady
-                ? "Imported"
-                : buildDidNotComplete
-                  ? "Incomplete"
-                  : hasFiles
-                    ? "Ready"
-                    : "Not started"
+            isBusy || effectiveCardStatus === "building"
+              ? "Building"
+              : effectiveCardStatus === "failed"
+                ? "Failed"
+                : importedReady
+                  ? "Imported"
+                  : buildDidNotComplete
+                    ? "Incomplete"
+                    : hasFiles
+                      ? cardDisplay.label
+                      : "Not started"
           }
-          ok={buildOk}
+          ok={buildOk && effectiveCardStatus !== "failed"}
           icon={buildOk ? CheckCircle2 : isBusy ? Loader2 : Clock}
         />
         <StatCard
           label="Experience"
-          value={previewReady ? "Ready" : hasFiles ? "Available" : "Pending"}
+          value={
+            effectiveCardStatus === "ready"
+              ? "Ready"
+              : effectiveCardStatus === "preview_preparing"
+                ? "Preparing preview"
+                : effectiveCardStatus === "preview_failed"
+                  ? "Preview failed"
+                  : hasFiles
+                    ? "Available"
+                    : "Pending"
+          }
           ok={previewReady}
-          icon={CheckCircle2}
+          icon={previewReady ? CheckCircle2 : AlertCircle}
         />
         <StatCard
           label="Publishing"

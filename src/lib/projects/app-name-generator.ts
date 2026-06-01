@@ -3,6 +3,11 @@ import type { Database } from "@/lib/supabase/types";
 import { callProviderStructured, parseJsonFromModel } from "@/lib/ai/provider-call";
 import { slugifyAppName } from "@/lib/creation/parse-builder-metadata";
 import { cleanAppName, stripMarkdownNoise } from "@/lib/projects/clean-app-name";
+import {
+  loadRecentAppNames,
+  pickUniqueBrandName,
+  validateGeneratedName,
+} from "@/lib/projects/app-identity-naming-engine";
 
 export type AppNameResult = {
   appName: string;
@@ -88,7 +93,8 @@ export async function generateAppName(input: {
   userSelectedModelId?: string | null;
 }): Promise<AppNameResult> {
   const intent = normalizeBuildIntent(input.buildIntent);
-  const fallback = fallbackName(intent);
+  const recent = await loadRecentAppNames(input.writer, input.userId);
+  const fallback = pickUniqueBrandName(recent, intent) || fallbackName(intent);
 
   if (!intent || intent.length < 8 || QUESTION_RE.test(intent)) {
     return {
@@ -132,8 +138,9 @@ export async function generateAppName(input: {
       namingConfidence?: number;
     }>(res.text);
     const candidate = parsed?.appName?.trim() ?? "";
-    if (isValidAppName(candidate, intent)) {
-      const appName = cleanAppName(stripMarkdownNoise(candidate), intent);
+    const validated = validateGeneratedName(candidate, intent, recent);
+    if (validated && isValidAppName(validated, intent)) {
+      const appName = validated;
       const slug = await ensureUniqueSlug(input.writer, slugifyAppName(appName), input.projectId);
       return {
         appName,

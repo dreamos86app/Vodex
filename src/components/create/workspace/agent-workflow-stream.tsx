@@ -23,6 +23,7 @@ import type { BuildDiagnosticsPayload } from "@/lib/build/build-diagnostics";
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { userMessageForPreviewFailure, isPreviewFailureCode } from "@/lib/preview/preview-failure-codes";
+import { AnimatedLineDelta } from "@/components/create/workspace/animated-line-delta";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
   return (
@@ -112,7 +113,7 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
       className={cn(
         "mr-6 flex max-w-md items-center gap-2 rounded-2xl bg-surface/90 px-3 py-2 sm:mr-10",
         event.status === "active"
-          ? "ring-1 ring-amber-400/55 shadow-[0_0_12px_-4px_rgba(251,191,36,0.35)]"
+          ? "animate-[workflow-gold-pulse_2s_ease-in-out_infinite] ring-1 ring-amber-400/55 shadow-[0_0_12px_-4px_rgba(251,191,36,0.35)]"
           : "ring-1 ring-border/60",
       )}
       data-testid="workflow-file-card"
@@ -121,10 +122,11 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
       <span className="shrink-0 text-[10.5px] font-medium text-muted-foreground">{verb}</span>
       <code className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground">{path}</code>
       {hasCounts && !isDelete ? (
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
-          {typeof event.addedLines === "number" ? `+${event.addedLines}` : ""}
-          {typeof event.removedLines === "number" ? ` -${event.removedLines}` : ""}
-        </span>
+        <AnimatedLineDelta
+          added={event.addedLines}
+          removed={event.removedLines}
+          active={event.status === "active"}
+        />
       ) : null}
     </motion.div>
   );

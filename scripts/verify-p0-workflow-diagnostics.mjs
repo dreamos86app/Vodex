@@ -22,6 +22,8 @@ const repair = read("src/lib/build/preview-deterministic-repair.ts");
 const admin = read("src/lib/admin/can-view-build-diagnostics.ts");
 const execute = read("src/lib/build/execute-staged-build-job.ts");
 const buildStatus = read("src/app/api/projects/[id]/build-status/route.ts");
+const naming = read("src/lib/projects/app-identity-naming-engine.ts");
+const namingGen = read("src/lib/projects/app-name-generator.ts");
 
 const suites = {
   "workflow-events-live": () => {
@@ -58,9 +60,27 @@ const suites = {
     if (!stream.includes("ring-amber-400")) throw new Error("active file gold outline missing");
   },
   "project-lifecycle-status": () => {
+    const card = read("src/lib/projects/project-card-status.ts");
+    if (!card.includes("computeProjectCardStatus")) throw new Error("shared card status helper missing");
+    if (!buildStatus.includes("computeProjectCardStatus")) throw new Error("build-status must use shared helper");
     if (!buildStatus.includes("card_status")) throw new Error("card_status in build-status API");
     if (!buildStatus.includes("preview_state")) throw new Error("preview_state missing");
-    if (!buildStatus.includes('cardStatus = "ready"')) throw new Error("ready gate must check integrity + root");
+    const home = read("src/app/api/home/recent-projects/route.ts");
+    if (!home.includes("card_status")) throw new Error("home feed must expose card_status");
+    if (!home.includes("computeProjectCardStatus")) throw new Error("home feed must use shared helper");
+  },
+  "app-naming-engine": () => {
+    if (!naming.includes("rejectsRecentName")) throw new Error("recent name rejection missing");
+    if (!namingGen.includes("loadRecentAppNames")) throw new Error("generator must load recent names");
+    if (!namingGen.includes("pickUniqueBrandName")) throw new Error("brand pool fallback missing");
+  },
+  "discuss-fast-pipeline": () => {
+    const discuss = read("src/lib/ai/fast-discuss-pipeline.ts");
+    const transport = read("src/lib/chat/create-chat-transport.ts");
+    const optimistic = read("src/components/create/workspace/optimistic-assistant-row.tsx");
+    if (!discuss.includes("resolveFastDiscussStreamSpec")) throw new Error("fast discuss pipeline missing");
+    if (!transport.includes("mode_at_submit")) throw new Error("transport must send mode_at_submit");
+    if (!optimistic.includes('DISCUSS_PHASES = ["Thinking"]')) throw new Error("discuss must only show Thinking");
   },
 };
 

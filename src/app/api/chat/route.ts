@@ -33,6 +33,8 @@ import { routeMainModelSpec } from "@/lib/ai/model-mix-router";
 import { resolveStageModel } from "@/lib/ai/model-cost-runtime";
 import { completeBuildWithValidation } from "@/lib/build/complete-build-with-validation";
 import { guardDiscussProviderCall } from "@/lib/ai/discuss-profit-guard";
+import { resolveFastDiscussStreamSpec } from "@/lib/ai/fast-discuss-pipeline";
+import { pickFreeDiscussModelId } from "@/lib/ai/discuss-model";
 import {
   classifyFirstCreatePrompt,
   classifyCreateIntent,
@@ -112,10 +114,6 @@ const LLM_SETUP_ERROR = "AI provider is not configured on this server.";
 const LLM_SETUP_HINT =
   "Add at least one of OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY to the server environment, then restart.";
 
-/** Cheapest available discuss model — skips exhausted providers (Anthropic quota → OpenAI). */
-function pickFreeDiscussModelId(): string {
-  return resolveDiscussModel(null).modelId;
-}
 
 function resolveModel(modelId: string) {
   const resolved = toApiModelId(modelId);
@@ -1116,22 +1114,28 @@ export async function POST(request: Request) {
   });
   let streamSpec = mixRouted.spec;
 
-  if (chargeMode === "discuss" || chargeMode === "create_question") {
-    const estIn = Math.min(4000, userText.length * 2 + 800);
+  if (modeAtSubmit === "discuss" || chargeMode === "discuss" || chargeMode === "create_question") {
+    streamSpec = resolveFastDiscussStreamSpec({
+      ownerEmail: userEmail,
+      manualModelSelection,
+      requestedModelId: requestedModel,
+    });
+    const estIn = Math.min(2000, userText.length * 2 + 400);
     const discussGuard = guardDiscussProviderCall({
       modelId: streamSpec.modelId,
       estimatedInputTokens: estIn,
-      estimatedOutputTokens: 800,
+      estimatedOutputTokens: 600,
       mode: "discuss",
       respectManualSelection: manualModelSelection,
     });
-    if (discussGuard.action === "fallback_cheap" && !manualModelSelection) {
-      streamSpec = routeOperation({
-        operationType: streamOp,
-        ownerEmail: userEmail,
-        requestedModelId: discussGuard.modelId,
-        complexity: buildComplexity,
-      });
+    if (!discussGuard.allowed) {
+      return NextResponse.json(
+        {
+          error: discussGuard.userMessage ?? "Discuss request too large for this mode.",
+          code: "discuss_context_too_large",
+        },
+        { status: 400 },
+      );
     }
   }
 

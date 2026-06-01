@@ -14,6 +14,7 @@ import {
 } from "@/lib/projects/backfill-project-media";
 import { isWeakIconSvg } from "@/lib/projects/ensure-project-icon";
 import { isUserVisibleProject } from "@/lib/projects/user-visible-projects";
+import { computeProjectCardStatus } from "@/lib/projects/project-card-status";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,14 @@ export async function GET(request: Request) {
         metadata,
       );
     }
+    const metaObj =
+      metadata && typeof metadata === "object" && !Array.isArray(metadata)
+        ? (metadata as Record<string, unknown>)
+        : {};
+    const card_status = computeProjectCardStatus({
+      build_status: row.build_status,
+      metadata: metaObj,
+    });
     const meta = LIFECYCLE_META[lifecycle];
     projects.push({
       ...row,
@@ -90,10 +99,11 @@ export async function GET(request: Request) {
       metadata,
       lifecycle_status: lifecycle,
       lifecycle_label: meta.userLabel,
+      card_status,
       public_url: resolveDisplayPublicUrl(row),
       show_in_dashboard: meta.showInDashboard,
       can_open_builder: meta.canOpenBuilder,
-      can_preview: meta.canPreview,
+      can_preview: card_status === "ready",
       can_publish: meta.canPublish,
     });
   }

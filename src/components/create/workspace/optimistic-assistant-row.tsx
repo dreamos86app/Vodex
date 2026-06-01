@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
 import { AnimatedDotsText } from "@/components/ui/animated-dots";
 
-const DISCUSS_PHASES = ["Thinking", "Considering your question", "Drafting a response"];
+/** Discuss — single phase only (no build-like progression). */
+const DISCUSS_PHASES = ["Thinking"];
 
 const BUILD_PHASES = [
   "Preparing your build",
@@ -32,6 +33,7 @@ export function OptimisticAssistantRow({ mode }: OptimisticAssistantRowProps) {
 
   React.useEffect(() => {
     setPhaseIndex(0);
+    if (mode === "discuss" || phases.length <= 1) return;
     const tick = setInterval(() => {
       setPhaseIndex((i) => Math.min(i + 1, phases.length - 1));
     }, 2400);

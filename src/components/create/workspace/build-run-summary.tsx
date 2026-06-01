@@ -18,6 +18,7 @@ export function BuildRunSummaryCard({
   publishReady,
   creditsUsed,
   errorMessage,
+  failureCode,
   refunded,
   showRefundLine = false,
   showRepairActions = false,
@@ -39,6 +40,7 @@ export function BuildRunSummaryCard({
   completedSummary?: string;
   remainingSummary?: string;
   errorMessage?: string;
+  failureCode?: string;
   refunded?: boolean;
   showRefundLine?: boolean;
   showRepairActions?: boolean;
@@ -71,6 +73,7 @@ export function BuildRunSummaryCard({
           ...(partial && typeof creditsUsed === "number"
             ? [`Used ${creditsUsed} Build Credit${creditsUsed === 1 ? "" : "s"} on this pass.`]
             : []),
+          ...(failed && failureCode ? [`Error: ${failureCode.replace(/_/g, " ")}`] : []),
           ...(failed && errorMessage ? [errorMessage] : []),
           ...(showRefundLine && refunded ? ["Credits were returned for this attempt."] : []),
         ].filter(Boolean);

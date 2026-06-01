@@ -68,6 +68,7 @@ export function createDreamChatTransport({
           messageId,
           modelId: extra.modelId,
           mode: extra.mode,
+          mode_at_submit: requestBody.mode_at_submit ?? extra.mode_at_submit ?? extra.mode,
           strategy: requestBody.strategy ?? extra.strategy,
           forceBuildPipeline: requestBody.forceBuildPipeline ?? extra.forceBuildPipeline,
           planFirstOnly: requestBody.planFirstOnly ?? extra.planFirstOnly,

@@ -25,8 +25,11 @@ import {
   getProjectCardStatus,
   getUserSafeProjectBadges,
   isImportedAppWithoutPreview,
+  resolveProjectCardStatus,
 } from "@/lib/projects/user-safe-project-badges";
 import { projectIconSrc } from "@/lib/projects/ensure-project-icon";
+import { isDreamosOwnerEmail } from "@/lib/admin-owner";
+import type { ProjectCardStatus } from "@/lib/projects/project-card-status";
 
 type ProjectRow = Omit<Project, "metadata"> & {
   metadata?: Record<string, unknown> | null;
@@ -39,6 +42,7 @@ type ProjectRow = Omit<Project, "metadata"> & {
   published_subdomain?: string | null;
   lifecycle_status?: string;
   lifecycle_label?: string;
+  card_status?: ProjectCardStatus;
   public_url?: string | null;
   banner_svg?: string | null;
   is_favorite?: boolean;
@@ -73,14 +77,18 @@ function ProjectCardSkeleton() {
 function ProjectCard({
   project,
   onToggleFavorite,
+  isAdmin,
 }: {
   project: ProjectRow;
   onToggleFavorite: (projectId: string, next: boolean) => void;
+  isAdmin: boolean;
 }) {
   const cfg = cardStatusLabel(project);
+  const cardStatus = resolveProjectCardStatus(project);
   const actions = getProjectCardActions(project, {
     lifecycleStatus: project.lifecycle_status,
     lifecycleLabel: project.lifecycle_label,
+    isAdmin,
   });
   const meta =
     project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
@@ -101,12 +109,13 @@ function ProjectCard({
       : null;
   const bannerSvg = project.banner_svg ?? null;
   const ls = project.lifecycle_status ?? readLifecycleFromMetadata(project.metadata).lifecycle_status;
-  const canPreview =
-    Boolean(project.preview_url) &&
-    ls &&
-    ["generated", "preview_ready", "publish_ready", "published", "imported_preview_ready"].includes(ls);
-  const canPublish = ls === "preview_ready" || ls === "publish_ready" || ls === "published" || ls === "imported_preview_ready";
-  const needsRepair = ls === "needs_attention" || ls === "failed";
+  const canPreview = cardStatus === "ready" && Boolean(project.preview_url);
+  const canPublish =
+    cardStatus === "ready" &&
+    (ls === "preview_ready" || ls === "publish_ready" || ls === "published" || ls === "imported_preview_ready");
+  const needsRepair =
+    (cardStatus === "preview_failed" || cardStatus === "failed") &&
+    ls === "needs_attention";
   const publicUrl = project.public_url ?? null;
   const iconSrc = projectIconSrc(project.id, iconSvg, project.icon_url);
   const importedPending = isImportedAppWithoutPreview(project);
@@ -236,6 +245,7 @@ export function ProjectsView() {
   const supabase = createClient();
   const { profile, user, loading: authLoading } = useAuthStore();
   const ownerId = user?.id ?? profile?.id;
+  const isAdmin = isDreamosOwnerEmail(user?.email ?? profile?.email);
   const [projects, setProjects] = React.useState<ProjectRow[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -558,7 +568,7 @@ export function ProjectsView() {
             : "space-y-2",
         )}>
           {filtered.map((p) => (
-            <ProjectCard key={p.id} project={p} onToggleFavorite={toggleFavorite} />
+            <ProjectCard key={p.id} project={p} onToggleFavorite={toggleFavorite} isAdmin={isAdmin} />
           ))}
         </div>
       )}

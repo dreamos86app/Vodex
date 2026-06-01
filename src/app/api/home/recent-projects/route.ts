@@ -3,6 +3,7 @@ import { getServerSessionUser } from "@/lib/auth/session";
 import { readBannerSvg, buildBannerForProject } from "@/lib/projects/backfill-project-media";
 import { ensureProjectIconSvg } from "@/lib/projects/ensure-project-icon";
 import { isUserVisibleProject } from "@/lib/projects/user-visible-projects";
+import { computeProjectCardStatus } from "@/lib/projects/project-card-status";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,10 @@ export async function GET() {
           : {};
       const displayName =
         (typeof row.app_name === "string" && row.app_name.trim()) || row.name;
+      const cardStatus = computeProjectCardStatus({
+        build_status: row.build_status,
+        metadata: meta,
+      });
       return {
         id: row.id,
         name: displayName,
@@ -48,6 +53,7 @@ export async function GET() {
         icon_svg: ensureProjectIconSvg(displayName, row.icon_svg),
         banner_svg: readBannerSvg(row.metadata) ?? buildBannerForProject(row),
         build_status: row.build_status,
+        card_status: cardStatus,
         published_subdomain: row.published_subdomain,
         metadata: meta,
         is_favorite: row.is_favorite ?? false,
