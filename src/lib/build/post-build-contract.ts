@@ -246,8 +246,8 @@ export function evaluatePostBuildContract(input: PostBuildContractInput): PostBu
       : hasStubFailure
         ? "Some generated source was incomplete. Run repair to complete the missing files."
         : missingImports.length > 0
-          ? "The files were saved, but preview could not render yet."
-          : "The files were saved, but preview could not render yet.";
+          ? "Files saved — an import path could not be resolved for preview."
+          : "Files saved — preview render failed. Use repair or retry preview.";
 
   return {
     passed: passed || savedUsable,

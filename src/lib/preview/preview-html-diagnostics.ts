@@ -1,6 +1,11 @@
 import type { BuildFile } from "@/lib/build/generated-file-utils";
 import { evaluateSourceIntegrity } from "@/lib/build/source-integrity-validator";
 import { truncateLargeDiagnosticString } from "@/lib/diagnostics/truncate-large-diagnostic-string";
+import {
+  classifyPreviewFailure,
+  mapLegacyPreviewErrorCode,
+  type PreviewFailureCode,
+} from "@/lib/preview/preview-failure-codes";
 
 function truncatePreviewSnippet(html: string): string {
   return truncateLargeDiagnosticString(html, 2000);
@@ -12,7 +17,7 @@ export type PreviewHtmlDiagnostics = {
   sourceFileCount: number;
   sourceIntegrityOk: boolean;
   previewRenderable: boolean;
-  errorCode?: string;
+  errorCode?: PreviewFailureCode;
   errorMessage?: string;
 };
 
@@ -30,21 +35,31 @@ export function analyzePreviewHtml(
     previewHtmlSnippet: truncatePreviewSnippet(html),
   });
 
-  let errorCode: string | undefined;
+  const hasFailure =
+    !integrity.previewRenderable ||
+    !integrity.sourceIntegrityOk ||
+    !hasRootElement ||
+    htmlLength < 400 ||
+    /no renderable content/i.test(html);
+
+  let errorCode: PreviewFailureCode | undefined;
   let errorMessage: string | undefined;
 
-  if (!hasRootElement || htmlLength < 400) {
-    errorCode = "empty_preview_html";
-    errorMessage = "Preview HTML is too small or missing the app root.";
-  } else if (/no renderable content/i.test(html)) {
-    errorCode = "empty_preview_html";
-    errorMessage = "Preview HTML has no renderable body.";
-  } else if (!integrity.sourceIntegrityOk) {
-    errorCode = "source_integrity_incomplete";
-    errorMessage = integrity.blockedReason ?? "Source integrity check failed.";
-  } else if (!integrity.previewRenderable) {
-    errorCode = "preview_not_renderable";
-    errorMessage = "Source is present but preview is not ready.";
+  if (hasFailure) {
+    const classified = classifyPreviewFailure({
+      html,
+      htmlLength,
+      hasRootElement,
+      sourceIntegrityOk: integrity.sourceIntegrityOk,
+      blockedReason: integrity.blockedReason,
+    });
+    errorCode =
+      !hasRootElement || htmlLength < 400 || /no renderable content/i.test(html)
+        ? "empty_preview_html"
+        : !integrity.sourceIntegrityOk
+          ? mapLegacyPreviewErrorCode("source_integrity_incomplete")
+          : classified.code;
+    errorMessage = classified.userMessage;
   }
 
   const previewRenderable = integrity.previewRenderable && !errorCode;

@@ -11,11 +11,13 @@ export function BuildLiveProgress({
   className,
   buildStartedAtMs,
   openerText,
+  projectId,
 }: {
   progress: BuildJobPollState | null;
   className?: string;
   buildStartedAtMs?: number;
   openerText?: string;
+  projectId?: string;
 }) {
   return (
     <AgentWorkflowStream
@@ -23,6 +25,7 @@ export function BuildLiveProgress({
       className={className}
       buildStartedAtMs={buildStartedAtMs}
       openerText={openerText}
+      projectId={projectId}
     />
   );
 }

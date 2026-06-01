@@ -2599,6 +2599,7 @@ export function ImmersiveWorkspace({
                   className="mt-1"
                   buildStartedAtMs={buildStartedAtRef.current ?? undefined}
                   openerText="Analyzing your request"
+                  projectId={effectiveProjectId ?? undefined}
                 />
               )}
               {buildRunSummary && !buildJobActive && (

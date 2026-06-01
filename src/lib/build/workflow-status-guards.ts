@@ -288,7 +288,7 @@ export function resolveBuildRunSummary(input: {
           ? input.errorDetail
           : /todo|stub|incomplete/i.test(input.errorDetail ?? "")
             ? "Some source files were incomplete. Run repair to finish them."
-            : "The files were saved, but preview could not render yet.",
+            : "Files saved — preview render failed. Retry preview or run repair.",
       ],
     },
     repair_failed: {

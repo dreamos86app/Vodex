@@ -1,4 +1,7 @@
-import { persistBuildJobEvent } from "@/lib/build/build-job-events";
+import {
+  emitWorkflowStepCompleted,
+  emitWorkflowStepStarted,
+} from "@/lib/build/workflow-live-events";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
@@ -217,9 +220,20 @@ export function traceModelCallEnded(
   traceBuildWorkerStage(snap, stage, detail, { modelCallState: outcome });
 }
 
-let lastPersistedTraceAt = new Map<string, number>();
+const lastPersistedStage = new Map<string, BuildWorkerTraceStage>();
 
-/** Persist trace to build_job_events (coalesced — at most one row per 4s per job). */
+function stepIdForStage(stage: BuildWorkerTraceStage): string {
+  if (stage.includes("plan") || stage.includes("planner")) return "planning";
+  if (stage.includes("identity")) return "identity";
+  if (stage === "file_generation_started" || stage === "scaffold_fallback_applied") return "writing";
+  if (stage.includes("contract")) return "validating";
+  if (stage.includes("persist")) return "saving";
+  if (stage.includes("preview")) return "preview";
+  if (stage === "preflight_started" || stage === "preflight_completed") return "preflight";
+  return "build";
+}
+
+/** Persist trace stages immediately — step_started then step_completed when stage advances. */
 export async function persistTraceStage(
   writer: SupabaseClient<Database>,
   input: {
@@ -231,47 +245,46 @@ export async function persistTraceStage(
     detail?: string;
   },
 ): Promise<void> {
-  const now = Date.now();
-  const last = lastPersistedTraceAt.get(input.jobId) ?? 0;
-  const terminal = input.stage === "job_completed" || input.stage === "job_failed";
-  if (!terminal && now - last < 4000) return;
-  lastPersistedTraceAt.set(input.jobId, now);
-
-  const title = FRIENDLY_EVENT_TITLE[input.stage] ?? "Working on your app";
-  const isFileStage =
-    input.stage === "persist_started" ||
-    input.stage === "persist_completed";
-  await persistBuildJobEvent(writer, {
+  const ctx = {
     jobId: input.jobId,
     projectId: input.projectId,
     userId: input.userId,
-    type: isFileStage
-      ? "saving_files"
-      : input.stage.includes("preview")
-        ? "preparing_preview"
-        : input.stage.includes("contract")
-          ? "checking_file"
-          : input.stage.includes("identity")
-            ? "generating_app_identity"
-            : input.stage === "scaffold_fallback_applied" || input.stage === "file_generation_started"
-              ? "planning_app"
-              : input.stage.includes("plan") || input.stage.includes("planner")
-                ? "planning_app"
-                : "understanding_request",
-    title,
-    detail: input.detail ?? title,
-    progressPercent: progressForStage(input.stage),
-    metadata: {
-      trace_stage: input.stage,
-      hidden:
-        input.stage === "worker_claim_attempt" || input.stage === "build_pipeline_entered",
-      operation_id: input.snap.operationId,
-      execution_instance_id: input.snap.executionInstanceId,
-      model_call_state: input.snap.modelCall.state,
-      provider: input.snap.modelCall.provider,
-      model: input.snap.modelCall.model,
-      timeout_ms: input.snap.modelCall.timeoutMs,
-    },
+  };
+  const hidden =
+    input.stage === "worker_claim_attempt" || input.stage === "build_pipeline_entered";
+  if (hidden) return;
+
+  const prev = lastPersistedStage.get(input.jobId);
+  const title = FRIENDLY_EVENT_TITLE[input.stage] ?? "Working on your app";
+  const stepId = stepIdForStage(input.stage);
+  const pct = progressForStage(input.stage);
+  const terminal = input.stage === "job_completed" || input.stage === "job_failed";
+
+  if (prev && prev !== input.stage) {
+    const prevTitle = FRIENDLY_EVENT_TITLE[prev] ?? "Step complete";
+    await emitWorkflowStepCompleted(writer, ctx, {
+      stepId: stepIdForStage(prev),
+      label: prevTitle,
+      progressPercent: progressForStage(prev),
+    });
+  }
+
+  if (terminal) {
+    await emitWorkflowStepCompleted(writer, ctx, {
+      stepId,
+      label: title,
+      progressPercent: pct,
+    });
+    lastPersistedStage.delete(input.jobId);
+    return;
+  }
+
+  lastPersistedStage.set(input.jobId, input.stage);
+  await emitWorkflowStepStarted(writer, ctx, {
+    stepId,
+    label: title,
+    sublabel: input.detail ?? title,
+    progressPercent: pct,
   });
 }
 

@@ -188,7 +188,7 @@ export function useBuildJobProgress(
           return next;
         });
 
-        if (!isTerminal) schedule(800);
+        if (!isTerminal) schedule(600);
       } catch (err) {
         if (cancelled) return;
         setState((prev) =>

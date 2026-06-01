@@ -116,16 +116,39 @@ function rowToStreamEvent(row: BuildJobEventRow, terminal: boolean): AgentWorkfl
   const removed =
     typeof meta.removed_lines === "number" ? meta.removed_lines : counts.removed;
 
-  let status: AgentWorkflowEventStatus = "done";
+  const stepStatus =
+    typeof meta.step_status === "string" ? meta.step_status : undefined;
+  const workflowType =
+    typeof meta.workflow_event_type === "string" ? meta.workflow_event_type : undefined;
+
+  let status: AgentWorkflowEventStatus = "pending";
   if (
     category === "failed_before_generation" ||
-    category === "failed_after_generation"
+    category === "failed_after_generation" ||
+    stepStatus === "failed" ||
+    workflowType === "step_failed" ||
+    workflowType === "preview_failed" ||
+    workflowType === "build_failed"
   ) {
     status = "failed";
-  } else if (category === "completed" || category === "partial_credit_stop") {
+  } else if (
+    category === "completed" ||
+    category === "partial_credit_stop" ||
+    stepStatus === "completed" ||
+    workflowType === "step_completed" ||
+    workflowType === "preview_rendered" ||
+    workflowType === "build_completed" ||
+    workflowType === "file_created" ||
+    workflowType === "file_updated" ||
+    workflowType === "file_deleted"
+  ) {
     status = "done";
-  } else if (!terminal) {
+  } else if (stepStatus === "active" || workflowType === "step_started" || workflowType === "step_progress") {
+    status = terminal ? "done" : "pending";
+  } else if (terminal) {
     status = "done";
+  } else {
+    status = "pending";
   }
 
   if (row.type === "refunded") {
@@ -216,25 +239,23 @@ export function extractAssistantMessages(events: AgentWorkflowEvent[]): AgentWor
   return events.filter((e) => e.category === "assistant_message");
 }
 
-/** Keep only the latest phase_started when several arrive back-to-back. */
+/** Drop duplicate completed phase rows with the same title (keep latest). */
 export function collapseRedundantPhaseStarted(
   events: AgentWorkflowEvent[],
 ): AgentWorkflowEvent[] {
   const out: AgentWorkflowEvent[] = [];
-  const seenTitle = new Set<string>();
   for (const ev of events) {
-    if (ev.category === "phase_started" && out.length > 0) {
+    if (ev.category === "phase_started" && ev.status === "done" && out.length > 0) {
       const last = out[out.length - 1];
-      if (last.category === "phase_started") {
+      if (
+        last.category === "phase_started" &&
+        last.status === "done" &&
+        last.title.trim().toLowerCase() === ev.title.trim().toLowerCase()
+      ) {
         out[out.length - 1] = ev;
         continue;
       }
     }
-    const key = `${ev.category}:${ev.title.trim().toLowerCase()}`;
-    if (seenTitle.has(key) && ev.category !== "file_created" && ev.category !== "file_edited") {
-      continue;
-    }
-    seenTitle.add(key);
     out.push(ev);
   }
   return out;

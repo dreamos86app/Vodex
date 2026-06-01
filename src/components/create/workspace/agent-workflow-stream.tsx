@@ -2,15 +2,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import {
-  CheckCircle2,
-  ChevronDown,
-  FileMinus,
-  FilePen,
-  FilePlus,
-  Loader2,
-  MessageSquare,
-} from "lucide-react";
+import { ChevronDown, FileMinus, FilePen, FilePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildJobPollState } from "@/hooks/use-build-job-progress";
 import {
@@ -24,6 +16,13 @@ import {
   buildEphemeralWorkflowEvents,
   mergeEphemeralWithServerEvents,
 } from "@/lib/workflow/workflow-ephemeral-steps";
+import { WorkflowStepCard, type WorkflowStepCardStatus } from "@/components/create/workspace/workflow-step-card";
+import { useStaggeredWorkflowEvents } from "@/hooks/use-staggered-workflow-events";
+import { BuildDiagnosticsCenter } from "@/components/create/workspace/build-diagnostics-center";
+import type { BuildDiagnosticsPayload } from "@/lib/build/build-diagnostics";
+import { isDreamosOwnerEmail } from "@/lib/admin-owner";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { userMessageForPreviewFailure, isPreviewFailureCode } from "@/lib/preview/preview-failure-codes";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
   return (
@@ -110,7 +109,12 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
       layout
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mr-6 flex max-w-md items-center gap-2 rounded-2xl bg-surface/90 px-3 py-2 ring-1 ring-border/60 sm:mr-10"
+      className={cn(
+        "mr-6 flex max-w-md items-center gap-2 rounded-2xl bg-surface/90 px-3 py-2 sm:mr-10",
+        event.status === "active"
+          ? "ring-1 ring-amber-400/55 shadow-[0_0_12px_-4px_rgba(251,191,36,0.35)]"
+          : "ring-1 ring-border/60",
+      )}
       data-testid="workflow-file-card"
     >
       <Icon className="size-3.5 shrink-0 text-accent/85" strokeWidth={1.75} />
@@ -153,35 +157,34 @@ function AnalyzingRequestBubble({ base = "Analyzing your request" }: { base?: st
   );
 }
 
+function mapStepStatus(event: AgentWorkflowEvent): WorkflowStepCardStatus {
+  if (event.status === "active") return "active";
+  if (event.status === "failed") return "failed";
+  if (event.status === "done") return "completed";
+  return "pending";
+}
+
 function ProgressRow({ event, reducedMotion }: { event: AgentWorkflowEvent; reducedMotion: boolean }) {
-  const done = event.status === "done";
-  const active = event.status === "active";
-  const failed = event.status === "failed";
+  const code = event.metadata?.preview_failure_code;
+  const friendlyFailure =
+    typeof code === "string" && isPreviewFailureCode(code)
+      ? userMessageForPreviewFailure(code)
+      : event.subtitle;
 
   return (
     <motion.div
       layout={!reducedMotion}
       initial={reducedMotion ? false : { opacity: 0, y: 3 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        "mr-6 flex max-w-md items-start gap-2 text-[11px] sm:mr-10",
-        done && "opacity-70",
-      )}
       data-testid={`workflow-event-${event.category}`}
     >
-      {active ? (
-        <Loader2 className="mt-0.5 size-3 shrink-0 animate-spin text-accent" strokeWidth={2} />
-      ) : done ? (
-        <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-accent/75" strokeWidth={1.75} />
-      ) : failed ? (
-        <span className="mt-1 size-2 shrink-0 rounded-full bg-destructive" />
-      ) : (
-        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-      )}
-      <div className="min-w-0">
-        <p className={cn("font-medium", failed ? "text-destructive" : "text-foreground")}>{event.title}</p>
-        {event.subtitle ? <p className="mt-0.5 text-muted-foreground">{event.subtitle}</p> : null}
-      </div>
+      <WorkflowStepCard
+        status={mapStepStatus(event)}
+        label={event.title}
+        sublabel={event.status === "failed" ? friendlyFailure : event.subtitle}
+        progress={event.progress}
+        error={event.status === "failed" ? friendlyFailure : undefined}
+      />
     </motion.div>
   );
 }
@@ -200,13 +203,19 @@ export function AgentWorkflowStream({
   className,
   buildStartedAtMs,
   openerText,
+  projectId,
 }: {
   progress: BuildJobPollState | null;
   className?: string;
   buildStartedAtMs?: number;
   openerText?: string;
+  projectId?: string;
 }) {
   const reducedMotion = useReducedMotion();
+  const email = useAuthStore((s) => s.user?.email);
+  const adminDiagnostics = isDreamosOwnerEmail(email);
+  const [diagOpen, setDiagOpen] = React.useState(false);
+  const [diagPayload, setDiagPayload] = React.useState<BuildDiagnosticsPayload | null>(null);
   const [now, setNow] = React.useState(() => Date.now());
 
   React.useEffect(() => {
@@ -215,15 +224,16 @@ export function AgentWorkflowStream({
     return () => clearInterval(t);
   }, [progress]);
 
-  if (!progress) return null;
-
-  const working = Boolean(!progress.done);
-  const serverRaw = coalesceWorkflowStreamEvents(progress.events, { terminal: progress.done });
+  const working = Boolean(progress && !progress.done);
+  const serverRaw = coalesceWorkflowStreamEvents(progress?.events ?? [], {
+    terminal: progress?.done ?? false,
+  });
   const serverCollapsed = collapseRedundantPhaseStarted(serverRaw);
-  const serverSequential = applySingleActiveWorkflowStep(serverCollapsed, !progress.done);
+  const serverSequential = applySingleActiveWorkflowStep(serverCollapsed, working);
 
   const startedAt =
-    buildStartedAtMs ?? (Date.parse(progress.events[0]?.created_at ?? "") || now - 500);
+    buildStartedAtMs ??
+    (Date.parse(progress?.events[0]?.created_at ?? "") || now - 500);
   const showAnalyzing =
     working &&
     (openerText?.toLowerCase().startsWith("analyzing") ?? false) &&
@@ -235,12 +245,28 @@ export function AgentWorkflowStream({
       : [];
   const merged = mergeEphemeralWithServerEvents(ephemeral, serverSequential);
   const grouped = groupFileEvents(merged);
-  const timeline = applySingleActiveWorkflowStep(grouped, working).slice(-24);
+  const timelineRaw = applySingleActiveWorkflowStep(grouped, working).slice(-24);
+  const timeline = useStaggeredWorkflowEvents(timelineRaw, working);
+
+  if (!progress) return null;
 
   const active = timeline.find((e) => e.status === "active");
   const failed =
     progress.done &&
     (progress.status === "failed" || progress.latest?.type === "failed");
+
+  React.useEffect(() => {
+    if (!failed || !adminDiagnostics || !projectId || !progress?.jobId) return;
+    void fetch(
+      `/api/projects/${projectId}/build-jobs/${progress.jobId}/diagnostics`,
+      { credentials: "include" },
+    )
+      .then((r) => r.json())
+      .then((body: { ok?: boolean; diagnostics?: BuildDiagnosticsPayload }) => {
+        if (body.ok && body.diagnostics) setDiagPayload(body.diagnostics);
+      })
+      .catch(() => undefined);
+  }, [failed, adminDiagnostics, projectId, progress?.jobId]);
 
   return (
     <div className={cn("space-y-2.5", className)} data-testid="agent-workflow-stream">
@@ -249,12 +275,13 @@ export function AgentWorkflowStream({
       ) : null}
 
       {active ? (
-        <div
-          className="mr-6 flex max-w-md items-center gap-2 rounded-xl border border-accent/25 bg-accent/[0.06] px-3 py-2 text-[11px] sm:mr-10"
-          data-testid="workflow-active-step"
-        >
-          <Loader2 className="size-3.5 shrink-0 animate-spin text-accent" />
-          <span className="font-medium text-foreground">{active.title}</span>
+        <div data-testid="workflow-active-step">
+          <WorkflowStepCard
+            status="active"
+            label={active.title}
+            sublabel={active.subtitle}
+            progress={active.progress}
+          />
         </div>
       ) : null}
 
@@ -272,11 +299,29 @@ export function AgentWorkflowStream({
         </AnimatePresence>
       </ul>
 
-      {failed && progress.error ? (
-        <p className="mr-6 rounded-lg bg-destructive/10 px-2 py-1.5 text-[10.5px] text-destructive sm:mr-10">
-          {progress.error}
-        </p>
+      {failed ? (
+        <div className="mr-6 space-y-2 sm:mr-10">
+          <p className="rounded-lg bg-destructive/10 px-2 py-1.5 text-[10.5px] text-destructive">
+            {progress.error ?? "Files saved — preview render failed."}
+          </p>
+          {adminDiagnostics ? (
+            <button
+              type="button"
+              onClick={() => setDiagOpen(true)}
+              className="text-[10px] font-medium text-amber-500 underline"
+              data-testid="open-build-diagnostics"
+            >
+              Open diagnostics center
+            </button>
+          ) : null}
+        </div>
       ) : null}
+
+      <BuildDiagnosticsCenter
+        open={diagOpen}
+        onClose={() => setDiagOpen(false)}
+        diagnostics={diagPayload}
+      />
     </div>
   );
 }

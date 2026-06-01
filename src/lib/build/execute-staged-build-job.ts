@@ -48,6 +48,20 @@ import {
   traceBuildWorkerStage,
 } from "@/lib/build/build-worker-trace";
 import { writeWorkerStallSnapshot } from "@/lib/build/worker-stall-snapshot";
+import {
+  emitPreviewWorkflowEvent,
+  emitRepairWorkflowEvent,
+} from "@/lib/build/workflow-live-events";
+import {
+  classifyPreviewFailure,
+  isPreviewFailureCode,
+  mapLegacyPreviewErrorCode,
+  userMessageForPreviewFailure,
+  type PreviewFailureCode,
+} from "@/lib/preview/preview-failure-codes";
+import { runDeterministicPreviewRepair, isPreviewRepairEligible } from "@/lib/build/preview-deterministic-repair";
+import { persistGeneratedBuildFiles } from "@/lib/build/persist-generated-files";
+import { analyzePreviewHtml } from "@/lib/preview/preview-html-diagnostics";
 
 type Writer = SupabaseClient<Database>;
 
@@ -781,18 +795,24 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     }
 
     await persistStage("preview_started");
-    const previewResult = await startPreviewSession({
+    await emitPreviewWorkflowEvent(input.writer, eventCtx, {
+      phase: "started",
+      message: "Starting preview render",
+      progressPercent: 92,
+    });
+    let previewResult = await startPreviewSession({
       writer: input.writer,
       userId: input.userId,
       projectId: input.projectId,
     });
 
-    const postPreviewHtml = buildProjectPreviewHtml(postPersist.files, {
+    let workingFiles = postPersist.files;
+    let postPreviewHtml = buildProjectPreviewHtml(workingFiles, {
       projectId: input.projectId,
       archetypeId: pr.appArchetype,
     });
 
-    const postPreview = await reconcilePostPersistBuildStatus({
+    let postPreview = await reconcilePostPersistBuildStatus({
       writer: input.writer,
       projectId: input.projectId,
       ownerId: input.userId,
@@ -808,11 +828,100 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       previewHtmlSnippet: postPreviewHtml.slice(0, 2000),
     });
 
-    if (!previewResult.ok || !postPreview.shouldComplete) {
-      const previewErr = !previewResult.ok
-        ? (previewResult.error ?? "Preview could not be prepared.")
-        : "Preview could not be prepared.";
-      const previewCode = !previewResult.ok ? previewResult.code : undefined;
+    let previewStillFailed = !previewResult.ok || !postPreview.shouldComplete;
+    if (previewStillFailed) {
+      const htmlDiag = analyzePreviewHtml(postPreviewHtml, workingFiles, {
+        previewSessionOk: previewResult.ok,
+      });
+      const rawCode = !previewResult.ok
+        ? previewResult.code
+        : htmlDiag.errorCode ?? postPreview.sourceIntegrity.blockedReason;
+      const classified = classifyPreviewFailure({
+        html: postPreviewHtml,
+        htmlLength: postPreviewHtml.length,
+        hasRootElement: htmlDiag.hasRootElement,
+        missingImports: postPreview.sourceIntegrity.blockedReason?.includes("import")
+          ? [postPreview.sourceIntegrity.blockedReason]
+          : [],
+        sourceIntegrityOk: postPreview.sourceIntegrity.sourceIntegrityOk,
+        blockedReason: postPreview.sourceIntegrity.blockedReason,
+        timedOut: rawCode === "preview_timeout",
+      });
+      let previewCode: PreviewFailureCode = isPreviewFailureCode(rawCode ?? "")
+        ? (rawCode as PreviewFailureCode)
+        : classified.code;
+      let previewErr = classified.userMessage;
+
+      if (isPreviewRepairEligible(previewCode)) {
+        await emitRepairWorkflowEvent(input.writer, eventCtx, {
+          phase: "started",
+          message: "Running deterministic preview repair",
+          progressPercent: 94,
+        });
+        const repair = runDeterministicPreviewRepair({
+          files: workingFiles,
+          failureCode: previewCode,
+          appName: pr.appName,
+          archetypeId: pr.appArchetype,
+        });
+        if (repair.applied) {
+          await persistGeneratedBuildFiles({
+            writer: input.writer,
+            projectId: input.projectId,
+            ownerId: input.userId,
+            files: repair.files,
+            executionInstanceId: workerCtx.executionInstanceId,
+          });
+          workingFiles = repair.files;
+          postPreviewHtml = buildProjectPreviewHtml(workingFiles, {
+            projectId: input.projectId,
+            archetypeId: pr.appArchetype,
+          });
+          previewResult = await startPreviewSession({
+            writer: input.writer,
+            userId: input.userId,
+            projectId: input.projectId,
+          });
+          postPreview = await reconcilePostPersistBuildStatus({
+            writer: input.writer,
+            projectId: input.projectId,
+            ownerId: input.userId,
+            appName: pr.appName || (typeof projRow?.app_name === "string" ? projRow.app_name : "Your app"),
+            blueprintRoutes,
+            priorFailures: allContractFailures,
+            operationId: input.operationId,
+            executionInstanceId: workerCtx.executionInstanceId,
+            userPrompt: input.userPrompt,
+            archetypeId: pr.appArchetype,
+            previewSessionOk: previewResult.ok,
+            previewHtmlLength: postPreviewHtml.length,
+            previewHtmlSnippet: postPreviewHtml.slice(0, 2000),
+          });
+          previewStillFailed = !previewResult.ok || !postPreview.shouldComplete;
+          if (!previewStillFailed) {
+            await emitRepairWorkflowEvent(input.writer, eventCtx, {
+              phase: "completed",
+              message: "Repair succeeded — preview render retried",
+              progressPercent: 97,
+            });
+            await emitPreviewWorkflowEvent(input.writer, eventCtx, {
+              phase: "rendered",
+              message: "Preview rendered successfully",
+              progressPercent: 98,
+            });
+          }
+        }
+        await emitRepairWorkflowEvent(input.writer, eventCtx, {
+          phase: "completed",
+          message: repair.applied ? "Repair pass finished" : "Repair not applicable",
+          progressPercent: 95,
+        });
+      }
+
+      if (previewStillFailed) {
+      previewErr =
+        userMessageForPreviewFailure(previewCode) ||
+        (!previewResult.ok ? (previewResult.error ?? previewErr) : previewErr);
       const filesKept = Math.max(fileGate.fileCount, postPreview.visibleFileCount);
 
       const { data: cur } = await input.writer
@@ -853,20 +962,16 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         reason: previewErr,
       });
 
-      await persistBuildJobEvent(input.writer, {
-        ...eventCtx,
-        type: "fixing_error",
-        title: "Build needs attention",
-        detail: postPreview.sourceIntegrity.sourceIntegrityOk
-          ? "The files were saved, but preview needs a technical fix before it can render."
-          : "Files were created, but the source code was incomplete. Run repair to generate the missing code.",
+      await emitPreviewWorkflowEvent(input.writer, eventCtx, {
+        phase: "failed",
+        message: previewErr,
+        failureCode: previewCode,
         progressPercent: 100,
         metadata: {
           preview_failed: true,
           files_kept: filesKept,
-          files_persisted: filesKept,
           failure_kind: "failed_after_generation",
-          code: previewCode,
+          preview_failure_code: previewCode,
           source_integrity_ok: postPreview.sourceIntegrity.sourceIntegrityOk,
           preview_renderable: postPreview.sourceIntegrity.previewRenderable,
           blocked_reason: postPreview.sourceIntegrity.blockedReason,
@@ -917,6 +1022,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         metadata: { code: previewCode, files_kept: filesKept },
       });
       return;
+      }
     }
 
     const iconApiUrl =
@@ -932,7 +1038,8 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       .eq("id", input.projectId)
       .eq("owner_id", input.userId);
 
-    await persistStage("preview_completed", previewResult.previewUrl ?? "ready");
+    const resolvedPreviewUrl = previewResult.ok ? previewResult.previewUrl : null;
+    await persistStage("preview_completed", resolvedPreviewUrl ?? "ready");
 
     await transitionBuildJobStatus(input.writer, {
       jobId: input.buildJobId,
@@ -1019,7 +1126,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       progressPercent: 100,
       metadata: {
         credits_charged: creditsCharged,
-        preview_url: previewResult.previewUrl ?? null,
+        preview_url: resolvedPreviewUrl,
         files_persisted: fileGate.fileCount,
         stream_category: "completed",
         source_integrity_ok: true,
@@ -1043,7 +1150,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       metadata: {
         files: fileGate.fileCount,
         credits_charged: creditsCharged,
-        preview_url: previewResult.previewUrl ?? null,
+        preview_url: resolvedPreviewUrl,
       },
     });
     await persistStage("job_completed");
