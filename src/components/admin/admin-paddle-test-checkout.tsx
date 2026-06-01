@@ -20,6 +20,8 @@ import { normalizePlanId } from "@/lib/billing/plans";
 import { resolveUnifiedBillingAction } from "@/lib/billing/unified-billing-action";
 import { unifiedActionAllowsExecution } from "@/lib/billing/unified-billing-action";
 import type { CatalogBillingInterval } from "@/lib/billing/plan-billing-catalog";
+import { PADDLE_TEST_PROMO_PRESETS } from "@/lib/billing/paddle-promo-codes";
+import { cn } from "@/lib/utils";
 
 const EXPECTED_PRODUCTION_WEBHOOK_URL = "https://vodex.dev/api/webhooks/paddle";
 import { refreshCredits } from "@/lib/stores/credits-store";
@@ -65,6 +67,10 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
   const [billingTruth, setBillingTruth] = React.useState<BillingTruth | null>(null);
   const [attemptSteps, setAttemptSteps] = React.useState<BillingAttemptStep[] | null>(null);
   const [planChangeBlocked, setPlanChangeBlocked] = React.useState<string | null>(null);
+  const [promoCode, setPromoCode] = React.useState("");
+  const [lastPaddleDiscount, setLastPaddleDiscount] = React.useState<Record<string, unknown> | null>(
+    null,
+  );
 
   const tier = resolveCatalogTier(plan, interval);
   const priceId = resolvePaddlePriceId(plan, interval);
@@ -236,6 +242,7 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
           testMode: true,
           source: "admin_test_checkout",
           billingAttemptId: attemptId ?? undefined,
+          ...(promoCode.trim() ? { promoCode: promoCode.trim().toUpperCase() } : {}),
         }),
       });
       const json = (await res.json()) as Record<string, unknown> & {
@@ -249,6 +256,8 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
         planChange?: { description?: string; action?: string };
       };
       setLastResponse({ ...json, ok: res.ok });
+      if (json.paddleDiscount) setLastPaddleDiscount(json.paddleDiscount as Record<string, unknown>);
+      else setLastPaddleDiscount(null);
       if (json.billingTruth) setBillingTruth(json.billingTruth as BillingTruth);
       if (!res.ok) {
         const reasons = json.failureReasons?.length
@@ -559,6 +568,43 @@ export function AdminPaddleTestCheckout({ userId, userEmail, config, testingCont
             {planChangeBlocked}
           </p>
         ) : null}
+
+        <div className="mt-4 space-y-2 rounded-lg border border-border bg-surface/40 p-3">
+          <p className="text-[12px] font-semibold text-foreground">Paddle promo code (optional)</p>
+          <p className="text-[11px] text-muted-foreground">
+            Promo must exist in Paddle Catalog → Discounts. Vodex does not apply local discounts — Paddle
+            validates the code on the transaction.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {PADDLE_TEST_PROMO_PRESETS.map((p) => (
+              <button
+                key={p.code}
+                type="button"
+                className={cn(
+                  "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
+                  promoCode === p.code
+                    ? "border-accent bg-accent/15 text-accent"
+                    : "border-border text-muted-foreground hover:border-accent/40",
+                )}
+                onClick={() => setPromoCode(p.code)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+            placeholder="VODEXTEST100"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-[12px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          />
+          {lastPaddleDiscount ? (
+            <pre className="max-h-24 overflow-auto rounded-lg bg-background px-2 py-2 font-mono text-[10px] ring-1 ring-border">
+              {JSON.stringify(lastPaddleDiscount, null, 2)}
+            </pre>
+          ) : null}
+        </div>
 
         <div>
           <p className="text-[11px] font-medium text-muted-foreground">custom_data preview</p>

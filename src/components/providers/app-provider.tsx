@@ -38,10 +38,12 @@ import {
 import type { Profile } from "@/lib/supabase/types";
 import { installChunkLoadRecovery } from "@/lib/navigation/chunk-load-recovery";
 import { isOnboardingExemptPath } from "@/lib/onboarding/exempt-paths";
+import { isLightweightPublicPath } from "@/lib/routing/lightweight-public-paths";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const lightweightPublic = isLightweightPublicPath(pathname);
   const { setUser, setSession, setProfile, setLoading, reset: resetAuth } =
     useAuthStore();
   const { reset: resetCredits } = useCreditsStore();
@@ -52,10 +54,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((s) => s.session);
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
-  const creditsSyncEnabled = Boolean(user?.id ?? profile?.id);
+  const creditsSyncEnabled = Boolean(user?.id ?? profile?.id) && !lightweightPublic;
   useCreditsSync(creditsSyncEnabled);
 
   React.useEffect(() => {
+    if (lightweightPublic) {
+      setLoading(false);
+      return;
+    }
     if (!profile?.id) return;
     const { isConfirmed } = useCreditsStore.getState();
     if (!isConfirmed) seedCreditsFromProfile(profile);
@@ -98,6 +104,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [loading, session, user, profile?.id, profile?.onboarding_completed, pathname, router]);
 
   React.useEffect(() => {
+    if (lightweightPublic) {
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
 
     async function bootstrapUser(userId: string): Promise<() => void> {
@@ -331,18 +342,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lightweightPublic]);
 
   return (
     <>
-      <NavigationProgress />
-      <RecentPagesTracker />
+      {!lightweightPublic && <NavigationProgress />}
+      {!lightweightPublic && <RecentPagesTracker />}
       <React.Suspense fallback={null}>
         <ReferralGuard />
         <ReferralNoticeHandler />
       </React.Suspense>
       <ReferralCapture />
-      <CommandCenter />
+      {!lightweightPublic && <CommandCenter />}
       <AuthStateDebug />
       {children}
     </>

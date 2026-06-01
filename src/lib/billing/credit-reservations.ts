@@ -7,6 +7,7 @@ import type { QuoteGenerationCostInput } from "@/lib/billing/credit-profit-guard
 import { dreamosLog } from "@/lib/diagnostics/dreamos-logger";
 import { logSecurityAudit } from "@/lib/security/audit-events";
 import { logCreditEconomicsAdmin } from "@/lib/billing/credit-admin-log";
+import { resolveCreditBillingTarget } from "@/lib/billing/workspace-credit-billing";
 
 type Writer = SupabaseClient<Database>;
 
@@ -15,10 +16,14 @@ function reservationWriter(writer: Writer): Writer {
 }
 
 export type ReserveCreditsInput = QuoteGenerationCostInput & {
+  /** Session user who triggered generation. */
+  actorUserId?: string;
+  /** Legacy alias — treated as actor when actorUserId omitted. */
   userId: string;
   userEmail: string;
   generationId: string;
   projectId?: string | null;
+  workspaceId?: string | null;
   conversationId?: string | null;
   balance: number;
   /** When set, reserves this amount instead of full quote (partial build credits). */
@@ -83,6 +88,21 @@ export async function reserveCreditsForGeneration(
   writer: Writer,
   input: ReserveCreditsInput,
 ): Promise<ReserveCreditsResult> {
+  const actorUserId = input.actorUserId ?? input.userId;
+  let billedUserId = input.userId;
+  let billedToType: "personal" | "workspace" = "personal";
+
+  if (input.projectId || input.workspaceId) {
+    const target = await resolveCreditBillingTarget(writer, {
+      actorUserId,
+      projectId: input.projectId,
+      workspaceId: input.workspaceId,
+      requiredCredits: input.overrideReserveAmount,
+    });
+    billedUserId = target.billedUserId;
+    billedToType = target.billedToType;
+  }
+
   const quote = quoteGenerationCost(input);
   const quotedReserve = quote.userCreditsReserved;
   const toReserve =
@@ -134,7 +154,7 @@ export async function reserveCreditsForGeneration(
   const reserveOpId = `reserve:${input.generationId}`;
 
   const rpcPayload = buildChargeTokensRpcPayload({
-    p_user_id: input.userId,
+    p_user_id: billedUserId,
     p_amount: toReserve,
     p_reason: `Reserve ${input.mode}`,
     p_idempotency_key: reserveOpId,
@@ -151,6 +171,8 @@ export async function reserveCreditsForGeneration(
       markup_multiplier: quote.adminBreakdown.markup_multiplier,
       project_id: input.projectId,
       conversation_id: input.conversationId,
+      actor_user_id: actorUserId,
+      billed_to_type: billedToType,
     },
     p_project_id: input.projectId ?? null,
     p_conversation_id: input.conversationId ?? null,
@@ -184,7 +206,7 @@ export async function reserveCreditsForGeneration(
         : null;
 
   const reservationRow = {
-    user_id: input.userId,
+    user_id: billedUserId,
     generation_id: input.generationId,
     project_id: input.projectId ?? null,
     conversation_id: input.conversationId ?? null,
@@ -200,6 +222,8 @@ export async function reserveCreditsForGeneration(
     metadata: {
       model_id: input.selectedModel,
       floor_reason: quote.floorReason,
+      actor_user_id: actorUserId,
+      billed_to_type: billedToType,
     },
   };
 
@@ -216,13 +240,13 @@ export async function reserveCreditsForGeneration(
       category: "credit",
       severity: "warn",
       message: "credit_reservations insert failed (charge already applied)",
-      userId: input.userId,
-      metadata: { error: insErr.message },
+      userId: billedUserId,
+      metadata: { error: insErr.message, actor_user_id: actorUserId },
     });
   }
 
   await econWriter.from("generation_cost_audits" as never).insert({
-    user_id: input.userId,
+    user_id: billedUserId,
     generation_id: input.generationId,
     project_id: input.projectId ?? null,
     mode: input.mode,

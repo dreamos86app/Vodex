@@ -38,6 +38,8 @@ const ALLOW_LINE = [
   /OLD_BRAND_NAMES/,
   /OLD_DOMAINS/,
   /legacy-brand-allowlist/,
+  /deprecatedUrls/,
+  /github-oauth-checklist/,
   /Re-export/,
 ];
 

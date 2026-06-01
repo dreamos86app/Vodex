@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { getProjectAccess } from "@/lib/projects/project-access";
 
 type Writer = SupabaseClient<Database>;
 
@@ -40,11 +41,13 @@ export async function loadProjectContextBlock(
 ): Promise<string> {
   const lines: string[] = [];
 
+  const access = await getProjectAccess(writer, userId, projectId);
+  if (!access) return "";
+
   const { data: project } = await writer
     .from("projects")
     .select("name, description, app_name, build_status, metadata, slug, framework, last_build_at")
     .eq("id", projectId)
-    .eq("owner_id", userId)
     .maybeSingle();
 
   if (project) {

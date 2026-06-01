@@ -31,8 +31,13 @@ const schema = z
     testMode: z.boolean().optional(),
     source: z.enum(["pricing", "admin_test_checkout", "settings"]).optional(),
     billingAttemptId: z.string().uuid().optional(),
+    promoCode: z.string().max(32).optional(),
+    discountId: z.string().max(64).optional(),
   })
-  .refine((d) => d.plan ?? d.planId, { message: "plan is required" });
+  .refine((d) => d.plan ?? d.planId, { message: "plan is required" })
+  .refine((d) => !(d.promoCode?.trim() && d.discountId?.trim()), {
+    message: "Provide promoCode or discountId, not both",
+  });
 
 export async function POST(request: Request) {
   const session = await loadPaddleBillingContextFromSession();
@@ -103,6 +108,8 @@ export async function POST(request: Request) {
     source,
     testMode,
     billingAttemptId: parsed.data.billingAttemptId,
+    promoCode: parsed.data.promoCode,
+    discountId: parsed.data.discountId,
   });
 
   const resolutionPayload = {
@@ -168,6 +175,8 @@ export async function POST(request: Request) {
       liveMode: status.environment === "production",
       testMode,
       billingTruth,
+      paddleDiscount: result.paddleDiscount ?? null,
+      promoCode: parsed.data.promoCode?.trim().toUpperCase() ?? null,
     });
   }
 

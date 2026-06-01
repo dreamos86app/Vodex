@@ -1,22 +1,45 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Sparkles, Shield, Zap, X } from "lucide-react";
-import { IntegrationShowcaseSection } from "@/components/marketing/integrations-showcase";
 import {
   PublicMarketingFooter,
   PublicMarketingHeader,
 } from "@/components/marketing/public-marketing-shell";
-import { PublicSignupSection } from "@/components/marketing/public-signup-section";
-import { PublicConversionCards } from "@/components/marketing/public-conversion-cards";
-import { HowItWorksDemo } from "@/components/marketing/how-it-works-demo";
-import { PublicPricingSection } from "@/components/marketing/public-pricing-section";
-import { DreamOsStatsSection } from "@/components/os-home/dreamos-stats-section";
-import { WhyDreamOsSection } from "@/components/os-home/why-dreamos-section";
 import { PublicLandingSecondaryCtas } from "@/components/marketing/public-landing-sections";
 import { cn } from "@/lib/utils";
+
+const PublicConversionCards = dynamic(
+  () => import("@/components/marketing/public-conversion-cards").then((m) => m.PublicConversionCards),
+  { loading: () => <div className="mx-auto mt-12 h-32 max-w-5xl animate-pulse rounded-2xl bg-surface/40" /> },
+);
+const HowItWorksDemo = dynamic(
+  () => import("@/components/marketing/how-it-works-demo").then((m) => m.HowItWorksDemo),
+  { loading: () => <div className="mx-auto mt-16 h-48 max-w-5xl animate-pulse rounded-2xl bg-surface/40" /> },
+);
+const PublicPricingSection = dynamic(
+  () => import("@/components/marketing/public-pricing-section").then((m) => m.PublicPricingSection),
+  { loading: () => <div className="mx-auto mt-16 h-64 max-w-5xl animate-pulse rounded-2xl bg-surface/40" /> },
+);
+const IntegrationShowcaseSection = dynamic(
+  () => import("@/components/marketing/integrations-showcase").then((m) => m.IntegrationShowcaseSection),
+  { loading: () => <div className="mx-auto mt-20 h-40 max-w-5xl animate-pulse rounded-2xl bg-surface/40" /> },
+);
+const WhyDreamOsSection = dynamic(
+  () => import("@/components/os-home/why-dreamos-section").then((m) => m.WhyDreamOsSection),
+  { loading: () => <div className="mx-auto mt-16 h-40 max-w-5xl animate-pulse rounded-2xl bg-surface/40" /> },
+);
+const DreamOsStatsSection = dynamic(
+  () => import("@/components/os-home/dreamos-stats-section").then((m) => m.DreamOsStatsSection),
+  { loading: () => <div className="mx-auto mt-16 h-32 max-w-5xl animate-pulse rounded-2xl bg-surface/40" /> },
+);
+const PublicSignupSection = dynamic(
+  () => import("@/components/marketing/public-signup-section").then((m) => m.PublicSignupSection),
+  { loading: () => <div className="mx-auto mt-16 h-24 max-w-5xl animate-pulse rounded-2xl bg-surface/40" /> },
+);
 
 function PublicAuthModal({
   open,
@@ -118,19 +141,12 @@ export function PublicLanding() {
       <PublicMarketingHeader />
 
       <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-8 sm:px-6 sm:pb-16 sm:pt-12">
-        <motion.div
+        <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,hsl(var(--accent)/0.22),transparent_70%)]"
-          animate={{ opacity: [0.7, 1, 0.7] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,hsl(var(--accent)/0.22),transparent_70%)] public-hero-glow"
         />
 
-        <motion.section
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="mx-auto max-w-3xl text-center"
-        >
+        <section className="mx-auto max-w-3xl text-center">
           <p className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
             <Sparkles className="size-3.5" strokeWidth={2} /> AI-native app OS
           </p>
@@ -188,42 +204,24 @@ export function PublicLanding() {
               <Zap className="size-3.5 text-accent" strokeWidth={1.75} /> Real preview & publish states
             </span>
           </div>
-        </motion.section>
+        </section>
 
         <PublicConversionCards />
         <HowItWorksDemo />
 
         <PublicPricingSection />
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
-          transition={{ duration: 0.4 }}
-          className="mx-auto mt-20 max-w-5xl"
-        >
+        <div className="mx-auto mt-20 max-w-5xl">
           <IntegrationShowcaseSection variant="premium" />
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
-          transition={{ duration: 0.4 }}
-          className="mx-auto mt-16 max-w-5xl px-4 sm:px-6"
-        >
+        <div className="mx-auto mt-16 max-w-5xl px-4 sm:px-6">
           <WhyDreamOsSection />
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
-          transition={{ duration: 0.4 }}
-          className="mx-auto mt-16 max-w-5xl"
-        >
+        <div className="mx-auto mt-16 max-w-5xl">
           <DreamOsStatsSection />
-        </motion.div>
+        </div>
 
         <PublicSignupSection />
       </main>

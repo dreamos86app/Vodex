@@ -74,6 +74,12 @@ import { finalizeBuildSuccess, finalizeBuildFailed } from "@/lib/build/finalize-
 import { runBuildQualityRepair } from "@/lib/build/quality-repair";
 import { ensureProjectConversation } from "@/lib/projects/project-conversation";
 import { loadProjectContextBlock, refineAppName } from "@/lib/projects/project-context";
+import { assertProjectAccess } from "@/lib/projects/project-access";
+import {
+  resolveCreditBillingTarget,
+  fetchProfileBalance,
+  billingSourceLabel,
+} from "@/lib/billing/workspace-credit-billing";
 import { parseAppBlueprint, requiresBlueprintApproval } from "@/lib/build/blueprint-schema";
 import { buildDeterministicBlueprint } from "@/lib/build/blueprint-deterministic";
 import { readCreateFlowConfig, buildTierToQualityLevel } from "@/lib/create/create-flow-config";
@@ -348,6 +354,20 @@ export async function POST(request: Request) {
 
   await ensureUserProfileServer(user.id, user.email ?? null);
 
+  let projectAccess: Awaited<ReturnType<typeof assertProjectAccess>> = null;
+  if (projectId) {
+    const needsEdit = mode === "edit" || mode === "build";
+    projectAccess = await assertProjectAccess(writer, user.id, projectId, {
+      requireEdit: needsEdit,
+    });
+    if (!projectAccess) {
+      return NextResponse.json(
+        { error: "Project not found or you do not have access.", code: "project_access_denied" },
+        { status: 403 },
+      );
+    }
+  }
+
   const chargeProbe = await getChargeTokensProbeCached();
   if (!chargeProbe.ok) {
     dreamosLog({
@@ -511,7 +531,6 @@ export async function POST(request: Request) {
       .from("projects")
       .select("metadata")
       .eq("id", projectId)
-      .eq("owner_id", user.id)
       .maybeSingle();
     const cfg = readCreateFlowConfig(projQ?.metadata);
     projectQuality = buildTierToQualityLevel(cfg.buildTier);
@@ -613,7 +632,19 @@ export async function POST(request: Request) {
           : "balanced",
   });
   const tokensNeeded = budgetPlan.creditQuote.userCreditsReserved;
-  const balance = profileRow.credits_remaining ?? 0;
+  let creditBillingTarget: Awaited<ReturnType<typeof resolveCreditBillingTarget>> | null = null;
+  if (projectId) {
+    creditBillingTarget = await resolveCreditBillingTarget(writer, {
+      actorUserId: user.id,
+      projectId,
+      workspaceId: projectAccess?.workspaceId ?? null,
+    });
+  }
+
+  let balance = profileRow.credits_remaining ?? 0;
+  if (creditBillingTarget && creditBillingTarget.billedUserId !== user.id) {
+    balance = await fetchProfileBalance(writer, creditBillingTarget.billedUserId);
+  }
   const buildAllowance = startBuildPipeline
     ? resolveBuildCreditAllowance(balance, budgetPlan.creditQuote)
     : null;
@@ -730,7 +761,6 @@ export async function POST(request: Request) {
       .from("projects")
       .select("metadata")
       .eq("id", projectId)
-      .eq("owner_id", user.id)
       .maybeSingle();
     const prevBuildMeta =
       projMetaRow?.metadata && typeof projMetaRow.metadata === "object" && !Array.isArray(projMetaRow.metadata)
@@ -747,8 +777,7 @@ export async function POST(request: Request) {
           hide_from_home: false,
         },
       } as never)
-      .eq("id", projectId)
-      .eq("owner_id", user.id);
+      .eq("id", projectId);
 
     const { data: bj, error: bjErr } = await writer
       .from("build_jobs")
@@ -845,7 +874,6 @@ export async function POST(request: Request) {
       .from("projects")
       .select("metadata")
       .eq("id", projectId)
-      .eq("owner_id", user.id)
       .maybeSingle();
     const buildMeta = (projMetaRow?.metadata ?? {}) as Record<string, unknown>;
     const buildCfg = readCreateFlowConfig(buildMeta);
@@ -896,8 +924,7 @@ export async function POST(request: Request) {
               blueprint_auto_approved: true,
             } as never,
           })
-          .eq("id", projectId)
-          .eq("owner_id", user.id);
+          .eq("id", projectId);
       } catch {
         /* non-fatal — build can proceed with in-memory blueprint */
       }
@@ -922,10 +949,12 @@ export async function POST(request: Request) {
     }
 
     const reserve = await reserveCreditsForGeneration(writer, {
+      actorUserId: user.id,
       userId: user.id,
       userEmail,
       generationId: opId,
       projectId,
+      workspaceId: projectAccess?.workspaceId ?? null,
       conversationId,
       balance,
       mode: "full_build",
@@ -1029,12 +1058,16 @@ export async function POST(request: Request) {
           : "Build started — track progress via events.",
         partialBuild: buildAllowance?.partial ?? false,
         creditsReserved: reserve.reserved,
+        billingSource: creditBillingTarget ? billingSourceLabel(creditBillingTarget) : "Your personal credits",
       },
       {
         status: 202,
         headers: {
           "X-DreamOS-Async-Build": "1",
           "X-DreamOS-Build-Job-Id": buildJobId,
+          ...(creditBillingTarget
+            ? { "X-Vodex-Billing-Source": billingSourceLabel(creditBillingTarget) }
+            : {}),
         },
       },
     );
@@ -1047,7 +1080,8 @@ export async function POST(request: Request) {
         ? "discuss_stream"
         : "discuss_stream";
   if (clientOpId) {
-    const alreadyDone = await hasSuccessfulChargeForOperation(writer, user.id, opId);
+    const billedForIdempotency = creditBillingTarget?.billedUserId ?? user.id;
+    const alreadyDone = await hasSuccessfulChargeForOperation(writer, billedForIdempotency, opId);
     if (alreadyDone) {
       return NextResponse.json(
         {
@@ -1269,7 +1303,7 @@ export async function POST(request: Request) {
               const appDescription = meta?.app?.description?.trim() ?? null;
               const rows = files.map((f) => ({
                 project_id: projectId,
-                owner_id: user.id,
+                owner_id: projectAccess?.ownerId ?? user.id,
                 path: f.path,
                 content: f.content,
                 language: f.path.split(".").pop() ?? "text",
@@ -1296,8 +1330,7 @@ export async function POST(request: Request) {
                 await writer
                   .from("projects")
                   .update({ icon_url: iconApiUrl, app_icon_url: svgIcon } as never)
-                  .eq("id", projectId)
-                  .eq("owner_id", user.id);
+                  .eq("id", projectId);
                 await finalizeBuildSuccess({
                   writer,
                   userId: user.id,
@@ -1366,7 +1399,8 @@ export async function POST(request: Request) {
         let charged = false;
         let chargeError: string | null = null;
 
-        const alreadyCharged = await hasSuccessfulChargeForOperation(writer, user.id, opId);
+        const billedUserId = creditBillingTarget?.billedUserId ?? user.id;
+        const alreadyCharged = await hasSuccessfulChargeForOperation(writer, billedUserId, opId);
 
         if (shouldCharge && !alreadyCharged) {
           const chargeCalc = calculateCreditsToCharge({
@@ -1388,6 +1422,7 @@ export async function POST(request: Request) {
           });
 
           const charge = await chargeAiOperation(writer, {
+            actorUserId: user.id,
             userId: user.id,
             userEmail,
             amount: creditsToCharge,
@@ -1396,6 +1431,7 @@ export async function POST(request: Request) {
             operationId: opId,
             conversationId,
             projectId,
+            workspaceId: projectAccess?.workspaceId ?? null,
             buildJobId,
             providerCostUsd: chargeCalc.estimatedProviderCostUsd,
             tokensInput: event.usage?.inputTokens ?? null,

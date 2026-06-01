@@ -36,6 +36,15 @@ export type PaddleCheckoutResult =
 
 export type PaddleBillingIntent = "new_subscription" | "upgrade" | "interval_change";
 
+export type PaddleCheckoutDiscountMeta = {
+  requestedPromoCode?: string | null;
+  requestedDiscountId?: string | null;
+  appliedMode?: "discount_id" | "discount_code";
+  appliedValue?: string;
+  paddleDiscountId?: string | null;
+  paddleDiscountCode?: string | null;
+};
+
 export async function createPaddleCheckoutSession(input: {
   planId: BillablePlanId;
   interval?: CatalogBillingInterval;
@@ -47,7 +56,13 @@ export async function createPaddleCheckoutSession(input: {
   billingAttemptId?: string;
   source?: "pricing" | "admin_test_checkout" | "settings";
   testMode?: boolean;
-}): Promise<PaddleCheckoutResult> {
+  /** Paddle catalog discount id (dsc_…) — mutually exclusive with discountCode */
+  discountId?: string;
+  /** Paddle checkout discount code — must exist in Paddle dashboard */
+  discountCode?: string;
+}): Promise<
+  PaddleCheckoutResult & { discount?: PaddleCheckoutDiscountMeta }
+> {
   const envGate = assertPaddleCheckoutEnvironment();
   if (!envGate.ok) {
     return { ok: false, code: "setup_required", error: envGate.error, missing: envGate.errors };
@@ -106,6 +121,22 @@ export async function createPaddleCheckoutSession(input: {
     custom_data: customData,
   };
 
+  const discountMeta: PaddleCheckoutDiscountMeta = {
+    requestedPromoCode: input.discountCode ?? null,
+    requestedDiscountId: input.discountId ?? null,
+  };
+
+  if (input.discountId?.trim()) {
+    transactionBody.discount_id = input.discountId.trim();
+    discountMeta.appliedMode = "discount_id";
+    discountMeta.appliedValue = input.discountId.trim();
+  } else if (input.discountCode?.trim()) {
+    const code = input.discountCode.trim().toUpperCase();
+    transactionBody.discount = { code };
+    discountMeta.appliedMode = "discount_code";
+    discountMeta.appliedValue = code;
+  }
+
   if (checkoutUrlResolution.url) {
     transactionBody.checkout = { url: checkoutUrlResolution.url };
   }
@@ -121,15 +152,30 @@ export async function createPaddleCheckoutSession(input: {
     });
 
     const json = (await res.json()) as {
-      data?: { checkout?: { url?: string }; id?: string };
-      error?: { detail?: string };
+      data?: {
+        checkout?: { url?: string };
+        id?: string;
+        discount_id?: string | null;
+        discount?: { code?: string | null; id?: string | null };
+      };
+      error?: { detail?: string; code?: string };
     };
 
     if (!res.ok) {
+      const detail = json.error?.detail ?? `Paddle API ${res.status}`;
+      const discountRejected =
+        discountMeta.appliedMode &&
+        /discount/i.test(detail);
       return {
         ok: false,
         code: "api_error",
-        error: json.error?.detail ?? `Paddle API ${res.status}`,
+        error: discountRejected
+          ? `Paddle rejected discount: ${detail}`
+          : detail,
+        discount: {
+          ...discountMeta,
+          paddleDiscountCode: discountMeta.appliedValue ?? null,
+        },
       };
     }
 
@@ -137,6 +183,10 @@ export async function createPaddleCheckoutSession(input: {
     if (!checkoutUrl) {
       return { ok: false, code: "api_error", error: "Paddle did not return a checkout URL" };
     }
+
+    discountMeta.paddleDiscountId = json.data?.discount_id ?? json.data?.discount?.id ?? null;
+    discountMeta.paddleDiscountCode =
+      json.data?.discount?.code ?? discountMeta.appliedValue ?? null;
 
     await logPaddleCheckoutAttempt({
       userId: input.userId,
@@ -154,6 +204,7 @@ export async function createPaddleCheckoutSession(input: {
       transactionId: json.data?.id,
       paddleCheckoutUrlSent: checkoutUrlResolution.url,
       paddleCheckoutUrlMode: checkoutUrlResolution.mode,
+      discount: discountMeta,
     };
   } catch (e) {
     return {

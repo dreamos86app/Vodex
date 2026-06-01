@@ -1,5 +1,8 @@
-import { DREAMOS_OWNER_EMAIL } from "@/lib/admin-owner";
-import { DEFAULT_EMAIL_FROM, SUPPORT_EMAIL } from "@/lib/branding/brand-assets";
+import {
+  CONTACT_NOTIFICATIONS_TO,
+  DEFAULT_EMAIL_FROM,
+  SUPPORT_EMAIL,
+} from "@/lib/branding/brand-assets";
 
 /** Server-only email configuration (never import from client components). */
 export type EmailConfig = {
@@ -18,7 +21,7 @@ export function getEmailConfig(): EmailConfig {
     process.env.RESEND_FROM_EMAIL?.trim() ||
     DEFAULT_EMAIL_FROM;
   const contactNotificationsTo =
-    process.env.CONTACT_NOTIFICATIONS_TO?.trim() || SUPPORT_EMAIL;
+    process.env.CONTACT_NOTIFICATIONS_TO?.trim() || CONTACT_NOTIFICATIONS_TO;
   const supportEmail =
     process.env.SUPPORT_EMAIL?.trim() ||
     process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim() ||

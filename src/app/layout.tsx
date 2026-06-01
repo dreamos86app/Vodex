@@ -30,9 +30,8 @@ import {
 
 
 
+/** App routes use client search params; keep dynamic until auth/help pages use Suspense boundaries. */
 export const dynamic = "force-dynamic";
-
-
 
 const geistSans = Geist({
 

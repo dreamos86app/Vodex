@@ -36,6 +36,7 @@ import {
 } from "@/lib/creation/models";
 import { CreditQuoteBanner, type CreditQuoteDisplay } from "@/components/billing/credit-quote-banner";
 import { CreditsTracker } from "@/components/credits/credits-tracker";
+import { ProjectBillingBadge } from "@/components/billing/project-billing-badge";
 import { BlueprintConfirmationModal } from "@/components/build/blueprint-confirmation-modal";
 import type { AppBlueprint } from "@/lib/build/blueprint-schema";
 import { ModelPicker } from "@/components/create/workspace/model-picker";
@@ -791,15 +792,17 @@ export function CreationWorkspace({
         {/* Composer */}
         <div className="shrink-0 border-t border-border/60 bg-background/90 px-3 py-3 backdrop-blur-xl">
           <div className="mx-auto max-w-3xl">
-            <CreditsTracker
-              build={build}
-              action={action}
-              planId={planId}
-              loading={creditsLoading || !isConfirmed}
-              variant="compact"
-              className="mb-3"
-              showUpgrade={build.available < build.planAllowance * 0.15}
-            />
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <CreditsTracker
+                build={build}
+                action={action}
+                planId={planId}
+                loading={creditsLoading || !isConfirmed}
+                variant="compact"
+                showUpgrade={build.available < build.planAllowance * 0.15}
+              />
+              <ProjectBillingBadge projectId={project?.id} />
+            </div>
             {(creditQuote || quoteLoading) && (
               <CreditQuoteBanner quote={creditQuote} loading={quoteLoading} className="mb-2" />
             )}

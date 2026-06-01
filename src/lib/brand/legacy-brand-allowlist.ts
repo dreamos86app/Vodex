@@ -3,7 +3,7 @@
  * and platform-owner auth. Not shown in user-facing UI copy.
  */
 
-import { APP_URL } from "@/lib/brand/brand-config";
+import { ADMIN_OWNER_EMAIL, APP_URL } from "@/lib/brand/brand-config";
 
 /** Legacy platform hosts that should redirect to vodex.dev. */
 export const LEGACY_DREAMOS86_PLATFORM_HOSTS = [
@@ -22,7 +22,13 @@ export const LEGACY_REDIRECT_ORIGINS = [
 
 /** Platform owner inbox — set ADMIN_OWNER_EMAIL in production. */
 export const LEGACY_PLATFORM_OWNER_EMAIL =
-  process.env.ADMIN_OWNER_EMAIL?.trim() || "dreamos86app@gmail.com";
+  process.env.ADMIN_OWNER_EMAIL?.trim() || ADMIN_OWNER_EMAIL;
+
+/**
+ * @legacy-migration Prior owner inbox — still grants admin until fully migrated in Supabase.
+ * Never shown in user-facing UI.
+ */
+export const LEGACY_PREVIOUS_OWNER_EMAIL = "dreamos86app@gmail.com";
 
 export function isLegacyPlatformHostname(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/\.$/, "");

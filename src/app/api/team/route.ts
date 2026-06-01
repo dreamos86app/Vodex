@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { ensurePersonalWorkspace } from "@/lib/identity/ensure-personal-workspace";
 
 export type TeamMemberRow = {
   user_id: string;
@@ -35,17 +36,25 @@ export async function GET() {
   const admin = createServiceRoleClient();
 
   let workspaceId: string | null = null;
-  const { data: owned } = await supabase.from("workspaces").select("id").eq("owner_id", user.id).limit(1).maybeSingle();
-  if (owned?.id) workspaceId = owned.id;
+  const { data: mem } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (mem?.workspace_id) workspaceId = mem.workspace_id;
+
   if (!workspaceId) {
-    const { data: mem } = await supabase
-      .from("workspace_members")
-      .select("workspace_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-    if (mem?.workspace_id) workspaceId = mem.workspace_id;
+    workspaceId = await ensurePersonalWorkspace(supabase, user.id, user.email);
   }
+
+  const { data: owned } = await supabase
+    .from("workspaces")
+    .select("id")
+    .eq("owner_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (!workspaceId && owned?.id) workspaceId = owned.id;
 
   const members: TeamMemberRow[] = [];
   const invites: TeamInviteRow[] = [];
@@ -87,19 +96,40 @@ export async function GET() {
       });
     }
 
-    const { data: pending } = await supabase
-      .from("team_members")
-      .select("id, email, role, status, created_at")
+    const { data: pendingInvites } = await supabase
+      .from("workspace_invitations")
+      .select("id, email, role, created_at, expires_at")
       .eq("workspace_id", workspaceId)
-      .eq("status", "pending");
-    for (const row of pending ?? []) {
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false });
+
+    for (const row of pendingInvites ?? []) {
+      if (new Date(row.expires_at) < new Date()) continue;
       invites.push({
         id: row.id,
         email: row.email,
         role: row.role,
-        status: row.status,
+        status: "pending",
         created_at: row.created_at,
       });
+    }
+
+    if (invites.length === 0) {
+      const { data: legacyPending } = await supabase
+        .from("team_members")
+        .select("id, email, role, status, created_at")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "pending");
+      for (const row of legacyPending ?? []) {
+        invites.push({
+          id: row.id,
+          email: row.email,
+          role: row.role,
+          status: row.status,
+          created_at: row.created_at,
+        });
+      }
     }
   }
 

@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getAppUrl, getCallbackUrl } from "@/lib/auth";
+import { GITHUB_OAUTH_APP_CHECKLIST } from "@/lib/auth/github-oauth-checklist";
 import { getSupabaseProjectRefFromUrl } from "@/lib/supabase/auth-domain";
 import type { AuthHealthResult, ProviderStatus } from "@/app/api/admin/auth-health/route";
 import { AdminProviderHealthPanel } from "@/components/admin/admin-provider-health-panel";
@@ -289,6 +290,32 @@ export function AuthHealthPanel() {
           </p>
         </div>
       )}
+
+      <Section title="GitHub OAuth app (manual)">
+        <Row
+          label="Homepage URL"
+          kind="info"
+          detail={GITHUB_OAUTH_APP_CHECKLIST.homepageUrl}
+          extra={<CopyText value={GITHUB_OAUTH_APP_CHECKLIST.homepageUrl} />}
+        />
+        <Row
+          label="Authorization callback URL"
+          kind="info"
+          detail="Register in GitHub Developer Settings — must match Supabase"
+          extra={<CopyText value={GITHUB_OAUTH_APP_CHECKLIST.authorizationCallbackUrl} />}
+        />
+        <Row
+          label="App redirect after auth"
+          kind="info"
+          detail="Add to Supabase → Authentication → URL configuration"
+          extra={<CopyText value={GITHUB_OAUTH_APP_CHECKLIST.appRedirectAfterAuth} />}
+        />
+        <Row
+          label="Remove deprecated URLs"
+          kind="warn"
+          detail={GITHUB_OAUTH_APP_CHECKLIST.deprecatedUrls.join(" · ")}
+        />
+      </Section>
 
       {/* Infrastructure */}
       <Section title="Infrastructure">

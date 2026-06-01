@@ -14,6 +14,12 @@ export const SUPPORT_EMAIL = "support@vodex.dev";
 
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}` as const;
 
+/** Platform owner inbox — admin OTPs and critical confirmations. */
+export const ADMIN_OWNER_EMAIL = "vodexlabs@gmail.com";
+
+/** Internal contact / security notifications (not end-user support). */
+export const CONTACT_NOTIFICATIONS_TO = ADMIN_OWNER_EMAIL;
+
 /** Resend / transactional sender (server env should match). */
 export const RESEND_FROM_EMAIL = `Vodex <${SUPPORT_EMAIL}>`;
 

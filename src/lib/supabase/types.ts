@@ -184,8 +184,18 @@ export interface Database {
           slug: string;
           avatar_url: string | null;
           plan_id: PlanId;
+          billing_mode: "personal_credits" | "workspace_sponsored" | "hybrid";
+          workspace_build_credits: number | null;
+          workspace_action_credits: number | null;
         };
-        Insert: Omit<Database["public"]["Tables"]["workspaces"]["Row"], "id" | "created_at" | "updated_at">;
+        Insert: Omit<
+          Database["public"]["Tables"]["workspaces"]["Row"],
+          "id" | "created_at" | "updated_at" | "billing_mode" | "workspace_build_credits" | "workspace_action_credits"
+        > & {
+          billing_mode?: "personal_credits" | "workspace_sponsored" | "hybrid";
+          workspace_build_credits?: number | null;
+          workspace_action_credits?: number | null;
+        };
         Update: Partial<Database["public"]["Tables"]["workspaces"]["Row"]>;
         Relationships: [];
       };
@@ -200,6 +210,28 @@ export interface Database {
         };
         Insert: Omit<Database["public"]["Tables"]["workspace_members"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["workspace_members"]["Row"]>;
+        Relationships: [];
+      };
+
+      workspace_invitations: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          workspace_id: string;
+          email: string;
+          role: "admin" | "editor" | "viewer";
+          token_hash: string;
+          invited_by: string;
+          expires_at: string;
+          accepted_at: string | null;
+          revoked_at: string | null;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["workspace_invitations"]["Row"],
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<Database["public"]["Tables"]["workspace_invitations"]["Row"]>;
         Relationships: [];
       };
 
@@ -398,12 +430,46 @@ export interface Database {
           error_message: string | null;
           conversation_id: string | null;
           operation_id: string | null;
+          actor_user_id: string | null;
+          workspace_id: string | null;
+          billed_to_type: "personal" | "workspace" | null;
+          billed_to_user_id: string | null;
+          action_type: string | null;
+          credits_charged: number | null;
+          project_id: string | null;
+          provider: string | null;
+          route_reason: string | null;
+          charged_after_success: boolean | null;
+          estimated_provider_cost: number | null;
         };
         Insert: Omit<
           Database["public"]["Tables"]["ai_usage_logs"]["Row"],
-          "id" | "created_at"
+          | "id"
+          | "created_at"
+          | "actor_user_id"
+          | "workspace_id"
+          | "billed_to_type"
+          | "billed_to_user_id"
+          | "action_type"
+          | "credits_charged"
+          | "project_id"
+          | "provider"
+          | "route_reason"
+          | "charged_after_success"
+          | "estimated_provider_cost"
         > & {
           operation_id?: string | null;
+          actor_user_id?: string | null;
+          workspace_id?: string | null;
+          billed_to_type?: "personal" | "workspace" | null;
+          billed_to_user_id?: string | null;
+          action_type?: string | null;
+          credits_charged?: number | null;
+          project_id?: string | null;
+          provider?: string | null;
+          route_reason?: string | null;
+          charged_after_success?: boolean | null;
+          estimated_provider_cost?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["ai_usage_logs"]["Row"]>;
         Relationships: [];

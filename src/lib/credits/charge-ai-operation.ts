@@ -13,13 +13,21 @@ import {
 import { logSecurityAudit } from "@/lib/security/audit-events";
 import { writeCreditEvent } from "@/lib/credits/credit-events";
 import { canAffordAtomicAction } from "@/lib/billing/partial-build-credits";
+import {
+  resolveCreditBillingTarget,
+  type CreditBillingTarget,
+} from "@/lib/billing/workspace-credit-billing";
 
 type Writer = SupabaseClient<Database>;
 
 export type ChargeAiOperationInput = {
+  /** User who triggered the action (session user). */
+  actorUserId?: string;
+  /** Billed account — resolved server-side from workspace billing_mode when omitted. */
   userId: string;
   userEmail: string;
   amount: number;
+  workspaceId?: string | null;
   modelId: string;
   mode: string;
   operationId: string;
@@ -62,10 +70,42 @@ async function fetchProfileBalance(writer: Writer, userId: string): Promise<numb
  * Server-authoritative credit charge after successful AI work.
  * Uses charge_tokens RPC (idempotent via operation_id / idempotency_key).
  */
+function usageLogRow(
+  input: ChargeAiOperationInput,
+  billing: CreditBillingTarget | null,
+  chargeUserId: string,
+  extra: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    user_id: chargeUserId,
+    user_email: input.userEmail,
+    actor_user_id: billing?.actorUserId ?? input.actorUserId ?? input.userId,
+    workspace_id: billing?.workspaceId ?? input.workspaceId ?? null,
+    billed_to_type: billing?.billedToType ?? "personal",
+    billed_to_user_id: chargeUserId,
+    action_type: input.operationType ?? input.mode,
+    ...extra,
+  };
+}
+
 export async function chargeAiOperation(
   writer: Writer,
   input: ChargeAiOperationInput,
 ): Promise<ChargeAiOperationResult> {
+  const actorUserId = input.actorUserId ?? input.userId;
+  let chargeUserId = input.userId;
+  let billingTarget: CreditBillingTarget | null = null;
+
+  if (input.projectId || input.workspaceId) {
+    billingTarget = await resolveCreditBillingTarget(writer, {
+      actorUserId,
+      projectId: input.projectId,
+      workspaceId: input.workspaceId,
+      requiredCredits: input.amount,
+    });
+    chargeUserId = billingTarget.billedUserId;
+  }
+
   if (input.amount < MIN_CHARGEABLE_CREDITS) {
     logCredits("info", "charge skipped reason", { reason: "invalid_amount", amount: input.amount });
     return { charged: false, remaining: null, error: "invalid_amount" };
@@ -81,7 +121,7 @@ export async function chargeAiOperation(
     "app_logo_generation",
   ]);
   if (atomicModes.has(input.mode) || input.operationType) {
-    const balance = await fetchProfileBalance(writer, input.userId);
+    const balance = await fetchProfileBalance(writer, chargeUserId);
     if (balance !== null && !canAffordAtomicAction(balance, input.amount)) {
       return {
         charged: false,
@@ -108,22 +148,22 @@ export async function chargeAiOperation(
       reason: profitCheck.reason,
       operation_id: input.operationId,
     });
-    await writer.from("ai_usage_logs").insert({
-      user_id: input.userId,
-      user_email: input.userEmail,
-      model_id: input.modelId,
-      mode: input.mode,
-      tokens_charged: 0,
-      credits_charged: 0,
-      status: "charge_failed",
-      error_message: profitCheck.reason ?? "unprofitable_charge",
-      conversation_id: input.conversationId ?? null,
-      operation_id: input.operationId,
-      project_id: input.projectId ?? null,
-      charged_after_success: false,
-    } as never);
+    await writer.from("ai_usage_logs").insert(
+      usageLogRow(input, billingTarget, chargeUserId, {
+        model_id: input.modelId,
+        mode: input.mode,
+        tokens_charged: 0,
+        credits_charged: 0,
+        status: "charge_failed",
+        error_message: profitCheck.reason ?? "unprofitable_charge",
+        conversation_id: input.conversationId ?? null,
+        operation_id: input.operationId,
+        project_id: input.projectId ?? null,
+        charged_after_success: false,
+      }) as never,
+    );
     await writeCreditEvent(writer, {
-      userId: input.userId,
+      userId: chargeUserId,
       operationId: input.operationId,
       modelId: input.modelId,
       creditsConsumed: 0,
@@ -136,7 +176,7 @@ export async function chargeAiOperation(
     return { charged: false, remaining: null, error: profitCheck.reason ?? "unprofitable_charge" };
   }
 
-  const ensured = await ensureUserProfileServer(input.userId, input.userEmail);
+  const ensured = await ensureUserProfileServer(chargeUserId, input.userEmail);
   if (!ensured.ok) {
     logCredits("warn", "charge failed", { reason: "ensure_profile", error: ensured.error });
   }
@@ -146,7 +186,8 @@ export async function chargeAiOperation(
     mode: input.mode,
     model: input.modelId,
     amount: input.amount,
-    user_id: input.userId,
+    actor_user_id: actorUserId,
+    billed_user_id: chargeUserId,
   });
 
   const providerUsd = input.providerCostUsd ?? 0;
@@ -164,7 +205,7 @@ export async function chargeAiOperation(
   });
 
   const rpcPayload = buildChargeTokensRpcPayload({
-      p_user_id: input.userId,
+      p_user_id: chargeUserId,
       p_amount: input.amount,
       p_reason: `AI ${input.mode}`,
       p_idempotency_key: input.operationId,
@@ -176,6 +217,8 @@ export async function chargeAiOperation(
         operation_id: input.operationId,
         provider_cost_usd: input.providerCostUsd,
         build_job_id: input.buildJobId,
+        actor_user_id: actorUserId,
+        billed_to_type: billingTarget?.billedToType,
       },
       p_project_id: input.projectId ?? null,
       p_conversation_id: input.conversationId ?? null,
@@ -194,24 +237,24 @@ export async function chargeAiOperation(
 
   if (rpcErr) {
     logCredits("warn", "charge failed", { error: rpcErr.message, operation_id: input.operationId });
-    await writer.from("ai_usage_logs").insert({
-      user_id: input.userId,
-      user_email: input.userEmail,
-      model_id: input.modelId,
-      mode: input.mode,
-      provider: input.provider ?? null,
-      route_reason: input.routeReason ?? null,
-      tokens_charged: 0,
-      credits_charged: 0,
-      status: "charge_failed",
-      error_message: rpcErr.message,
-      conversation_id: input.conversationId ?? null,
-      operation_id: input.operationId,
-      project_id: input.projectId ?? null,
-      charged_after_success: false,
-    } as never);
+    await writer.from("ai_usage_logs").insert(
+      usageLogRow(input, billingTarget, chargeUserId, {
+        model_id: input.modelId,
+        mode: input.mode,
+        provider: input.provider ?? null,
+        route_reason: input.routeReason ?? null,
+        tokens_charged: 0,
+        credits_charged: 0,
+        status: "charge_failed",
+        error_message: rpcErr.message,
+        conversation_id: input.conversationId ?? null,
+        operation_id: input.operationId,
+        project_id: input.projectId ?? null,
+        charged_after_success: false,
+      }) as never,
+    );
     await writeCreditEvent(writer, {
-      userId: input.userId,
+      userId: chargeUserId,
       operationId: input.operationId,
       modelId: input.modelId,
       creditsConsumed: 0,
@@ -244,15 +287,13 @@ export async function chargeAiOperation(
         : null;
 
   if (remaining == null && (rpcOk || idempotent)) {
-    remaining = await fetchProfileBalance(writer, input.userId);
+    remaining = await fetchProfileBalance(writer, chargeUserId);
   }
 
   const charged = rpcOk && !idempotent;
 
   if (charged) {
-    const usageRow: Record<string, unknown> = {
-      user_id: input.userId,
-      user_email: input.userEmail,
+    const usageRow: Record<string, unknown> = usageLogRow(input, billingTarget, chargeUserId, {
       model_id: input.modelId,
       mode: input.mode,
       provider: input.provider ?? null,
@@ -265,7 +306,7 @@ export async function chargeAiOperation(
       project_id: input.projectId ?? null,
       charged_after_success: true,
       estimated_provider_cost: input.providerCostUsd ?? 0,
-    };
+    });
 
     if (input.tokensInput != null) usageRow.tokens_input = input.tokensInput;
     if (input.tokensOutput != null) usageRow.tokens_output = input.tokensOutput;
@@ -289,17 +330,19 @@ export async function chargeAiOperation(
           credits_remaining: remaining,
           tokens_remaining: remaining,
         } as never)
-        .eq("id", input.userId);
+        .eq("id", chargeUserId);
     }
 
     // charge_tokens RPC writes the authoritative credit_events row on success.
     logCredits("info", "charge ok", {
       balance_after: remaining,
       operation_id: input.operationId,
+      actor_user_id: actorUserId,
+      billed_user_id: chargeUserId,
     });
 
     await logSecurityAudit({
-      userId: input.userId,
+      userId: actorUserId,
       action: "credit_charge",
       projectId: input.projectId ?? null,
       metadata: {
@@ -307,6 +350,8 @@ export async function chargeAiOperation(
         mode: input.mode,
         modelId: input.modelId,
         operationId: input.operationId,
+        billed_user_id: chargeUserId,
+        billed_to_type: billingTarget?.billedToType,
       },
     });
   } else if (idempotent) {
@@ -320,7 +365,7 @@ export async function chargeAiOperation(
       operation_id: input.operationId,
     });
     await writeCreditEvent(writer, {
-      userId: input.userId,
+      userId: chargeUserId,
       operationId: input.operationId,
       modelId: input.modelId,
       creditsConsumed: 0,
@@ -331,6 +376,7 @@ export async function chargeAiOperation(
       metadata: {
         mode: input.mode,
         reason: creditResult?.error ?? "not_charged",
+        actor_user_id: actorUserId,
       },
     });
   }

@@ -1,13 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { TeamInvitePanel } from "@/components/settings/team-invite-panel";
+import { WorkspaceBillingSettings } from "@/components/settings/workspace-billing-settings";
 import { Badge } from "@/components/ui/badge";
-import { SectionCard, selectCls } from "@/components/settings/shared";
-import { cn } from "@/lib/utils";
+import { SectionCard } from "@/components/settings/shared";
 import {
-  UserPlus,
   Crown,
   ShieldCheck,
   User,
@@ -95,12 +94,12 @@ function memberInitials(m: ApiMember): string {
 }
 
 export default function TeamSettingsPage() {
-  const [inviteEmail, setInviteEmail] = React.useState("");
-  const [inviteRole, setInviteRole] = React.useState("member");
+  const [workspaceId, setWorkspaceId] = React.useState<string | null>(null);
+  const [isOwner, setIsOwner] = React.useState(false);
   const [members, setMembers] = React.useState<ApiMember[]>([]);
   const [invites, setInvites] = React.useState<ApiInvite[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [sending, setSending] = React.useState(false);
+  const [inviteActionId, setInviteActionId] = React.useState<string | null>(null);
 
   async function loadTeam() {
     setLoading(true);
@@ -110,9 +109,15 @@ export default function TeamSettingsPage() {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error ?? "Could not load team");
       }
-      const data = (await res.json()) as { members: ApiMember[]; invites: ApiInvite[] };
+      const data = (await res.json()) as {
+        workspace_id?: string | null;
+        members: ApiMember[];
+        invites: ApiInvite[];
+      };
+      setWorkspaceId(data.workspace_id ?? null);
       setMembers(data.members ?? []);
       setInvites(data.invites ?? []);
+      setIsOwner((data.members ?? []).some((m) => m.is_you && m.role.toLowerCase() === "owner"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not load team");
       setMembers([]);
@@ -134,68 +139,54 @@ export default function TeamSettingsPage() {
           othersCount === 0 ? "" : ` · ${othersCount} teammate${othersCount !== 1 ? "s" : ""}`
         }`;
 
-  async function handleInvite() {
-    if (!inviteEmail.includes("@")) return;
-    setSending(true);
-    const addr = inviteEmail.trim();
+  async function handleResendInvite(inviteId: string) {
+    if (!workspaceId) return;
+    setInviteActionId(inviteId);
     try {
-      const res = await fetch("/api/team/invite", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: addr,
-          role: inviteRole === "admin" ? "admin" : "member",
-        }),
-      });
-      const j = (await res.json().catch(() => ({}))) as { error?: string; invite?: ApiInvite };
-      if (!res.ok) {
-        throw new Error(j.error ?? "Invite failed");
-      }
-      setInviteEmail("");
-      if (j.invite) setInvites((prev) => [j.invite as ApiInvite, ...prev]);
-      toast.success(`Invitation recorded for ${addr}`);
-      await loadTeam();
+      const res = await fetch(
+        `/api/workspaces/${workspaceId}/invitations/${inviteId}/resend`,
+        { method: "POST", credentials: "include" },
+      );
+      const j = (await res.json().catch(() => ({}))) as { error?: string; email_sent?: boolean };
+      if (!res.ok) throw new Error(j.error ?? "Resend failed");
+      toast.success(j.email_sent ? "Invitation resent" : "Invitation refreshed (check email config)");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Invite failed");
+      toast.error(e instanceof Error ? e.message : "Resend failed");
     } finally {
-      setSending(false);
+      setInviteActionId(null);
+    }
+  }
+
+  async function handleRevokeInvite(inviteId: string) {
+    if (!workspaceId) return;
+    setInviteActionId(inviteId);
+    try {
+      const res = await fetch(
+        `/api/workspaces/${workspaceId}/invitations/${inviteId}/revoke`,
+        { method: "POST", credentials: "include" },
+      );
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(j.error ?? "Revoke failed");
+      setInvites((prev) => prev.filter((i) => i.id !== inviteId));
+      toast.success("Invitation revoked");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Revoke failed");
+    } finally {
+      setInviteActionId(null);
     }
   }
 
   return (
     <div className="space-y-5">
-      <SectionCard title="Invite Team Member" description="Invite collaborators to your workspace by email.">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="flex-1">
-            <Input
-              type="email"
-              placeholder="colleague@company.com"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void handleInvite()}
-            />
-          </div>
-          <select
-            value={inviteRole}
-            onChange={(e) => setInviteRole(e.target.value)}
-            className={cn(selectCls, "sm:w-36")}
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
-          <Button
-            variant="accent"
-            size="md"
-            onClick={() => void handleInvite()}
-            disabled={!inviteEmail.includes("@") || sending}
-            className="gap-1.5"
-          >
-            {sending ? <Loader2 className="size-3.5 animate-spin" strokeWidth={1.6} /> : <UserPlus className="size-3.5" strokeWidth={1.6} />}
-            Send invite
-          </Button>
-        </div>
-      </SectionCard>
+      <TeamInvitePanel
+        workspaceId={workspaceId}
+        onInvited={(invite) => {
+          setInvites((prev) => [invite, ...prev]);
+          void loadTeam();
+        }}
+      />
+
+      <WorkspaceBillingSettings workspaceId={workspaceId} canManage={isOwner} />
 
       <SectionCard title="Team Members" description={totalLabel} noPadding>
         {loading ? (
@@ -272,6 +263,24 @@ export default function TeamSettingsPage() {
                 <Badge variant="neutral" className="shrink-0 capitalize">
                   {displayRoleLabel(invite.role)}
                 </Badge>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={inviteActionId === invite.id}
+                    onClick={() => void handleResendInvite(invite.id)}
+                  >
+                    Resend
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={inviteActionId === invite.id}
+                    onClick={() => void handleRevokeInvite(invite.id)}
+                  >
+                    Revoke
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

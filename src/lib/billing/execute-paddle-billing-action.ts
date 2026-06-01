@@ -10,7 +10,12 @@ import {
 import { validateCheckoutPlanInterval } from "@/lib/billing/paddle-billing";
 import { buildPaddleCheckoutCustomData } from "@/lib/billing/paddle-checkout-custom-data";
 import type { PaddleBillingContext } from "@/lib/billing/paddle-billing-context";
-import { createPaddleCheckoutSession, updatePaddleSubscriptionPlan } from "@/lib/billing/paddle-api";
+import {
+  createPaddleCheckoutSession,
+  updatePaddleSubscriptionPlan,
+  type PaddleCheckoutDiscountMeta,
+} from "@/lib/billing/paddle-api";
+import { resolvePaddlePromoForTransaction } from "@/lib/billing/paddle-promo-codes";
 import type { PaddleBillingIntent } from "@/lib/billing/paddle-api";
 import { logPlanChangeAttempt } from "@/lib/billing/plan-change-audit";
 import { getPaddleBillingStatus } from "@/lib/billing/paddle-billing";
@@ -48,6 +53,10 @@ export type ExecutePaddleBillingInput = {
   cancelUrl?: string;
   /** Pre-created from POST /api/billing/paddle/attempt/start */
   billingAttemptId?: string;
+  /** Paddle catalog promo code (must exist in Paddle dashboard). */
+  promoCode?: string;
+  /** Paddle catalog discount id (dsc_…). */
+  discountId?: string;
 };
 
 export type ExecutePaddleBillingResult =
@@ -59,6 +68,7 @@ export type ExecutePaddleBillingResult =
       resolution: UnifiedBillingResolution;
       customDataPreview: ReturnType<typeof buildPaddleCheckoutCustomData>;
       billingAttemptId: string;
+      paddleDiscount?: PaddleCheckoutDiscountMeta;
     }
   | {
       ok: true;
@@ -347,6 +357,26 @@ export async function executePaddleBillingAction(
     testMode: input.testMode,
   });
 
+  let discountId: string | undefined;
+  let discountCode: string | undefined;
+  if (input.promoCode?.trim() || input.discountId?.trim()) {
+    const promo = resolvePaddlePromoForTransaction({
+      promoCode: input.promoCode,
+      discountId: input.discountId,
+    });
+    if (!promo.ok) {
+      return {
+        ok: false,
+        code: "invalid_promo",
+        error: promo.error,
+        httpStatus: 400,
+        resolution,
+      };
+    }
+    if (promo.mode === "discount_id") discountId = promo.discountId;
+    else discountCode = promo.promoCode;
+  }
+
   await patchBillingAttempt(billingAttemptId, { paddle_request_started: true });
 
   const checkout = await createPaddleCheckoutSession({
@@ -365,6 +395,8 @@ export async function executePaddleBillingAction(
           ? "settings"
           : "pricing",
     testMode: input.testMode,
+    discountId,
+    discountCode,
   });
 
   await patchBillingAttempt(billingAttemptId, {
@@ -403,5 +435,6 @@ export async function executePaddleBillingAction(
     resolution,
     customDataPreview,
     billingAttemptId,
+    paddleDiscount: checkout.discount,
   };
 }
