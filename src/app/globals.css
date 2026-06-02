@@ -899,6 +899,24 @@ body {
   transform-style: preserve-3d;
 }
 
+.vodex-intro-p13__image-panel {
+  transform-style: preserve-3d;
+}
+
+.vodex-intro-p13__glass-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    125deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.12) 45%,
+    transparent 58%
+  );
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  animation: vodex-intro-p13-shimmer 5.5s ease-in-out infinite;
+}
+
 .vodex-intro-p13__glow-trail {
   position: absolute;
   inset: -12%;

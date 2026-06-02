@@ -92,6 +92,18 @@ export function AdminAiUsagePanel() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [warning, setWarning] = React.useState<string | null>(null);
+  const [promptRows, setPromptRows] = React.useState<
+    Array<{
+      promptId: string;
+      startedAt: string;
+      requestCount: number;
+      credits: number;
+      providerCostUsd: number;
+      marginUsd: number;
+      modes: string[];
+    }>
+  >([]);
+  const [requestTotals, setRequestTotals] = React.useState<Bucket | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -101,10 +113,16 @@ export function AdminAiUsagePanel() {
     void Promise.all([
       fetch("/api/admin/ai-usage/summary"),
       fetch("/api/admin/ai-usage?limit=50"),
+      fetch("/api/admin/ai-usage/by-prompt"),
     ])
-      .then(async ([sumRes, evRes]) => {
+      .then(async ([sumRes, evRes, promptRes]) => {
         const sum = (await sumRes.json()) as Summary & { error?: string; hint?: string };
         const ev = (await evRes.json()) as { events?: Event[]; error?: string; warning?: string };
+        const pr = (await promptRes.json()) as {
+          prompts?: typeof promptRows;
+          requestTotals?: Bucket;
+          error?: string;
+        };
         if (cancelled) return;
         if (!sumRes.ok) {
           setError([sum.error, sum.hint].filter(Boolean).join(" — ") || "Could not load summary");
@@ -114,6 +132,10 @@ export function AdminAiUsagePanel() {
         if (ev.error) setWarning(ev.error);
         else if (ev.warning) setWarning(ev.warning);
         if (evRes.ok) setEvents(ev.events ?? []);
+        if (promptRes.ok) {
+          setPromptRows(pr.prompts ?? []);
+          setRequestTotals(pr.requestTotals ?? null);
+        }
       })
       .catch(() => {
         if (!cancelled) setError("Failed to load AI usage");
@@ -171,9 +193,60 @@ export function AdminAiUsagePanel() {
         />
       </div>
 
+      {requestTotals ? (
+        <p className="text-[11px] text-muted-foreground">
+          Per-prompt view groups build steps into one user submission (3 min gap). Raw provider
+          requests: {requestTotals.requests.toLocaleString()} · est. cost{" "}
+          {fmtUsd(requestTotals.providerCostUsd)}.
+        </p>
+      ) : null}
+
       <div className="rounded-xl bg-surface ring-1 ring-border">
         <div className="border-b border-border px-4 py-3">
-          <p className="text-[13px] font-semibold text-foreground">Cost by mode</p>
+          <p className="text-[13px] font-semibold text-foreground">Usage per user prompt</p>
+          <p className="text-[11px] text-muted-foreground">
+            One row per full prompt — not per internal build step
+          </p>
+        </div>
+        <div className="max-h-72 overflow-y-auto">
+          <table className="w-full min-w-[520px] text-left text-[12px]">
+            <thead className="sticky top-0 bg-surface">
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="px-4 py-2 font-medium">Started</th>
+                <th className="px-4 py-2 font-medium">Requests</th>
+                <th className="px-4 py-2 font-medium">Credits</th>
+                <th className="px-4 py-2 font-medium">Provider cost</th>
+                <th className="px-4 py-2 font-medium">Margin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {promptRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                    No prompt groups yet
+                  </td>
+                </tr>
+              ) : (
+                promptRows.slice(0, 60).map((p) => (
+                  <tr key={p.promptId} className="border-b border-border/50">
+                    <td className="px-4 py-2 text-[11px]">
+                      {new Date(p.startedAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 tabular-nums">{p.requestCount}</td>
+                    <td className="px-4 py-2 tabular-nums">{p.credits}</td>
+                    <td className="px-4 py-2 tabular-nums">{fmtUsd(p.providerCostUsd)}</td>
+                    <td className="px-4 py-2 tabular-nums">{fmtUsd(p.marginUsd)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-surface ring-1 ring-border">
+        <div className="border-b border-border px-4 py-3">
+          <p className="text-[13px] font-semibold text-foreground">Cost by mode (all requests)</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px] text-left text-[12px]">

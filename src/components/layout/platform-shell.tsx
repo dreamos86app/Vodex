@@ -11,6 +11,7 @@ import {
 } from "@/components/layout/deferred-shell-chrome";
 import { AdminDiagnosticsDrawer } from "@/components/dev/admin-diagnostics-drawer";
 import { DiagnosticsBootstrap } from "@/components/dev/diagnostics-bootstrap";
+import { PlatformIncidentBanner } from "@/components/platform/platform-incident-banner";
 import { cn } from "@/lib/utils";
 
 const pageMeta: Record<string, { title: string; subtitle?: string }> = {
@@ -241,6 +242,7 @@ export function PlatformShell({
 
       {/* Right column: topbar + scrollable content */}
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden">
+        <PlatformIncidentBanner />
         <DeferredTopBar
           mode={isCreateHome ? "create" : "standard"}
           title={meta.title}

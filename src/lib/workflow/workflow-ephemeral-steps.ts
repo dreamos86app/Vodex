@@ -1,26 +1,37 @@
 import type { AgentWorkflowEvent } from "@/lib/build/workflow-stream-types";
 
 export const EPHEMERAL_BUILD_STEPS: readonly { title: string; stableKey: string; ms: number }[] = [
-  { title: "I'm mapping the screens and data model.", stableKey: "ephemeral:screens", ms: 700 },
-  { title: "I'm designing the main layout.", stableKey: "ephemeral:layout", ms: 800 },
-  { title: "I'm generating the portfolio sections.", stableKey: "ephemeral:sections", ms: 900 },
-  { title: "I'm checking imports and preview readiness.", stableKey: "ephemeral:preview", ms: 1000 },
+  { title: "I am now going to work on the app structure and data model.", stableKey: "ephemeral:screens", ms: 700 },
+  { title: "I am now going to work on the main layout and navigation.", stableKey: "ephemeral:layout", ms: 800 },
+  { title: "I am now going to work on the core screens and components.", stableKey: "ephemeral:sections", ms: 900 },
+  { title: "I am now going to work on preview readiness and polish.", stableKey: "ephemeral:preview", ms: 1000 },
 ] as const;
+
+export function buildWorkOpenerFromPrompt(prompt: string): string {
+  const trimmed = prompt.trim().replace(/\s+/g, " ");
+  const snippet =
+    trimmed.length > 72 ? `${trimmed.slice(0, 72).trim()}…` : trimmed || "your app";
+  return `I am now going to work on ${snippet}`;
+}
 
 export function buildEphemeralWorkflowEvents(
   startedAtMs: number,
   nowMs: number,
   openerText?: string,
+  userPrompt?: string,
 ): AgentWorkflowEvent[] {
+  const resolvedOpener =
+    openerText ??
+    (userPrompt?.trim() ? buildWorkOpenerFromPrompt(userPrompt) : undefined);
   const elapsed = nowMs - startedAtMs;
   const events: AgentWorkflowEvent[] = [];
   const at = new Date(nowMs).toISOString();
 
-  if (openerText) {
+  if (resolvedOpener) {
     events.push({
       id: `ephemeral-opener-${startedAtMs}`,
       category: "assistant_message",
-      title: openerText,
+      title: resolvedOpener,
       status: "done",
       at,
       stableKey: "ephemeral:opener",

@@ -661,6 +661,12 @@ export function ImmersiveWorkspace({
     state: "pending" | "final" | "finalizing";
     credits: number;
   } | null>(null);
+  const [assistantMessageCosts, setAssistantMessageCosts] = React.useState<
+    Record<string, { state: "pending" | "final" | "finalizing"; credits: number }>
+  >({});
+  const [frozenBuildWorkflow, setFrozenBuildWorkflow] =
+    React.useState<BuildJobPollState | null>(null);
+  const activeBuildPromptRef = React.useRef<string>("");
   const [pendingDiffRefresh, setPendingDiffRefresh] = React.useState(0);
   const [histLoading, setHistLoading] = React.useState(false);
   const [postBuildActive, setPostBuildActive] = React.useState(false);
@@ -1015,10 +1021,15 @@ export function ImmersiveWorkspace({
     [project?.name],
   );
 
+  const buildJobProgressRef = React.useRef<BuildJobPollState | null>(null);
+
   const buildJobProgress = useBuildJobProgress(
     activeBuildJob ? { jobId: activeBuildJob.jobId, eventsUrl: activeBuildJob.eventsUrl } : null,
     React.useCallback(
       (terminal: BuildJobPollState) => {
+        if (buildJobProgressRef.current) {
+          setFrozenBuildWorkflow({ ...buildJobProgressRef.current, done: true });
+        }
         clearBuildJob();
         setLockedTaskMode(null);
         setProjectDataRefresh((n) => n + 1);
@@ -1049,6 +1060,16 @@ export function ImmersiveWorkspace({
             .order("created_at", { ascending: true })
             .then(({ data }) => {
               if (!data?.length) return;
+              const costFromDb: Record<
+                string,
+                { state: "final"; credits: number }
+              > = {};
+              for (const row of data) {
+                if (row.role === "assistant" && typeof row.credits_used === "number") {
+                  costFromDb[row.id] = { state: "final", credits: row.credits_used };
+                }
+              }
+              setAssistantMessageCosts((prev) => ({ ...prev, ...costFromDb }));
               setMessages((prev) => {
                 const fromDb = data.map((row) => ({
                   id: row.id,
@@ -1078,6 +1099,10 @@ export function ImmersiveWorkspace({
       [applyTerminalBuildSummary, clearBuildJob, projectFiles.length, setMessages, supabase, uid],
     ),
   );
+
+  React.useEffect(() => {
+    buildJobProgressRef.current = buildJobProgress;
+  }, [buildJobProgress]);
 
   const isStreaming =
     (streamActive || status === "submitted" || status === "streaming") &&
@@ -1734,6 +1759,8 @@ export function ImmersiveWorkspace({
     if (submitModeEarly === "build") {
       setBuildStarting(true);
       buildStartedAtRef.current = Date.now();
+      activeBuildPromptRef.current = text;
+      setFrozenBuildWorkflow(null);
     } else {
       setBuildStarting(false);
     }
@@ -2747,6 +2774,12 @@ export function ImmersiveWorkspace({
                     m.role === "assistant" &&
                     i === messages.length - 1 &&
                     !isBusy;
+                  const storedCost = assistantMessageCosts[m.id];
+                  const costInfo =
+                    m.role === "assistant"
+                      ? storedCost ??
+                        (isLastAssistant ? lastMessageCost ?? undefined : undefined)
+                      : undefined;
                   const showPlanInChat =
                     m.role === "assistant" &&
                     isLastAssistant &&
@@ -2761,8 +2794,8 @@ export function ImmersiveWorkspace({
                     userName={resolveDisplayName(profile, user)}
                     streaming={isBusy && i === messages.length - 1 && m.role === "assistant"}
                     mode={mode}
-                    creditsUsed={isLastAssistant ? lastMessageCost?.credits : undefined}
-                    costState={isLastAssistant ? lastMessageCost?.state : undefined}
+                    creditsUsed={costInfo?.credits}
+                    costState={costInfo?.state}
                     planFooter={
                       showPlanInChat ? (
                         <div className="mt-2">
@@ -2806,12 +2839,17 @@ export function ImmersiveWorkspace({
                 />
               )}
 
-              {(buildJobActive || buildStarting) && activeMode === "build" && (
+              {activeMode === "build" &&
+                (buildJobActive || buildStarting || frozenBuildWorkflow) && (
                 <BuildLiveProgress
-                  progress={buildJobProgress}
+                  progress={
+                    buildJobActive || buildStarting
+                      ? buildJobProgress
+                      : frozenBuildWorkflow
+                  }
                   className="mt-1"
                   buildStartedAtMs={buildStartedAtRef.current ?? undefined}
-                  openerText="Analyzing your request"
+                  userPrompt={activeBuildPromptRef.current}
                   projectId={effectiveProjectId ?? undefined}
                   ownerDiagnostics={{
                     open: ownerDiagOpen,

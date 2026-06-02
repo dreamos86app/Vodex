@@ -132,6 +132,17 @@ function redirectLoggedInReferralAttempt(request: NextRequest): NextResponse {
 
 export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+  const host = (request.headers.get("host") ?? "").split(":")[0]?.toLowerCase();
+
+  if (host === "status.vodex.dev" || host.startsWith("status.")) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.next({ request });
+    }
+    const rewritePath = pathname === "/" || pathname === "" ? "/status" : `/status${pathname}`;
+    const url = request.nextUrl.clone();
+    url.pathname = rewritePath;
+    return NextResponse.rewrite(url);
+  }
 
   // Never run session refresh on OAuth callback — PKCE verifier cookies must reach the route handler intact.
   if (pathname === "/auth/callback" || pathname.startsWith("/auth/callback/")) {

@@ -11,6 +11,7 @@ export function BuildLiveProgress({
   className,
   buildStartedAtMs,
   openerText,
+  userPrompt,
   projectId,
   ownerDiagnostics,
 }: {
@@ -18,6 +19,7 @@ export function BuildLiveProgress({
   className?: string;
   buildStartedAtMs?: number;
   openerText?: string;
+  userPrompt?: string;
   projectId?: string;
   ownerDiagnostics?: {
     open: boolean;
@@ -31,6 +33,7 @@ export function BuildLiveProgress({
       className={className}
       buildStartedAtMs={buildStartedAtMs}
       openerText={openerText}
+      userPrompt={userPrompt}
       projectId={projectId}
       ownerDiagnostics={ownerDiagnostics}
     />

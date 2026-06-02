@@ -114,7 +114,7 @@ const suites = {
     const screens = read("src/components/session/intro-v3-app-screens.tsx");
     must(screens, "data-intro-density=\"desktop-framed\"", "desktop density", errors);
     must(screens, "data-intro-density=\"mobile-framed\"", "mobile density", errors);
-    must(read("src/components/session/intro/IntroAppPanel.tsx"), "IntroAppPanel", "app panels", errors);
+    must(read("src/components/session/intro/CinematicAppPanel.tsx"), "CinematicAppPanel", "app panels", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), '"mobile" : "desktop"', "layout switch", errors);
     return errors;
   },
@@ -203,7 +203,7 @@ const suites = {
   },
   "intro-60fps-safe": () => {
     const errors = [];
-    must(read("src/components/session/intro/IntroAppPanel.tsx"), "willChange", "gpu hint", errors);
+    must(read("src/components/session/intro/CinematicAppPanel.tsx"), "willChange", "gpu hint", errors);
     must(read("src/app/globals.css"), "prefers-reduced-motion", "reduced motion", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), "useReducedMotion", "a11y hook", errors);
     return errors;
@@ -221,6 +221,81 @@ const suites = {
     const errors = [];
     must(read("src/components/session/vodex-session-intro.tsx"), "isMobile", "mobile layout", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), "innerWidth < 768", "breakpoint", errors);
+    return errors;
+  },
+  "intro-real-assets-loaded": () => {
+    const errors = [];
+    for (const f of ["nova.png", "bite.png", "frame-ai.png", "apex.png"]) {
+      const p = path.join(root, "public", "intro", f);
+      if (!fs.existsSync(p)) errors.push(`missing public/intro/${f}`);
+    }
+    return errors;
+  },
+  "intro-uses-reference-images": () => {
+    const errors = [];
+    must(read("src/components/session/intro/CinematicAppPanel.tsx"), 'data-intro-reference-image', "reference image attr", errors);
+    must(read("src/components/session/intro/intro-apps.ts"), "/intro/nova.png", "nova asset path", errors);
+    must(read("src/components/session/intro/intro-apps.ts"), "imageSrc", "image src config", errors);
+    return errors;
+  },
+  "intro-not-css-placeholder-panels": () => {
+    const errors = [];
+    const panel = read("src/components/session/intro/CinematicAppPanel.tsx");
+    if (panel.includes("IntroFashionScreen")) errors.push("css mock screen in panel");
+    must(panel, "next/image", "next image", errors);
+    return errors;
+  },
+  "intro-logo-reveal-not-cut-off": () => {
+    const errors = [];
+    must(read("src/components/session/vodex-session-intro.tsx"), "revealComplete", "reveal complete gate", errors);
+    must(read("src/components/session/vodex-session-intro.tsx"), "onRevealComplete", "reveal callback", errors);
+    must(read("src/components/session/intro/intro-constants.ts"), "INTRO_MIN_MS", "min intro duration", errors);
+    return errors;
+  },
+  "intro-animation-completes-before-fade": () => {
+    const errors = [];
+    must(read("src/components/session/vodex-session-intro.tsx"), "INTRO_MIN_MS", "min duration", errors);
+    must(read("src/components/session/vodex-session-intro.tsx"), "EXIT_FADE_MS", "exit fade", errors);
+    if (read("src/components/session/vodex-session-intro.tsx").includes("INTRO_TOTAL_MS")) {
+      errors.push("hard INTRO_TOTAL_MS timeout removed");
+    }
+    return errors;
+  },
+  "status-page-public": () => {
+    const errors = [];
+    must(read("src/app/status/page.tsx"), "PublicStatusPage", "status page", errors);
+    must(read("src/app/api/status/public/route.ts"), "fetchPublicStatusPayload", "status api", errors);
+    return errors;
+  },
+  "status-subdomain-routing": () => {
+    const errors = [];
+    must(read("src/proxy.ts"), "status.vodex.dev", "status host", errors);
+    return errors;
+  },
+  "platform-announcement-banner": () => {
+    const errors = [];
+    must(read("src/components/platform/platform-incident-banner.tsx"), "platform-incident-banner", "banner", errors);
+    must(read("src/components/layout/platform-shell.tsx"), "PlatformIncidentBanner", "banner wired", errors);
+    return errors;
+  },
+  "admin-status-management": () => {
+    const errors = [];
+    must(read("src/components/admin/admin-system-status-panel.tsx"), "Publish banner", "admin publish", errors);
+    must(read("src/app/api/admin/status/announcements/publish/route.ts"), "platform_announcements", "publish api", errors);
+    must(read("src/app/api/admin/status/components/update/route.ts"), "requireDreamosOwner", "owner gate", errors);
+    must(read("src/app/api/admin/status/incidents/create/route.ts"), "status_incidents", "incident create", errors);
+    return errors;
+  },
+  "status-30-day-history": () => {
+    const errors = [];
+    must(read("src/lib/status/status-public.ts"), "HISTORY_DAYS = 30", "30 day window", errors);
+    must(read("src/components/status/public-status-page.tsx"), "history", "history ui", errors);
+    return errors;
+  },
+  "status-rls-owner-gating": () => {
+    const errors = [];
+    must(read("supabase/migrations/20260720120000_platform_status.sql"), "enable row level security", "rls", errors);
+    must(read("src/app/api/admin/status/incidents/resolve/route.ts"), "requireDreamosOwner", "owner resolve", errors);
     return errors;
   },
   "no-generic-credit-toast": () => {

@@ -206,6 +206,7 @@ export function AgentWorkflowStream({
   className,
   buildStartedAtMs,
   openerText,
+  userPrompt,
   projectId,
   ownerDiagnostics,
 }: {
@@ -213,6 +214,7 @@ export function AgentWorkflowStream({
   className?: string;
   buildStartedAtMs?: number;
   openerText?: string;
+  userPrompt?: string;
   projectId?: string;
   /** When set, parent owns diagnostics modal (single launcher). */
   ownerDiagnostics?: {
@@ -298,7 +300,12 @@ export function AgentWorkflowStream({
   );
   const ephemeral =
     working && (!hasServerActivity || serverSequential.length < 2)
-      ? buildEphemeralWorkflowEvents(startedAt, now, showAnalyzing ? undefined : openerText)
+      ? buildEphemeralWorkflowEvents(
+          startedAt,
+          now,
+          showAnalyzing ? undefined : openerText,
+          userPrompt,
+        )
       : [];
   const merged = mergeEphemeralWithServerEvents(ephemeral, serverSequential);
   const grouped = groupFileEvents(merged);

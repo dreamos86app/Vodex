@@ -7,23 +7,23 @@ import { toast } from "@/lib/toast";
 
 export type MessageCostState = "idle" | "pending" | "final" | "finalizing";
 
-export function MessageCostBadge({
-  state: _state,
-  credits: _credits,
-  className: _className,
-}: {
-  state: MessageCostState;
-  credits: number | null;
-  className?: string;
-}) {
-  return null;
+function formatCredits(credits: number): string {
+  if (!Number.isFinite(credits)) return "—";
+  if (credits >= 10) return credits.toFixed(1).replace(/\.0$/, "");
+  if (credits >= 1) return credits.toFixed(1);
+  if (credits > 0) return credits.toFixed(2);
+  return "0";
 }
 
 export function MessageActionsMenu({
   messageText,
+  credits,
+  creditsPending,
   className,
 }: {
   messageText: string;
+  credits?: number | null;
+  creditsPending?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -48,6 +48,9 @@ export function MessageActionsMenu({
     }
   };
 
+  const showCredits =
+    creditsPending || (typeof credits === "number" && credits >= 0);
+
   return (
     <div ref={ref} className={cn("relative", className)}>
       <button
@@ -60,7 +63,22 @@ export function MessageActionsMenu({
         <MoreHorizontal className="size-4" strokeWidth={1.75} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-lg border border-border bg-background py-1 shadow-lg ring-1 ring-border/80">
+        <div className="absolute right-0 top-full z-20 mt-1 min-w-[168px] rounded-lg border border-border bg-background py-1 shadow-lg ring-1 ring-border/80">
+          {showCredits ? (
+            <div
+              className="border-b border-border/60 px-3 py-2 text-[11px]"
+              data-testid="message-action-credits"
+            >
+              <span className="text-muted-foreground">Credits used</span>
+              <p className="mt-0.5 font-semibold tabular-nums text-foreground">
+                {creditsPending ? (
+                  <span className="text-muted-foreground">Calculating…</span>
+                ) : (
+                  formatCredits(credits ?? 0)
+                )}
+              </p>
+            </div>
+          ) : null}
           <button
             type="button"
             data-testid="message-action-copy"
@@ -73,5 +91,34 @@ export function MessageActionsMenu({
         </div>
       )}
     </div>
+  );
+}
+
+export function MessageCostBadge({
+  state,
+  credits,
+  className,
+}: {
+  state: MessageCostState;
+  credits: number | null;
+  className?: string;
+}) {
+  if (state === "idle") return null;
+  const label =
+    state === "pending" || state === "finalizing"
+      ? "…"
+      : typeof credits === "number"
+        ? formatCredits(credits)
+        : "—";
+  return (
+    <span
+      className={cn(
+        "rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground",
+        className,
+      )}
+      data-testid="message-cost-badge"
+    >
+      {label}c
+    </span>
   );
 }

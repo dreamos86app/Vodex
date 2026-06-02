@@ -364,6 +364,121 @@ export async function fetchAiUsageSummaryRows(
   };
 }
 
+export type AiUsagePromptGroup = {
+  promptId: string;
+  startedAt: string;
+  conversationId: string | null;
+  userEmail: string | null;
+  requestCount: number;
+  credits: number;
+  providerCostUsd: number;
+  revenueUsd: number;
+  marginUsd: number;
+  modes: string[];
+  successCount: number;
+  failedCount: number;
+};
+
+const PROMPT_GAP_MS = 3 * 60 * 1000;
+
+/** One row per user prompt window (not per internal build step). */
+export async function fetchAiUsageByPrompt(
+  admin: AdminClient,
+  sinceIso: string,
+): Promise<{ prompts: AiUsagePromptGroup[]; requestTotals: AiUsageCostBucket; error?: string }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const res = await (admin as any)
+    .from("ai_usage_logs")
+    .select(
+      "created_at,conversation_id,user_email,mode,model_id,tokens_charged,tokens_input,tokens_output,status,metadata",
+    )
+    .gte("created_at", sinceIso)
+    .order("created_at", { ascending: true })
+    .limit(12000);
+
+  if (res.error) {
+    return {
+      prompts: [],
+      requestTotals: emptyBucket(),
+      error: res.error.message,
+    };
+  }
+
+  type Row = {
+    created_at: string;
+    conversation_id: string | null;
+    user_email: string | null;
+    mode: string;
+    model_id: string;
+    tokens_charged?: number;
+    credits_charged?: number;
+    tokens_input: number | null;
+    tokens_output: number | null;
+    status: string;
+    metadata?: Record<string, unknown> | null;
+  };
+
+  const rows = (res.data ?? []) as Row[];
+  const requestTotals = emptyBucket();
+  const prompts: AiUsagePromptGroup[] = [];
+  let batch: Row[] = [];
+
+  const flush = () => {
+    if (batch.length === 0) return;
+    const bucket = emptyBucket();
+    const modes = new Set<string>();
+    let success = 0;
+    let failed = 0;
+    for (const r of batch) {
+      const charged = r.tokens_charged ?? r.credits_charged ?? 0;
+      const normalized = {
+        status: r.status,
+        mode: r.mode,
+        model_id: r.model_id,
+        tokens_charged: charged,
+        tokens_input: r.tokens_input,
+        tokens_output: r.tokens_output,
+        metadata: r.metadata ?? null,
+      };
+      addToBucket(bucket, normalized);
+      addToBucket(requestTotals, normalized);
+      modes.add(r.mode);
+      if (isUsageSuccessStatus(r.status)) success += 1;
+      else failed += 1;
+    }
+    const first = batch[0]!;
+    prompts.push({
+      promptId: `${first.conversation_id ?? "na"}-${first.created_at}`,
+      startedAt: first.created_at,
+      conversationId: first.conversation_id,
+      userEmail: first.user_email,
+      requestCount: bucket.count,
+      credits: bucket.credits,
+      providerCostUsd: bucket.providerCostUsd,
+      revenueUsd: bucket.userRevenueUsd,
+      marginUsd: bucket.estimatedMarginUsd,
+      modes: [...modes],
+      successCount: success,
+      failedCount: failed,
+    });
+    batch = [];
+  };
+
+  for (const row of rows) {
+    const t = Date.parse(row.created_at);
+    const prevT = batch.length ? Date.parse(batch[batch.length - 1]!.created_at) : t;
+    const newConversation =
+      batch.length > 0 && row.conversation_id !== batch[0]!.conversation_id;
+    if (batch.length > 0 && (newConversation || t - prevT > PROMPT_GAP_MS)) {
+      flush();
+    }
+    batch.push(row);
+  }
+  flush();
+
+  return { prompts: prompts.reverse(), requestTotals };
+}
+
 export type AdminActionRow = {
   id: string;
   created_at: string;
