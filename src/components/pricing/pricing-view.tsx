@@ -506,6 +506,15 @@ function PlanCard({
           ? ctaOnClick
           : undefined
       : undefined;
+
+  const activateCard = () => {
+    if (isCurrent || planAction.disabled) return;
+    if (isPaidDowngrade && onPaidDowngrade) {
+      onPaidDowngrade();
+      return;
+    }
+    effectiveOnClick?.();
+  };
   const priceDisplay =
     price != null && price > 0
       ? resolveAnnualPriceDisplay(price, annualPrice, annual)
@@ -514,8 +523,22 @@ function PlanCard({
   return (
     <motion.div
       variants={variants.fadeUp}
+      role={!isCurrent && effectiveOnClick ? "button" : undefined}
+      tabIndex={!isCurrent && effectiveOnClick ? 0 : undefined}
+      onClick={!isCurrent && effectiveOnClick ? activateCard : undefined}
+      onKeyDown={
+        !isCurrent && effectiveOnClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                activateCard();
+              }
+            }
+          : undefined
+      }
       className={cn(
-        "relative flex h-full flex-col rounded-[var(--radius-xl)] ring-1 overflow-hidden",
+        "relative flex h-full flex-col rounded-[var(--radius-xl)] ring-1 overflow-hidden transition",
+        !isCurrent && effectiveOnClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-lg hover:ring-accent/35",
         highlight
           ? "bg-gradient-to-b from-accent/8 via-background to-background ring-accent/40 shadow-[0_0_0_1px_hsl(var(--accent)/0.15),0_12px_40px_-8px_hsl(var(--accent)/0.25)]"
           : "bg-background ring-border",
@@ -633,7 +656,14 @@ function PlanCard({
           }
           if (effectiveOnClick) {
             return (
-              <button type="button" className={ctaClass} onClick={effectiveOnClick}>
+              <button
+                type="button"
+                className={ctaClass}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  effectiveOnClick();
+                }}
+              >
                 {cta}
                 <ArrowRight className="size-3.5" strokeWidth={2.5} />
               </button>

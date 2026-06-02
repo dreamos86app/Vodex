@@ -13,6 +13,7 @@ export type ChargeActionCreditInput = {
   operationId: string;
   provider?: string;
   providerCostUsd?: number | null;
+  dynamicFloor?: number | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -46,6 +47,7 @@ export async function chargeActionCredit(
   const quote = quoteActionCredits({
     actionType: input.actionType,
     providerCostUsd: input.providerCostUsd,
+    dynamicFloor: input.dynamicFloor,
   });
 
   if (quote.isFree || isFreeRuntimeAction(input.actionType)) {

@@ -637,6 +637,14 @@ body {
   will-change: opacity, transform;
 }
 
+.vodex-intro-v2 .vodex-cinematic-intro__icon-wrap {
+  animation: none;
+}
+
+.vodex-intro-v2 .vodex-premium-intro__icon-wrap {
+  animation: none;
+}
+
 .vodex-cinematic-intro--exit {
   animation: vodex-cinematic-fade-out 0.48s ease forwards;
 }

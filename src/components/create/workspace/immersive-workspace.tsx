@@ -59,6 +59,7 @@ import { PreviewBlockedPopup, type PreviewBlockingIssue } from "@/components/pre
 import { RepairCenter } from "@/components/repair/repair-center";
 import { buildRepairChatPrompt } from "@/lib/repair/repair-chat-prompt";
 import { BuildLiveProgress } from "@/components/create/workspace/build-live-progress";
+import { BuildCreditsUpgradePanel } from "@/components/billing/build-credits-upgrade-panel";
 import { AdminDiagnosticsFab } from "@/components/create/workspace/admin-diagnostics-fab";
 import {
   persistWorkspaceTask,
@@ -1988,7 +1989,7 @@ export function ImmersiveWorkspace({
     if (streamActiveRef.current || buildJobActiveRef.current || submitInFlightRef.current) return;
     const credits = useCreditsStore.getState().build.available;
     if (credits <= 0) {
-      toast.error("Out of build credits — queue paused until you upgrade or credits reset.");
+      setCreditError(true);
       return;
     }
     const nextIdx = promptQueueRef.current.findIndex((q) => q.status === "queued");
@@ -2799,66 +2800,13 @@ export function ImmersiveWorkspace({
                   className="mx-2"
                 />
               )}
-              {creditError && (
-                <div className="overflow-hidden rounded-xl bg-gradient-to-br from-background via-surface to-background shadow-[0_4px_16px_-4px_rgba(0,0,0,0.3)] ring-1 ring-border/80">
-                  <div className="h-[2px] w-full bg-gradient-to-r from-violet-600 via-accent to-sky-500" />
-                  <div className="px-4 py-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 ring-1 ring-accent/20">
-                        <Zap className="size-4 text-accent" strokeWidth={1.75} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold text-foreground">
-                          {creditBlockedZero
-                            ? "Build Credits are used up"
-                            : "More credits needed for this step"}
-                        </p>
-                        <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                          {creditBlockedZero
-                            ? `Add credits or upgrade to keep building.${resetAt ? ` Credits reset after ${new Date(resetAt).toLocaleDateString()}.` : ""}`
-                            : remaining > 0
-                              ? userFacingPartialBuildStartMessage(remaining)
-                              : "Add Build Credits or upgrade to continue."}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {!creditBlockedZero && remaining > 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCreditError(false);
-                            void runSubmitRef.current("button");
-                          }}
-                          className="rounded-xl bg-accent px-3 py-2 text-[12px] font-semibold text-white shadow-sm"
-                        >
-                          Continue with {Math.floor(remaining)} credit
-                          {Math.floor(remaining) === 1 ? "" : "s"}
-                        </button>
-                      ) : null}
-                      <Link
-                        href="/pricing"
-                        className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-accent to-violet-500 px-3 py-2 text-center text-[12px] font-semibold text-white shadow-[0_4px_12px_-2px_hsl(var(--accent)/0.4)] transition hover:opacity-90"
-                      >
-                        <Zap className="size-3" strokeWidth={2} />
-                        Upgrade
-                      </Link>
-                      <Link
-                        href="/settings"
-                        className="rounded-xl bg-surface px-3 py-2 text-[12px] font-medium text-foreground ring-1 ring-border"
-                      >
-                        Add credits
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => setCreditError(false)}
-                        className="rounded-xl bg-surface px-3 py-2 text-[12px] font-medium text-muted-foreground ring-1 ring-border transition hover:bg-surface-raised"
-                      >
-                        Save for later
-                      </button>
-                    </div>
-                  </div>
-                </div>
+              {(creditError || showUpgradeCard) && (
+                <BuildCreditsUpgradePanel
+                  planId={planId}
+                  resetAt={resetAt}
+                  onDismiss={() => setCreditError(false)}
+                  compact
+                />
               )}
               {error && !creditError && (
                 <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive ring-1 ring-destructive/20">
@@ -2889,20 +2837,6 @@ export function ImmersiveWorkspace({
               mobilePanel !== "chat" && "max-lg:hidden",
             )}
           >
-            {showUpgradeCard && !creditError && (
-              <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-accent/25 bg-gradient-to-r from-accent/[0.07] to-violet-500/[0.05] px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-foreground">Build Credits are used up</p>
-                  <p className="text-[10.5px] text-muted-foreground">Add credits or upgrade to keep building.</p>
-                </div>
-                <Link
-                  href="/pricing"
-                  className="shrink-0 rounded-lg bg-accent px-2.5 py-1.5 text-[10.5px] font-bold text-white shadow-sm"
-                >
-                  Upgrade to {nextPlanLabel}
-                </Link>
-              </div>
-            )}
             {(buildStarting || isStreaming) && (
               <p className="mb-1.5 px-1 text-[10px] text-muted-foreground" data-testid="composer-status-hint">
                 {buildStrategy === "plan_first" && !blueprintApproved

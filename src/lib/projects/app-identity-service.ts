@@ -3,7 +3,10 @@ import type { Database, Json } from "@/lib/supabase/types";
 import { assertActionCreditsAffordable } from "@/lib/action-credits/assert-action-credits-affordable";
 import { getActionCreditAvailability } from "@/lib/action-credits/get-action-credit-availability";
 import { chargeActionCredit } from "@/lib/action-credits/charge-action-credit";
-import { quoteLogoRegenerationCredits } from "@/lib/action-credits/logo-generation-pricing";
+import {
+  quoteLogoGenerationCredits,
+  quoteLogoRegenerationCredits,
+} from "@/lib/action-credits/logo-generation-pricing";
 import {
   isDreamOSMediaProviderDisabled,
   routeDreamOSMedia,
@@ -348,14 +351,14 @@ export async function createAppIdentityForBuild(input: CreateAppIdentityInput): 
     } else {
       const creditAvail = await getActionCreditAvailability(input.userId, {
         projectId: input.projectId,
-        actionType: "app_icon_ai_generation",
+        actionType: "app_logo_generation",
         providerCostUsd: mediaRoute.estimatedProviderCostUsd,
       });
 
       const afford = await assertActionCreditsAffordable({
         ownerUserId: input.userId,
         projectId: input.projectId,
-        actionType: "app_icon_ai_generation",
+        actionType: "app_logo_generation",
         providerCostUsd: mediaRoute.estimatedProviderCostUsd,
       });
 
@@ -379,25 +382,45 @@ export async function createAppIdentityForBuild(input: CreateAppIdentityInput): 
           metadata: {
             icon_generation_mode: "skipped_no_action_credits",
             icon_credit_skipped: true,
+            icon_credit_skipped_depleted: !creditAvail.available,
             icon_credit_depleted: !creditAvail.available,
             credit_avail: creditAvail,
             afford_ok: afford.ok,
           },
         });
       } else {
+        const iconCreditQuote = quoteLogoGenerationCredits(mediaRoute.estimatedProviderCostUsd);
+        await logServerOperation({
+          writer: input.writer,
+          userId: input.userId,
+          userEmail: input.userEmail ?? null,
+          stage: "build",
+          event: "icon_credit_reserved",
+          status: "ok",
+          mode: "build",
+          projectId: input.projectId,
+          operationId: logoOperationId,
+          metadata: {
+            icon_credit_reserved: iconCreditQuote.finalActionCredits,
+            provider_cost_usd: mediaRoute.estimatedProviderCostUsd,
+          },
+        });
+
         const charge = await chargeActionCredit({
           ownerUserId: input.userId,
           projectId: input.projectId,
-          actionType: "app_icon_ai_generation",
+          actionType: "app_logo_generation",
           operationId: logoOperationId,
           provider: mediaRoute.internal.provider,
           providerCostUsd: mediaRoute.estimatedProviderCostUsd,
+          dynamicFloor: iconCreditQuote.finalActionCredits,
           metadata: {
             dreamos_label: mediaRoute.userLabel,
             model_id: mediaRoute.internal.modelId,
             project_id: input.projectId,
             build_operation_id: input.buildOperationId,
             charge_from_user_pool: true,
+            icon_credit_reserved: iconCreditQuote.finalActionCredits,
           },
         });
 
@@ -430,6 +453,21 @@ export async function createAppIdentityForBuild(input: CreateAppIdentityInput): 
           if (logo.ok) {
             input.onProgress?.("Saving brand assets");
             logoGenerationActionCreditCost = charge.charged;
+            await logServerOperation({
+              writer: input.writer,
+              userId: input.userId,
+              userEmail: input.userEmail ?? null,
+              stage: "build",
+              event: "icon_credit_charged",
+              status: "ok",
+              mode: "build",
+              projectId: input.projectId,
+              operationId: logoOperationId,
+              metadata: {
+                icon_credit_charged: charge.charged,
+                icon_credit_remaining: charge.remaining,
+              },
+            });
             iconProviderCostUsd = logo.providerCostUsd;
             iconUrl = logo.urls.iconUrl;
             logoAssets = logo.urls;
@@ -462,6 +500,18 @@ export async function createAppIdentityForBuild(input: CreateAppIdentityInput): 
               projectId: input.projectId,
               operationId: logoOperationId,
               reason: "openai_image_failed",
+            });
+            await logServerOperation({
+              writer: input.writer,
+              userId: input.userId,
+              userEmail: input.userEmail ?? null,
+              stage: "build",
+              event: "icon_credit_refunded",
+              status: "ok",
+              mode: "build",
+              projectId: input.projectId,
+              operationId: logoOperationId,
+              metadata: { reason: "openai_image_failed" },
             });
             logoGenerationActionCreditCost = 0;
             await applyDeterministicFallback();

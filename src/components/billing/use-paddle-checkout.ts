@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { toast } from "@/lib/toast";
+import { pushRuntimeDiagnostic } from "@/lib/dev/runtime-diagnostics";
 import type { BillablePlanId } from "@/lib/billing/billable-plans";
 
 export type PaddleCheckoutPlan = BillablePlanId;
@@ -91,9 +92,26 @@ export function usePaddleCheckout() {
           ]
             .filter(Boolean)
             .join("\n");
-          throw new Error(detail);
+          pushRuntimeDiagnostic("charge_failed", {
+            reason: "paddle_checkout_failed",
+            plan,
+            annual,
+            error: json.error,
+            code: json.code,
+          });
+          toast.error(json.error ?? "Billing could not start");
+          return null;
         }
         return null;
+      }
+
+      if (json.billingAttemptId) {
+        pushRuntimeDiagnostic("charge_started", {
+          billingAttemptId: json.billingAttemptId,
+          plan,
+          annual,
+          source: "pricing",
+        });
       }
 
       if (json.mode === "paddle_subscription_update") {

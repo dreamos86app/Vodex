@@ -19,6 +19,11 @@ import {
 } from "@/lib/branding/generated-app-branding";
 import { findPrimaryAppPage } from "@/lib/build/source-integrity-validator";
 import { jsxToStaticHtml } from "@/lib/preview/jsx-to-static-html";
+import {
+  sanitizePreviewDocument,
+  stripInlineScriptsFromPreviewBody,
+  validatePreviewHtmlSafe,
+} from "@/lib/preview/preview-html-sanitizer";
 
 export type PreviewRendererSource =
   | "compiled"
@@ -75,7 +80,7 @@ export function wrapPreviewDocument(bodyInner: string, options?: PreviewHtmlOpti
   <div ${rootAttrs} class="min-h-screen">${bodyInner}</div>
 </body>
 </html>`;
-  return injectDreamOSBrandingIntoPreviewHtml(doc, options?.branding ?? {});
+  return sanitizePreviewDocument(injectDreamOSBrandingIntoPreviewHtml(doc, options?.branding ?? {}));
 }
 
 /** Build a self-contained HTML snapshot from generated files. */
@@ -101,11 +106,22 @@ export function buildStaticPreviewHtmlDetailed(
   const indexHtml = files.find((f) => f.path === "index.html" || f.path.endsWith("/index.html"));
   if (indexHtml?.content?.trim()) {
     if (indexHtml.content.includes("generated-app-preview-root")) {
-      return { html: indexHtml.content, rendererSource: "compiled", primaryFile: indexHtml.path };
+      const safe = sanitizePreviewDocument(indexHtml.content);
+      return { html: safe, rendererSource: "compiled", primaryFile: indexHtml.path };
+    }
+    const body = stripInlineScriptsFromPreviewBody(
+      indexHtml.content.replace(/<\/?html[^>]*>|<\/?head[^>]*>|<\/?body[^>]*>/gi, ""),
+    );
+    if (!validatePreviewHtmlSafe(body).ok) {
+      return {
+        html: wrapPreviewDocument("<div class='p-6 text-sm text-slate-600'>Preview blocked — invalid script in generated HTML.</div>", options),
+        rendererSource: "fallback_error",
+        primaryFile: indexHtml.path,
+      };
     }
     return {
       html: wrapPreviewDocument(
-        indexHtml.content.replace(/<\/?html[^>]*>|<\/?head[^>]*>|<\/?body[^>]*>/gi, ""),
+        body,
         options,
       ),
       rendererSource: "compiled",

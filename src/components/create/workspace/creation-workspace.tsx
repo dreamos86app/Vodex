@@ -19,8 +19,6 @@ import {
   Zap,
   Sparkles,
   X,
-  ArrowRight,
-  CheckCircle2,
   Code2,
 } from "lucide-react";
 
@@ -34,6 +32,7 @@ import {
   MODE_META,
   type CreationMode,
 } from "@/lib/creation/models";
+import { BuildCreditsUpgradePanel } from "@/components/billing/build-credits-upgrade-panel";
 import { CreditQuoteBanner, type CreditQuoteDisplay } from "@/components/billing/credit-quote-banner";
 import { CreditsTracker } from "@/components/credits/credits-tracker";
 import { ProjectBillingBadge } from "@/components/billing/project-billing-badge";
@@ -165,174 +164,6 @@ const MODE_STYLE = {
 } satisfies Record<string, { topbar: string; composerRing: string; badge: { label: string; color: string } | null }>;
 
 // ─── Out-of-tokens card ───────────────────────────────────────────────────────
-
-const PLAN_META: Record<string, { name: string; quota: number; nextPlan: string; nextPrice: number; nextCredits: string }> = {
-  free:     { name: "Free",     quota: 30,    nextPlan: "Starter", nextPrice: 20,  nextCredits: "200" },
-  starter:  { name: "Starter",  quota: 200,   nextPlan: "Pro",     nextPrice: 50,  nextCredits: "500" },
-  pro:      { name: "Pro",      quota: 500,   nextPlan: "Infinity",nextPrice: 100, nextCredits: "1,000+" },
-  infinity: { name: "Infinity", quota: 1_000, nextPlan: "Infinity",nextPrice: 200, nextCredits: "2,000+" },
-};
-
-const UPGRADE_PERKS: Record<string, string[]> = {
-  free:     ["Manual model selection", "Edit & Build modes", "Custom domains", "10× more credits", "Priority generation"],
-  starter:  ["All frontier models", "Advanced AI generation", "Advanced analytics", "API access", "5 collaborators"],
-  pro:      ["Dedicated compute", "Enterprise scale", "White-label", "Custom SLAs", "SSO / SAML"],
-  infinity: ["Custom SLAs expansion", "Dedicated runtime", "Priority infra"],
-};
-
-function OutOfCreditsCard({
-  planId,
-  totalUsed,
-  resetAt,
-  onDismiss,
-}: {
-  planId: string;
-  totalUsed: number;
-  resetAt: string | null;
-  onDismiss: () => void;
-}) {
-  const meta = PLAN_META[planId] ?? PLAN_META.free;
-  const perks = UPGRADE_PERKS[planId] ?? UPGRADE_PERKS.free;
-  const daysLeft = resetAt
-    ? Math.max(0, Math.ceil((new Date(resetAt).getTime() - Date.now()) / 86_400_000))
-    : null;
-  const hoursLeft = resetAt
-    ? Math.max(0, Math.ceil((new Date(resetAt).getTime() - Date.now()) / 3_600_000))
-    : null;
-  const usedPct = Math.min(100, Math.round((totalUsed / meta.quota) * 100));
-  const resetLabel = daysLeft !== null
-    ? daysLeft === 0 && hoursLeft !== null
-      ? hoursLeft <= 1 ? "in less than 1 hour" : `in ${hoursLeft}h`
-      : daysLeft === 1 ? "tomorrow"
-      : `in ${daysLeft} days`
-    : "next month";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.97, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className="relative mt-4 overflow-hidden rounded-2xl bg-background ring-1 ring-border shadow-[0_12px_48px_-12px_rgba(0,0,0,0.45)]"
-    >
-      {/* Ambient gradient bg */}
-      <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.04] via-transparent to-violet-500/[0.04] pointer-events-none" />
-      {/* Top accent stripe */}
-      <div className="h-[3px] w-full bg-gradient-to-r from-amber-500 via-accent to-violet-600" />
-
-      <div className="relative px-5 pt-5 pb-5 space-y-4">
-
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3.5">
-            <div className="relative flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 to-accent/20 ring-1 ring-amber-500/30">
-              <Zap className="size-5 text-amber-500" strokeWidth={2} />
-              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">!</span>
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[15px] font-bold text-foreground tracking-tight">Build Credits are used up</p>
-                <span className="rounded-full bg-amber-500/12 px-2 py-0.5 text-[10px] font-semibold text-amber-600 ring-1 ring-amber-500/25 dark:text-amber-400">
-                  {meta.name} plan
-                </span>
-              </div>
-              <p className="mt-1 text-[12.5px] text-muted-foreground leading-relaxed">
-                All <span className="font-semibold text-foreground">{meta.quota.toLocaleString()} credits</span> used this month.
-                {" "}Credits refill {resetLabel}.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition hover:bg-surface hover:text-muted-foreground"
-            aria-label="Dismiss"
-          >
-            <X className="size-3.5" strokeWidth={2} />
-          </button>
-        </div>
-
-        {/* Token usage meter */}
-        <div className="rounded-xl bg-surface/70 px-4 py-3 ring-1 ring-border/60 space-y-2">
-          <div className="flex items-center justify-between text-[11.5px]">
-            <span className="font-medium text-muted-foreground">Credits used this period</span>
-            <span className="tabular-nums font-bold text-foreground">
-              {totalUsed.toLocaleString()} <span className="font-normal text-muted-foreground">/ {meta.quota.toLocaleString()}</span>
-            </span>
-          </div>
-          <div className="relative h-2 w-full overflow-hidden rounded-full bg-border/50">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${usedPct}%` }}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-              className="h-full rounded-full bg-gradient-to-r from-amber-500 to-accent"
-            />
-          </div>
-          <p className="text-[10.5px] text-muted-foreground/60 flex items-center gap-1">
-            <span className="size-1.5 rounded-full bg-amber-500/60 inline-block" />
-            Credits reset {resetLabel}. Current plan: {meta.name}.
-          </p>
-        </div>
-
-        {/* Upgrade plan highlight */}
-        <div>
-          <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-            Upgrade for instant access
-          </p>
-          <div className="rounded-2xl bg-gradient-to-br from-accent/10 via-background to-violet-500/10 px-4 py-4 ring-1 ring-accent/25">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <Sparkles className="size-3.5 text-accent" strokeWidth={2} />
-                  <p className="text-[15px] font-bold tracking-tight text-foreground">{meta.nextPlan}</p>
-                </div>
-                <p className="text-[12px] text-muted-foreground">
-                  <span className="font-semibold text-foreground">{meta.nextCredits} credits</span> per month
-                </p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-[26px] font-black tracking-tight text-foreground leading-none">
-                  ${meta.nextPrice}
-                </p>
-                <p className="text-[10.5px] text-muted-foreground">/ month</p>
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {perks.slice(0, 4).map((f) => (
-                <span
-                  key={f}
-                  className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[10.5px] font-medium text-accent ring-1 ring-accent/15"
-                >
-                  <CheckCircle2 className="size-2.5" strokeWidth={2.5} />
-                  {f}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* CTA */}
-        <div className="flex items-stretch gap-2">
-          <Link
-            href="/pricing"
-            className="group relative flex-1 overflow-hidden rounded-2xl bg-gradient-to-r from-accent to-violet-600 px-5 py-3 text-center text-[13.5px] font-bold text-white shadow-[0_6px_20px_-4px_hsl(var(--accent)/0.5)] transition hover:shadow-[0_8px_28px_-4px_hsl(var(--accent)/0.65)] hover:scale-[1.01] active:scale-[0.99]"
-          >
-            <span className="relative flex items-center justify-center gap-2">
-              <Sparkles className="size-4" strokeWidth={2} />
-              Upgrade to {meta.nextPlan}
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" strokeWidth={2.5} />
-            </span>
-          </Link>
-          <Link
-            href="/pricing"
-            className="flex items-center gap-1.5 rounded-2xl px-4 text-[12px] font-medium text-muted-foreground ring-1 ring-border transition hover:bg-surface hover:text-foreground hover:ring-accent/30"
-          >
-            All plans
-          </Link>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 // ─── Workspace ────────────────────────────────────────────────────────────────
 
@@ -757,9 +588,9 @@ export function CreationWorkspace({
 
             {/* Out-of-credits upgrade card */}
             {creditError && (
-              <OutOfCreditsCard
-                planId={profile?.plan_id ?? "free"}
-                totalUsed={totalUsedThisPeriod}
+              <BuildCreditsUpgradePanel
+                className="mt-4 bg-[#060d1f]"
+                planId={planId ?? profile?.plan_id ?? "free"}
                 resetAt={resetAt}
                 onDismiss={() => setCreditError(false)}
               />

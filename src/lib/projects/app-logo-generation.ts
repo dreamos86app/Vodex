@@ -69,7 +69,7 @@ export function buildLogoPrompt(input: {
   ].join(" ");
 }
 
-const VISUAL_MASS_MIN_RATIO = 0.62;
+const VISUAL_MASS_MIN_RATIO = 0.6;
 const WHITE_CORNER_LUMA = 235;
 
 /** Scale small glyphs so non-transparent content fills the circular mask. */
@@ -114,6 +114,64 @@ export async function scaleIconVisualMass(buffer: Buffer): Promise<Buffer> {
     .png()
     .toBuffer()
     .catch(() => buffer);
+}
+
+export type IconVisualValidation = {
+  ok: boolean;
+  massRatio: number;
+  textLike: boolean;
+  whiteCorners: boolean;
+};
+
+/** Heuristic: reject tiny marks, text-like strokes, or white matte corners. */
+export async function validateIconVisualQuality(buffer: Buffer): Promise<IconVisualValidation> {
+  const { data, info } = await sharp(buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  if (!width || !height || channels < 4) {
+    return { ok: false, massRatio: 0, textLike: false, whiteCorners: true };
+  }
+
+  let minX = width;
+  let minY = height;
+  let maxX = 0;
+  let maxY = 0;
+  let opaque = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * channels;
+      const a = data[i + 3] ?? 0;
+      if (a > 28) {
+        opaque += 1;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  const massRatio = opaque / (width * height);
+  const bw = maxX - minX + 1;
+  const bh = maxY - minY + 1;
+  const aspect = bw / Math.max(1, bh);
+  const textLike = aspect > 2.4 && massRatio < 0.35;
+
+  const corners = [
+    [0, 0],
+    [width - 1, 0],
+    [0, height - 1],
+    [width - 1, height - 1],
+  ];
+  let whiteCorners = 0;
+  for (const [x, y] of corners) {
+    const i = (y * width + x) * channels;
+    const r = data[i] ?? 0;
+    const g = data[i + 1] ?? 0;
+    const b = data[i + 2] ?? 0;
+    if (r >= WHITE_CORNER_LUMA && g >= WHITE_CORNER_LUMA && b >= WHITE_CORNER_LUMA) whiteCorners += 1;
+  }
+
+  const ok = massRatio >= VISUAL_MASS_MIN_RATIO && !textLike && whiteCorners < 3;
+  return { ok, massRatio, textLike, whiteCorners: whiteCorners >= 3 };
 }
 
 /** Re-flatten when corner pixels are mostly white (square matte artifact). */
@@ -353,10 +411,27 @@ export async function generateAppLogoWithOpenAi(input: {
 
   try {
     const prompt = buildLogoPrompt(input);
-    const generated = await generateOpenAiLogo(prompt);
-    const validated = await validateLogoBuffer(generated.buffer);
+    let generated = await generateOpenAiLogo(prompt);
+    let validated = await validateLogoBuffer(generated.buffer);
     if (!validated.ok) {
       return { ok: false, error: validated.error, providerCostUsd: generated.providerCostUsd };
+    }
+    let visual = await validateIconVisualQuality(generated.buffer);
+    if (!visual.ok) {
+      const strictPrompt = `${prompt} CRITICAL: single bold symbolic glyph, NO letters, fills 90% of canvas, no white border.`;
+      const retry = await generateOpenAiLogo(strictPrompt);
+      const retryValid = await validateLogoBuffer(retry.buffer);
+      if (retryValid.ok) {
+        const retryVisual = await validateIconVisualQuality(retry.buffer);
+        if (retryVisual.ok) {
+          generated = retry;
+          validated = retryValid;
+          visual = retryVisual;
+        }
+      }
+    }
+    if (!visual.ok) {
+      return { ok: false, error: "icon_visual_validation_failed", providerCostUsd: generated.providerCostUsd };
     }
     const urls = await uploadLogoDerivatives(input.projectId, input.operationId, generated.buffer);
     return {
