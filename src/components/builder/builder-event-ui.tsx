@@ -298,14 +298,19 @@ export function BuilderFileChangeList({ files }: { files: Array<{ path: string; 
 export function BuilderResultSummary({
   meta,
   creditsUsed,
+  previewReady = false,
   className,
 }: {
   meta: BuilderOutputContract | null;
   creditsUsed?: number | null;
+  previewReady?: boolean;
   className?: string;
 }) {
   if (!meta?.app?.name && !meta?.summary) return null;
   const appName = meta.app?.name ? stripMarkdownNoise(meta.app.name) : null;
+  const headline = previewReady
+    ? `Done — ${appName ? `I created ${appName}` : "Build complete"}`
+    : `Build saved — ${appName ?? "your app"} needs a preview fix`;
   return (
     <div
       className={cn(
@@ -326,11 +331,13 @@ export function BuilderResultSummary({
           <VodexBrandIcon variant="assistant" alt="" />
         </motion.div>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-foreground">
-            Done — {appName ? `I created ${appName}` : "Build complete"}
-          </p>
+          <p className="text-[13px] font-semibold text-foreground">{headline}</p>
           {meta.summary ? (
-            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{meta.summary}</p>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+              {previewReady
+                ? meta.summary
+                : "Files are saved. Use repair or retry preview when the build finishes."}
+            </p>
           ) : null}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {(meta.pages?.length ?? 0) > 0 && (
@@ -386,6 +393,7 @@ export function BuilderAssistantMessage({
   progressIndex: _progressIndex,
   creditsUsed,
   buildFinalized,
+  previewReady = false,
 }: {
   text: string;
   streaming?: boolean;
@@ -394,6 +402,7 @@ export function BuilderAssistantMessage({
   progressIndex: number;
   creditsUsed?: number | null;
   buildFinalized?: boolean;
+  previewReady?: boolean;
 }) {
   const appName = meta?.app?.name ? stripMarkdownNoise(meta.app.name) : plan.summary?.slice(0, 48);
   const fileRows =
@@ -439,7 +448,9 @@ export function BuilderAssistantMessage({
         </div>
       )}
 
-      {showDone && <BuilderResultSummary meta={meta} creditsUsed={creditsUsed} />}
+      {showDone && (
+        <BuilderResultSummary meta={meta} creditsUsed={creditsUsed} previewReady={previewReady} />
+      )}
       {streaming && !showDone && fileRows.length > 0 && (
         <p className="text-[10.5px] text-muted-foreground">Saving files and preparing preview…</p>
       )}

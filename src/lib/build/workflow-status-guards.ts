@@ -299,9 +299,16 @@ export function resolveBuildRunSummary(input: {
       ].filter(Boolean),
     },
     completed: {
-      headline: input.previewReady !== false ? "First version ready" : input.appName ? `Done — created ${input.appName}` : "Build complete",
+      headline:
+        input.previewReady === true
+          ? "First version ready"
+          : input.appName
+            ? `Build saved — ${input.appName} needs a preview fix`
+            : "Build saved — preview needs repair",
       bodyLines: [
-        input.previewReady !== false ? "Preview is live." : "Files saved — preview is still preparing.",
+        input.previewReady === true
+          ? "Preview is live."
+          : "Files are saved. Run repair or retry preview to finish.",
         typeof filesCount === "number" && filesCount > 0
           ? `${filesCount} file${filesCount === 1 ? "" : "s"} created or updated`
           : "",

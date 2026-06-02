@@ -28,21 +28,102 @@
   }
 }
 
-.workflow-active-ring {
-  animation: workflow-gold-pulse 2s ease-in-out infinite;
-  border: 1px solid rgba(251, 191, 36, 0.55);
-  box-shadow:
-    0 0 0 1px rgba(251, 191, 36, 0.2),
-    0 0 20px -2px rgba(251, 191, 36, 0.45);
+@property --workflow-gold-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes workflow-gold-orbit {
+  to {
+    --workflow-gold-angle: 360deg;
+  }
+}
+
+.workflow-gold-border-active {
+  position: relative;
+  border-radius: 0.75rem;
+  isolation: isolate;
+}
+
+.workflow-gold-border-active::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--workflow-gold-angle),
+    rgba(180, 120, 20, 0.35) 0deg,
+    rgba(251, 191, 36, 0.95) 60deg,
+    rgba(255, 230, 150, 1) 120deg,
+    rgba(217, 119, 6, 0.55) 200deg,
+    rgba(251, 191, 36, 0.85) 280deg,
+    rgba(180, 120, 20, 0.35) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: workflow-gold-orbit 2.8s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workflow-gold-border-active::before {
+    animation: none;
+    background: linear-gradient(
+      135deg,
+      rgba(251, 191, 36, 0.65),
+      rgba(217, 119, 6, 0.45)
+    );
+  }
+}
+
+.workflow-gold-border-active > * {
+  position: relative;
+  z-index: 1;
+}
+
+.workflow-active-ring.workflow-gold-border-active {
+  background: color-mix(in oklab, var(--color-amber-500) 7%, transparent);
 }
 
 .file-active-ring {
-  animation: workflow-gold-pulse 2s ease-in-out infinite;
-  box-shadow:
-    0 0 0 1px rgba(251, 191, 36, 0.35),
-    0 0 14px -3px rgba(251, 191, 36, 0.4);
-  outline: 1px solid rgba(251, 191, 36, 0.5);
-  outline-offset: 0;
+  position: relative;
+  border-radius: 1rem;
+  isolation: isolate;
+}
+
+.file-active-ring::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--workflow-gold-angle),
+    rgba(180, 120, 20, 0.3) 0deg,
+    rgba(251, 191, 36, 0.9) 90deg,
+    rgba(255, 230, 150, 1) 180deg,
+    rgba(251, 191, 36, 0.75) 270deg,
+    rgba(180, 120, 20, 0.3) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: workflow-gold-orbit 2.8s linear infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-active-ring::before {
+    animation: none;
+  }
 }
 
 /* Vodex — atmospheric white × blue (calm, cinematic, OS-grade) */

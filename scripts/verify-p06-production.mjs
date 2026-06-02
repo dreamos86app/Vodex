@@ -56,13 +56,14 @@ const suites = {
   },
   "session-intro-preload": () => {
     const errors = [];
-    must(read("src/components/session/vodex-session-intro.tsx"), "vodex_intro_seen_session", "session flag", errors);
+    must(read("src/lib/session/session-intro-decision.ts"), "vodex_intro_seen_session", "session flag", errors);
     const gate = read("src/components/session/vodex-session-intro-gate.tsx");
     must(gate, "VodexSessionIntroGate", "intro gate", errors);
     must(gate, "useLayoutEffect", "intro before paint", errors);
     must(gate, "pendingLoginIntro", "login intro flag", errors);
     must(gate, "serverUserId", "server user id", errors);
-    must(gate, "invisible fixed inset-0", "app preloads behind intro", errors);
+    must(gate, "vodex-app-preload", "app preloads behind intro", errors);
+    must(gate, "decideSessionIntro", "deterministic intro decision", errors);
     must(read("src/lib/bootstrap/session-preload.ts"), "beginSessionCreditsWarmup", "preload starts credits", errors);
     must(read("src/components/providers/app-chrome-providers.tsx"), "CreditsServerHydrator", "credits hydrator wired", errors);
     must(read("src/components/providers/app-chrome-providers.tsx"), "VodexSessionIntroGate", "intro wired in chrome", errors);

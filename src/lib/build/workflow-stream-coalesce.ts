@@ -174,7 +174,11 @@ function rowToStreamEvent(row: BuildJobEventRow, terminal: boolean): AgentWorkfl
     category,
       title,
       subtitle: mapped.subtitle,
-    progress: row.progress_percent ?? undefined,
+    progress:
+      meta.real_progress === true ||
+      typeof meta.file_progress_index === "number"
+        ? row.progress_percent ?? undefined
+        : undefined,
     phase: mapActivePhaseFromJobType(row.type),
     status,
     filePath,

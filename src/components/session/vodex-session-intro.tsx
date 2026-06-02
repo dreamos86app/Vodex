@@ -2,40 +2,27 @@
 
 import * as React from "react";
 import { VodexBrandIcon } from "@/components/brand/vodex-brand-icon";
+import { INTRO_SESSION_KEY } from "@/lib/session/session-intro-decision";
 
-const INTRO_KEY = "vodex_intro_seen_session";
 const MAX_MS = 2400;
-
-export function isPageReload(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const nav = performance.getEntriesByType("navigation")[0] as
-      | PerformanceNavigationTiming
-      | undefined;
-    return nav?.type === "reload";
-  } catch {
-    return false;
-  }
-}
 
 export function VodexSessionIntro({
   show,
   onDone,
+  onVisible,
 }: {
   show: boolean;
   onDone: () => void;
+  /** Called once when overlay is actually shown — safe place to mark session seen. */
+  onVisible?: () => void;
 }) {
   const [visible, setVisible] = React.useState(show);
   const doneRef = React.useRef(false);
+  const visibleReported = React.useRef(false);
 
   const finish = React.useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
-    try {
-      sessionStorage.setItem(INTRO_KEY, "1");
-    } catch {
-      /* ignore */
-    }
     setVisible(false);
     onDone();
   }, [onDone]);
@@ -43,19 +30,24 @@ export function VodexSessionIntro({
   React.useEffect(() => {
     if (!show) {
       setVisible(false);
+      visibleReported.current = false;
       return;
     }
     setVisible(true);
     doneRef.current = false;
+    if (!visibleReported.current) {
+      visibleReported.current = true;
+      onVisible?.();
+    }
     const t = window.setTimeout(finish, MAX_MS);
     return () => window.clearTimeout(t);
-  }, [show, finish]);
+  }, [show, finish, onVisible]);
 
   if (!visible) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-background"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-background"
       data-testid="vodex-session-intro"
       role="status"
       aria-live="polite"
@@ -74,20 +66,20 @@ export function VodexSessionIntro({
   );
 }
 
-/** First browser entry in this tab — skip on hard refresh only. */
+/** @deprecated use decideSessionIntro in gate */
 export function shouldShowSessionIntro(): boolean {
   if (typeof window === "undefined") return false;
-  if (isPageReload()) return false;
   try {
-    return sessionStorage.getItem(INTRO_KEY) !== "1";
+    return sessionStorage.getItem(INTRO_SESSION_KEY) !== "1";
   } catch {
     return true;
   }
 }
 
 export function markSessionIntroSeen(): void {
+  if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(INTRO_KEY, "1");
+    sessionStorage.setItem(INTRO_SESSION_KEY, "1");
   } catch {
     /* ignore */
   }

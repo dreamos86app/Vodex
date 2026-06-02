@@ -4,20 +4,26 @@ import * as React from "react";
 import {
   VodexSessionIntro,
   markSessionIntroSeen,
-  shouldShowSessionIntro,
 } from "@/components/session/vodex-session-intro";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { runSessionPreload } from "@/lib/bootstrap/session-preload";
 import { beginSessionCreditsWarmup } from "@/lib/credits/session-credits-warmup";
-import { isLightweightPublicPath } from "@/lib/routing/lightweight-public-paths";
-import { hasActiveSession } from "@/lib/auth/client-identity";
+import {
+  clearIntroPendingCookie,
+  clearOnboardingIntroPending,
+  decideSessionIntro,
+  readIntroPendingCookie,
+  readOnboardingIntroPending,
+  readSessionIntroSeen,
+} from "@/lib/session/session-intro-decision";
+import { logIntroDecision, registerIntroDebugHook } from "@/lib/session/intro-debug";
 import { usePathname } from "next/navigation";
 
-type EntryPhase = "intro" | "ready";
+type EntryPhase = "deciding" | "intro" | "ready";
 
 /**
- * Session entry: VODEX intro on first visit per tab (or after fresh login).
- * App mounts behind overlay; credits warm from server snapshot + lite fetch.
+ * Session entry: VODEX intro on first tab visit, after login, or after onboarding.
+ * Mounted only inside authenticated AppChromeProviders (never on marketing-only shells).
  */
 export function VodexSessionIntroGate({
   children,
@@ -26,24 +32,20 @@ export function VodexSessionIntroGate({
 }: {
   children: React.ReactNode;
   serverUserId?: string;
-  /** Set by auth callback cookie — forces intro once after login. */
   pendingLoginIntro?: boolean;
 }) {
   const pathname = usePathname();
-  const session = useAuthStore((s) => s.session);
   const user = useAuthStore((s) => s.user);
-  const profileId = useAuthStore((s) => s.profile?.id);
-  const profilePlanId = useAuthStore((s) => s.profile?.plan_id);
+  const email = useAuthStore((s) => s.user?.email ?? s.profile?.email);
 
-  const userId = serverUserId ?? user?.id ?? profileId ?? null;
-  const sessionActive = hasActiveSession(session, user) || Boolean(serverUserId);
+  const userId = serverUserId ?? user?.id ?? null;
 
   const [phase, setPhase] = React.useState<EntryPhase>(() =>
-    pendingLoginIntro ? "intro" : "ready",
+    userId ? "deciding" : "ready",
   );
 
-  React.useLayoutEffect(() => {
-    if (isLightweightPublicPath(pathname) || !userId) {
+  const runDecision = React.useCallback(() => {
+    if (!userId) {
       setPhase("ready");
       return;
     }
@@ -51,49 +53,89 @@ export function VodexSessionIntroGate({
     beginSessionCreditsWarmup(userId, useAuthStore.getState().profile);
     runSessionPreload(userId, useAuthStore.getState().profile);
 
-    const showIntro =
-      pendingLoginIntro || (sessionActive && shouldShowSessionIntro());
+    const hasPendingCookie = pendingLoginIntro || readIntroPendingCookie();
+    const seenSession = readSessionIntroSeen();
+    const onboardingIntroPending = readOnboardingIntroPending(userId);
 
-    if (showIntro) {
-      if (pendingLoginIntro) {
+    const decision = decideSessionIntro({
+      userId,
+      pendingLoginIntro,
+      hasPendingCookie,
+      sessionIntroSeen: seenSession,
+      onboardingIntroPending,
+    });
+
+    logIntroDecision(email, {
+      userId,
+      hasPendingCookie,
+      seenSession,
+      shouldShow: decision.shouldShow,
+      reason: decision.reason,
+      appVisible: !decision.shouldShow,
+    });
+
+    if (decision.shouldShow) {
+      if (hasPendingCookie) {
         try {
           sessionStorage.removeItem("vodex_intro_seen_session");
         } catch {
           /* ignore */
         }
       }
+      clearIntroPendingCookie();
       setPhase("intro");
     } else {
       setPhase("ready");
     }
-  }, [pathname, userId, sessionActive, pendingLoginIntro, profilePlanId]);
+  }, [userId, pendingLoginIntro, email]);
+
+  React.useLayoutEffect(() => {
+    runDecision();
+  }, [runDecision, pathname]);
+
+  React.useEffect(() => {
+    registerIntroDebugHook(() => {
+      setPhase("intro");
+    });
+  }, []);
+
+  const onIntroVisible = React.useCallback(() => {
+    markSessionIntroSeen();
+    if (userId) clearOnboardingIntroPending(userId);
+    clearIntroPendingCookie();
+  }, [userId]);
 
   const finishIntro = React.useCallback(() => {
     markSessionIntroSeen();
+    if (userId) clearOnboardingIntroPending(userId);
+    clearIntroPendingCookie();
     setPhase("ready");
-    try {
-      document.cookie = "vodex_session_intro_pending=; Max-Age=0; path=/";
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  }, [userId]);
 
+  const appVisible = phase === "ready";
   const showIntroOverlay = phase === "intro";
 
   return (
     <>
       <div
         className={
-          showIntroOverlay
-            ? "pointer-events-none invisible fixed inset-0 z-0 overflow-hidden"
-            : undefined
+          appVisible
+            ? undefined
+            : "pointer-events-none invisible fixed inset-0 z-0 overflow-hidden opacity-0"
         }
-        aria-hidden={showIntroOverlay}
+        aria-hidden={!appVisible}
+        data-testid={appVisible ? "vodex-app-visible" : "vodex-app-preload"}
       >
         {children}
       </div>
       {showIntroOverlay ? (
-        <VodexSessionIntro show onDone={finishIntro} />
+        <VodexSessionIntro show onVisible={onIntroVisible} onDone={finishIntro} />
+      ) : phase === "deciding" ? (
+        <div
+          className="fixed inset-0 z-[9998] bg-background"
+          data-testid="vodex-session-intro-deciding"
+          aria-hidden
+        />
       ) : null}
     </>
   );

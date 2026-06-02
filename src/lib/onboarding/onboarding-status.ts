@@ -6,6 +6,7 @@ import {
 } from "@/lib/cache/session-bootstrap-cache";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Profile } from "@/lib/supabase/types";
+import { setOnboardingIntroPending } from "@/lib/session/session-intro-decision";
 
 const SESSION_KEY_PREFIX = "vodex:onboarding-complete:";
 
@@ -69,6 +70,7 @@ export function applyOnboardingCompleteToClient(
   } catch {
     /* ignore */
   }
+  setOnboardingIntroPending(userId);
 }
 
 /** Server: profiles row OR onboarding.completed_at / completed flag. */

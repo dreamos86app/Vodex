@@ -13,11 +13,11 @@ function must(rel, needle, label) {
   else ok.push(label);
 }
 
-must("src/app/globals.css", "workflow-gold-pulse", "gold pulse keyframes");
-must("src/app/globals.css", "workflow-active-ring", "step active ring");
-must("src/app/globals.css", "file-active-ring", "file active ring");
-must("src/components/create/workspace/workflow-step-card.tsx", "workflow-active-ring", "step card ring");
-must("src/components/create/workspace/agent-workflow-stream.tsx", "file-active-ring", "file row ring");
+must("src/app/globals.css", "workflow-gold-orbit", "orbiting gold border");
+must("src/app/globals.css", "conic-gradient", "conic gold gradient");
+must("src/app/globals.css", "workflow-gold-border-active", "animated border class");
+must("src/components/create/workspace/workflow-step-card.tsx", "workflow-gold-border-active", "step card ring");
+must("src/components/create/workspace/agent-workflow-stream.tsx", "workflow-gold-border-active", "file row ring");
 
 console.log("\n=== verify:gold-outline-workflow ===\n");
 ok.forEach((m) => console.log("✓", m));

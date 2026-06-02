@@ -37,7 +37,7 @@ export function WorkflowStepCard({
     <div
       className={cn(
         "mr-6 max-w-md rounded-xl px-3 py-2 text-[11px] transition-all sm:mr-10",
-        active && "workflow-active-ring bg-amber-500/[0.07]",
+        active && "workflow-gold-border-active workflow-active-ring bg-amber-500/[0.07]",
         completed && "border border-transparent opacity-80",
         failed && "border border-destructive/45 bg-destructive/[0.06]",
         status === "pending" && "border border-transparent opacity-55",
@@ -72,8 +72,10 @@ export function WorkflowStepCard({
             {label}
           </p>
           {sublabel ? <p className="mt-0.5 text-muted-foreground">{sublabel}</p> : null}
-          {typeof progress === "number" && active ? (
+          {typeof progress === "number" && active && progress > 0 && progress < 100 ? (
             <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">{progress}%</p>
+          ) : active ? (
+            <p className="mt-1 text-[10px] text-muted-foreground">Working…</p>
           ) : null}
           {fileDelta && (fileDelta.added != null || fileDelta.removed != null) ? (
             <p className="mt-1 font-mono text-[10px] tabular-nums text-muted-foreground">

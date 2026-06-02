@@ -41,7 +41,7 @@ export function BuildDiagnosticsCenter({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4 sm:p-8"
+      className="fixed inset-0 z-[130] flex items-center justify-center p-4 sm:p-8"
       data-testid="build-diagnostics-modal"
       role="dialog"
       aria-modal="true"

@@ -148,7 +148,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
   });
 
   let stepIndex = 0;
-  const progressForStep = () => Math.min(90, 25 + stepIndex++ * 7);
+  const progressForStep = () => undefined;
   let lastActivityAt = Date.now();
   let currentStepLabel = "Creating the app plan";
   let lastHeartbeatPersist = 0;
@@ -179,7 +179,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       type: "understanding_request",
       title: "Still working",
       detail: `Still working on ${currentStepLabel}…`,
-      progressPercent: Math.min(88, 25 + stepIndex * 5),
+      progressPercent: undefined,
       metadata: {
         trace_stage: stageLabel,
         heartbeat: true,
@@ -1135,20 +1135,26 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       progressPercent: 98,
     });
 
+    const previewLive = isStaticPreviewSnapshotHealthy(
+      postPreviewHtml,
+      workingFiles.length,
+    );
     await persistBuildJobEvent(input.writer, {
       ...eventCtx,
       type: "completed",
-      title: "First version ready",
-      detail: "Preview is live.",
+      title: previewLive ? "First version ready" : "Build saved",
+      detail: previewLive
+        ? "Preview is live."
+        : "Files saved — preview needs repair. Use repair or retry preview.",
       progressPercent: 100,
       metadata: {
         credits_charged: creditsCharged,
         preview_url: resolvedPreviewUrl,
         files_persisted: fileGate.fileCount,
         stream_category: "completed",
-        source_integrity_ok: true,
-        preview_renderable: true,
-        ready_reason: "source_integrity_ok_preview_live",
+        source_integrity_ok: postPreview.sourceIntegrity.sourceIntegrityOk,
+        preview_renderable: previewLive,
+        ready_reason: previewLive ? "source_integrity_ok_preview_live" : "preview_pending",
       },
     });
 

@@ -11,6 +11,8 @@ import {
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { truncateIdentityId } from "@/lib/identity/dreamos-identity";
+import { copyTextToClipboard } from "@/lib/clipboard/copy-text";
+import { toast } from "@/lib/toast";
 
 function IdentitySummaryStrip() {
   const [summary, setSummary] = React.useState<{
@@ -53,7 +55,7 @@ function IdentitySummaryStrip() {
   if (!summary?.accountId) return null;
 
   return (
-    <div className="border-b border-border px-4 py-2 text-[10px] text-muted-foreground space-y-1">
+    <div className="space-y-1 border-b border-border px-5 py-3 text-[10px] text-muted-foreground">
       <p>
         <span className="text-foreground/80">accountId</span>{" "}
         <span className="font-mono" title={summary.accountId}>
@@ -85,11 +87,13 @@ function IdentitySummaryStrip() {
   );
 }
 
+/** Owner-only runtime diagnostics — center-left launcher, centered modal (not a right drawer). */
 export function RuntimeDiagnosticsDrawer() {
   const email = useAuthStore((s) => s.profile?.email);
   const isOwner = isDreamosOwnerEmail(email);
   const [open, setOpen] = React.useState(false);
   const [entries, setEntries] = React.useState<RuntimeDiagnosticEntry[]>([]);
+  const [fallbackText, setFallbackText] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(() => {
     setEntries(readRuntimeDiagnostics());
@@ -102,6 +106,29 @@ export function RuntimeDiagnosticsDrawer() {
     return () => clearInterval(t);
   }, [isOwner, open, refresh]);
 
+  const copyBundle = async () => {
+    const local = readRuntimeDiagnostics();
+    let server: unknown = null;
+    try {
+      const r = await fetch("/api/admin/runtime-diagnostics-bundle", {
+        credentials: "include",
+      });
+      if (r.ok) server = await r.json();
+    } catch {
+      /* ignore */
+    }
+    const bundle = { client: local, server, copied_at: new Date().toISOString() };
+    const text = JSON.stringify(bundle, null, 2);
+    const result = await copyTextToClipboard(text);
+    if (result.ok) {
+      toast.success(`Copied ${result.chars.toLocaleString()} characters`);
+      setFallbackText(null);
+      return;
+    }
+    setFallbackText(text);
+    toast.error("Clipboard blocked — select and copy the text below");
+  };
+
   if (!isOwner) return null;
 
   return (
@@ -112,35 +139,47 @@ export function RuntimeDiagnosticsDrawer() {
           setOpen(true);
           refresh();
         }}
-        className="fixed bottom-20 right-3 z-[90] flex size-10 items-center justify-center rounded-full bg-amber-500/90 text-amber-950 shadow-lg ring-2 ring-amber-300/50 lg:bottom-6"
+        className="fixed left-4 top-1/2 z-[85] -translate-y-1/2 rounded-full bg-amber-500 px-3 py-2 text-[11px] font-semibold text-amber-950 shadow-lg ring-2 ring-amber-300/50"
         title="Owner diagnostics"
-        aria-label="Open runtime diagnostics"
+        aria-label="Open diagnostics"
+        data-testid="owner-diagnostics-launcher"
       >
-        <Bug className="size-4" strokeWidth={2} />
+        <span className="flex items-center gap-1.5">
+          <Bug className="size-3.5" strokeWidth={2} />
+          Diagnostics
+        </span>
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-[100] flex justify-end">
+      {open ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-8"
+          data-testid="runtime-diagnostics-modal"
+          role="dialog"
+          aria-modal="true"
+        >
           <button
             type="button"
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
             aria-label="Close diagnostics"
             onClick={() => setOpen(false)}
           />
           <div
             className={cn(
-              "relative flex h-full w-full max-w-md flex-col border-l border-border bg-background shadow-2xl",
+              "relative flex max-h-[min(90vh,820px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-amber-500/25 bg-background shadow-2xl",
             )}
           >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
-                <p className="text-[13px] font-semibold text-foreground">Runtime diagnostics</p>
-                <p className="text-[11px] text-muted-foreground">Owner only · last {entries.length} events</p>
+                <p className="text-[14px] font-semibold text-foreground">Runtime diagnostics</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Owner only · last {entries.length} events
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface"
+                className="rounded-lg p-2 hover:bg-muted"
+                aria-label="Close"
               >
                 <X className="size-4" />
               </button>
@@ -148,26 +187,12 @@ export function RuntimeDiagnosticsDrawer() {
 
             <IdentitySummaryStrip />
 
-            <div className="flex gap-2 border-b border-border px-4 py-2">
+            <div className="flex gap-2 border-b border-border px-5 py-2">
               <button
                 type="button"
-                onClick={() => {
-                  void (async () => {
-                    const local = readRuntimeDiagnostics();
-                    let server: unknown = null;
-                    try {
-                      const r = await fetch("/api/admin/runtime-diagnostics-bundle", {
-                        credentials: "include",
-                      });
-                      if (r.ok) server = await r.json();
-                    } catch {
-                      /* ignore */
-                    }
-                    const bundle = { client: local, server, copied_at: new Date().toISOString() };
-                    await navigator.clipboard.writeText(JSON.stringify(bundle, null, 2));
-                  })();
-                }}
-                className="flex items-center gap-1.5 rounded-lg bg-surface px-2.5 py-1.5 text-[11px] font-medium ring-1 ring-border"
+                onClick={() => void copyBundle()}
+                className="flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-500/30"
+                data-testid="copy-diagnostic-bundle"
               >
                 <Copy className="size-3.5" />
                 Copy diagnostic bundle
@@ -178,14 +203,25 @@ export function RuntimeDiagnosticsDrawer() {
                   clearRuntimeDiagnostics();
                   refresh();
                 }}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-muted-foreground hover:bg-surface"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-muted-foreground hover:bg-muted"
               >
                 <Trash2 className="size-3.5" />
                 Clear
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2 font-mono text-[10.5px]">
+            {fallbackText ? (
+              <div className="border-b border-border px-5 py-3">
+                <textarea
+                  readOnly
+                  className="h-28 w-full resize-y rounded-md border border-border bg-background p-2 font-mono text-[10px]"
+                  value={fallbackText}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+              </div>
+            ) : null}
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 font-mono text-[10.5px]">
               {entries.length === 0 ? (
                 <p className="py-8 text-center text-muted-foreground">No events yet.</p>
               ) : (
@@ -196,18 +232,18 @@ export function RuntimeDiagnosticsDrawer() {
                   >
                     <p className="font-semibold text-accent">{e.event}</p>
                     <p className="text-muted-foreground">{e.at}</p>
-                    {e.detail && (
+                    {e.detail ? (
                       <pre className="mt-1 whitespace-pre-wrap break-all text-foreground/80">
                         {JSON.stringify(e.detail)}
                       </pre>
-                    )}
+                    ) : null}
                   </div>
                 ))
               )}
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 }

@@ -194,7 +194,7 @@ export function evaluateSourceIntegrity(
   const layoutHasRealContent = layout ? fileMeetsMeaningfulThreshold(layout) : false;
   const globalsHasRealContent = globals ? fileMeetsMeaningfulThreshold(globals) : false;
 
-  const minMeaningful = 6;
+  const minMeaningful = meaningfulSourceFileCount >= 8 ? 6 : 4;
   const portfolioBuild = files.some((f) =>
     /(^|\/)lib\/portfolio-data\.(ts|js)$/i.test(normalizeBuildFilePath(f.path)),
   );

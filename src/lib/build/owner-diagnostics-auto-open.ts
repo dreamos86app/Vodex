@@ -21,6 +21,7 @@ export function shouldAutoOpenOwnerDiagnostics(input: {
   if (!reason) return false;
   if (reason.includes("missing_root_page")) return true;
   if (reason.includes("technical_generation_incomplete")) return true;
+  if (reason.includes("insufficient_meaningful")) return true;
   if (reason.includes("preview_failed")) return true;
   if (reason.includes("build_failed")) return true;
   return false;
