@@ -4,6 +4,8 @@ import {
   USER_FACING_UI_BANNED,
 } from "@/lib/build/ui-quality-contract";
 import { reviewGeneratedUi, type UiQualityScore } from "@/lib/generation/generated-ui-review";
+import { dashboardQualityScore } from "@/lib/build/dashboard-quality-validator";
+import { validateUiRichness } from "@/lib/build/ui-richness-validator";
 
 export type GeneratedUiQualityResult = {
   score: number;
@@ -11,6 +13,9 @@ export type GeneratedUiQualityResult = {
   review: UiQualityScore;
   failures: string[];
   basicUiFailure: boolean;
+  dashboardScore: number;
+  uiRichnessScore: number;
+  uiRichnessPasses: boolean;
 };
 
 function scoreBasicUiPenalties(uiContent: string, pageContent: string): { penalty: number; failures: string[] } {
@@ -81,7 +86,18 @@ export function checkGeneratedUiQuality(input: {
   const pageContent = homePath?.content ?? uiContent.slice(0, 4000);
 
   const { penalty, failures } = scoreBasicUiPenalties(uiContent, pageContent);
-  const score = Math.max(0, Math.min(100, review.overall - penalty));
+  const dash = dashboardQualityScore(input.files);
+  const richness = validateUiRichness(input.files);
+  const combinedFailures = [
+    ...failures,
+    ...dash.failures,
+    ...richness.failures,
+    ...review.issues.slice(0, 6),
+  ];
+  const score = Math.max(
+    0,
+    Math.min(100, Math.round((review.overall - penalty + richness.score + dash.score) / 3)),
+  );
   const basicUiFailure = failures.some((f) =>
     ["welcome_only_no_nav", "welcome_plus_plain_cards", "generic_card_stack_home", "shallow_primary_route"].includes(f),
   );
@@ -90,14 +106,19 @@ export function checkGeneratedUiQuality(input: {
     score >= PREVIEW_READY_MIN_SCORE &&
     review.passesGate &&
     !review.placeholderLike &&
-    !basicUiFailure;
+    !basicUiFailure &&
+    dash.passes &&
+    richness.passes;
 
   return {
     score,
     passesPreview,
     review,
-    failures: [...failures, ...review.issues.slice(0, 6)],
+    failures: combinedFailures,
     basicUiFailure,
+    dashboardScore: dash.score,
+    uiRichnessScore: richness.score,
+    uiRichnessPasses: richness.passes,
   };
 }
 

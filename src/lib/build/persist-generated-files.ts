@@ -171,6 +171,9 @@ export async function persistGeneratedBuildFiles(input: {
         totalFiles: total,
         progressPercent,
       });
+      if (i < sorted.length - 1) {
+        await new Promise((r) => setTimeout(r, 48));
+      }
     }
   }
 

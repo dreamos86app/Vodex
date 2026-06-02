@@ -210,6 +210,7 @@ export function resolveBuildRunSummary(input: {
   filesCount?: number;
   pages?: string[];
   previewReady?: boolean;
+  uiRichnessPasses?: boolean;
   sourceIntegrityOk?: boolean;
   creditsUsed?: number;
   errorDetail?: string;
@@ -301,14 +302,18 @@ export function resolveBuildRunSummary(input: {
     completed: {
       headline:
         input.previewReady === true
-          ? "First version ready"
-          : input.appName
-            ? `Build saved — ${input.appName} needs a preview fix`
-            : "Build saved — preview needs repair",
+          ? "Done — preview is ready"
+          : input.uiRichnessPasses === false
+            ? "Draft saved — additional generation needed"
+            : input.appName
+              ? `Draft generated — improving ${input.appName}`
+              : "Draft generated — improving UI quality",
       bodyLines: [
         input.previewReady === true
-          ? "Preview is live."
-          : "Files are saved. Run repair or retry preview to finish.",
+          ? "Preview is live with populated dashboard sections."
+          : input.uiRichnessPasses === false
+            ? "Files are saved but the UI is still shallow — run another build pass or repair."
+            : "Files are saved. Run repair or retry preview to finish.",
         typeof filesCount === "number" && filesCount > 0
           ? `${filesCount} file${filesCount === 1 ? "" : "s"} created or updated`
           : "",

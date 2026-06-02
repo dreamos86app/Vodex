@@ -65,10 +65,13 @@ export function evaluateBuildSuccessContract(
   }
 
   const passed = failures.length === 0;
-  const userMessage = passed
-    ? "First version ready — preview is live."
+  const richnessOk = input.uiQuality.uiRichnessPasses;
+  const userMessage = passed && input.uiQuality.passesPreview && richnessOk
+    ? "Done — preview is ready."
     : renderable.length >= MIN_RENDERABLE_FILES
-      ? "First version ready — preview is live."
+      ? richnessOk
+        ? "Draft generated — improving UI quality."
+        : "Draft saved — additional generation needed."
       : failures.some((f) => f.includes("renderable") || f.includes("missing_app"))
         ? "The files were saved, but preview could not render because of a technical issue."
         : "I couldn't generate files for this request. Try again or simplify your prompt.";
@@ -80,7 +83,7 @@ export function evaluateBuildSuccessContract(
     renderableCount: renderable.length,
     pageCount,
     uiQualityScore: input.uiQuality.score,
-    previewReady: passed && input.uiQuality.passesPreview,
+    previewReady: passed && input.uiQuality.passesPreview && richnessOk,
     userMessage,
   };
 }

@@ -926,6 +926,7 @@ export function ImmersiveWorkspace({
         sourceIntegrityOk &&
         previewRenderable &&
         (terminal.status === "completed" || meta.ready_reason === "source_integrity_ok_preview_live");
+      const uiRichnessPasses = meta.ui_richness_passes !== false;
       const resolved = resolveBuildRunSummary({
         facts,
         appName: project?.name ?? undefined,
@@ -936,6 +937,7 @@ export function ImmersiveWorkspace({
             : undefined,
         errorDetail: terminal.error ?? terminal.latest?.detail ?? undefined,
         previewReady,
+        uiRichnessPasses,
         sourceIntegrityOk,
       });
       const summary = resolved;

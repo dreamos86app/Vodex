@@ -4,8 +4,24 @@ import * as React from "react";
 
 export type DraggablePosition = { x: number; y: number };
 
+const LEFT_SNAP_X = 20;
+const MAGNET_PX = 64;
+const MAX_LEFT_X = 148;
+
+function clampPosition(next: DraggablePosition, elWidth = 120, elHeight = 40): DraggablePosition {
+  if (typeof window === "undefined") return next;
+  const maxY = Math.max(56, window.innerHeight - elHeight - 24);
+  const maxX = Math.min(MAX_LEFT_X, window.innerWidth - elWidth - 16);
+  let x = Math.min(maxX, Math.max(8, next.x));
+  let y = Math.min(maxY, Math.max(48, next.y));
+  if (x < MAGNET_PX) x = LEFT_SNAP_X;
+  return { x, y };
+}
+
 export function useDraggablePosition(storageKey: string, defaultPos: DraggablePosition) {
-  const [pos, setPos] = React.useState<DraggablePosition>(defaultPos);
+  const [pos, setPos] = React.useState<DraggablePosition>(() =>
+    clampPosition(defaultPos),
+  );
   const dragRef = React.useRef<{
     startX: number;
     startY: number;
@@ -19,7 +35,7 @@ export function useDraggablePosition(storageKey: string, defaultPos: DraggablePo
       if (!raw) return;
       const parsed = JSON.parse(raw) as DraggablePosition;
       if (typeof parsed.x === "number" && typeof parsed.y === "number") {
-        setPos(parsed);
+        setPos(clampPosition(parsed));
       }
     } catch {
       /* ignore */
@@ -28,9 +44,10 @@ export function useDraggablePosition(storageKey: string, defaultPos: DraggablePo
 
   const persist = React.useCallback(
     (next: DraggablePosition) => {
-      setPos(next);
+      const clamped = clampPosition(next);
+      setPos(clamped);
       try {
-        localStorage.setItem(storageKey, JSON.stringify(next));
+        localStorage.setItem(storageKey, JSON.stringify(clamped));
       } catch {
         /* ignore */
       }
@@ -58,15 +75,23 @@ export function useDraggablePosition(storageKey: string, defaultPos: DraggablePo
       const dx = e.clientX - dragRef.current.startX;
       const dy = e.clientY - dragRef.current.startY;
       persist({
-        x: Math.max(8, dragRef.current.originX + dx),
-        y: Math.max(48, dragRef.current.originY + dy),
+        x: dragRef.current.originX + dx,
+        y: dragRef.current.originY + dy,
       });
     },
     [persist],
   );
 
   const onPointerUp = React.useCallback(() => {
+    if (!dragRef.current) return;
     dragRef.current = null;
+    persist(pos);
+  }, [persist, pos]);
+
+  React.useEffect(() => {
+    const onResize = () => setPos((p) => clampPosition(p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   return {

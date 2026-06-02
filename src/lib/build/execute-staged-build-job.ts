@@ -273,6 +273,8 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
           primaryModelId: input.modelId,
           complexity: 1,
           uiQualityScore: 0,
+          dashboardQualityScore: 0,
+          uiRichnessPasses: false,
           buildContract: {
             passed: false,
             allowed: false,
@@ -1164,10 +1166,14 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       workingFiles.length,
     );
 
-    const doneSummary = previewLive
+    const richnessOk = pr.uiRichnessPasses && pr.uiQualityScore >= 85;
+    const canShowDone = previewLive && richnessOk && pr.buildContract.previewReady;
+    const doneSummary = canShowDone
       ? pr.meta?.summary?.trim() ||
-        `${pr.appName} is ready to preview with ${fileGate.fileCount} files.`
-      : `Draft saved — preview needs repair (${fileGate.fileCount} files persisted).`;
+        `Done — preview is ready for ${pr.appName} (${fileGate.fileCount} files).`
+      : richnessOk
+        ? `Draft generated — improving UI quality (${fileGate.fileCount} files saved).`
+        : `Draft saved — additional generation needed (${fileGate.fileCount} files).`;
     await persistAssistantBuildMessage(input.writer, eventCtx, {
       message: doneSummary.slice(0, 280),
       progressPercent: 98,
@@ -1175,10 +1181,12 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     await persistBuildJobEvent(input.writer, {
       ...eventCtx,
       type: "completed",
-      title: previewLive ? "First version ready" : "Draft saved",
-      detail: previewLive
-        ? "Preview is live."
-        : "Draft saved — preview needs repair. Use repair or retry preview.",
+      title: canShowDone ? "Done — preview is ready" : richnessOk ? "Draft generated" : "Draft saved",
+      detail: canShowDone
+        ? "Preview is live with rich dashboard UI."
+        : richnessOk
+          ? "Draft generated — improving UI quality."
+          : "Draft saved — additional generation needed.",
       progressPercent: 100,
       metadata: {
         credits_charged: creditsCharged,
@@ -1187,6 +1195,8 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         stream_category: "completed",
         source_integrity_ok: postPreview.sourceIntegrity.sourceIntegrityOk,
         preview_renderable: previewLive,
+        ui_richness_passes: richnessOk,
+        ui_quality_score: pr.uiQualityScore,
         ready_reason: previewLive ? "source_integrity_ok_preview_live" : "preview_pending",
       },
     });

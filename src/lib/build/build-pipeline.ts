@@ -37,6 +37,7 @@ import {
   replaceStubFilesWithArchetypeScaffold,
 } from "@/lib/build/archetype-scaffold-fallback";
 import { expandBuildPromptIfShallow } from "@/lib/build/build-feature-expansion";
+import { expandProductIntelligence } from "@/lib/build/product-intelligence-expansion";
 import {
   buildDeterministicPlanForArchetype,
   deterministicPlanToJson,
@@ -144,6 +145,8 @@ export type StagedBuildResult = {
   primaryModelId: string;
   complexity: number;
   uiQualityScore: number;
+  dashboardQualityScore: number;
+  uiRichnessPasses: boolean;
   buildContract: BuildSuccessContractResult;
   /** Full post-build contract failures (includes ui_quality, routes, imports). */
   postBuildFailures: string[];
@@ -317,6 +320,8 @@ export async function runStagedBuildPipeline(input: {
       iconUrl: null,
       appName: "Dream App",
       uiQualityScore: 0,
+      dashboardQualityScore: 0,
+      uiRichnessPasses: false,
       buildContract: {
         passed: false,
         allowed: false,
@@ -339,7 +344,14 @@ export async function runStagedBuildPipeline(input: {
   let primaryModelId = "gpt-5.4-mini";
 
   const featureExpansion = expandBuildPromptIfShallow(input.userPrompt);
-  const pipelinePrompt = featureExpansion.executionPrompt;
+  const productIntel = expandProductIntelligence({
+    userPrompt: input.userPrompt,
+    executionPrompt: featureExpansion.executionPrompt,
+    archetypeId: featureExpansion.archetypeId,
+  });
+  const pipelinePrompt = productIntel.executionPrompt;
+  track(events, "planning", "Understanding product & workflows");
+  trackAssistant(events, productIntel.brief.headline, emit);
   if (featureExpansion.expanded) {
     dreamosLog({
       source: "server",
@@ -704,6 +716,8 @@ export async function runStagedBuildPipeline(input: {
       primaryModelId,
       complexity,
       uiQualityScore: 0,
+      dashboardQualityScore: 0,
+      uiRichnessPasses: false,
       buildContract: {
         passed: false,
         allowed: false,
@@ -872,6 +886,8 @@ export async function runStagedBuildPipeline(input: {
       primaryModelId,
       complexity,
       uiQualityScore: 0,
+      dashboardQualityScore: 0,
+      uiRichnessPasses: false,
       buildContract: {
         passed: false,
         allowed: true,
@@ -1106,6 +1122,8 @@ export async function runStagedBuildPipeline(input: {
       primaryModelId,
       complexity,
       uiQualityScore: 0,
+      dashboardQualityScore: 0,
+      uiRichnessPasses: false,
       buildContract: {
         passed: false,
         allowed: false,
@@ -1224,8 +1242,10 @@ export async function runStagedBuildPipeline(input: {
     files: allFiles.map((f) => ({ path: f.path, action: "created" as const })),
     summary: ok
       ? buildContract.previewReady
-        ? `Built ${resolvedAppName} with ${allFiles.length} files.`
-        : `Draft saved for ${resolvedAppName} — preview needs repair.`
+        ? `Done — preview is ready for ${resolvedAppName} (${allFiles.length} files).`
+        : uiQuality.uiRichnessPasses
+          ? `Draft generated for ${resolvedAppName} — improving UI quality.`
+          : `Draft saved for ${resolvedAppName} — additional generation needed.`
       : summaryText,
     dashboard: undefined,
     publish: undefined,
@@ -1289,6 +1309,10 @@ export async function runStagedBuildPipeline(input: {
         meta: ev.meta,
       })) as unknown as Json,
       ui_quality_score: uiQuality.score,
+      dashboard_quality_score: uiQuality.dashboardScore,
+      ui_richness_score: uiQuality.uiRichnessScore,
+      ui_richness_passes: uiQuality.uiRichnessPasses,
+      product_intelligence_headline: productIntel.brief.headline,
       ui_preview_ready: buildContract.previewReady,
       build_success_contract: buildContract.passed,
       build_contract_failures: buildContract.failures,
@@ -1359,6 +1383,8 @@ export async function runStagedBuildPipeline(input: {
     primaryModelId,
     complexity,
     uiQualityScore: uiQuality.score,
+    dashboardQualityScore: uiQuality.dashboardScore,
+    uiRichnessPasses: uiQuality.uiRichnessPasses,
     buildContract,
     postBuildFailures: postContract.failures,
     appArchetype: archetype.id,

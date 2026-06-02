@@ -4,7 +4,10 @@ import * as React from "react";
 import { useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-function useAnimatedCount(target: number | undefined, durationMs = 380): number | undefined {
+const STEP_MS = 120;
+
+/** Animate count in ~120ms steps (Cursor-style live deltas). */
+function useAnimatedCountStep(target: number | undefined): number | undefined {
   const reduced = useReducedMotion();
   const fromRef = React.useRef(target ?? 0);
   const [display, setDisplay] = React.useState(target);
@@ -20,23 +23,28 @@ function useAnimatedCount(target: number | undefined, durationMs = 380): number 
       fromRef.current = target;
       return;
     }
-    const from = fromRef.current;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs);
-      const eased = 1 - (1 - t) ** 2;
-      const next = Math.round(from + (target - from) * eased);
-      setDisplay(next);
-      if (t < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        fromRef.current = target;
+    let current = fromRef.current;
+    if (current === target) {
+      setDisplay(target);
+      return;
+    }
+    const id = window.setInterval(() => {
+      const diff = target - current;
+      if (diff === 0) {
+        window.clearInterval(id);
+        return;
       }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, reduced, durationMs]);
+      const step = Math.max(1, Math.ceil(Math.abs(diff) / 8));
+      current += diff > 0 ? step : -step;
+      if ((diff > 0 && current >= target) || (diff < 0 && current <= target)) {
+        current = target;
+      }
+      fromRef.current = current;
+      setDisplay(current);
+      if (current === target) window.clearInterval(id);
+    }, STEP_MS);
+    return () => window.clearInterval(id);
+  }, [target, reduced]);
 
   return display;
 }
@@ -52,8 +60,8 @@ export function AnimatedLineDelta({
   active?: boolean;
   className?: string;
 }) {
-  const addedN = useAnimatedCount(added, active ? 280 : 420);
-  const removedN = useAnimatedCount(removed, active ? 280 : 420);
+  const addedN = useAnimatedCountStep(added);
+  const removedN = useAnimatedCountStep(removed);
   const [bump, setBump] = React.useState(0);
   React.useEffect(() => {
     if (added == null && removed == null) return;

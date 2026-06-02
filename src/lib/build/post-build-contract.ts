@@ -168,6 +168,13 @@ export function evaluatePostBuildContract(input: PostBuildContractInput): PostBu
     }
   }
 
+  if (!uiQuality.uiRichnessPasses) {
+    failures.push(`ui_richness_${uiQuality.uiRichnessScore}_failed`);
+  }
+  if (uiQuality.dashboardScore < 85) {
+    failures.push(`dashboard_quality_${uiQuality.dashboardScore}_lt_85`);
+  }
+
   if (input.requiredPageSlugs?.length) {
     const missingPages = requiredPagesMissing(renderable, input.requiredPageSlugs);
     if (missingPages.length) {

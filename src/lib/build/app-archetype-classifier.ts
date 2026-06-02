@@ -25,6 +25,7 @@ export type AppArchetypeId =
   | "marina_operations"
   | "event_ticketing"
   | "mediation_planner"
+  | "product_launch_pad"
   | "generic_app";
 
 export type AppArchetype = {
@@ -61,6 +62,14 @@ const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: 
       /dispute resolution|settlement conference/i,
     ],
     weight: 2,
+  },
+  {
+    id: "product_launch_pad",
+    patterns: [
+      /launch\s*pad|product launch|waitlist|early[- ]?bird|affiliate tracking|launch day analytics/i,
+      /pre[- ]?launch|go[- ]?to[- ]?market|mintlane/i,
+    ],
+    weight: 3,
   },
   {
     id: "event_ticketing",
@@ -276,6 +285,35 @@ const ARCHETYPE_DEFS: Record<AppArchetypeId, Omit<AppArchetype, "id" | "confiden
     primarySections: ["occupancy metrics", "slip assignment table", "maintenance queue", "owner notices", "weather card"],
     visualTone: "nautical, clean, operational premium",
     terminology: ["slips", "berths", "owners", "work orders", "occupancy"],
+  },
+  product_launch_pad: {
+    label: "Product launch pad",
+    navigationStyle: "sidebar",
+    coreRoutes: [
+      "/dashboard",
+      "/campaigns",
+      "/waitlist",
+      "/affiliates",
+      "/orders",
+      "/analytics",
+      "/checkout",
+      "/product",
+      "/landing",
+      "/email",
+      "/settings",
+    ],
+    primarySections: [
+      "launch KPI dashboard with charts",
+      "campaign performance table",
+      "waitlist funnel",
+      "affiliate leaderboard",
+      "revenue & orders",
+      "checkout settings",
+      "landing page editor",
+      "email blast center",
+    ],
+    visualTone: "premium startup launch — gradients, countdown, conversion-focused",
+    terminology: ["campaigns", "waitlist", "affiliates", "checkout", "launch", "signups"],
   },
   mediation_planner: {
     label: "Mediation session planner",

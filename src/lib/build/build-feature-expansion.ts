@@ -33,6 +33,20 @@ const ARCHETYPE_MVP_FEATURES: Partial<Record<AppArchetypeId, string[]>> = {
     "Realistic sample data across all screens (no empty tables)",
     "Polished sidebar navigation and responsive dashboard layout",
   ],
+  product_launch_pad: [
+    "Overview dashboard: signup KPIs, conversion %, launch countdown, affiliate revenue, traffic + sales charts",
+    "Launch campaigns list with status, goal, dates, and performance badges",
+    "Waitlist management: funnel stages, signup table (12+ rows), export, segment filters",
+    "Affiliate program: referral links, commission tiers, top affiliates table, payout status",
+    "Orders & revenue screen with early-bird checkout history and MRR-style summary",
+    "Analytics: launch-day traffic graph, sales graph, campaign comparison, cohort mini-chart",
+    "Checkout settings: pricing tiers, early-bird limits, Stripe-ready UI (mock)",
+    "Product editor for positioning, features, and hero copy",
+    "Landing page builder preview with CTA hierarchy and social proof strip",
+    "Email blast center with draft campaigns and audience segments",
+    "Onboarding checklist for first-time founders (connect domain, publish waitlist, invite affiliates)",
+    "Premium indigo/violet gradients, realistic mock data everywhere, no empty tables",
+  ],
   mediation_planner: [
     "Dashboard with upcoming sessions, open disputes count, and agreement status KPIs",
     "Party profiles: organizations/people, roles, contact info, conflict summary",
@@ -76,6 +90,10 @@ const DOMAIN_PROMPTS: Array<{
   pattern: RegExp;
   archetypeId: AppArchetypeId;
 }> = [
+  {
+    pattern: /launch\s*pad|product launch|waitlist|early[- ]?bird|affiliate|launch day analytics/i,
+    archetypeId: "product_launch_pad",
+  },
   {
     pattern: /mediation|mediator|caucus|party profiles|agreement drafting|agenda templates/i,
     archetypeId: "mediation_planner",
@@ -128,8 +146,10 @@ function buildExpandedPrompt(
 ): BuildFeatureExpansion {
   const archetype = classifyAppArchetype(originalPrompt);
   const label =
-    archetypeId === "mediation_planner"
-      ? "Mediation session planner"
+    archetypeId === "product_launch_pad"
+      ? "Digital product launch pad"
+      : archetypeId === "mediation_planner"
+        ? "Mediation session planner"
       : archetypeId === "restaurant_inventory"
         ? "Inventory operations"
         : archetype.label;

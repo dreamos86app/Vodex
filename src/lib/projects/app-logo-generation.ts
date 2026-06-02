@@ -69,7 +69,7 @@ export function buildLogoPrompt(input: {
   ].join(" ");
 }
 
-const VISUAL_MASS_MIN_RATIO = 0.55;
+const VISUAL_MASS_MIN_RATIO = 0.62;
 const WHITE_CORNER_LUMA = 235;
 
 /** Scale small glyphs so non-transparent content fills the circular mask. */
@@ -109,6 +109,7 @@ export async function scaleIconVisualMass(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer)
     .extract({ left, top, width: w, height: h })
     .resize(1024, 1024, { fit: "cover", position: "centre" })
+    .modulate({ saturation: 1.12, brightness: 1.04 })
     .flatten({ background: { r: 15, g: 23, b: 42 } })
     .png()
     .toBuffer()

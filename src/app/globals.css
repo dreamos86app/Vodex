@@ -632,7 +632,78 @@ body {
   }
 }
 
-/* Premium Vodex session intro (2.4–3s cinematic) */
+/* Cinematic Vodex session intro (2.8–3.2s anime-style) */
+.vodex-cinematic-intro {
+  will-change: opacity, transform;
+}
+
+.vodex-cinematic-intro--exit {
+  animation: vodex-cinematic-fade-out 0.48s ease forwards;
+}
+
+.vodex-cinematic-intro__bg {
+  position: absolute;
+  inset: 0;
+  background: #030408;
+}
+
+.vodex-cinematic-intro__nebula {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 40%, color-mix(in oklab, #3b82f6 45%, transparent), transparent 65%),
+    radial-gradient(ellipse 50% 40% at 30% 60%, color-mix(in oklab, #6366f1 35%, transparent), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 75% 35%, color-mix(in oklab, #8b5cf6 28%, transparent), transparent 72%);
+  filter: blur(2px);
+}
+
+.vodex-cinematic-intro__rays {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(
+    from 200deg at 50% 45%,
+    transparent 0deg,
+    color-mix(in oklab, #60a5fa 12%, transparent) 40deg,
+    transparent 80deg,
+    color-mix(in oklab, #a78bfa 10%, transparent) 140deg,
+    transparent 200deg
+  );
+  opacity: 0.5;
+  animation: vodex-cinematic-rays 6s linear infinite;
+}
+
+@keyframes vodex-cinematic-rays {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes vodex-cinematic-fade-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.vodex-cinematic-intro__flash-card {
+  box-shadow: 0 8px 32px color-mix(in oklab, #6366f1 25%, transparent);
+}
+
+.vodex-cinematic-intro__letter {
+  text-shadow: 0 0 24px color-mix(in oklab, #818cf8 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vodex-cinematic-intro__rays,
+  .vodex-cinematic-intro__particle {
+    animation: none !important;
+  }
+  .vodex-cinematic-intro--exit {
+    animation-duration: 0.2s;
+  }
+}
+
+/* Premium Vodex session intro (legacy class hooks) */
 @keyframes vodex-intro-icon-in {
   0% {
     opacity: 0;

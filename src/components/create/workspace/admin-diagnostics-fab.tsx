@@ -35,8 +35,8 @@ export function AdminDiagnosticsFab({
   const [internalDiag, setInternalDiag] = React.useState<BuildDiagnosticsPayload | null>(null);
   const [loading, setLoading] = React.useState(false);
   const { pos, style, dragHandlers } = useDraggablePosition("vodex_owner_diagnostics_pos", {
-    x: 16,
-    y: typeof window !== "undefined" ? Math.round(window.innerHeight * 0.42) : 320,
+    x: 20,
+    y: typeof window !== "undefined" ? Math.round(window.innerHeight * 0.38) : 300,
   });
 
   const open = diagnosticsOpen ?? internalOpen;
