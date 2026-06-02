@@ -5,84 +5,73 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { VodexBrandIcon } from "@/components/brand/vodex-brand-icon";
 import { INTRO_SESSION_KEY } from "@/lib/session/session-intro-decision";
 import { IntroFallingStars } from "@/components/session/intro-falling-stars";
-import { INTRO_SHOWCASE_MOCKS } from "@/components/session/intro-showcase-mocks";
+import { INTRO_V3_APPS } from "@/components/session/intro-v3-app-screens";
+import { IntroV3Collapse } from "@/components/session/intro-v3-collapse";
 
-/** 2.5s app showcase + ~1.25s brand merge/fade */
-const SHOWCASE_MS = 2500;
-const BRAND_MS = 1250;
-const INTRO_MS = SHOWCASE_MS + BRAND_MS + 250;
+/** Phase 1 montage · Phase 2 collapse · Phase 3 brand */
+const PHASE_MONTAGE_END = 1.8;
+const PHASE_COLLAPSE_END = 2.7;
+const INTRO_MS = 4000;
 
-/** Corner offsets from center — TL, TR, BL, BR (desktop) */
-const CORNER_DESKTOP = [
-  { x: -200, y: -148, rotate: -6 },
-  { x: 200, y: -148, rotate: 5 },
-  { x: -200, y: 148, rotate: 4 },
-  { x: 200, y: 148, rotate: -5 },
-] as const;
+const CUT_DURATION = PHASE_MONTAGE_END / INTRO_V3_APPS.length;
 
-const CORNER_MOBILE = [
-  { x: -92, y: -108, rotate: -5 },
-  { x: 92, y: -108, rotate: 5 },
-  { x: -92, y: 108, rotate: 4 },
-  { x: 92, y: 108, rotate: -4 },
-] as const;
-
-function ShowcaseSquare({
-  Mock,
-  corner,
-  cardSize,
+function IntroAppFrame({
+  children,
+  layout,
+  active,
+  cutIndex,
   reducedMotion,
-  index,
 }: {
-  Mock: (typeof INTRO_SHOWCASE_MOCKS)[number]["Mock"];
-  corner: { x: number; y: number; rotate: number };
-  cardSize: number;
+  children: React.ReactNode;
+  layout: "desktop" | "mobile";
+  active: boolean;
+  cutIndex: number;
   reducedMotion: boolean;
-  index: number;
 }) {
-  const enterDelay = 0.08 + index * 0.06;
-  const mergeStart = SHOWCASE_MS / 1000;
+  const start = cutIndex * CUT_DURATION;
+
+  const frameClass =
+    layout === "mobile"
+      ? "h-[min(72vh,520px)] w-[min(46vw,240px)]"
+      : "h-[min(58vh,440px)] w-[min(88vw,780px)]";
 
   return (
     <motion.div
-      className="absolute left-1/2 top-1/2 z-[5] -translate-x-1/2 -translate-y-1/2 will-change-transform"
-      style={{ width: cardSize, height: cardSize }}
-      initial={
-        reducedMotion
-          ? { opacity: 0, x: corner.x, y: corner.y, scale: 0.92 }
-          : { opacity: 0, x: corner.x, y: corner.y, scale: 0.88, rotate: corner.rotate - 8 }
-      }
+      className={`vodex-intro-v3__screen absolute left-1/2 top-1/2 z-[6] -translate-x-1/2 -translate-y-1/2 ${frameClass}`}
+      initial={false}
       animate={
         reducedMotion
-          ? {
-              opacity: [0, 1, 1, 0],
-              x: [corner.x, corner.x, 0],
-              y: [corner.y, corner.y, 0],
-              scale: [0.92, 1, 0.15],
-            }
+          ? { opacity: active ? 1 : 0, scale: 1, x: 0, y: 0, rotateX: 0, rotateY: 0, filter: "blur(0px)" }
+          : active
+            ? {
+                opacity: [0, 1, 1, 0],
+                scale: [0.88, 1, 1, 0.92],
+                x: [layout === "mobile" ? 40 : 80, 0, 0, layout === "mobile" ? -30 : -60],
+                y: [20, 0, 0, -10],
+                rotateY: [layout === "mobile" ? 8 : 6, 0, 0, -4],
+                rotateX: [4, 0, 0, 2],
+                filter: ["blur(8px)", "blur(0px)", "blur(0px)", "blur(6px)"],
+              }
+            : { opacity: 0, scale: 0.85, filter: "blur(8px)" }
+      }
+      transition={
+        reducedMotion
+          ? { duration: 0.2 }
           : {
-              opacity: [0, 1, 1, 1, 0],
-              x: [corner.x, corner.x, corner.x, corner.x * 0.15, 0],
-              y: [corner.y, corner.y, corner.y, corner.y * 0.15, 0],
-              scale: [0.88, 1, 1, 1, 0.12],
-              rotate: [corner.rotate - 8, corner.rotate, corner.rotate, corner.rotate, 0],
+              duration: CUT_DURATION + 0.15,
+              delay: start,
+              times: [0, 0.12, 0.82, 1],
+              ease: [0.22, 1, 0.36, 1],
             }
       }
-      transition={{
-        duration: mergeStart + 0.7,
-        delay: enterDelay,
-        times: reducedMotion
-          ? [0, 0.12, 0.75, 1]
-          : [0, 0.1, 0.55, 0.78, 1],
-        ease: [0.22, 1, 0.36, 1],
+      style={{
+        perspective: 1200,
+        transformStyle: "preserve-3d",
+        pointerEvents: "none",
       }}
+      aria-hidden={!active}
     >
-      <div
-        className="h-full w-full overflow-hidden rounded-xl shadow-[0_24px_64px_-12px_rgba(0,0,0,0.75)] ring-1 ring-white/25"
-        style={{ transform: "translateZ(0)" }}
-      >
-        <Mock />
-      </div>
+      <div className="vodex-intro-v3__chromatic relative h-full w-full">{children}</div>
     </motion.div>
   );
 }
@@ -98,6 +87,7 @@ export function VodexSessionIntro({
 }) {
   const reducedMotion = useReducedMotion();
   const [phase, setPhase] = React.useState<"hidden" | "show" | "exit">("hidden");
+  const [timeline, setTimeline] = React.useState(0);
   const doneRef = React.useRef(false);
   const visibleReported = React.useRef(false);
 
@@ -111,6 +101,7 @@ export function VodexSessionIntro({
   React.useEffect(() => {
     if (!show) {
       setPhase("hidden");
+      setTimeline(0);
       visibleReported.current = false;
       return;
     }
@@ -120,9 +111,18 @@ export function VodexSessionIntro({
       visibleReported.current = true;
       onVisible?.();
     }
-    const exitAt = window.setTimeout(() => setPhase("exit"), INTRO_MS - 400);
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      setTimeline((now - t0) / 1000);
+      if (now - t0 < INTRO_MS) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    const exitAt = window.setTimeout(() => setPhase("exit"), INTRO_MS - 420);
     const doneAt = window.setTimeout(finish, INTRO_MS);
     return () => {
+      cancelAnimationFrame(raf);
       window.clearTimeout(exitAt);
       window.clearTimeout(doneAt);
     };
@@ -132,96 +132,103 @@ export function VodexSessionIntro({
 
   const exiting = phase === "exit";
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-  const corners = isMobile ? CORNER_MOBILE : CORNER_DESKTOP;
-  const cardSize = isMobile ? 112 : 168;
-  const brandDelay = reducedMotion ? 0.15 : SHOWCASE_MS / 1000 + 0.05;
+  const layout = isMobile ? "mobile" : "desktop";
+
+  const inMontage = timeline < PHASE_MONTAGE_END;
+  const inCollapse = timeline >= PHASE_MONTAGE_END && timeline < PHASE_COLLAPSE_END;
+  const inBrand = timeline >= PHASE_COLLAPSE_END;
+
+  const activeCutIndex = reducedMotion
+    ? 0
+    : Math.min(INTRO_V3_APPS.length - 1, Math.floor(timeline / CUT_DURATION));
+
+  const brandDelay = reducedMotion ? 0.12 : 0;
+  const showBrand = reducedMotion || inBrand;
 
   return (
     <AnimatePresence>
       <motion.div
-        className={`vodex-cinematic-intro vodex-intro-v2 fixed inset-0 z-[9999] overflow-hidden ${exiting ? "vodex-cinematic-intro--exit" : ""}`}
+        className={`vodex-cinematic-intro vodex-intro-v3 fixed inset-0 z-[9999] overflow-hidden ${exiting ? "vodex-cinematic-intro--exit" : ""}`}
         data-testid="vodex-session-intro"
+        data-intro-version="v3"
         role="status"
         aria-live="polite"
         aria-label="Loading Vodex"
         initial={{ opacity: 1 }}
         animate={{ opacity: exiting ? 0 : 1 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.42 }}
       >
-        <div className="vodex-intro-v2__sky" aria-hidden />
+        <div className="vodex-intro-v3__cosmos" aria-hidden />
         <IntroFallingStars active={!reducedMotion} />
 
         <motion.div
-          className="pointer-events-none absolute left-1/2 top-1/2 z-[4] size-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-400/20 blur-3xl"
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: [0, 0, 0.85, 0.4], scale: [0.5, 0.5, 1.6, 2] }}
-          transition={{
-            duration: BRAND_MS / 1000 + 0.3,
-            delay: brandDelay,
-            ease: "easeOut",
+          className="vodex-intro-v3__energy pointer-events-none absolute inset-0"
+          animate={{
+            opacity: inCollapse || inBrand ? 0.9 : 0.35,
+            scale: inCollapse ? 1.15 : 1,
           }}
+          transition={{ duration: 0.5 }}
           aria-hidden
         />
 
-        {!reducedMotion ? (
+        {(inMontage || reducedMotion) && (
           <div className="pointer-events-none absolute inset-0" aria-hidden>
-            {INTRO_SHOWCASE_MOCKS.map(({ id, Mock }, i) => (
-              <ShowcaseSquare
-                key={id}
-                Mock={Mock}
-                corner={corners[i]!}
-                cardSize={cardSize}
-                reducedMotion={false}
-                index={i}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="pointer-events-none absolute inset-0" aria-hidden>
-            {INTRO_SHOWCASE_MOCKS.slice(0, 1).map(({ id, Mock }, i) => (
-              <ShowcaseSquare
-                key={id}
-                Mock={Mock}
-                corner={corners[0]!}
-                cardSize={cardSize}
-                reducedMotion
-                index={i}
-              />
-            ))}
+            {INTRO_V3_APPS.map((app, i) => {
+              const Screen = app.Screen;
+              const isActive = reducedMotion ? i === 0 : i === activeCutIndex && inMontage;
+              return (
+                <IntroAppFrame
+                  key={app.id}
+                  layout={layout}
+                  active={isActive}
+                  cutIndex={i}
+                  reducedMotion={!!reducedMotion}
+                >
+                  <Screen layout={layout} />
+                </IntroAppFrame>
+              );
+            })}
           </div>
         )}
 
+        <IntroV3Collapse active={inCollapse && !reducedMotion} />
+
         <motion.div
-          className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center"
+          className="relative z-20 flex h-full flex-col items-center justify-center px-6 text-center"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: brandDelay, duration: 0.2 }}
+          animate={{ opacity: showBrand ? 1 : 0 }}
+          transition={{ duration: 0.35 }}
         >
           <motion.div
-            className="vodex-cinematic-intro__icon-wrap relative flex size-24 items-center justify-center"
-            initial={{ opacity: 0, scale: 0.35 }}
-            animate={{ opacity: 1, scale: 1 }}
+            className="vodex-cinematic-intro__icon-wrap relative flex size-28 items-center justify-center"
+            initial={{ opacity: 0, scale: 0.2 }}
+            animate={showBrand ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.2 }}
             transition={{
               delay: brandDelay,
-              duration: 0.55,
+              duration: 0.6,
               type: "spring",
-              stiffness: 260,
-              damping: 22,
+              stiffness: 220,
+              damping: 20,
             }}
           >
-            <VodexBrandIcon size="xl" alt="" className="vodex-cinematic-intro__icon relative size-20" />
+            <motion.div
+              className="absolute inset-0 rounded-full bg-sky-400/25 blur-2xl"
+              animate={showBrand ? { scale: [0.5, 1.4, 1.2], opacity: [0, 0.8, 0.5] } : {}}
+              transition={{ delay: brandDelay, duration: 0.8 }}
+            />
+            <VodexBrandIcon size="xl" alt="" className="vodex-cinematic-intro__icon relative size-24" />
           </motion.div>
 
-          <div className="mt-5 flex items-center justify-center gap-[0.35em]" aria-hidden>
+          <div className="mt-6 flex items-center justify-center gap-[0.35em]" aria-hidden>
             {"VODEX".split("").map((ch, i) => (
               <motion.span
                 key={ch + i}
-                className="vodex-cinematic-intro__letter text-2xl font-semibold tracking-[0.22em] text-white"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
+                className="vodex-cinematic-intro__letter text-3xl font-semibold tracking-[0.24em] text-white"
+                initial={{ opacity: 0, y: 18 }}
+                animate={showBrand ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
                 transition={{
-                  delay: brandDelay + 0.12 + i * 0.05,
-                  duration: 0.38,
+                  delay: brandDelay + 0.15 + i * 0.055,
+                  duration: 0.4,
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
@@ -230,10 +237,10 @@ export function VodexSessionIntro({
             ))}
           </div>
           <motion.p
-            className="vodex-cinematic-intro__tagline mt-3 text-[13px] font-medium tracking-wide text-sky-100/85"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: brandDelay + 0.45, duration: 0.4 }}
+            className="vodex-cinematic-intro__tagline mt-3 text-sm font-medium tracking-wide text-sky-100/90"
+            initial={{ opacity: 0, y: 10 }}
+            animate={showBrand ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+            transition={{ delay: brandDelay + 0.55, duration: 0.45 }}
           >
             Preparing your workspace
           </motion.p>

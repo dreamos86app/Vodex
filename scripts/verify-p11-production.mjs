@@ -67,25 +67,62 @@ const suites = {
   "intro-v2-cinematic-app-showcase": () => {
     const errors = [];
     const intro = read("src/components/session/vodex-session-intro.tsx");
-    const mocks = read("src/components/session/intro-showcase-mocks.tsx");
-    must(intro, "INTRO_SHOWCASE_MOCKS", "showcase mocks wired", errors);
-    must(intro, "SHOWCASE_MS", "2.5s showcase timing", errors);
-    must(mocks, "FashionStoreMock", "fashion mock", errors);
-    must(mocks, "FoodDeliveryMock", "food mock", errors);
-    must(mocks, "VideoEditorMock", "video mock", errors);
-    must(mocks, "FinanceMock", "finance mock", errors);
-    must(read("src/components/session/intro-falling-stars.tsx"), "IntroFallingStars", "stars", errors);
+    must(intro, "INTRO_V3_APPS", "v3 apps wired", errors);
+    must(intro, "data-intro-version=\"v3\"", "v3 marker", errors);
+    return errors;
+  },
+  "intro-real-app-screens": () => {
+    const errors = [];
+    const screens = read("src/components/session/intro-v3-app-screens.tsx");
+    const intro = read("src/components/session/vodex-session-intro.tsx");
+    must(intro, "intro-v3-app-screens", "v3 screens import", errors);
+    must(screens, "IntroFashionScreen", "fashion full screen", errors);
+    must(screens, "IntroFoodDeliveryScreen", "food full screen", errors);
+    must(screens, "IntroVideoEditorScreen", "video full screen", errors);
+    must(screens, "IntroFinanceScreen", "finance full screen", errors);
+    must(screens, "DesktopChrome", "desktop chrome", errors);
+    must(screens, "PhoneChrome", "mobile chrome", errors);
+    must(screens, "data-intro-app=", "real app markers", errors);
+    return errors;
+  },
+  "intro-no-placeholder-ui": () => {
+    const errors = [];
+    const intro = read("src/components/session/vodex-session-intro.tsx");
+    if (intro.includes("INTRO_SHOWCASE_MOCKS")) errors.push("v2 floating mocks removed from intro");
+    if (intro.includes("ShowcaseSquare")) errors.push("tiny floating cards removed");
+    const screens = read("src/components/session/intro-v3-app-screens.tsx");
+    must(screens, "<header", "nav density — fashion", errors);
+    must(screens, "Checkout", "checkout cta", errors);
+    must(screens, "Timeline", "editor timeline", errors);
+    must(screens, "Stripe payout", "finance transactions", errors);
+    return errors;
+  },
+  "intro-premium-motion": () => {
+    const errors = [];
+    const intro = read("src/components/session/vodex-session-intro.tsx");
+    must(intro, "PHASE_MONTAGE_END", "phased montage", errors);
+    must(intro, "PHASE_COLLAPSE_END", "phased collapse", errors);
+    must(intro, "IntroV3Collapse", "collapse burst", errors);
+    must(intro, "rotateY", "parallax tilt", errors);
+    must(read("src/app/globals.css"), "vodex-intro-v3__chromatic", "chromatic layer", errors);
+    return errors;
+  },
+  "intro-desktop-mobile-density": () => {
+    const errors = [];
+    const screens = read("src/components/session/intro-v3-app-screens.tsx");
+    must(screens, "data-intro-density=\"desktop-framed\"", "desktop density", errors);
+    must(screens, "data-intro-density=\"mobile-framed\"", "mobile density", errors);
+    must(read("src/components/session/vodex-session-intro.tsx"), "min(88vw,780px)", "large desktop frame", errors);
+    must(read("src/components/session/vodex-session-intro.tsx"), '"mobile" : "desktop"', "layout switch", errors);
     return errors;
   },
   "intro-no-start-artifact": () => {
     const errors = [];
     const intro = read("src/components/session/vodex-session-intro.tsx");
-    if (intro.includes("vodex-premium-intro__icon-wrap") && intro.includes("animate")) {
-      errors.push("legacy icon-wrap animation should not run at t=0");
-    }
     must(intro, "initial={{ opacity: 1 }}", "no flash fade-in from 0 on root", errors);
-    must(intro, "vodex-intro-v2", "v2 shell class", errors);
-    must(read("src/app/globals.css"), "vodex-intro-v2__sky", "sky gradient", errors);
+    must(intro, "vodex-intro-v3", "v3 shell class", errors);
+    must(intro, "showBrand", "brand gated until phase 3", errors);
+    must(read("src/app/globals.css"), "vodex-intro-v3__cosmos", "cosmos fill", errors);
     return errors;
   },
   "intro-mobile-desktop-variants": () => {
