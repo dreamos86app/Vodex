@@ -32,28 +32,24 @@ export function VodexSessionIntroGate({
   const pathname = usePathname();
   const session = useAuthStore((s) => s.session);
   const user = useAuthStore((s) => s.user);
-  const profile = useAuthStore((s) => s.profile);
+  const profileId = useAuthStore((s) => s.profile?.id);
+  const profilePlanId = useAuthStore((s) => s.profile?.plan_id);
 
-  const userId = serverUserId ?? user?.id ?? profile?.id ?? null;
+  const userId = serverUserId ?? user?.id ?? profileId ?? null;
   const sessionActive = hasActiveSession(session, user) || Boolean(serverUserId);
 
-  const [phase, setPhase] = React.useState<EntryPhase>("ready");
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [phase, setPhase] = React.useState<EntryPhase>(() =>
+    pendingLoginIntro ? "intro" : "ready",
+  );
 
   React.useLayoutEffect(() => {
-    if (!mounted) return;
-
     if (isLightweightPublicPath(pathname) || !userId) {
       setPhase("ready");
       return;
     }
 
-    beginSessionCreditsWarmup(userId, profile);
-    runSessionPreload(userId, profile);
+    beginSessionCreditsWarmup(userId, useAuthStore.getState().profile);
+    runSessionPreload(userId, useAuthStore.getState().profile);
 
     const showIntro =
       pendingLoginIntro || (sessionActive && shouldShowSessionIntro());
@@ -70,14 +66,7 @@ export function VodexSessionIntroGate({
     } else {
       setPhase("ready");
     }
-  }, [
-    mounted,
-    pathname,
-    userId,
-    profile,
-    sessionActive,
-    pendingLoginIntro,
-  ]);
+  }, [pathname, userId, sessionActive, pendingLoginIntro, profilePlanId]);
 
   const finishIntro = React.useCallback(() => {
     markSessionIntroSeen();

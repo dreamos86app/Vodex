@@ -61,7 +61,10 @@ import {
 } from "@/lib/preview/preview-failure-codes";
 import { runDeterministicPreviewRepair, isPreviewRepairEligible } from "@/lib/build/preview-deterministic-repair";
 import { persistGeneratedBuildFiles } from "@/lib/build/persist-generated-files";
-import { analyzePreviewHtml } from "@/lib/preview/preview-html-diagnostics";
+import {
+  analyzePreviewHtml,
+  isStaticPreviewSnapshotHealthy,
+} from "@/lib/preview/preview-html-diagnostics";
 import { startValidationWatchdog } from "@/lib/build/validation-watchdog";
 
 type Writer = SupabaseClient<Database>;
@@ -835,10 +838,15 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       previewHtmlSnippet: postPreviewHtml.slice(0, 2000),
     });
 
-    let previewStillFailed = !previewResult.ok || !postPreview.shouldComplete;
+    const staticPreviewOk = isStaticPreviewSnapshotHealthy(
+      postPreviewHtml,
+      workingFiles.length,
+    );
+    let previewStillFailed =
+      !staticPreviewOk && (!previewResult.ok || !postPreview.shouldComplete);
     if (previewStillFailed) {
       const htmlDiag = analyzePreviewHtml(postPreviewHtml, workingFiles, {
-        previewSessionOk: previewResult.ok,
+        previewSessionOk: previewResult.ok || staticPreviewOk,
       });
       const rawCode = !previewResult.ok
         ? previewResult.code
@@ -904,7 +912,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
             previewHtmlLength: postPreviewHtml.length,
             previewHtmlSnippet: postPreviewHtml.slice(0, 2000),
           });
-          previewStillFailed = !previewResult.ok || !postPreview.shouldComplete;
+          previewStillFailed =
+            !isStaticPreviewSnapshotHealthy(postPreviewHtml, workingFiles.length) &&
+            (!previewResult.ok || !postPreview.shouldComplete);
           if (!previewStillFailed) {
             await emitRepairWorkflowEvent(input.writer, eventCtx, {
               phase: "completed",

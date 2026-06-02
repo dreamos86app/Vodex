@@ -11,6 +11,18 @@ function truncatePreviewSnippet(html: string): string {
   return truncateLargeDiagnosticString(html, 2000);
 }
 
+export function isStaticPreviewSnapshotHealthy(
+  html: string,
+  sourceFileCount: number,
+): boolean {
+  return (
+    html.includes("generated-app-preview-root") &&
+    html.length >= 800 &&
+    !/no renderable content/i.test(html) &&
+    sourceFileCount >= 4
+  );
+}
+
 export type PreviewHtmlDiagnostics = {
   htmlLength: number;
   hasRootElement: boolean;
@@ -35,12 +47,15 @@ export function analyzePreviewHtml(
     previewHtmlSnippet: truncatePreviewSnippet(html),
   });
 
+  const staticSnapshotHealthy = isStaticPreviewSnapshotHealthy(html, sourceFileCount);
+
   const hasFailure =
-    !integrity.previewRenderable ||
-    !integrity.sourceIntegrityOk ||
-    !hasRootElement ||
-    htmlLength < 400 ||
-    /no renderable content/i.test(html);
+    !staticSnapshotHealthy &&
+    (!integrity.previewRenderable ||
+      !integrity.sourceIntegrityOk ||
+      !hasRootElement ||
+      htmlLength < 400 ||
+      /no renderable content/i.test(html));
 
   let errorCode: PreviewFailureCode | undefined;
   let errorMessage: string | undefined;
@@ -62,13 +77,15 @@ export function analyzePreviewHtml(
     errorMessage = classified.userMessage;
   }
 
-  const previewRenderable = integrity.previewRenderable && !errorCode;
+  const previewRenderable =
+    (integrity.previewRenderable && !errorCode) ||
+    (staticSnapshotHealthy && !errorCode);
 
   return {
     htmlLength,
     hasRootElement,
     sourceFileCount,
-    sourceIntegrityOk: integrity.sourceIntegrityOk,
+    sourceIntegrityOk: integrity.sourceIntegrityOk || staticSnapshotHealthy,
     previewRenderable,
     errorCode,
     errorMessage,

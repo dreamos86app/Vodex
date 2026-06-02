@@ -14,10 +14,10 @@ import {
   fileMeetsMeaningfulThreshold,
   type SourceIntegrityReport,
 } from "@/lib/build/source-integrity-validator";
+import { primaryAppPageHasRealContent } from "@/lib/build/source-integrity-validator";
 
 export function rootPageContentOk(files: BuildFile[]): boolean {
-  const root = files.find((f) => /^app\/page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)));
-  return root ? fileMeetsMeaningfulThreshold(root) : false;
+  return primaryAppPageHasRealContent(files);
 }
 
 /** Replace model output when stub, redirect-only, or below root-page integrity threshold. */

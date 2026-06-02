@@ -8,6 +8,43 @@ import {
 } from "@/lib/build/generated-file-utils";
 import { isThinGeneratedFile } from "@/lib/build/meaningful-file-guard";
 
+function isRedirectOnlyRoot(content: string): boolean {
+  const t = content.trim();
+  if (!t) return true;
+  if (!/redirect\s*\(/i.test(t)) return false;
+  return t.split("\n").filter((l) => l.trim().length > 0).length <= 12;
+}
+
+/** Pick the page used for static preview + root integrity (dashboard apps redirect from `/`). */
+export function findPrimaryAppPage(files: BuildFile[]): BuildFile | undefined {
+  const renderable = filterRenderableBuildFiles(files);
+  const root = renderable.find((f) =>
+    /^app\/page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)),
+  );
+  const dashboard = renderable.find((f) =>
+    /^app\/dashboard\/page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)),
+  );
+
+  if (root?.content && !isRedirectOnlyRoot(root.content) && fileMeetsMeaningfulThreshold(root)) {
+    return root;
+  }
+  if (dashboard?.content && fileMeetsMeaningfulThreshold(dashboard)) {
+    return dashboard;
+  }
+  if (root?.content?.trim()) return root;
+  if (dashboard?.content?.trim()) return dashboard;
+
+  return (
+    renderable.find((f) => /^app\/[^/]+\/page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path))) ||
+    renderable.find((f) => /\/page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)))
+  );
+}
+
+export function primaryAppPageHasRealContent(files: BuildFile[]): boolean {
+  const page = findPrimaryAppPage(files);
+  return page ? fileMeetsMeaningfulThreshold(page) : false;
+}
+
 const PLACEHOLDER_CONTENT_RE =
   /select a file from the tree|no generated files|lorem ipsum only|coming soon\.\.\.|your app routes stay connected|this screen was added automatically|upgrade to a paid plan|upgrade to .* plan to edit/i;
 
@@ -148,12 +185,11 @@ export function evaluateSourceIntegrity(
     }
   }
 
-  const root = files.find((f) => /^app\/page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)));
   const pkg = files.find((f) => normalizeBuildFilePath(f.path) === "package.json");
   const layout = files.find((f) => /(^|\/)app\/layout\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)));
   const globals = files.find((f) => /(^|\/)app\/globals\.css$/i.test(normalizeBuildFilePath(f.path)));
 
-  const rootPageHasRealContent = root ? fileMeetsMeaningfulThreshold(root) : false;
+  const rootPageHasRealContent = primaryAppPageHasRealContent(files);
   const packageJsonHasRealContent = pkg ? fileMeetsMeaningfulThreshold(pkg) : false;
   const layoutHasRealContent = layout ? fileMeetsMeaningfulThreshold(layout) : false;
   const globalsHasRealContent = globals ? fileMeetsMeaningfulThreshold(globals) : false;

@@ -17,6 +17,7 @@ import {
   injectDreamOSBrandingIntoPreviewHtml,
   type GeneratedAppBrandingOptions,
 } from "@/lib/branding/generated-app-branding";
+import { findPrimaryAppPage } from "@/lib/build/source-integrity-validator";
 
 export type PreviewHtmlOptions = {
   projectId?: string;
@@ -107,11 +108,7 @@ export function buildStaticPreviewHtml(
     }
   }
 
-  const page =
-    files.find((f) => /^app\/page\.(tsx|jsx)$/i.test(f.path.replace(/\\/g, "/"))) ||
-    files.find((f) => /^app\/dashboard\/page\.(tsx|jsx)$/i.test(f.path.replace(/\\/g, "/"))) ||
-    files.find((f) => /\/page\.(tsx|jsx)$/i.test(f.path)) ||
-    files.find((f) => /page\.(tsx|jsx)$/i.test(f.path));
+  const page = findPrimaryAppPage(files);
   const jsxBody = page?.content ?? "";
   const rendered = jsxToStaticHtml(jsxBody);
   const inner =

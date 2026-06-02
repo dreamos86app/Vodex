@@ -6,6 +6,18 @@ import { VodexBrandIcon } from "@/components/brand/vodex-brand-icon";
 const INTRO_KEY = "vodex_intro_seen_session";
 const MAX_MS = 2400;
 
+export function isPageReload(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const nav = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    return nav?.type === "reload";
+  } catch {
+    return false;
+  }
+}
+
 export function VodexSessionIntro({
   show,
   onDone,
@@ -62,12 +74,14 @@ export function VodexSessionIntro({
   );
 }
 
+/** First browser entry in this tab — skip on hard refresh only. */
 export function shouldShowSessionIntro(): boolean {
   if (typeof window === "undefined") return false;
+  if (isPageReload()) return false;
   try {
     return sessionStorage.getItem(INTRO_KEY) !== "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
