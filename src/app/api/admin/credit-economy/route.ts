@@ -152,6 +152,14 @@ export async function GET(request: Request) {
   const totalRequests = filtered.length + failedCharges.length;
   const failedChargeCount = failedCharges.length;
 
+  const { count: paddleCompletedPayments } = await admin
+    .from("billing_events")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", since)
+    .like("event_type", "paddle.transaction.completed%");
+
+  const creditUsageRevenueUsd = Math.round(userCreditsToRevenueUsd(totalUser) * 100) / 100;
+
   const planEconomics = allPlanEconomicsRows().map((row) => ({
     plan: row.name,
     planId: row.planId,
@@ -173,7 +181,12 @@ export async function GET(request: Request) {
     totalRequests,
     failedChargeCount,
     totalUserCreditsCharged: totalUser,
-    totalRevenueUsd: Math.round(userCreditsToRevenueUsd(totalUser) * 100) / 100,
+    creditUsageRevenueUsd,
+    /** @deprecated Use creditUsageRevenueUsd — this is credits consumed, not Paddle sales */
+    totalRevenueUsd: creditUsageRevenueUsd,
+    paddleCompletedPayments: paddleCompletedPayments ?? 0,
+    metricsDisclaimer:
+      "Credit usage (USD) is estimated from consumed credits in generation_cost_audits — not confirmed Paddle checkout revenue. Paddle sales appear only after transaction.completed webhooks.",
     totalInternalCostCredits: totalInternal,
     providerSpendUsd: Math.round(totalProvider * 10000) / 10000,
     avgRevenueMultiplier: count > 0 ? multiplierSum / count : 3,

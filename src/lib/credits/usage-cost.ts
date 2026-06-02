@@ -13,16 +13,54 @@ export function defaultTokenEnvelopeForMode(mode: string): { input: number; outp
   return { input: 2000, output: 4000 };
 }
 
+/** Treat 0 / missing token counts as unknown — use mode envelope for admin cost estimates. */
+export function effectiveTokenCountsForMode(
+  mode: string,
+  tokensInput?: number | null,
+  tokensOutput?: number | null,
+): { input: number; output: number } {
+  const defaults = defaultTokenEnvelopeForMode(mode);
+  const input =
+    tokensInput != null && tokensInput > 0 ? tokensInput : defaults.input;
+  const output =
+    tokensOutput != null && tokensOutput > 0 ? tokensOutput : defaults.output;
+  return { input, output };
+}
+
 export function estimateProviderCostUsd(
   modelId: string,
   mode: string,
   tokensInput?: number | null,
   tokensOutput?: number | null,
 ): number {
-  const defaults = defaultTokenEnvelopeForMode(mode);
-  const inTok = tokensInput ?? defaults.input;
-  const outTok = tokensOutput ?? defaults.output;
-  return estimateTokenProviderCostUsd(modelId, inTok, outTok);
+  const { input, output } = effectiveTokenCountsForMode(mode, tokensInput, tokensOutput);
+  return estimateTokenProviderCostUsd(modelId, input, output);
+}
+
+/** Prefer logged provider USD; never treat explicit 0 as “known” when tokens are absent. */
+export function resolveRowProviderCostUsd(input: {
+  modelId: string;
+  mode: string;
+  tokensInput?: number | null;
+  tokensOutput?: number | null;
+  metadata?: Record<string, unknown> | null;
+}): number {
+  const raw = input.metadata?.provider_cost_usd;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return raw;
+  }
+  if (raw && typeof raw === "object" && "costUsd" in raw) {
+    const nested = (raw as { costUsd?: number }).costUsd;
+    if (typeof nested === "number" && Number.isFinite(nested) && nested > 0) {
+      return nested;
+    }
+  }
+  return estimateProviderCostUsd(
+    input.modelId,
+    input.mode,
+    input.tokensInput,
+    input.tokensOutput,
+  );
 }
 
 export function estimateOwnerRevenueUsd(creditsCharged: number): number {

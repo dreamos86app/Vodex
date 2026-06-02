@@ -67,8 +67,8 @@ const suites = {
   "intro-v2-cinematic-app-showcase": () => {
     const errors = [];
     const intro = read("src/components/session/vodex-session-intro.tsx");
-    must(intro, "INTRO_V3_APPS", "v3 apps wired", errors);
-    must(intro, "data-intro-version=\"v3\"", "v3 marker", errors);
+    must(intro, "INTRO_CINEMATIC_APPS", "p13 apps wired", errors);
+    must(intro, "data-intro-version=\"p13\"", "p13 marker", errors);
     return errors;
   },
   "intro-real-app-screens": () => {
@@ -76,6 +76,7 @@ const suites = {
     const screens = read("src/components/session/intro-v3-app-screens.tsx");
     const intro = read("src/components/session/vodex-session-intro.tsx");
     must(intro, "intro-v3-app-screens", "v3 screens import", errors);
+    must(screens, "NOVA", "nova branding", errors);
     must(screens, "IntroFashionScreen", "fashion full screen", errors);
     must(screens, "IntroFoodDeliveryScreen", "food full screen", errors);
     must(screens, "IntroVideoEditorScreen", "video full screen", errors);
@@ -100,11 +101,12 @@ const suites = {
   "intro-premium-motion": () => {
     const errors = [];
     const intro = read("src/components/session/vodex-session-intro.tsx");
-    must(intro, "PHASE_MONTAGE_END", "phased montage", errors);
-    must(intro, "PHASE_COLLAPSE_END", "phased collapse", errors);
-    must(intro, "IntroV3Collapse", "collapse burst", errors);
-    must(intro, "QuadrantApp", "quadrant layout", errors);
+    must(intro, "SHOWCASE_END_S", "phased showcase", errors);
+    must(intro, "COLLAPSE_END_S", "phased collapse", errors);
+    must(intro, "IntroVortex", "vortex burst", errors);
+    must(intro, "IntroAppPanel", "staggered panels", errors);
     must(read("src/app/globals.css"), "vodex-intro-v3__chromatic", "chromatic layer", errors);
+    must(read("src/app/globals.css"), "vodex-intro-p13__shimmer", "p13 motion", errors);
     return errors;
   },
   "intro-desktop-mobile-density": () => {
@@ -112,7 +114,7 @@ const suites = {
     const screens = read("src/components/session/intro-v3-app-screens.tsx");
     must(screens, "data-intro-density=\"desktop-framed\"", "desktop density", errors);
     must(screens, "data-intro-density=\"mobile-framed\"", "mobile density", errors);
-    must(read("src/components/session/vodex-session-intro.tsx"), "QuadrantApp", "quadrant frames", errors);
+    must(read("src/components/session/intro/IntroAppPanel.tsx"), "IntroAppPanel", "app panels", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), '"mobile" : "desktop"', "layout switch", errors);
     return errors;
   },
@@ -157,18 +159,53 @@ const suites = {
   "intro-app-previews-visible-before-vortex": () => {
     const errors = [];
     const intro = read("src/components/session/vodex-session-intro.tsx");
-    must(intro, "PREVIEW_START", "preview start delay", errors);
-    must(intro, "previewsVisible", "previews visible gate", errors);
-    must(intro, "PHASE_MONTAGE_END", "montage end before vortex", errors);
-    must(intro, "INTRO_V3_APPS.map", "four apps at once", errors);
+    must(intro, "SHOWCASE_END_S", "showcase end before vortex", errors);
+    must(intro, "inShowcase", "showcase phase gate", errors);
+    must(read("src/components/session/intro/intro-constants.ts"), "APP_ENTRANCE_S", "stagger entrances", errors);
+    must(read("src/components/session/intro/IntroAppPanel.tsx"), "enterAt", "per-app entrance", errors);
     return errors;
   },
   "intro-vortex-after-previews": () => {
     const errors = [];
     const intro = read("src/components/session/vodex-session-intro.tsx");
-    must(intro, "IntroV3Collapse", "vortex collapse", errors);
+    must(intro, "IntroVortex", "vortex component", errors);
     must(intro, "collapsing", "collapse phase", errors);
     if (intro.includes("CUT_DURATION")) errors.push("sequential cuts removed for quadrant montage");
+    return errors;
+  },
+  "intro-motion-stagger": () => {
+    const errors = [];
+    const c = read("src/components/session/intro/intro-constants.ts");
+    must(c, "nova: 0.15", "nova stagger", errors);
+    must(c, "bite: 0.55", "bite stagger", errors);
+    must(c, "frame: 0.95", "frame stagger", errors);
+    must(c, "apex: 1.35", "apex stagger", errors);
+    return errors;
+  },
+  "intro-vortex-sequence": () => {
+    const errors = [];
+    must(read("src/components/session/intro/IntroVortex.tsx"), "vortex-ring", "vortex rings", errors);
+    must(read("src/components/session/intro/intro-constants.ts"), "COLLAPSE_END_S", "collapse timing", errors);
+    return errors;
+  },
+  "intro-apps-not-static": () => {
+    const errors = [];
+    must(read("src/components/session/intro/IntroAliveOverlay.tsx"), "IntroAliveOverlay", "alive overlay", errors);
+    must(read("src/app/globals.css"), "vodex-intro-p13__shimmer", "shimmer css", errors);
+    must(read("src/app/globals.css"), "vodex-intro-p13__spark", "spark animation", errors);
+    return errors;
+  },
+  "intro-logo-reveal": () => {
+    const errors = [];
+    must(read("src/components/session/intro/IntroLogoReveal.tsx"), "IntroLogoReveal", "logo reveal", errors);
+    must(read("src/components/session/intro/IntroLogoReveal.tsx"), "logo-bloom", "energy bloom", errors);
+    return errors;
+  },
+  "intro-60fps-safe": () => {
+    const errors = [];
+    must(read("src/components/session/intro/IntroAppPanel.tsx"), "willChange", "gpu hint", errors);
+    must(read("src/app/globals.css"), "prefers-reduced-motion", "reduced motion", errors);
+    must(read("src/components/session/vodex-session-intro.tsx"), "useReducedMotion", "a11y hook", errors);
     return errors;
   },
   "intro-no-start-artifact": () => {

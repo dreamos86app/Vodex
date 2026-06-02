@@ -819,6 +819,333 @@ body {
   }
 }
 
+/* Intro P1.3 — staggered cinematic showcase */
+.vodex-intro-p13__cosmos {
+  animation: vodex-intro-p13-cosmos-in 1.2s ease-out both;
+}
+
+@keyframes vodex-intro-p13-cosmos-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.vodex-intro-p13__aurora-wrap {
+  z-index: 2;
+  overflow: hidden;
+}
+
+.vodex-intro-p13__aurora {
+  position: absolute;
+  width: 140%;
+  height: 55%;
+  border-radius: 50%;
+  filter: blur(48px);
+  mix-blend-mode: screen;
+}
+
+.vodex-intro-p13__aurora--a {
+  top: 8%;
+  left: -20%;
+  background: radial-gradient(ellipse, rgb(56 189 248 / 0.45), transparent 70%);
+}
+
+.vodex-intro-p13__aurora--b {
+  bottom: 10%;
+  right: -25%;
+  background: radial-gradient(ellipse, rgb(99 102 241 / 0.35), transparent 72%);
+}
+
+.vodex-intro-p13__particle {
+  position: absolute;
+  bottom: -4%;
+  border-radius: 50%;
+  background: rgb(186 230 253 / calc(0.35 + var(--p-depth, 0.5) * 0.4));
+  box-shadow: 0 0 8px rgb(56 189 248 / 0.35);
+  animation: vodex-intro-p13-particle-rise 6s linear infinite;
+}
+
+@keyframes vodex-intro-p13-particle-rise {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-110vh) translateX(calc((var(--p-depth) - 0.5) * 40px));
+    opacity: 0;
+  }
+}
+
+.vodex-intro-p13__camera-drift {
+  animation: vodex-intro-p13-drift 12s ease-in-out infinite alternate;
+}
+
+@keyframes vodex-intro-p13-drift {
+  from {
+    transform: scale(1) translate(0, 0);
+  }
+  to {
+    transform: scale(1.03) translate(1%, -0.5%);
+  }
+}
+
+.vodex-intro-p13__panel {
+  transform-style: preserve-3d;
+}
+
+.vodex-intro-p13__glow-trail {
+  position: absolute;
+  inset: -12%;
+  border-radius: inherit;
+  opacity: 0.5;
+  filter: blur(28px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.vodex-intro-p13__glow-trail--purple {
+  background: radial-gradient(circle, rgb(167 139 250 / 0.5), transparent 65%);
+}
+
+.vodex-intro-p13__glow-trail--orange {
+  background: radial-gradient(circle, rgb(251 146 60 / 0.45), transparent 65%);
+}
+
+.vodex-intro-p13__glow-trail--cyan {
+  background: radial-gradient(circle, rgb(34 211 238 / 0.4), transparent 65%);
+}
+
+.vodex-intro-p13__glow-trail--green {
+  background: radial-gradient(circle, rgb(52 211 153 / 0.42), transparent 65%);
+}
+
+.vodex-intro-p13__shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgb(255 255 255 / 0.07) 48%,
+    transparent 56%
+  );
+  background-size: 220% 100%;
+  animation: vodex-intro-p13-shimmer 4.5s ease-in-out infinite;
+}
+
+.vodex-intro-p13__shimmer--bite {
+  animation-duration: 3.8s;
+}
+
+@keyframes vodex-intro-p13-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+.vodex-intro-p13__cursor {
+  position: absolute;
+  top: 42%;
+  left: 58%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.85);
+  box-shadow: 0 0 12px rgb(56 189 248 / 0.6);
+  animation: vodex-intro-p13-cursor 5s ease-in-out infinite;
+}
+
+@keyframes vodex-intro-p13-cursor {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(18px, -12px);
+    opacity: 1;
+  }
+}
+
+.vodex-intro-p13__badge {
+  position: absolute;
+  top: 10%;
+  right: 8%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  animation: vodex-intro-p13-badge-breathe 2.4s ease-in-out infinite;
+}
+
+.vodex-intro-p13__badge--purple {
+  background: rgb(139 92 246 / 0.9);
+  color: white;
+}
+
+.vodex-intro-p13__badge--orange {
+  background: rgb(249 115 22 / 0.9);
+  color: white;
+}
+
+@keyframes vodex-intro-p13-badge-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgb(255 255 255 / 0);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 14px rgb(251 191 36 / 0.45);
+  }
+}
+
+.vodex-intro-p13__scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgb(34 211 238 / 0.04) 3px,
+    rgb(34 211 238 / 0.04) 4px
+  );
+  animation: vodex-intro-p13-scan 3s linear infinite;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+@keyframes vodex-intro-p13-scan {
+  from {
+    transform: translateY(-8%);
+  }
+  to {
+    transform: translateY(8%);
+  }
+}
+
+.vodex-intro-p13__sparkline {
+  position: absolute;
+  bottom: 18%;
+  left: 8%;
+  right: 8%;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 28px;
+  opacity: 0.85;
+}
+
+.vodex-intro-p13__spark {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(to top, rgb(16 185 129), rgb(110 231 183));
+  animation: vodex-intro-p13-spark 1.8s ease-in-out infinite;
+  animation-delay: calc(var(--spark-i) * 0.12s);
+  height: calc(35% + (var(--spark-i) * 7%));
+}
+
+@keyframes vodex-intro-p13-spark {
+  0%,
+  100% {
+    transform: scaleY(0.85);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scaleY(1.15);
+    opacity: 1;
+  }
+}
+
+.vodex-intro-p13__vortex-core {
+  position: absolute;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(186 230 253 / 0.95), rgb(56 189 248 / 0.2) 55%, transparent 70%);
+  box-shadow:
+    0 0 60px rgb(56 189 248 / 0.7),
+    0 0 120px rgb(99 102 241 / 0.35);
+}
+
+.vodex-intro-p13__vortex-ring {
+  position: absolute;
+  width: calc(5rem + var(--ring-i) * 2.5rem);
+  height: calc(5rem + var(--ring-i) * 2.5rem);
+  border-radius: 50%;
+  border: 1px solid rgb(125 211 252 / calc(0.5 - var(--ring-i) * 0.08));
+  box-shadow: inset 0 0 24px rgb(56 189 248 / 0.15);
+}
+
+.vodex-intro-p13__vortex-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: rgb(186 230 253 / 0.9);
+  box-shadow: 0 0 10px rgb(56 189 248 / 0.55);
+}
+
+.vodex-intro-p13__vortex-aberration {
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 40%, rgb(167 139 250 / 0.12) 55%, transparent 70%);
+  mix-blend-mode: screen;
+}
+
+.vodex-intro-p13__logo-bloom {
+  background: radial-gradient(circle, rgb(56 189 248 / 0.55), transparent 70%);
+  filter: blur(12px);
+}
+
+.vodex-intro-p13__tagline::after {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: -2px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(125 211 252 / 0.6), transparent);
+  animation: vodex-intro-p13-tagline-sweep 2.8s ease-in-out infinite;
+}
+
+@keyframes vodex-intro-p13-tagline-sweep {
+  0% {
+    transform: translateX(-30%);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(30%);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vodex-intro-p13__aurora,
+  .vodex-intro-p13__particle,
+  .vodex-intro-p13__camera-drift,
+  .vodex-intro-p13__shimmer,
+  .vodex-intro-p13__cursor,
+  .vodex-intro-p13__badge,
+  .vodex-intro-p13__scanlines,
+  .vodex-intro-p13__spark,
+  .vodex-intro-p13__tagline::after {
+    animation: none !important;
+  }
+}
+
 .vodex-cinematic-intro--exit {
   animation: vodex-cinematic-fade-out 0.48s ease forwards;
 }

@@ -38,7 +38,7 @@ export function IntroFashionScreen({ layout }: { layout: IntroScreenLayout }) {
   const inner = (
     <div className="flex h-full w-full flex-col bg-[#09070d] text-white" data-intro-app="fashion-store">
       <header className="flex items-center justify-between border-b border-white/8 px-3 py-2 backdrop-blur-md">
-        <span className="text-[11px] font-semibold tracking-[0.2em] text-rose-100">MAISON</span>
+        <span className="text-[12px] font-black tracking-[0.15em] text-violet-400">NOVA</span>
         <nav className="hidden gap-3 text-[8px] text-white/50 sm:flex">
           <span>Women</span>
           <span>Men</span>
@@ -95,7 +95,7 @@ export function IntroFoodDeliveryScreen({ layout }: { layout: IntroScreenLayout 
   const inner = (
     <div className="flex h-full w-full flex-col bg-[#0f0c09] text-white" data-intro-app="food-delivery">
       <header className="flex items-center gap-2 border-b border-white/8 px-3 py-2">
-        <span className="text-[11px] font-bold text-orange-300">BITE</span>
+        <span className="text-[12px] font-black text-orange-400">bite.</span>
         <span className="ml-auto rounded-full bg-emerald-500/90 px-2 py-0.5 text-[7px] font-bold">
           12 min
         </span>
@@ -217,7 +217,7 @@ export function IntroFinanceScreen({ layout }: { layout: IntroScreenLayout }) {
     <div className="flex h-full w-full flex-col bg-[#050f0d] text-white" data-intro-app="finance-app">
       <header className="flex items-center justify-between border-b border-emerald-500/15 px-3 py-2">
         <div>
-          <p className="text-[10px] font-bold text-emerald-200">APEX PAY</p>
+          <p className="text-[10px] font-bold text-emerald-200">APEX FINANCE</p>
           <p className="text-[7px] text-white/40">Business · USD</p>
         </div>
         <span className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[7px] text-emerald-300">Live</span>

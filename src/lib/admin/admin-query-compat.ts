@@ -7,7 +7,7 @@ import {
 import {
   estimateOwnerMarginUsd,
   estimateOwnerRevenueUsd,
-  estimateProviderCostUsd,
+  resolveRowProviderCostUsd,
 } from "@/lib/credits/usage-cost";
 
 type AdminClient = SupabaseClient<Database>;
@@ -111,13 +111,13 @@ function addToBucket(
   },
 ): void {
   const charged = row.tokens_charged ?? 0;
-  const meta = row.metadata ?? null;
-  const metaCost =
-    typeof meta?.provider_cost_usd === "number" ? meta.provider_cost_usd : null;
-  const provider =
-    metaCost != null
-      ? metaCost
-      : estimateProviderCostUsd(row.model_id, row.mode, row.tokens_input, row.tokens_output);
+  const provider = resolveRowProviderCostUsd({
+    modelId: row.model_id,
+    mode: row.mode,
+    tokensInput: row.tokens_input,
+    tokensOutput: row.tokens_output,
+    metadata: row.metadata ?? null,
+  });
   bucket.count += 1;
   bucket.credits += charged;
   bucket.providerCostUsd += provider;
@@ -262,27 +262,58 @@ export async function fetchAiUsageLogs(
   };
 }
 
+function mapAiUsageSummaryRow(r: Record<string, unknown>) {
+  return {
+    model_id: String(r.model_id),
+    mode: String(r.mode),
+    tokens_charged: Number(r.tokens_charged ?? r.credits_charged ?? 0),
+    tokens_input: (r.tokens_input as number | null) ?? null,
+    tokens_output: (r.tokens_output as number | null) ?? null,
+    status: String(r.status),
+    conversation_id: (r.conversation_id as string | null) ?? null,
+    metadata: (r.metadata as Record<string, unknown> | null) ?? null,
+  };
+}
+
 export async function fetchAiUsageSummaryRows(
   admin: AdminClient,
   sinceIso: string,
-): Promise<{ rows: Array<{ model_id: string; mode: string; tokens_charged: number; tokens_input: number | null; tokens_output: number | null; status: string; conversation_id: string | null }>; error?: string }> {
+): Promise<{
+  rows: Array<{
+    model_id: string;
+    mode: string;
+    tokens_charged: number;
+    tokens_input: number | null;
+    tokens_output: number | null;
+    status: string;
+    conversation_id: string | null;
+    metadata?: Record<string, unknown> | null;
+  }>;
+  error?: string;
+}> {
   const primary = await admin
     .from("ai_usage_logs")
-    .select("model_id,mode,tokens_charged,tokens_input,tokens_output,status,conversation_id")
+    .select("model_id,mode,tokens_charged,tokens_input,tokens_output,status,conversation_id,metadata")
     .gte("created_at", sinceIso);
 
   if (!primary.error) {
     return {
-      rows: (primary.data ?? []).map((r) => ({
-        model_id: r.model_id,
-        mode: r.mode,
-        tokens_charged: r.tokens_charged ?? 0,
-        tokens_input: r.tokens_input,
-        tokens_output: r.tokens_output,
-        status: r.status,
-        conversation_id: r.conversation_id,
-      })),
+      rows: (primary.data ?? []).map((r) =>
+        mapAiUsageSummaryRow(r as unknown as Record<string, unknown>),
+      ),
     };
+  }
+
+  if (primary.error?.message?.includes("metadata")) {
+    const noMeta = await admin
+      .from("ai_usage_logs")
+      .select("model_id,mode,tokens_charged,tokens_input,tokens_output,status,conversation_id")
+      .gte("created_at", sinceIso);
+    if (!noMeta.error) {
+      return {
+        rows: (noMeta.data ?? []).map((r) => mapAiUsageSummaryRow(r as Record<string, unknown>)),
+      };
+    }
   }
 
   if (
@@ -299,15 +330,13 @@ export async function fetchAiUsageSummaryRows(
       .gte("created_at", sinceIso);
     if (!noTok.error) {
       return {
-        rows: (noTok.data ?? []).map((r) => ({
-          model_id: r.model_id,
-          mode: r.mode,
-          tokens_charged: r.tokens_charged ?? 0,
-          tokens_input: null,
-          tokens_output: null,
-          status: r.status,
-          conversation_id: r.conversation_id,
-        })),
+        rows: (noTok.data ?? []).map((r) =>
+          mapAiUsageSummaryRow({
+            ...(r as Record<string, unknown>),
+            tokens_input: null,
+            tokens_output: null,
+          }),
+        ),
       };
     }
   }

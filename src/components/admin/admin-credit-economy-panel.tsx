@@ -23,6 +23,9 @@ type EconomyRow = {
   billingProcessor?: string;
   totalUserCreditsCharged?: number;
   totalRevenueUsd?: number;
+  creditUsageRevenueUsd?: number;
+  paddleCompletedPayments?: number;
+  metricsDisclaimer?: string;
   totalInternalCostCredits?: number;
   avgRevenueMultiplier?: number;
   avgGrossMargin?: number;
@@ -167,8 +170,28 @@ export function AdminCreditEconomyPanel() {
               </table>
             </div>
           ) : null}
+          {data?.metricsDisclaimer ? (
+            <p className="rounded-lg border border-amber-500/25 bg-amber-500/8 px-3 py-2 text-[11px] leading-relaxed text-amber-900 dark:text-amber-100/90">
+              {data.metricsDisclaimer}
+              {typeof data.paddleCompletedPayments === "number" ? (
+                <span className="mt-1 block font-medium">
+                  Paddle completed payments ({range}): {data.paddleCompletedPayments}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard icon={TrendingUp} label="Revenue (USD)" value={data?.totalRevenueUsd != null ? `$${data.totalRevenueUsd}` : "—"} />
+            <StatCard
+              icon={TrendingUp}
+              label="Credit usage (est. USD)"
+              value={
+                data?.creditUsageRevenueUsd != null
+                  ? `$${data.creditUsageRevenueUsd}`
+                  : data?.totalRevenueUsd != null
+                    ? `$${data.totalRevenueUsd}`
+                    : "—"
+              }
+            />
             <StatCard icon={PiggyBank} label="Provider spend" value={data?.providerSpendUsd != null ? `$${data.providerSpendUsd}` : "—"} />
             <StatCard icon={Activity} label="Avg multiplier" value={data?.avgRevenueMultiplier != null ? `${data.avgRevenueMultiplier.toFixed(2)}×` : "—"} />
             <StatCard icon={Coins} label="Gross margin" value={marginPct != null ? `${marginPct}%` : "—"} />

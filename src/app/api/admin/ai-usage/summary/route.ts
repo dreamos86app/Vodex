@@ -5,7 +5,7 @@ import { fetchAiUsageSummaryRows } from "@/lib/admin/admin-query-compat";
 import {
   estimateOwnerMarginUsd,
   estimateOwnerRevenueUsd,
-  estimateProviderCostUsd,
+  resolveRowProviderCostUsd,
 } from "@/lib/credits/usage-cost";
 
 export async function GET() {
@@ -57,12 +57,13 @@ export async function GET() {
 
   for (const row of rows) {
     const charged = row.tokens_charged ?? 0;
-    const provider = estimateProviderCostUsd(
-      row.model_id,
-      row.mode,
-      row.tokens_input,
-      row.tokens_output,
-    );
+    const provider = resolveRowProviderCostUsd({
+      modelId: row.model_id,
+      mode: row.mode,
+      tokensInput: row.tokens_input,
+      tokensOutput: row.tokens_output,
+      metadata: row.metadata ?? null,
+    });
     const revenue = estimateOwnerRevenueUsd(charged);
     const margin = estimateOwnerMarginUsd(charged, provider);
 

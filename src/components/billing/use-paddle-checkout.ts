@@ -83,15 +83,16 @@ export function usePaddleCheckout() {
           toast.error(
             json.error ?? "Billing is being activated. Owner test checkout is available for admins.",
           );
+        } else if (json.code === "checkout_domain_pending") {
+          pushRuntimeDiagnostic("charge_failed", {
+            reason: "paddle_checkout_domain_pending",
+            plan,
+            annual,
+            error: json.error,
+            code: json.code,
+          });
+          toast.error(json.error ?? "Checkout domain pending Paddle approval");
         } else {
-          const detail = [
-            json.error ?? "Billing could not start",
-            json.planChange?.description,
-            ...(json.failureReasons ?? []),
-            json.missingEnv?.length ? `Missing: ${json.missingEnv.join(", ")}` : null,
-          ]
-            .filter(Boolean)
-            .join("\n");
           pushRuntimeDiagnostic("charge_failed", {
             reason: "paddle_checkout_failed",
             plan,

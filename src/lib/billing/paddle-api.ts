@@ -24,6 +24,43 @@ function paddleApiBase(): string {
     : "https://sandbox-api.paddle.com";
 }
 
+function isPaddleCheckoutDomainError(detail: string): boolean {
+  return /checkout\.url/i.test(detail) && /approved by Paddle/i.test(detail);
+}
+
+type PaddleTransactionJson = {
+  data?: {
+    checkout?: { url?: string };
+    id?: string;
+    discount_id?: string | null;
+    discount?: { code?: string | null; id?: string | null };
+  };
+  error?: { detail?: string; code?: string };
+};
+
+async function postPaddleTransaction(
+  apiKey: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; json: PaddleTransactionJson } | { ok: false; status: number; detail: string }> {
+  const res = await fetch(`${paddleApiBase()}/transactions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const json = (await res.json()) as PaddleTransactionJson;
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      detail: json.error?.detail ?? `Paddle API ${res.status}`,
+    };
+  }
+  return { ok: true, json };
+}
+
 export type PaddleCheckoutResult =
   | {
       ok: true;
@@ -32,7 +69,12 @@ export type PaddleCheckoutResult =
       paddleCheckoutUrlSent: string | null;
       paddleCheckoutUrlMode: "explicit" | "default";
     }
-  | { ok: false; code: "setup_required" | "api_error" | "invalid_price"; error: string; missing?: string[] };
+  | {
+      ok: false;
+      code: "setup_required" | "api_error" | "invalid_price" | "checkout_domain_pending";
+      error: string;
+      missing?: string[];
+    };
 
 export type PaddleBillingIntent = "new_subscription" | "upgrade" | "interval_change";
 
@@ -137,35 +179,42 @@ export async function createPaddleCheckoutSession(input: {
     discountMeta.appliedValue = code;
   }
 
-  if (checkoutUrlResolution.url) {
-    transactionBody.checkout = { url: checkoutUrlResolution.url };
+  const checkoutUrlSent = checkoutUrlResolution.url;
+  if (checkoutUrlSent) {
+    transactionBody.checkout = { url: checkoutUrlSent };
   }
 
   try {
-    const res = await fetch(`${paddleApiBase()}/transactions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(transactionBody),
-    });
+    let txResult = await postPaddleTransaction(apiKey, transactionBody);
+    let checkoutUrlMode: "explicit" | "default" = checkoutUrlResolution.mode;
 
-    const json = (await res.json()) as {
-      data?: {
-        checkout?: { url?: string };
-        id?: string;
-        discount_id?: string | null;
-        discount?: { code?: string | null; id?: string | null };
-      };
-      error?: { detail?: string; code?: string };
-    };
+    if (
+      !txResult.ok &&
+      checkoutUrlSent &&
+      isPaddleCheckoutDomainError(txResult.detail)
+    ) {
+      const retryBody = { ...transactionBody };
+      delete retryBody.checkout;
+      txResult = await postPaddleTransaction(apiKey, retryBody);
+      checkoutUrlMode = "default";
+    }
 
-    if (!res.ok) {
-      const detail = json.error?.detail ?? `Paddle API ${res.status}`;
+    if (!txResult.ok) {
+      const detail = txResult.detail;
       const discountRejected =
-        discountMeta.appliedMode &&
-        /discount/i.test(detail);
+        discountMeta.appliedMode && /discount/i.test(detail);
+      if (isPaddleCheckoutDomainError(detail)) {
+        return {
+          ok: false,
+          code: "checkout_domain_pending",
+          error:
+            "Paddle has not approved your checkout domain yet. Approve the domain in Paddle (Website → Checkout domains), or unset PADDLE_CHECKOUT_URL to use Paddle’s default payment link.",
+          discount: {
+            ...discountMeta,
+            paddleDiscountCode: discountMeta.appliedValue ?? null,
+          },
+        };
+      }
       return {
         ok: false,
         code: "api_error",
@@ -179,6 +228,7 @@ export async function createPaddleCheckoutSession(input: {
       };
     }
 
+    const json = txResult.json;
     const checkoutUrl = json.data?.checkout?.url;
     if (!checkoutUrl) {
       return { ok: false, code: "api_error", error: "Paddle did not return a checkout URL" };
@@ -202,8 +252,8 @@ export async function createPaddleCheckoutSession(input: {
       ok: true,
       checkoutUrl,
       transactionId: json.data?.id,
-      paddleCheckoutUrlSent: checkoutUrlResolution.url,
-      paddleCheckoutUrlMode: checkoutUrlResolution.mode,
+      paddleCheckoutUrlSent: checkoutUrlMode === "explicit" ? checkoutUrlSent : null,
+      paddleCheckoutUrlMode: checkoutUrlMode,
       discount: discountMeta,
     };
   } catch (e) {
