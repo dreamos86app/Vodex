@@ -101,6 +101,7 @@
     "verify:intro-not-css-placeholder-panels": "node scripts/verify-p11-production.mjs intro-not-css-placeholder-panels",
     "verify:intro-logo-reveal-not-cut-off": "node scripts/verify-p11-production.mjs intro-logo-reveal-not-cut-off",
     "verify:intro-animation-completes-before-fade": "node scripts/verify-p11-production.mjs intro-animation-completes-before-fade",
+    "verify:status-owner-full-view": "node scripts/verify-p11-production.mjs status-owner-full-view",
     "verify:status-page-public": "node scripts/verify-p11-production.mjs status-page-public",
     "verify:status-30-day-history": "node scripts/verify-p11-production.mjs status-30-day-history",
     "verify:admin-status-management": "node scripts/verify-p11-production.mjs admin-status-management",

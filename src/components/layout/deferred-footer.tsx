@@ -4,7 +4,8 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import { VodexImportantLinksFooter } from "@/components/layout/vodex-important-links-footer";
 
-const HIDE_PREFIXES = ["/create", "/auth", "/onboarding", "/apps/", "/builder"];
+/** Only hide footer where it breaks immersive UX (not /apps list or admin). */
+const HIDE_PREFIXES = ["/create", "/auth", "/onboarding", "/builder"];
 
 export function DeferredFooter() {
   const pathname = usePathname();

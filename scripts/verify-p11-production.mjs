@@ -262,6 +262,13 @@ const suites = {
     }
     return errors;
   },
+  "status-owner-full-view": () => {
+    const errors = [];
+    must(read("src/lib/admin-owner.ts"), "canViewFullStatusPage", "owner gate", errors);
+    must(read("src/lib/status/status-public-surface.ts"), "Functionalities", "public surface", errors);
+    must(read("src/app/api/status/public/route.ts"), "fullView", "api full view", errors);
+    return errors;
+  },
   "status-page-public": () => {
     const errors = [];
     must(read("src/app/status/page.tsx"), "PublicStatusPage", "status page", errors);
@@ -353,7 +360,8 @@ const suites = {
   },
   "community-discussions-rls": () => {
     const errors = [];
-    must(read("supabase/migrations/20260722120000_p17_production_stability.sql"), "discussions: authenticated read", "discussions rls", errors);
+    must(read("supabase/migrations/20260723120000_p171_discussions_harden.sql"), "discussions: authenticated read", "discussions rls", errors);
+    must(read("supabase/migrations/20260723120000_p171_discussions_harden.sql"), "_p171_owner_coalesce_expr", "adaptive owner", errors);
     return errors;
   },
   "community-page-no-permission-crash": () => {
@@ -363,7 +371,8 @@ const suites = {
   },
   "discord-community-card-premium": () => {
     const errors = [];
-    must(read("src/components/community/vodex-discord-community-card.tsx"), "vodex-discord-card-premium", "premium card", errors);
+    must(read("src/components/ui/premium-discord-card.tsx"), "vodex-discord-card-premium", "premium card", errors);
+    must(read("src/components/ui/premium-discord-card.tsx"), "DiscordGlyph", "discord icon", errors);
     must(read("src/app/globals.css"), "vodex-discord-shimmer", "shimmer css", errors);
     return errors;
   },
@@ -417,12 +426,12 @@ const suites = {
   },
   "intro-mobile-corner-layout": () => {
     const errors = [];
-    must(read("src/components/session/intro/intro-apps.ts"), '"-34%"', "corner x", errors);
+    must(read("src/components/session/intro/intro-apps.ts"), '"-42%"', "corner x", errors);
     return errors;
   },
   "intro-showcase-spacing": () => {
     const errors = [];
-    must(read("src/components/session/intro/CinematicAppPanel.tsx"), "44vw", "mobile size", errors);
+    must(read("src/components/session/intro/CinematicAppPanel.tsx"), "46vw", "mobile size", errors);
     return errors;
   },
   "intro-fusion-center-path": () => {

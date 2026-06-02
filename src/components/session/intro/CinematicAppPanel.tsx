@@ -20,7 +20,7 @@ export function CinematicAppPanel({
   const corner = layout === "mobile" ? app.mobile : app.desktop;
   const frameClass =
     layout === "mobile"
-      ? "aspect-square w-[min(44vw,196px)] max-h-[min(44vw,196px)]"
+      ? "aspect-square w-[min(46vw,228px)] max-h-[min(46vw,228px)]"
       : "aspect-[5/4] w-[min(46vw,520px)] max-h-[min(46vh,416px)]";
 
   const entered = timeline >= app.enterAt;

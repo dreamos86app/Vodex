@@ -126,7 +126,12 @@ function ProjectCard({
     (cardStatus === "preview_failed" || cardStatus === "failed") &&
     ls === "needs_attention";
   const publicUrl = project.public_url ?? null;
-  const iconSrc = projectIconSrc(project.id, iconSvg, project.icon_url);
+  const iconSrc = projectIconSrc(
+    project.id,
+    iconSvg,
+    project.icon_url,
+    project.updated_at,
+  );
   const importedPending = isImportedAppWithoutPreview(project);
 
   return (

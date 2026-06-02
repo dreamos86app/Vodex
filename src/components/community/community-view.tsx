@@ -97,6 +97,9 @@ function CommunityFetchFallback({
           Retry
         </Button>
       </div>
+      <div className="mt-8 w-full max-w-xl">
+        <VodexDiscordCommunityCard />
+      </div>
     </div>
   );
 }
@@ -975,16 +978,6 @@ export function CommunityView() {
         ))}
       </motion.div>
 
-      <motion.div
-        variants={variants.fadeUp}
-        initial="hidden"
-        animate="show"
-        transition={{ delay: 0.08 }}
-        className="relative mt-6"
-      >
-        <VodexDiscordCommunityCard />
-      </motion.div>
-
       {/* Trending tab */}
       {tab === "Trending" && (
         <motion.div variants={variants.fadeUp} initial="hidden" animate="show" transition={{ delay: 0.1 }} className="mt-6">
@@ -1084,6 +1077,16 @@ export function CommunityView() {
           />
         )}
       </AnimatePresence>
+
+      <motion.div
+        variants={variants.fadeUp}
+        initial="hidden"
+        animate="show"
+        transition={{ delay: 0.12 }}
+        className="relative mt-10"
+      >
+        <VodexDiscordCommunityCard />
+      </motion.div>
     </div>
   );
 }

@@ -80,7 +80,7 @@ export const navSections: NavSection[] = [
   {
     label: "Admin",
     items: [
-      { title: "Admin Panel", href: "/admin/users", icon: Shield },
+      { title: "Control Center", href: "/admin/control-center", icon: Shield },
     ],
   },
 ];

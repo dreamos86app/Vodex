@@ -33,6 +33,7 @@ import { AdminAppPaymentsPanel } from "@/components/admin/admin-app-payments-pan
 import { AdminSchemaHealthBanner } from "@/components/admin/admin-schema-health-banner";
 import { AdminOnboardingInsightsPanel } from "@/components/admin/admin-onboarding-insights-panel";
 import { AdminControlCenterPanel } from "@/components/admin/admin-control-center-panel";
+import { SafeAdminPanel } from "@/components/admin/admin-panel-error-boundary";
 
 export type AdminTab =
   | "onboarding"
@@ -112,32 +113,76 @@ export function AdminView({ initialTab = "users" }: { initialTab?: AdminTab }) {
         ))}
       </div>
 
-      {activeTab === "onboarding" && <AdminOnboardingInsightsPanel />}
-      {activeTab === "users" && <AdminUsersPanel />}
-      {activeTab === "contacts" && <ContactRequestsPanel />}
-      {activeTab === "billing" && (
-        <div className="space-y-6">
-          <AdminCreditEconomyPanel />
-          <AdminBillingPanel />
-          <AdminAppPaymentsPanel />
-        </div>
+      {activeTab === "onboarding" && (
+        <SafeAdminPanel name="Onboarding">
+          <AdminOnboardingInsightsPanel />
+        </SafeAdminPanel>
       )}
-      {activeTab === "ai" && <AdminAiUsagePanel />}
-      {activeTab === "action" && <ActionUsagePanel />}
-      {activeTab === "mobile" && <AdminMobileBuildsPanel />}
-      {activeTab === "storage" && <AdminStoragePanel />}
-      {activeTab === "audit" && <AdminAuditPanel />}
+      {activeTab === "users" && (
+        <SafeAdminPanel name="Users">
+          <AdminUsersPanel />
+        </SafeAdminPanel>
+      )}
+      {activeTab === "contacts" && (
+        <SafeAdminPanel name="Contacts">
+          <ContactRequestsPanel />
+        </SafeAdminPanel>
+      )}
+      {activeTab === "billing" && (
+        <SafeAdminPanel name="Billing">
+          <div className="space-y-6">
+            <AdminCreditEconomyPanel />
+            <AdminBillingPanel />
+            <AdminAppPaymentsPanel />
+          </div>
+        </SafeAdminPanel>
+      )}
+      {activeTab === "ai" && (
+        <SafeAdminPanel name="AI usage">
+          <AdminAiUsagePanel />
+        </SafeAdminPanel>
+      )}
+      {activeTab === "action" && (
+        <SafeAdminPanel name="Action usage">
+          <ActionUsagePanel />
+        </SafeAdminPanel>
+      )}
+      {activeTab === "mobile" && (
+        <SafeAdminPanel name="Mobile builds">
+          <AdminMobileBuildsPanel />
+        </SafeAdminPanel>
+      )}
+      {activeTab === "storage" && (
+        <SafeAdminPanel name="Uploads">
+          <AdminStoragePanel />
+        </SafeAdminPanel>
+      )}
+      {activeTab === "audit" && (
+        <SafeAdminPanel name="Audit log">
+          <AdminAuditPanel />
+        </SafeAdminPanel>
+      )}
 
-      {activeTab === "status" && <AdminControlCenterPanel />}
+      {activeTab === "status" && (
+        <SafeAdminPanel name="Control Center">
+          <AdminControlCenterPanel />
+        </SafeAdminPanel>
+      )}
 
       {activeTab === "auth" && (
-        <div className="max-w-2xl space-y-6">
-          <DeploymentStatusPanel />
-          <AuthHealthPanel />
-        </div>
+        <SafeAdminPanel name="System">
+          <div className="max-w-2xl space-y-6">
+            <DeploymentStatusPanel />
+            <AuthHealthPanel />
+          </div>
+        </SafeAdminPanel>
       )}
 
-      {activeTab === "competitive" && <CompetitiveScorePanel />}
+      {activeTab === "competitive" && (
+        <SafeAdminPanel name="Competitive">
+          <CompetitiveScorePanel />
+        </SafeAdminPanel>
+      )}
     </motion.div>
   );
 }

@@ -153,6 +153,10 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                 {notifications.slice(0, 20).map((n) => {
                   const meta = getMeta(n.type ?? "system");
                   const Icon = meta.icon;
+                  const md = n.metadata as Record<string, unknown> | null;
+                  const isWelcome =
+                    md?.kind === "welcome" ||
+                    (typeof n.title === "string" && n.title.startsWith("Welcome to Vodex"));
                   return (
                     <button
                       key={n.id}
@@ -161,10 +165,34 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                       className={cn(
                         "flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-surface/60",
                         !n.read && "bg-accent/3",
+                        isWelcome &&
+                          "relative overflow-hidden rounded-xl border border-sky-200/60 bg-gradient-to-br from-sky-50 via-indigo-50/80 to-violet-100/70",
                       )}
                     >
-                      <div className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl", meta.bg)}>
-                        <Icon className={cn("size-4", meta.color)} strokeWidth={1.65} />
+                      {isWelcome ? (
+                        <div
+                          className="pointer-events-none absolute inset-0 opacity-40"
+                          aria-hidden
+                          style={{
+                            backgroundImage:
+                              "radial-gradient(circle at 20% 30%, white 1px, transparent 1px), radial-gradient(circle at 70% 60%, white 1px, transparent 1px)",
+                            backgroundSize: "48px 48px, 64px 64px",
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={cn(
+                          "relative mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl",
+                          isWelcome
+                            ? "bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-md"
+                            : meta.bg,
+                        )}
+                      >
+                        {isWelcome ? (
+                          <span className="text-[11px] font-bold">V</span>
+                        ) : (
+                          <Icon className={cn("size-4", meta.color)} strokeWidth={1.65} />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={cn("text-[12.5px] leading-snug", !n.read ? "font-semibold text-foreground" : "text-foreground/80")}>

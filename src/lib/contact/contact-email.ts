@@ -97,6 +97,7 @@ export async function sendContactNotificationEmail(input: {
   projectName?: string | null;
   isPlatformContact?: boolean;
 }): Promise<{ emailStatus: ContactEmailStatus; error?: string; message: string }> {
+  const cfg = getEmailConfig();
   const target = resolveContactNotificationTarget({
     ownerUserEmail: input.ownerUserEmail,
     isPlatformContact: input.isPlatformContact,
@@ -106,8 +107,15 @@ export async function sendContactNotificationEmail(input: {
     projectName: input.projectName,
   });
 
+  const bcc =
+    target.bcc ??
+    (input.isPlatformContact || target.label === "platform"
+      ? [cfg.contactNotificationsTo]
+      : undefined);
+
   const result = await sendResendEmail({
     to: target.to,
+    bcc,
     subject,
     text,
     html,

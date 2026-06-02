@@ -1,4 +1,5 @@
 import type { StatusLevel } from "@/lib/status/status-types";
+import { aggregatePublicSurface } from "@/lib/status/status-public-surface";
 
 const HISTORY_DAYS = 30;
 
@@ -52,7 +53,8 @@ function lastNDays(): string[] {
   return out;
 }
 
-export function buildFallbackStatusPayload() {
+export function buildFallbackStatusPayload(options?: { fullView?: boolean }) {
+  const fullView = options?.fullView === true;
   const days = lastNDays();
   const components = CATALOG.map((c, i) => ({
     ...c,
@@ -64,12 +66,18 @@ export function buildFallbackStatusPayload() {
       uptime_percent: 100,
     })),
   }));
+  const publicComponents = aggregatePublicSurface(
+    components.map((c) => ({ key: c.key, current_status: c.current_status })),
+  );
+
   return {
     ok: true as const,
     schemaReady: false,
     placeholder: true as const,
+    viewMode: fullView ? ("full" as const) : ("public" as const),
     overallStatus: "operational" as StatusLevel,
-    components,
+    components: fullView ? components : [],
+    publicComponents: fullView ? [] : publicComponents,
     incidents: [] as [],
     activeAnnouncements: [],
     activeAnnouncement: null,

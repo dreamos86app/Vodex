@@ -8,6 +8,7 @@ type Props = {
   name?: string;
   iconSvg?: string | null;
   iconUrl?: string | null;
+  cacheKey?: string | null;
   size?: number;
   className?: string;
   /** When true, renders a filled circle (default). */
@@ -18,11 +19,12 @@ export function ProjectIcon({
   projectId,
   iconSvg,
   iconUrl,
+  cacheKey,
   size = 40,
   className,
   circular = true,
 }: Props) {
-  const src = projectIconSrc(projectId, iconSvg, iconUrl);
+  const src = projectIconSrc(projectId, iconSvg, iconUrl, cacheKey);
   const px = `${size}px`;
 
   return (

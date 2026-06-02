@@ -197,7 +197,10 @@ export function PlatformShell({
   const isOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
   const isCreateHome = pathname === "/" && homeSessionFromServer;
   const isFullBleed =
-    isOnboarding || (pathname === "/" && homeSessionFromServer) || pathname === "/chat";
+    isOnboarding ||
+    pathname === "/chat" ||
+    pathname.startsWith("/create") ||
+    pathname.includes("/builder");
   /** Home scrolls on `main` so the scrollbar sits at the right edge of the content column. */
   const isHomeShellScroll = pathname === "/" && homeSessionFromServer;
   const meta = pageMeta[pathname] ?? { title: "Vodex" };
@@ -277,7 +280,7 @@ export function PlatformShell({
           <div
             className={
               isHomeShellScroll
-                ? "flex w-full min-w-0 flex-col"
+                ? "flex min-h-full w-full min-w-0 flex-col"
                 : isFullBleed
                   ? "flex h-full min-h-0 min-w-0 flex-col"
                   : "flex min-h-full flex-1 flex-col"

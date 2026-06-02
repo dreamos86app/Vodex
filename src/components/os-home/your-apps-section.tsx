@@ -66,7 +66,7 @@ export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
             const status = getProjectCardStatus(p);
             const badges = getUserSafeProjectBadges(p, { mode: "user" });
             const actions = getProjectCardActions(p, { isAdmin });
-            const iconSrc = projectIconSrc(p.id, p.icon_svg, p.icon_url);
+            const iconSrc = projectIconSrc(p.id, p.icon_svg, p.icon_url, p.updated_at);
             const importedPending = isImportedAppWithoutPreview(p);
             const cardStatus = resolveProjectCardStatus(p);
             const showPreview = cardStatus === "ready" && Boolean(p.preview_url);

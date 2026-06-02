@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { PremiumDiscordCard } from "@/components/ui/premium-discord-card";
+import { FooterIcedBirds } from "@/components/layout/footer-iced-birds";
 
-const DISCORD_URL = "https://discord.gg/y8EbeMc9Mb";
 const STATUS_URL = "https://status.vodex.dev";
 
 const COLUMNS = [
@@ -24,6 +25,7 @@ const COLUMNS = [
       { href: "/help", label: "Help" },
       { href: "/changelog", label: "Changelog" },
       { href: STATUS_URL, label: "Status", external: true },
+      { href: "https://discord.gg/y8EbeMc9Mb", label: "Discord Community", external: true },
     ],
   },
   {
@@ -45,27 +47,6 @@ const COLUMNS = [
   },
 ] as const;
 
-function DiscordFooterCard() {
-  return (
-    <a
-      href={DISCORD_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      data-testid="footer-discord-social"
-      className="vodex-footer-discord-card group relative flex items-center gap-3 overflow-hidden rounded-xl border border-indigo-300/40 bg-gradient-to-r from-[#5865F2] via-[#5b6eea] to-[#7c3aed] px-4 py-3 shadow-md transition hover:shadow-lg"
-    >
-      <span className="flex size-9 items-center justify-center rounded-lg bg-white/20 text-lg font-bold text-white ring-1 ring-white/30">
-        D
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-white">Community</p>
-        <p className="text-[11px] text-indigo-100/90">Join builders on Discord</p>
-      </div>
-      <span className="text-[11px] font-semibold text-white/90 group-hover:underline">Join →</span>
-    </a>
-  );
-}
-
 export function VodexImportantLinksFooter({ className }: { className?: string }) {
   return (
     <footer
@@ -76,31 +57,33 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
       )}
       data-testid="vodex-important-links-footer"
     >
+      <div className="vodex-footer-ambient pointer-events-none absolute inset-0" aria-hidden />
+      <FooterIcedBirds />
       <div className="vodex-footer-bird-trail pointer-events-none absolute inset-0 overflow-hidden" aria-hidden />
       <div className="relative mx-auto max-w-6xl px-[var(--page-padding-x)] py-10">
-        <div className="mb-8 grid gap-8 lg:grid-cols-[1fr_280px]">
+        <div className="mb-8 grid gap-8 lg:grid-cols-[1fr_minmax(260px,320px)]">
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {COLUMNS.map((col) => (
               <div key={col.title}>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-sky-700/80">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-sky-800/90 drop-shadow-sm">
                   {col.title}
                 </p>
-                <ul className="mt-3 space-y-2">
+                <ul className="mt-3 space-y-2.5">
                   {col.links.map((link) => (
-                    <li key={link.label}>
+                    <li key={`${col.title}-${link.label}`}>
                       {"external" in link && link.external ? (
                         <a
                           href={link.href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[12px] font-medium text-slate-600 transition hover:text-sky-700 hover:underline"
+                          className="text-[12.5px] font-semibold text-slate-600/95 transition hover:text-sky-700 hover:underline"
                         >
                           {link.label}
                         </a>
                       ) : (
                         <Link
                           href={link.href}
-                          className="text-[12px] font-medium text-slate-600 transition hover:text-sky-700 hover:underline"
+                          className="text-[12.5px] font-semibold text-slate-600/95 transition hover:text-sky-700 hover:underline"
                         >
                           {link.label}
                         </Link>
@@ -111,9 +94,9 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
               </div>
             ))}
           </div>
-          <DiscordFooterCard />
+          <PremiumDiscordCard variant="footer" testId="footer-discord-social" />
         </div>
-        <p className="text-center text-[11px] font-medium text-slate-500/90">
+        <p className="text-center text-[11px] font-semibold tracking-wide text-slate-500/90">
           © {new Date().getFullYear()} Vodex · Built for AI-native creators
         </p>
       </div>

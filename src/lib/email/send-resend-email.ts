@@ -4,6 +4,7 @@ export type ResendDeliveryChannel = "resend" | "dev_console" | "none";
 
 export type SendResendEmailInput = {
   to: string | string[];
+  bcc?: string | string[];
   subject: string;
   text: string;
   html?: string;
@@ -76,6 +77,9 @@ export async function sendResendEmail(
     if (input.html) body.html = input.html;
     if (input.replyTo) {
       body.reply_to = Array.isArray(input.replyTo) ? input.replyTo : [input.replyTo];
+    }
+    if (input.bcc) {
+      body.bcc = Array.isArray(input.bcc) ? input.bcc : [input.bcc];
     }
 
     const res = await fetch("https://api.resend.com/emails", {

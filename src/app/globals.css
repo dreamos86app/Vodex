@@ -1452,9 +1452,87 @@ body {
   animation: vodex-footer-bird-fly 9s ease-in-out infinite;
 }
 
+@keyframes vodex-sparkle-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.vodex-sparkle-dot {
+  animation: vodex-sparkle-twinkle 2.4s ease-in-out infinite;
+}
+
+.vodex-footer-ambient {
+  background: linear-gradient(
+    120deg,
+    rgb(224 242 254 / 0.5) 0%,
+    transparent 40%,
+    rgb(219 234 254 / 0.35) 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: vodex-discord-shimmer 18s linear infinite;
+}
+
+@keyframes vodex-footer-bird-path-a {
+  0% {
+    transform: translate(-8%, 72%) rotate(-8deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.7;
+  }
+  88% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translate(92%, 18%) rotate(6deg);
+    opacity: 0;
+  }
+}
+
+@keyframes vodex-footer-bird-path-b {
+  0% {
+    transform: translate(95%, 65%) rotate(10deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.55;
+  }
+  85% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: translate(5%, 28%) rotate(-12deg);
+    opacity: 0;
+  }
+}
+
+.vodex-footer-bird--a {
+  position: absolute;
+  animation: vodex-footer-bird-path-a 11s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgb(186 230 253 / 0.8));
+}
+
+.vodex-footer-bird--b {
+  position: absolute;
+  animation: vodex-footer-bird-path-b 13s ease-in-out infinite 2.5s;
+  filter: drop-shadow(0 0 6px rgb(224 242 254 / 0.9));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vodex-discord-card-shimmer,
-  .vodex-footer-bird-trail::after {
+  .vodex-footer-bird-trail::after,
+  .vodex-footer-ambient,
+  .vodex-footer-bird--a,
+  .vodex-footer-bird--b,
+  .vodex-sparkle-dot {
     animation: none !important;
   }
 }

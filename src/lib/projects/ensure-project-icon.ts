@@ -22,9 +22,16 @@ export function ensureProjectIconSvg(title: string, stored?: string | null): str
   return buildInitialsIconSvg(name);
 }
 
-export function projectIconSrc(projectId: string, iconSvg?: string | null, iconUrl?: string | null): string {
+export function projectIconSrc(
+  projectId: string,
+  iconSvg?: string | null,
+  iconUrl?: string | null,
+  cacheKey?: string | null,
+): string {
+  const bust = cacheKey?.trim() ? `?v=${encodeURIComponent(cacheKey.trim())}` : "";
   if (iconSvg?.trim() && !isWeakIconSvg(iconSvg)) {
     return `data:image/svg+xml,${encodeURIComponent(iconSvg.trim())}`;
   }
-  return iconUrl?.trim() || `/api/projects/${projectId}/icon`;
+  const url = iconUrl?.trim() || `/api/projects/${projectId}/icon`;
+  return bust && !url.startsWith("data:") ? `${url}${bust}` : url;
 }

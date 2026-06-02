@@ -35,7 +35,7 @@ export const useNotificationsStore = create<NotificationsState>()((set) => ({
       unreadCount: s.unreadCount + (notification.read ? 0 : 1),
     })),
 
-  markRead: (id) =>
+  markRead: (id) => {
     set((s) => {
       const updated = s.notifications.map((n) =>
         n.id === id ? { ...n, read: true } : n,
@@ -44,13 +44,27 @@ export const useNotificationsStore = create<NotificationsState>()((set) => ({
         notifications: updated,
         unreadCount: updated.filter((n) => !n.read).length,
       };
-    }),
+    });
+    void fetch("/api/notifications/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ id }),
+    }).catch(() => undefined);
+  },
 
-  markAllRead: () =>
+  markAllRead: () => {
     set((s) => ({
       notifications: s.notifications.map((n) => ({ ...n, read: true })),
       unreadCount: 0,
-    })),
+    }));
+    void fetch("/api/notifications/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ all: true }),
+    }).catch(() => undefined);
+  },
 
   setLoading: (loading) => set({ loading }),
 

@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { buildFallbackStatusPayload } from "@/lib/status/status-fallback";
 import { isStatusSchemaMissingError, uptimePercentForStatus } from "@/lib/status/status-db";
+import { aggregatePublicSurface } from "@/lib/status/status-public-surface";
 import type {
   PlatformAnnouncementRow,
   StatusComponentRow,
@@ -61,7 +62,8 @@ function incidentStatusForDay(
   return worst;
 }
 
-export async function fetchPublicStatusPayload() {
+export async function fetchPublicStatusPayload(options?: { fullView?: boolean }) {
+  const fullView = options?.fullView === true;
   const admin = createServiceRoleClient();
   if (!admin) {
     return { ok: false as const, error: "Service role unavailable", schemaReady: false };
@@ -81,7 +83,7 @@ export async function fetchPublicStatusPayload() {
     .order("sort_order", { ascending: true });
 
   if (compErr && isStatusSchemaMissingError(compErr)) {
-    return buildFallbackStatusPayload();
+    return buildFallbackStatusPayload({ fullView });
   }
 
   const compRows = (components ?? []) as StatusComponentRow[];
@@ -95,7 +97,7 @@ export async function fetchPublicStatusPayload() {
     .gte("date", since);
 
   if (histErr && isStatusSchemaMissingError(histErr)) {
-    return buildFallbackStatusPayload();
+    return buildFallbackStatusPayload({ fullView });
   }
 
   const historyByComp = new Map<string, Map<string, StatusDayRow>>();
@@ -123,7 +125,7 @@ export async function fetchPublicStatusPayload() {
     .limit(40);
 
   if (incErr && isStatusSchemaMissingError(incErr)) {
-    return buildFallbackStatusPayload();
+    return buildFallbackStatusPayload({ fullView });
   }
 
   const incidentRows = (incidents ?? []) as StatusIncidentRow[];
@@ -141,7 +143,7 @@ export async function fetchPublicStatusPayload() {
     .limit(2);
 
   if (annErr && isStatusSchemaMissingError(annErr)) {
-    return buildFallbackStatusPayload();
+    return buildFallbackStatusPayload({ fullView });
   }
 
   const activeAnnouncements = ((announcements ?? []) as PlatformAnnouncementRow[]).slice(0, 2);
@@ -178,12 +180,18 @@ export async function fetchPublicStatusPayload() {
     activeIncidents.length > 0 ? "partial_outage" : "operational",
   );
 
+  const publicSurface = aggregatePublicSurface(
+    componentsWithHistory.map((c) => ({ key: c.key, current_status: c.current_status })),
+  );
+
   return {
     ok: true as const,
     schemaReady: true,
+    viewMode: fullView ? ("full" as const) : ("public" as const),
     overallStatus: overallWorst,
-    components: componentsWithHistory,
-    incidents: incidentRows,
+    components: fullView ? componentsWithHistory : [],
+    publicComponents: fullView ? [] : publicSurface,
+    incidents: fullView ? incidentRows : incidentRows.filter((i) => !i.resolved_at).slice(0, 5),
     activeAnnouncements,
     activeAnnouncement: activeAnnouncements[0] ?? null,
   };

@@ -34,7 +34,7 @@ export function DraftsSection({ projects }: { projects: YourAppsProject[] }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {projects.slice(0, 8).map((p, i) => {
           const ui = computeProjectCardUiState(p as ProjectCardUiInput);
-          const iconSrc = projectIconSrc(p.id, p.icon_svg, p.icon_url);
+          const iconSrc = projectIconSrc(p.id, p.icon_svg, p.icon_url, p.updated_at);
           const isFailed = ui.visibility_status === "failed_attempt";
           return (
             <motion.div
