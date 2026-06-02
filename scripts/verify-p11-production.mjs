@@ -31,6 +31,10 @@ const suites = {
     const errors = [];
     must(read("src/components/billing/build-credits-upgrade-panel.tsx"), "build-credits-upgrade-panel", "panel", errors);
     must(read("src/components/billing/build-credits-upgrade-panel.tsx"), "#2563eb", "vodex blue", errors);
+    must(read("src/components/billing/build-credits-upgrade-panel.tsx"), "build-credits-upgrade-panel__cta", "premium cta", errors);
+    const panel = read("src/components/billing/build-credits-upgrade-panel.tsx");
+    if (panel.includes("Add credits")) errors.push("add credits removed");
+    if (panel.includes("Save for later")) errors.push("save for later removed");
     must(read("src/lib/billing/build-credits-upgrade.ts"), "resolveBuildCreditsUpgradeOffer", "offer resolver", errors);
     must(read("src/components/create/workspace/immersive-workspace.tsx"), "BuildCreditsUpgradePanel", "workspace panel", errors);
     return errors;
@@ -63,11 +67,14 @@ const suites = {
   "intro-v2-cinematic-app-showcase": () => {
     const errors = [];
     const intro = read("src/components/session/vodex-session-intro.tsx");
-    must(intro, "SHOWCASE_APPS", "showcase apps", errors);
-    must(intro, "Clothing store", "fashion app", errors);
-    must(intro, "Food delivery", "food app", errors);
-    must(intro, "AI video editor", "video app", errors);
-    must(intro, "Finance app", "finance app", errors);
+    const mocks = read("src/components/session/intro-showcase-mocks.tsx");
+    must(intro, "INTRO_SHOWCASE_MOCKS", "showcase mocks wired", errors);
+    must(intro, "SHOWCASE_MS", "2.5s showcase timing", errors);
+    must(mocks, "FashionStoreMock", "fashion mock", errors);
+    must(mocks, "FoodDeliveryMock", "food mock", errors);
+    must(mocks, "VideoEditorMock", "video mock", errors);
+    must(mocks, "FinanceMock", "finance mock", errors);
+    must(read("src/components/session/intro-falling-stars.tsx"), "IntroFallingStars", "stars", errors);
     return errors;
   },
   "intro-no-start-artifact": () => {
@@ -78,11 +85,12 @@ const suites = {
     }
     must(intro, "initial={{ opacity: 1 }}", "no flash fade-in from 0 on root", errors);
     must(intro, "vodex-intro-v2", "v2 shell class", errors);
+    must(read("src/app/globals.css"), "vodex-intro-v2__sky", "sky gradient", errors);
     return errors;
   },
   "intro-mobile-desktop-variants": () => {
     const errors = [];
-    must(read("src/components/session/vodex-session-intro.tsx"), 'layout === "mobile"', "mobile layout", errors);
+    must(read("src/components/session/vodex-session-intro.tsx"), "isMobile", "mobile layout", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), "innerWidth < 768", "breakpoint", errors);
     return errors;
   },

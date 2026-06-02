@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { Loader2, Sparkles, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,17 +12,23 @@ import { usePaddleBillingReady, usePaddleCheckout } from "@/components/billing/u
 import { toast } from "@/lib/toast";
 import { pushRuntimeDiagnostic } from "@/lib/dev/runtime-diagnostics";
 
+const SPARKLE_OFFSETS = [
+  { top: "12%", left: "78%", delay: 0 },
+  { top: "42%", left: "8%", delay: 0.4 },
+  { top: "68%", left: "88%", delay: 0.8 },
+] as const;
+
 export function BuildCreditsUpgradePanel({
   planId,
   resetAt,
   className,
   onDismiss,
-  compact,
 }: {
   planId: string | null | undefined;
   resetAt?: string | null;
   className?: string;
   onDismiss?: () => void;
+  /** @deprecated layout is always compact */
   compact?: boolean;
 }) {
   const offer = React.useMemo(() => resolveBuildCreditsUpgradeOffer(planId), [planId]);
@@ -31,7 +36,7 @@ export function BuildCreditsUpgradePanel({
   const { startCheckout, busy } = usePaddleCheckout();
 
   const resetHint = resetAt
-    ? `Credits reset ${new Date(resetAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`
+    ? `Resets ${new Date(resetAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
     : null;
 
   const runUpgrade = () => {
@@ -60,92 +65,94 @@ export function BuildCreditsUpgradePanel({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "relative overflow-hidden rounded-2xl bg-[#060d1f] ring-1 ring-sky-500/35 shadow-[0_16px_48px_-16px_rgba(37,99,235,0.45)]",
+        "build-credits-upgrade-panel relative mx-auto w-full max-w-[300px] overflow-hidden rounded-2xl",
+        "ring-1 ring-sky-300/80 shadow-[0_12px_40px_-8px_rgba(37,99,235,0.35)]",
         className,
       )}
       data-testid="build-credits-upgrade-panel"
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-sky-600/20 via-[#1d4ed8]/15 to-indigo-900/25 pointer-events-none" />
-      <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-sky-400 via-[#2563eb] to-indigo-500" />
+      <div className="build-credits-upgrade-panel__aurora pointer-events-none absolute inset-0" aria-hidden />
+      <div className="build-credits-upgrade-panel__shimmer pointer-events-none absolute inset-0" aria-hidden />
 
-      <div className={cn("relative px-4 py-4 sm:px-5 sm:py-5", compact && "py-3.5")}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#2563eb]/20 ring-1 ring-sky-400/40">
-              <Zap className="size-5 text-sky-300" strokeWidth={2} />
-            </div>
-            <div>
-              <p className="text-[15px] font-bold tracking-tight text-white">Build Credits are used up</p>
-              <p className="mt-1 text-[12.5px] text-sky-100/85 leading-relaxed">
-                Upgrade to keep building without waiting for reset.
-              </p>
-              {resetHint ? (
-                <p className="mt-1 text-[10.5px] text-sky-200/55">{resetHint}</p>
-              ) : null}
-            </div>
+      {SPARKLE_OFFSETS.map((s, i) => (
+        <motion.span
+          key={i}
+          className="pointer-events-none absolute text-amber-300/90"
+          style={{ top: s.top, left: s.left }}
+          animate={{ opacity: [0.2, 1, 0.2], scale: [0.85, 1.15, 0.85], rotate: [0, 12, 0] }}
+          transition={{ duration: 2.2, delay: s.delay, repeat: Infinity, ease: "easeInOut" }}
+          aria-hidden
+        >
+          <Sparkles className="size-3" strokeWidth={2} />
+        </motion.span>
+      ))}
+
+      <div className="relative px-3.5 py-3">
+        <div className="flex items-start gap-2.5 pr-6">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/70 shadow-sm ring-1 ring-sky-200/80">
+            <Zap className="size-4 text-[#2563eb]" strokeWidth={2.25} fill="#2563eb" fillOpacity={0.15} />
           </div>
-          {onDismiss ? (
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="rounded-lg p-1.5 text-sky-200/60 hover:bg-white/10 hover:text-white"
-              aria-label="Dismiss"
-            >
-              <X className="size-3.5" />
-            </button>
-          ) : null}
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold leading-snug tracking-tight text-sky-950">
+              Build Credits are used up
+            </p>
+            <p className="mt-0.5 text-[11px] leading-snug text-sky-800/85">
+              Upgrade to keep building without waiting.
+            </p>
+            {resetHint ? (
+              <p className="mt-0.5 text-[9.5px] text-sky-700/70">{resetHint}</p>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-sky-400/25 bg-[#0b1530]/60 px-3.5 py-3 backdrop-blur-sm">
+        {onDismiss ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="absolute right-2 top-2 rounded-lg p-1 text-sky-700/50 transition hover:bg-white/50 hover:text-sky-900"
+            aria-label="Dismiss"
+          >
+            <X className="size-3.5" />
+          </button>
+        ) : null}
+
+        <div className="mt-2.5 rounded-xl bg-white/45 px-2.5 py-2 ring-1 ring-white/60 backdrop-blur-[2px]">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="size-3.5 text-sky-300" />
-              <p className="text-[13px] font-semibold text-white">{offer.nextPlanLabel}</p>
-            </div>
-            <p className="text-[22px] font-black tabular-nums text-white leading-none">
+            <p className="text-[11px] font-bold text-sky-900">{offer.nextPlanLabel}</p>
+            <p className="text-[17px] font-black tabular-nums leading-none text-sky-950">
               ${offer.monthlyPriceUsd}
-              <span className="text-[11px] font-medium text-sky-200/70">/mo</span>
+              <span className="text-[9px] font-semibold text-sky-700/75">/mo</span>
             </p>
           </div>
-          <ul className="mt-2.5 space-y-1">
-            {offer.perks.slice(0, 5).map((p) => (
-              <li key={p} className="text-[11px] text-sky-100/80">
-                • {p}
+          <ul className="mt-1.5 space-y-0.5">
+            {offer.perks.slice(0, 4).map((p) => (
+              <li
+                key={p}
+                className="flex items-center gap-1.5 text-[10px] font-medium leading-tight text-amber-700"
+              >
+                <Sparkles className="size-2.5 shrink-0 text-amber-500" strokeWidth={2.5} />
+                <span className="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 bg-clip-text text-transparent">
+                  {p}
+                </span>
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={runUpgrade}
-            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563eb] to-indigo-600 px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_24px_-6px_rgba(37,99,235,0.65)] transition hover:brightness-110 disabled:opacity-60 sm:flex-[1.4]"
-            data-testid="upgrade-panel-primary-cta"
-          >
-            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-            {offer.ctaLabel}
-          </button>
-          <Link
-            href="/settings/billing"
-            className="inline-flex items-center justify-center rounded-xl border border-sky-400/30 bg-white/5 px-3.5 py-2.5 text-[12px] font-semibold text-sky-50 hover:bg-white/10"
-          >
-            Add credits
-          </Link>
-          {onDismiss ? (
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="rounded-xl px-3 py-2.5 text-[12px] font-medium text-sky-200/70 hover:text-white"
-            >
-              Save for later
-            </button>
-          ) : null}
-        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={runUpgrade}
+          className="build-credits-upgrade-panel__cta mt-2.5 flex w-full min-h-10 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[12px] font-bold text-white disabled:opacity-60"
+          data-testid="upgrade-panel-primary-cta"
+        >
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-3.5 opacity-90" />}
+          {offer.ctaLabel}
+        </button>
       </div>
     </motion.div>
   );

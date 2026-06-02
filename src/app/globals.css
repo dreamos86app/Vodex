@@ -645,6 +645,135 @@ body {
   animation: none;
 }
 
+/* Intro V2 — light blue × black sky + falling stars */
+.vodex-intro-v2__sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 0%, #4a9eff 0%, #1e4a8a 28%, transparent 55%),
+    radial-gradient(ellipse 90% 70% at 80% 100%, #2563eb33 0%, transparent 50%),
+    linear-gradient(165deg, #0c1a2e 0%, #050810 42%, #020306 100%);
+}
+
+.vodex-intro-v2__stars {
+  z-index: 1;
+}
+
+.vodex-intro-v2__star {
+  position: absolute;
+  top: -8px;
+  border-radius: 50%;
+  animation: vodex-intro-star-fall linear infinite;
+  will-change: transform, opacity;
+}
+
+.vodex-intro-v2__star--white {
+  background: #fff;
+  box-shadow: 0 0 6px 1px rgb(255 255 255 / 0.55);
+}
+
+.vodex-intro-v2__star--blue {
+  background: #7dd3fc;
+  box-shadow: 0 0 8px 2px rgb(56 189 248 / 0.45);
+}
+
+@keyframes vodex-intro-star-fall {
+  0% {
+    transform: translateY(-10px) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) translateX(12px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vodex-intro-v2__star {
+    animation: none;
+    opacity: 0.35;
+  }
+}
+
+/* Build credits upgrade panel — light blue premium card */
+.build-credits-upgrade-panel {
+  background: linear-gradient(145deg, #e8f4ff 0%, #cfe9ff 38%, #b8e0ff 72%, #93c5fd 100%);
+}
+
+.build-credits-upgrade-panel__aurora {
+  background:
+    radial-gradient(ellipse 70% 55% at 20% 20%, rgb(255 255 255 / 0.55), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 85% 75%, rgb(56 189 248 / 0.35), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgb(37 99 235 / 0.2), transparent 65%);
+  animation: build-credits-aurora-drift 7s ease-in-out infinite alternate;
+}
+
+.build-credits-upgrade-panel__shimmer {
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.45) 48%,
+    transparent 62%
+  );
+  background-size: 220% 100%;
+  animation: build-credits-shimmer-sweep 3.2s ease-in-out infinite;
+}
+
+.build-credits-upgrade-panel__cta {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 45%, #1d4ed8 100%);
+  box-shadow:
+    0 4px 14px rgb(37 99 235 / 0.45),
+    0 1px 0 rgb(255 255 255 / 0.25) inset,
+    0 0 0 1px rgb(29 78 216 / 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.build-credits-upgrade-panel__cta:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    0 8px 22px rgb(37 99 235 / 0.5),
+    0 1px 0 rgb(255 255 255 / 0.3) inset,
+    0 0 0 1px rgb(29 78 216 / 0.4);
+  transform: translateY(-1px);
+}
+
+.build-credits-upgrade-panel__cta:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+@keyframes build-credits-aurora-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(4%, -3%) scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes build-credits-shimmer-sweep {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .build-credits-upgrade-panel__aurora,
+  .build-credits-upgrade-panel__shimmer {
+    animation: none;
+  }
+}
+
 .vodex-cinematic-intro--exit {
   animation: vodex-cinematic-fade-out 0.48s ease forwards;
 }

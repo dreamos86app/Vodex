@@ -589,7 +589,7 @@ export function CreationWorkspace({
             {/* Out-of-credits upgrade card */}
             {creditError && (
               <BuildCreditsUpgradePanel
-                className="mt-4 bg-[#060d1f]"
+                className="mt-4"
                 planId={planId ?? profile?.plan_id ?? "free"}
                 resetAt={resetAt}
                 onDismiss={() => setCreditError(false)}

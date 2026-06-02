@@ -4,81 +4,84 @@ import * as React from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { VodexBrandIcon } from "@/components/brand/vodex-brand-icon";
 import { INTRO_SESSION_KEY } from "@/lib/session/session-intro-decision";
+import { IntroFallingStars } from "@/components/session/intro-falling-stars";
+import { INTRO_SHOWCASE_MOCKS } from "@/components/session/intro-showcase-mocks";
 
-const INTRO_MS = 3600;
+/** 2.5s app showcase + ~1.25s brand merge/fade */
+const SHOWCASE_MS = 2500;
+const BRAND_MS = 1250;
+const INTRO_MS = SHOWCASE_MS + BRAND_MS + 250;
 
-const SHOWCASE_APPS = [
-  {
-    id: "fashion",
-    label: "Clothing store",
-    gradient: "from-rose-500 via-fuchsia-500 to-violet-600",
-    chips: ["New drops", "Cart", "Lookbook"],
-  },
-  {
-    id: "food",
-    label: "Food delivery",
-    gradient: "from-orange-500 via-amber-500 to-yellow-400",
-    chips: ["Live map", "Orders", "Promos"],
-  },
-  {
-    id: "video",
-    label: "AI video editor",
-    gradient: "from-cyan-500 via-blue-500 to-indigo-600",
-    chips: ["Timeline", "Effects", "Export"],
-  },
-  {
-    id: "finance",
-    label: "Finance app",
-    gradient: "from-emerald-500 via-teal-500 to-cyan-600",
-    chips: ["Portfolio", "Spend", "Goals"],
-  },
+/** Corner offsets from center — TL, TR, BL, BR (desktop) */
+const CORNER_DESKTOP = [
+  { x: -200, y: -148, rotate: -6 },
+  { x: 200, y: -148, rotate: 5 },
+  { x: -200, y: 148, rotate: 4 },
+  { x: 200, y: 148, rotate: -5 },
 ] as const;
 
-function ShowcaseCard({
-  app,
-  layout,
-  delay,
-  position,
+const CORNER_MOBILE = [
+  { x: -92, y: -108, rotate: -5 },
+  { x: 92, y: -108, rotate: 5 },
+  { x: -92, y: 108, rotate: 4 },
+  { x: 92, y: 108, rotate: -4 },
+] as const;
+
+function ShowcaseSquare({
+  Mock,
+  corner,
+  cardSize,
+  reducedMotion,
+  index,
 }: {
-  app: (typeof SHOWCASE_APPS)[number];
-  layout: "desktop" | "mobile";
-  delay: number;
-  position: { x: number; y: number; rotate: number; scale: number };
+  Mock: (typeof INTRO_SHOWCASE_MOCKS)[number]["Mock"];
+  corner: { x: number; y: number; rotate: number };
+  cardSize: number;
+  reducedMotion: boolean;
+  index: number;
 }) {
-  const isMobile = layout === "mobile";
+  const enterDelay = 0.08 + index * 0.06;
+  const mergeStart = SHOWCASE_MS / 1000;
+
   return (
     <motion.div
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-      initial={{ opacity: 0, scale: 0.5, rotate: position.rotate - 12, filter: "blur(10px)" }}
-      animate={{
-        opacity: [0, 1, 1, 0],
-        scale: [0.5, position.scale, position.scale * 0.92, 0.2],
-        rotate: [position.rotate - 12, position.rotate, position.rotate + 6, position.rotate + 20],
-        x: [position.x, position.x * 0.35, 0],
-        y: [position.y, position.y * 0.4, 0],
+      className="absolute left-1/2 top-1/2 z-[5] -translate-x-1/2 -translate-y-1/2 will-change-transform"
+      style={{ width: cardSize, height: cardSize }}
+      initial={
+        reducedMotion
+          ? { opacity: 0, x: corner.x, y: corner.y, scale: 0.92 }
+          : { opacity: 0, x: corner.x, y: corner.y, scale: 0.88, rotate: corner.rotate - 8 }
+      }
+      animate={
+        reducedMotion
+          ? {
+              opacity: [0, 1, 1, 0],
+              x: [corner.x, corner.x, 0],
+              y: [corner.y, corner.y, 0],
+              scale: [0.92, 1, 0.15],
+            }
+          : {
+              opacity: [0, 1, 1, 1, 0],
+              x: [corner.x, corner.x, corner.x, corner.x * 0.15, 0],
+              y: [corner.y, corner.y, corner.y, corner.y * 0.15, 0],
+              scale: [0.88, 1, 1, 1, 0.12],
+              rotate: [corner.rotate - 8, corner.rotate, corner.rotate, corner.rotate, 0],
+            }
+      }
+      transition={{
+        duration: mergeStart + 0.7,
+        delay: enterDelay,
+        times: reducedMotion
+          ? [0, 0.12, 0.75, 1]
+          : [0, 0.1, 0.55, 0.78, 1],
+        ease: [0.22, 1, 0.36, 1],
       }}
-      transition={{ duration: 1.35, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       <div
-        className={`overflow-hidden rounded-2xl bg-gradient-to-br ${app.gradient} shadow-[0_20px_60px_-20px_rgba(0,0,0,0.65)] ring-1 ring-white/20 ${
-          isMobile ? "h-[220px] w-[110px]" : "h-[148px] w-[248px]"
-        }`}
+        className="h-full w-full overflow-hidden rounded-xl shadow-[0_24px_64px_-12px_rgba(0,0,0,0.75)] ring-1 ring-white/25"
+        style={{ transform: "translateZ(0)" }}
       >
-        <div className="flex items-center justify-between border-b border-white/15 px-2.5 py-1.5">
-          <span className="text-[9px] font-semibold text-white/90">{app.label}</span>
-          <span className="size-1.5 rounded-full bg-white/80" />
-        </div>
-        <div className="space-y-1.5 p-2.5">
-          <div className="h-8 rounded-lg bg-white/15" />
-          <div className="grid grid-cols-3 gap-1">
-            {app.chips.map((c) => (
-              <div key={c} className="rounded-md bg-black/15 px-1 py-1 text-center text-[7px] text-white/85">
-                {c}
-              </div>
-            ))}
-          </div>
-          <div className="h-12 rounded-lg bg-white/10" />
-        </div>
+        <Mock />
       </div>
     </motion.div>
   );
@@ -117,7 +120,7 @@ export function VodexSessionIntro({
       visibleReported.current = true;
       onVisible?.();
     }
-    const exitAt = window.setTimeout(() => setPhase("exit"), INTRO_MS - 520);
+    const exitAt = window.setTimeout(() => setPhase("exit"), INTRO_MS - 400);
     const doneAt = window.setTimeout(finish, INTRO_MS);
     return () => {
       window.clearTimeout(exitAt);
@@ -128,78 +131,83 @@ export function VodexSessionIntro({
   if (phase === "hidden") return null;
 
   const exiting = phase === "exit";
-  const layout =
-    typeof window !== "undefined" && window.innerWidth < 768 ? "mobile" : "desktop";
-
-  const positions =
-    layout === "mobile"
-      ? [
-          { x: -70, y: -90, rotate: -8, scale: 1 },
-          { x: 72, y: -70, rotate: 10, scale: 0.95 },
-          { x: -64, y: 72, rotate: 6, scale: 0.92 },
-          { x: 70, y: 88, rotate: -10, scale: 0.9 },
-        ]
-      : [
-          { x: -280, y: -40, rotate: -10, scale: 1 },
-          { x: -90, y: -110, rotate: 6, scale: 0.95 },
-          { x: 120, y: -95, rotate: -8, scale: 0.96 },
-          { x: 290, y: -20, rotate: 12, scale: 1 },
-        ];
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const corners = isMobile ? CORNER_MOBILE : CORNER_DESKTOP;
+  const cardSize = isMobile ? 112 : 168;
+  const brandDelay = reducedMotion ? 0.15 : SHOWCASE_MS / 1000 + 0.05;
 
   return (
     <AnimatePresence>
       <motion.div
-        className={`vodex-cinematic-intro vodex-intro-v2 fixed inset-0 z-[9999] overflow-hidden bg-[#02040a] ${exiting ? "vodex-cinematic-intro--exit" : ""}`}
+        className={`vodex-cinematic-intro vodex-intro-v2 fixed inset-0 z-[9999] overflow-hidden ${exiting ? "vodex-cinematic-intro--exit" : ""}`}
         data-testid="vodex-session-intro"
         role="status"
         aria-live="polite"
         aria-label="Loading Vodex"
         initial={{ opacity: 1 }}
         animate={{ opacity: exiting ? 0 : 1 }}
-        transition={{ duration: 0.45 }}
+        transition={{ duration: 0.4 }}
       >
-        <div className="vodex-cinematic-intro__bg" aria-hidden />
+        <div className="vodex-intro-v2__sky" aria-hidden />
+        <IntroFallingStars active={!reducedMotion} />
+
         <motion.div
-          className="vodex-cinematic-intro__nebula"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.15, duration: 0.5 }}
-          aria-hidden
-        />
-        <motion.div
-          className="vodex-cinematic-intro__rays"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.55 }}
-          transition={{ delay: 0.25, duration: 0.6 }}
+          className="pointer-events-none absolute left-1/2 top-1/2 z-[4] size-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-400/20 blur-3xl"
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: [0, 0, 0.85, 0.4], scale: [0.5, 0.5, 1.6, 2] }}
+          transition={{
+            duration: BRAND_MS / 1000 + 0.3,
+            delay: brandDelay,
+            ease: "easeOut",
+          }}
           aria-hidden
         />
 
         {!reducedMotion ? (
           <div className="pointer-events-none absolute inset-0" aria-hidden>
-            {SHOWCASE_APPS.map((app, i) => (
-              <ShowcaseCard
-                key={app.id}
-                app={app}
-                layout={layout}
-                delay={0.32 + i * 0.14}
-                position={positions[i]!}
+            {INTRO_SHOWCASE_MOCKS.map(({ id, Mock }, i) => (
+              <ShowcaseSquare
+                key={id}
+                Mock={Mock}
+                corner={corners[i]!}
+                cardSize={cardSize}
+                reducedMotion={false}
+                index={i}
               />
             ))}
-            <motion.div
-              className="absolute left-1/2 top-1/2 size-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-500/25 blur-3xl"
-              initial={{ opacity: 0, scale: 0.2 }}
-              animate={{ opacity: [0, 0.9, 0.5], scale: [0.2, 1.4, 1.8] }}
-              transition={{ delay: 1.55, duration: 0.9 }}
-            />
           </div>
-        ) : null}
+        ) : (
+          <div className="pointer-events-none absolute inset-0" aria-hidden>
+            {INTRO_SHOWCASE_MOCKS.slice(0, 1).map(({ id, Mock }, i) => (
+              <ShowcaseSquare
+                key={id}
+                Mock={Mock}
+                corner={corners[0]!}
+                cardSize={cardSize}
+                reducedMotion
+                index={i}
+              />
+            ))}
+          </div>
+        )}
 
-        <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center">
+        <motion.div
+          className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: brandDelay, duration: 0.2 }}
+        >
           <motion.div
             className="vodex-cinematic-intro__icon-wrap relative flex size-24 items-center justify-center"
-            initial={{ opacity: 0, scale: 0.4 }}
+            initial={{ opacity: 0, scale: 0.35 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: reducedMotion ? 0.1 : 1.85, duration: 0.55, type: "spring" }}
+            transition={{
+              delay: brandDelay,
+              duration: 0.55,
+              type: "spring",
+              stiffness: 260,
+              damping: 22,
+            }}
           >
             <VodexBrandIcon size="xl" alt="" className="vodex-cinematic-intro__icon relative size-20" />
           </motion.div>
@@ -209,23 +217,27 @@ export function VodexSessionIntro({
               <motion.span
                 key={ch + i}
                 className="vodex-cinematic-intro__letter text-2xl font-semibold tracking-[0.22em] text-white"
-                initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ delay: (reducedMotion ? 0.2 : 2.1) + i * 0.06, duration: 0.4 }}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  delay: brandDelay + 0.12 + i * 0.05,
+                  duration: 0.38,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
               >
                 {ch}
               </motion.span>
             ))}
           </div>
           <motion.p
-            className="vodex-cinematic-intro__tagline mt-3 text-[13px] font-medium tracking-wide text-white/75"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: reducedMotion ? 0.35 : 2.45, duration: 0.45 }}
+            className="vodex-cinematic-intro__tagline mt-3 text-[13px] font-medium tracking-wide text-sky-100/85"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: brandDelay + 0.45, duration: 0.4 }}
           >
             Preparing your workspace
           </motion.p>
-        </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );
