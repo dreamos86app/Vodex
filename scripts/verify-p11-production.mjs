@@ -275,13 +275,14 @@ const suites = {
   },
   "platform-announcement-banner": () => {
     const errors = [];
-    must(read("src/components/platform/platform-incident-banner.tsx"), "platform-incident-banner", "banner", errors);
-    must(read("src/components/layout/platform-shell.tsx"), "PlatformIncidentBanner", "banner wired", errors);
+    must(read("src/components/platform/platform-announcement-banners.tsx"), "platform-incident-banner", "banner", errors);
+    must(read("src/components/layout/platform-shell.tsx"), "PlatformAnnouncementBanners", "banner wired", errors);
     return errors;
   },
   "admin-status-management": () => {
     const errors = [];
     must(read("src/components/admin/admin-system-status-panel.tsx"), "Publish banner", "admin publish", errors);
+    must(read("src/app/api/admin/status/overview/route.ts"), "schemaReady", "admin overview", errors);
     must(read("src/app/api/admin/status/announcements/publish/route.ts"), "platform_announcements", "publish api", errors);
     must(read("src/app/api/admin/status/components/update/route.ts"), "requireDreamosOwner", "owner gate", errors);
     must(read("src/app/api/admin/status/incidents/create/route.ts"), "status_incidents", "incident create", errors);
@@ -297,6 +298,40 @@ const suites = {
     const errors = [];
     must(read("supabase/migrations/20260720120000_platform_status.sql"), "enable row level security", "rls", errors);
     must(read("src/app/api/admin/status/incidents/resolve/route.ts"), "requireDreamosOwner", "owner resolve", errors);
+    return errors;
+  },
+  "platform-announcements-table": () => {
+    const errors = [];
+    must(read("supabase/migrations/20260720120000_platform_status.sql"), "platform_announcements", "table migration", errors);
+    must(read("supabase/migrations/20260721120000_platform_status_p16.sql"), "notify pgrst", "schema reload", errors);
+    must(read("src/lib/status/status-db.ts"), "isStatusSchemaMissingError", "schema guard", errors);
+    return errors;
+  },
+  "multiple-platform-announcements": () => {
+    const errors = [];
+    must(read("src/components/platform/platform-announcement-banners.tsx"), "active-announcements", "multi fetch", errors);
+    must(read("src/app/api/admin/status/announcements/publish/route.ts"), "deactivateOthers", "multi publish", errors);
+    must(read("src/app/api/admin/status/announcements/toggle/route.ts"), "isActive", "toggle api", errors);
+    return errors;
+  },
+  "footer-important-links": () => {
+    const errors = [];
+    must(read("src/components/layout/vodex-important-links-footer.tsx"), "vodex-important-links-footer", "footer", errors);
+    must(read("src/components/layout/platform-shell.tsx"), "VodexImportantLinksFooter", "footer wired", errors);
+    must(read("src/components/layout/vodex-important-links-footer.tsx"), "discord.gg/y8EbeMc9Mb", "discord link", errors);
+    return errors;
+  },
+  "discord-community-card": () => {
+    const errors = [];
+    must(read("src/components/community/vodex-discord-community-card.tsx"), "Join the Vodex community", "discord card", errors);
+    must(read("src/components/community/community-view.tsx"), "VodexDiscordCommunityCard", "community wired", errors);
+    return errors;
+  },
+  "intro-mobile-image-sizing": () => {
+    const errors = [];
+    must(read("src/components/session/intro/CinematicAppPanel.tsx"), "aspect-square", "mobile square", errors);
+    must(read("src/components/session/intro/intro-apps.ts"), 'y: "-24%"', "2x2 cluster", errors);
+    must(read("src/components/session/intro/IntroReferenceImage.tsx"), "object-contain", "mobile contain", errors);
     return errors;
   },
   "no-generic-credit-toast": () => {

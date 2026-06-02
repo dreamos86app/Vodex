@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { variants } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { VodexDiscordCommunityCard } from "@/components/community/vodex-discord-community-card";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import type { Discussion } from "@/lib/supabase/types";
@@ -972,6 +973,16 @@ export function CommunityView() {
             {t}
           </button>
         ))}
+      </motion.div>
+
+      <motion.div
+        variants={variants.fadeUp}
+        initial="hidden"
+        animate="show"
+        transition={{ delay: 0.08 }}
+        className="relative mt-6"
+      >
+        <VodexDiscordCommunityCard />
       </motion.div>
 
       {/* Trending tab */}

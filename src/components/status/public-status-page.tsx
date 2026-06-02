@@ -12,6 +12,7 @@ type Payload = {
     key: string;
     name: string;
     group_name: string;
+    description: string | null;
     current_status: StatusLevel;
     uptimePercent: number;
     history: Array<{ date: string; status: StatusLevel; uptime_percent: number }>;
@@ -35,13 +36,37 @@ const STATUS_COLOR: Record<StatusLevel, string> = {
   maintenance: "bg-sky-400",
 };
 
-function StatusSquare({ status }: { status: StatusLevel }) {
+const GROUP_ORDER = [
+  "Core Platform",
+  "Builder",
+  "Infrastructure",
+  "Billing",
+  "Communications",
+  "AI Services",
+  "Functionalities",
+  "Services",
+  "Other",
+];
+
+function StatusSquare({
+  status,
+  date,
+}: {
+  status: StatusLevel;
+  date: string;
+}) {
+  const label = `${date} · ${status.replace(/_/g, " ")}`;
   return (
     <span
-      className={cn("inline-block size-2.5 rounded-[3px]", STATUS_COLOR[status])}
-      title={status}
+      className={cn("inline-block size-2.5 rounded-[3px] ring-1 ring-black/5", STATUS_COLOR[status])}
+      title={label}
+      aria-label={label}
     />
   );
+}
+
+function formatStatusLabel(s: StatusLevel) {
+  return s.replace(/_/g, " ");
 }
 
 export function PublicStatusPage() {
@@ -59,7 +84,8 @@ export function PublicStatusPage() {
   }, []);
 
   const operational =
-    data?.overallStatus === "operational" && (data?.incidents.filter((i) => !i.resolved_at).length ?? 0) === 0;
+    data?.overallStatus === "operational" &&
+    (data?.incidents.filter((i) => !i.resolved_at).length ?? 0) === 0;
 
   const groups = React.useMemo(() => {
     if (!data) return [];
@@ -69,15 +95,25 @@ export function PublicStatusPage() {
       if (!map.has(g)) map.set(g, []);
       map.get(g)!.push(c);
     }
-    return [...map.entries()];
+    const ordered: Array<[string, Payload["components"]]> = [];
+    for (const name of GROUP_ORDER) {
+      if (map.has(name)) {
+        ordered.push([name, map.get(name)!]);
+        map.delete(name);
+      }
+    }
+    for (const [name, items] of map) ordered.push([name, items]);
+    return ordered;
   }, [data]);
+
+  const historyLabels = data?.components[0]?.history;
 
   return (
     <div className="min-h-screen bg-[#faf9f7] text-foreground">
       <header className="border-b border-border/60 bg-white/80 px-6 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between">
           <Link href="https://vodex.dev" className="text-[15px] font-bold tracking-tight">
-            Vodex <span className="text-muted-foreground font-normal">| Status</span>
+            Vodex <span className="font-normal text-muted-foreground">| Status</span>
           </Link>
           <a
             href="mailto:support@vodex.dev"
@@ -99,21 +135,38 @@ export function PublicStatusPage() {
                 "rounded-2xl border px-6 py-8 text-center",
                 operational
                   ? "border-emerald-200 bg-emerald-50"
-                  : "border-rose-200 bg-rose-50",
+                  : data.overallStatus === "degraded" || data.overallStatus === "maintenance"
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-rose-200 bg-rose-50",
               )}
             >
               <p
                 className={cn(
                   "text-2xl font-semibold",
-                  operational ? "text-emerald-800" : "text-rose-800",
+                  operational
+                    ? "text-emerald-800"
+                    : data.overallStatus === "degraded" || data.overallStatus === "maintenance"
+                      ? "text-amber-900"
+                      : "text-rose-800",
                 )}
               >
-                {operational ? "Everything is operational" : "Something's not quite right"}
+                {operational
+                  ? "Everything is operational"
+                  : data.overallStatus === "degraded"
+                    ? "Some systems are degraded"
+                    : "Something's not quite right"}
               </p>
               <p className="mt-2 text-[13px] text-muted-foreground">
-                30-day history · updated {new Date().toLocaleString()}
+                Last 30 days · updated {new Date().toLocaleString()}
               </p>
             </div>
+
+            {historyLabels ? (
+              <p className="mt-6 flex justify-between text-[10px] text-muted-foreground">
+                <span>30 days ago</span>
+                <span>Today</span>
+              </p>
+            ) : null}
 
             {groups.map(([group, items]) => (
               <section key={group} className="mt-10">
@@ -126,17 +179,22 @@ export function PublicStatusPage() {
                       key={c.id}
                       className="rounded-xl border border-border bg-white p-4 shadow-sm"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
                           <p className="font-semibold">{c.name}</p>
-                          <p className="text-[11px] capitalize text-muted-foreground">
-                            {c.current_status.replace(/_/g, " ")} · {c.uptimePercent}% uptime
+                          {c.description ? (
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">{c.description}</p>
+                          ) : null}
+                          <p className="mt-1 text-[11px] capitalize text-muted-foreground">
+                            {formatStatusLabel(c.current_status)} · {c.uptimePercent}% uptime
                           </p>
                         </div>
-                        <div className="flex gap-0.5">
-                          {c.history.map((d) => (
-                            <StatusSquare key={d.date} status={d.status} />
-                          ))}
+                        <div className="shrink-0">
+                          <div className="flex gap-0.5">
+                            {c.history.map((d) => (
+                              <StatusSquare key={d.date} status={d.status} date={d.date} />
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -156,7 +214,9 @@ export function PublicStatusPage() {
                       <p className="font-semibold">{inc.title}</p>
                       <p className="mt-1 text-[12px] text-muted-foreground">
                         {inc.status} · {new Date(inc.started_at).toLocaleString()}
-                        {inc.resolved_at ? ` · resolved ${new Date(inc.resolved_at).toLocaleString()}` : ""}
+                        {inc.resolved_at
+                          ? ` · resolved ${new Date(inc.resolved_at).toLocaleString()}`
+                          : ""}
                       </p>
                       <p className="mt-2 text-[13px]">{inc.message}</p>
                     </li>

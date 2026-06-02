@@ -30,9 +30,9 @@ export function IntroReferenceImage({
         quality={100}
         sizes={`${pixelSize}px`}
         onLoad={() => setReady(true)}
-        className={`object-cover object-top brightness-[1.02] contrast-[1.03] transition-opacity duration-150 ${
-          ready ? "opacity-100" : "opacity-0"
-        }`}
+        className={`brightness-[1.02] contrast-[1.03] transition-opacity duration-150 ${
+          layout === "mobile" ? "object-contain object-center" : "object-cover object-top"
+        } ${ready ? "opacity-100" : "opacity-0"}`}
         data-intro-reference-image={panelId}
       />
       {!ready ? (

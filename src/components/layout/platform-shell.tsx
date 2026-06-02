@@ -11,7 +11,8 @@ import {
 } from "@/components/layout/deferred-shell-chrome";
 import { AdminDiagnosticsDrawer } from "@/components/dev/admin-diagnostics-drawer";
 import { DiagnosticsBootstrap } from "@/components/dev/diagnostics-bootstrap";
-import { PlatformIncidentBanner } from "@/components/platform/platform-incident-banner";
+import { PlatformAnnouncementBanners } from "@/components/platform/platform-announcement-banners";
+import { VodexImportantLinksFooter } from "@/components/layout/vodex-important-links-footer";
 import { cn } from "@/lib/utils";
 
 const pageMeta: Record<string, { title: string; subtitle?: string }> = {
@@ -242,7 +243,7 @@ export function PlatformShell({
 
       {/* Right column: topbar + scrollable content */}
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden">
-        <PlatformIncidentBanner />
+        <PlatformAnnouncementBanners />
         <DeferredTopBar
           mode={isCreateHome ? "create" : "standard"}
           title={meta.title}
@@ -281,6 +282,9 @@ export function PlatformShell({
             }
           >
             {children}
+            {!isFullBleed && !isOnboarding && pathname !== "/admin" && (
+              <VodexImportantLinksFooter className="-mx-[var(--page-padding-x)] -mb-[var(--page-padding-y)] mt-10 w-[calc(100%+2*var(--page-padding-x))]" />
+            )}
           </div>
         </main>
       </div>

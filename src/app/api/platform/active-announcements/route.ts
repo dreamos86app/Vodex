@@ -4,11 +4,10 @@ import { fetchPublicStatusPayload } from "@/lib/status/status-public";
 export async function GET() {
   const payload = await fetchPublicStatusPayload();
   if (!payload.ok) {
-    return NextResponse.json({ announcement: null, announcements: [] });
+    return NextResponse.json({ announcements: [], schemaReady: false });
   }
-  const list = payload.activeAnnouncements ?? [];
   return NextResponse.json({
-    announcement: payload.activeAnnouncement ?? list[0] ?? null,
-    announcements: list,
+    announcements: payload.activeAnnouncements ?? [],
+    schemaReady: payload.schemaReady ?? true,
   });
 }

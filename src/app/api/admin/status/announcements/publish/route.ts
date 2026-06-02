@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireDreamosOwner } from "@/lib/admin/require-owner";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { getBannerTemplate } from "@/lib/status/announcement-templates";
+import { isStatusSchemaMissingError, STATUS_SCHEMA_INSTALL_HINT } from "@/lib/status/status-db";
 
 export async function POST(request: Request) {
   const owner = await requireDreamosOwner();
@@ -15,40 +17,19 @@ export async function POST(request: Request) {
     title?: string;
     message?: string;
     severity?: string;
+    bannerType?: string;
     linkLabel?: string;
     linkUrl?: string;
     template?: string;
+    priority?: number;
+    gradientFrom?: string;
+    gradientTo?: string;
+    textColor?: string;
+    iconType?: string;
+    deactivateOthers?: boolean;
   };
 
-  const templates: Record<string, { title: string; message: string }> = {
-    builder_degraded: {
-      title: "Technical issue affecting app generation",
-      message:
-        "We're aware of an issue affecting the builder. Some generations may fail or take longer than usual. We're working to resolve it as quickly as possible.",
-    },
-    platform_issue: {
-      title: "Some Vodex services are affected",
-      message:
-        "We're aware of a technical issue affecting some services. We're actively investigating and will post updates on the status page.",
-    },
-    maintenance: {
-      title: "Scheduled maintenance in progress",
-      message:
-        "Vodex is undergoing scheduled maintenance. Some features may be temporarily unavailable.",
-    },
-    billing_issue: {
-      title: "Billing service interruption",
-      message:
-        "Checkout or subscription management may be temporarily unavailable. Existing apps and data are not affected.",
-    },
-    preview_issue: {
-      title: "Preview rendering issue",
-      message:
-        "Some generated app previews may not load correctly. Builds are saved and can be repaired once service is restored.",
-    },
-  };
-
-  const tpl = body.template ? templates[body.template] : null;
+  const tpl = body.template ? getBannerTemplate(body.template) : null;
   const title = body.title?.trim() || tpl?.title;
   const message = body.message?.trim() || tpl?.message;
   if (!title || !message) {
@@ -57,16 +38,25 @@ export async function POST(request: Request) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = admin as any;
-  await db.from("platform_announcements").update({ is_active: false }).eq("is_active", true);
+
+  if (body.deactivateOthers) {
+    await db.from("platform_announcements").update({ is_active: false }).eq("is_active", true);
+  }
 
   const { data, error } = await db
     .from("platform_announcements")
     .insert({
       title,
       message,
-      severity: body.severity ?? "incident",
-      link_label: body.linkLabel ?? "Status Page",
-      link_url: body.linkUrl ?? "https://status.vodex.dev",
+      severity: body.severity ?? tpl?.severity ?? "incident",
+      banner_type: body.bannerType ?? tpl?.bannerType ?? "incident",
+      link_label: body.linkLabel ?? tpl?.linkLabel ?? "Status Page",
+      link_url: body.linkUrl ?? tpl?.linkUrl ?? "https://status.vodex.dev",
+      gradient_from: body.gradientFrom ?? tpl?.gradientFrom ?? "#DC2626",
+      gradient_to: body.gradientTo ?? tpl?.gradientTo ?? "#EF4444",
+      text_color: body.textColor ?? tpl?.textColor ?? "#ffffff",
+      icon_type: body.iconType ?? tpl?.iconType ?? "alert",
+      priority: body.priority ?? tpl?.priority ?? 100,
       is_active: true,
       starts_at: new Date().toISOString(),
       created_by: owner.user.id,
@@ -75,6 +65,9 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    if (isStatusSchemaMissingError(error)) {
+      return NextResponse.json({ error: STATUS_SCHEMA_INSTALL_HINT }, { status: 503 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

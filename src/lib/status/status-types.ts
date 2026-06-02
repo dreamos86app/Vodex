@@ -7,7 +7,16 @@ export type StatusLevel =
 
 export type IncidentStatus = "investigating" | "identified" | "monitoring" | "resolved";
 
-export type AnnouncementSeverity = "info" | "warning" | "incident" | "maintenance" | "outage";
+export type AnnouncementSeverity =
+  | "info"
+  | "warning"
+  | "incident"
+  | "maintenance"
+  | "outage"
+  | "sale"
+  | "success";
+
+export type BannerType = "incident" | "sale" | "maintenance" | "info" | "success" | "warning";
 
 export type StatusComponentRow = {
   id: string;
@@ -43,4 +52,11 @@ export type PlatformAnnouncementRow = {
   severity: AnnouncementSeverity;
   link_label: string | null;
   link_url: string | null;
+  priority?: number;
+  banner_type?: BannerType;
+  gradient_from?: string | null;
+  gradient_to?: string | null;
+  text_color?: string | null;
+  icon_type?: string | null;
+  is_active?: boolean;
 };

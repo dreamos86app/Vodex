@@ -3,9 +3,15 @@ import { requireDreamosOwner } from "@/lib/admin/require-owner";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { isStatusSchemaMissingError, STATUS_SCHEMA_INSTALL_HINT } from "@/lib/status/status-db";
 
-export async function GET() {
+export async function POST(request: Request) {
   const owner = await requireDreamosOwner();
   if (owner.error) return owner.error;
+
+  const body = (await request.json()) as { id?: string; isActive?: boolean };
+  const id = body.id?.trim();
+  if (!id || typeof body.isActive !== "boolean") {
+    return NextResponse.json({ error: "id and isActive required" }, { status: 400 });
+  }
 
   const admin = createServiceRoleClient();
   if (!admin) {
@@ -14,20 +20,17 @@ export async function GET() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = admin as any;
-  const { data, error } = await db
+  const { error } = await db
     .from("platform_announcements")
-    .select(
-      "id,title,message,severity,banner_type,is_active,priority,starts_at,ends_at,gradient_from,gradient_to,created_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(20);
+    .update({ is_active: body.isActive, updated_at: new Date().toISOString() })
+    .eq("id", id);
 
   if (error) {
     if (isStatusSchemaMissingError(error)) {
-      return NextResponse.json({ error: STATUS_SCHEMA_INSTALL_HINT, schemaReady: false }, { status: 503 });
+      return NextResponse.json({ error: STATUS_SCHEMA_INSTALL_HINT }, { status: 503 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ announcements: data ?? [] });
+  return NextResponse.json({ ok: true });
 }
