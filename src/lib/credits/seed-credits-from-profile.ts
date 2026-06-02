@@ -47,5 +47,7 @@ export function seedCreditsFromProfile(profile: Partial<Profile>): void {
     build: bucketFromProfile(buildAvailable, buildAllowance, resetDate),
     action: bucketFromProfile(actionAllowance, actionAllowance, resetDate),
   };
-  useCreditsStore.getState().applyProfileSeed(payload);
+  const state = useCreditsStore.getState();
+  if (state.isConfirmed) return;
+  useCreditsStore.getState().applyInstantCredits(payload);
 }

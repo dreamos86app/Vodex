@@ -26,7 +26,11 @@ import {
   invalidateBootstrapCache,
   setCachedBootstrap,
 } from "@/lib/cache/session-bootstrap-cache";
-import { runCreditsBootstrap, resetCreditsBootstrap } from "@/lib/credits/credits-bootstrap";
+import { resetCreditsBootstrap } from "@/lib/credits/credits-bootstrap";
+import {
+  beginSessionCreditsWarmup,
+  resetSessionCreditsWarmup,
+} from "@/lib/credits/session-credits-warmup";
 import {
   loadUserProfileCoreDeduped,
 } from "@/lib/supabase/load-user-profile";
@@ -65,7 +69,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (lightweightPublic) return;
     if (!profileId) return;
-    runCreditsBootstrap(profileId, profile);
+    beginSessionCreditsWarmup(profileId, profile);
   }, [lightweightPublic, profileId, profilePlanId, profileCreditsRemaining]);
 
   React.useEffect(() => {
@@ -73,7 +77,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const state = useAuthStore.getState();
       if (state.profile?.id) {
         state.setLoading(false);
-        runCreditsBootstrap(state.profile.id, state.profile);
+        beginSessionCreditsWarmup(state.profile.id, state.profile);
       }
     });
     return installChunkLoadRecovery();
@@ -135,7 +139,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const current = useAuthStore.getState().profile;
         const merged = mergeProfileOnboardingStatus(current, cached.profile) as Profile;
         setProfile(merged);
-        runCreditsBootstrap(userId, merged);
+        beginSessionCreditsWarmup(userId, merged);
         setLoading(false);
       }
       if (cached?.notifications.length) {
@@ -167,7 +171,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const current = useAuthStore.getState().profile;
         const profile = mergeProfileOnboardingStatus(current, coreProfile) as Profile;
         setProfile(profile);
-        runCreditsBootstrap(userId, profile);
+        beginSessionCreditsWarmup(userId, profile);
         setCachedBootstrap(userId, {
           profile,
           notifications: cached?.notifications ?? [],
@@ -286,6 +290,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (persisted && persisted.id !== liveUser.id) {
           setProfile(null);
         }
+        beginSessionCreditsWarmup(liveUser.id, useAuthStore.getState().profile);
         setLoading(false);
         void bootstrapUser(liveUser.id).then((dispose) => {
           disposeRealtime = dispose;
@@ -314,6 +319,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (event === "SIGNED_IN" && session?.user) {
         disposeRealtime?.();
+        beginSessionCreditsWarmup(session.user.id, useAuthStore.getState().profile);
         setLoading(false);
         void bootstrapUser(session.user.id).then((dispose) => {
           disposeRealtime = dispose;
@@ -341,6 +347,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         resetAuth();
         resetCredits();
         resetCreditsBootstrap();
+        resetSessionCreditsWarmup();
         resetNotifications();
         if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
           router.push("/auth/login");

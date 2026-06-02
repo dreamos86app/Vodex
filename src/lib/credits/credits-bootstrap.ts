@@ -1,10 +1,7 @@
 /**
- * Single entry for credits hydration — prevents duplicate /api/credits on mount.
+ * Credits lite TTL + dedupe helpers (warmup orchestration in session-credits-warmup.ts).
  */
-import type { Profile } from "@/lib/supabase/types";
-import { seedCreditsFromProfile } from "@/lib/credits/seed-credits-from-profile";
-import { markCreditsFirstPaint } from "@/lib/credits/credits-local-cache";
-import { hydrateCreditsFromLocalCache, useCreditsStore } from "@/lib/stores/credits-store";
+import { useCreditsStore } from "@/lib/stores/credits-store";
 
 export const CREDITS_LITE_TTL_MS = 25_000;
 
@@ -27,7 +24,7 @@ export function shouldSkipLiteCreditsFetch(userId: string): boolean {
   if (state.isConfirmed && state.lastSyncedAt && Date.now() - state.lastSyncedAt < CREDITS_LITE_TTL_MS) {
     return true;
   }
-  if (Date.now() - lastLiteFetchAt < CREDITS_LITE_TTL_MS && bootstrapCompletedForUser === userId) {
+  if (Date.now() - lastLiteFetchAt < 3_000 && bootstrapCompletedForUser === userId) {
     duplicateFetchBlocked += 1;
     logCreditsDev("credits_duplicate_fetch_blocked", { userId, count: duplicateFetchBlocked });
     return true;
@@ -38,50 +35,6 @@ export function shouldSkipLiteCreditsFetch(userId: string): boolean {
 export function markLiteCreditsFetched(userId: string): void {
   lastLiteFetchAt = Date.now();
   bootstrapCompletedForUser = userId;
-}
-
-/** Run once per session user — profile + cache first, then single lite fetch. */
-export function runCreditsBootstrap(userId: string, profile?: Partial<Profile> | null): void {
-  if (!userId) return;
-
-  hydrateCreditsFromLocalCache(userId);
-  if (profile?.id) {
-    seedCreditsFromProfile(profile as Profile);
-    markCreditsFirstPaint(userId);
-  }
-
-  if (shouldSkipLiteCreditsFetch(userId)) {
-    const s = useCreditsStore.getState();
-    if (s.syncing && (s.build.available > 0 || s.action.available > 0)) {
-      useCreditsStore.setState({ syncing: false, loading: false });
-    }
-    return;
-  }
-
-  if (bootstrapCompletedForUser === userId && useCreditsStore.getState().isConfirmed) {
-    return;
-  }
-
-  bootstrapCompletedForUser = userId;
-  const syncClearTimer = setTimeout(() => {
-    const s = useCreditsStore.getState();
-    if (!s.isConfirmed && s.syncing) {
-      useCreditsStore.setState({ syncing: false, loading: false });
-    }
-  }, 1200);
-
-  void useCreditsStore.getState().syncFromDB({ reason: "bootstrap" }).then((payload) => {
-    clearTimeout(syncClearTimer);
-    if (payload) markLiteCreditsFetched(userId);
-    else {
-      const s = useCreditsStore.getState();
-      if (s.build.available > 0 || s.action.available > 0 || s.lastSyncedAt) {
-        useCreditsStore.setState({ syncing: false, loading: false, isConfirmed: Boolean(s.lastSyncedAt) });
-      } else {
-        useCreditsStore.setState({ syncing: false, loading: false });
-      }
-    }
-  });
 }
 
 export function resetCreditsBootstrap(): void {

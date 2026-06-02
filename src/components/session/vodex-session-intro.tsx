@@ -5,7 +5,6 @@ import { VodexBrandIcon } from "@/components/brand/vodex-brand-icon";
 
 const INTRO_KEY = "vodex_intro_seen_session";
 const MAX_MS = 2400;
-const SLOW_BOOT_MS = 3000;
 
 export function VodexSessionIntro({
   show,
@@ -37,11 +36,7 @@ export function VodexSessionIntro({
     setVisible(true);
     doneRef.current = false;
     const t = window.setTimeout(finish, MAX_MS);
-    const slow = window.setTimeout(finish, SLOW_BOOT_MS);
-    return () => {
-      window.clearTimeout(t);
-      window.clearTimeout(slow);
-    };
+    return () => window.clearTimeout(t);
   }, [show, finish]);
 
   if (!visible) return null;

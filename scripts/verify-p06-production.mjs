@@ -29,19 +29,23 @@ function countLabelsInPool() {
 const suites = {
   "credits-instant-and-deduped": () => {
     const errors = [];
+    const warmup = read("src/lib/credits/session-credits-warmup.ts");
     const bootstrap = read("src/lib/credits/credits-bootstrap.ts");
     const store = read("src/lib/stores/credits-store.ts");
     const provider = read("src/components/providers/app-provider.tsx");
-    must(bootstrap, "runCreditsBootstrap", "credits bootstrap controller", errors);
+    must(warmup, "beginSessionCreditsWarmup", "session credits warmup", errors);
+    must(warmup, "SESSION_CREDITS_LITE_TIMEOUT_MS", "intro-length lite timeout", errors);
+    must(bootstrap, "shouldSkipLiteCreditsFetch", "lite dedupe", errors);
     must(bootstrap, "shouldSkipLiteCreditsFetch", "lite dedupe", errors);
     must(bootstrap, "credits_duplicate_fetch_blocked", "duplicate fetch log", errors);
     must(store, "/api/credits?lite=1", "lite endpoint", errors);
     must(store, "inFlightRequest", "in-flight guard", errors);
-    must(store, "applyCanonical(cached)", "cache instant paint", errors);
+    must(store, "applyInstantCredits", "instant credit display", errors);
+    must(store, "liteTimeoutMs", "configurable lite timeout", errors);
     if (!store.includes(".applyCanonical(cached)")) {
       errors.push("hydrateCreditsFromLocalCache must applyCanonical for instant paint");
     }
-    must(provider, "runCreditsBootstrap", "provider uses bootstrap", errors);
+    must(provider, "beginSessionCreditsWarmup", "provider uses session warmup", errors);
     if (!provider.includes("profileCreditsRemaining")) {
       errors.push("provider credits effect must not depend on whole profile object");
     }
@@ -50,8 +54,12 @@ const suites = {
   "session-intro-preload": () => {
     const errors = [];
     must(read("src/components/session/vodex-session-intro.tsx"), "vodex_intro_seen_session", "session flag", errors);
-    must(read("src/components/session/vodex-session-intro-gate.tsx"), "VodexSessionIntroGate", "intro gate", errors);
-    must(read("src/lib/bootstrap/session-preload.ts"), "runSessionPreload", "preload runner", errors);
+    const gate = read("src/components/session/vodex-session-intro-gate.tsx");
+    must(gate, "VodexSessionIntroGate", "intro gate", errors);
+    must(gate, "useLayoutEffect", "intro before paint", errors);
+    must(gate, 'phase === "intro"', "intro phase", errors);
+    must(gate, "invisible fixed inset-0", "app preloads behind intro", errors);
+    must(read("src/lib/bootstrap/session-preload.ts"), "beginSessionCreditsWarmup", "preload starts credits", errors);
     must(read("src/components/providers/app-chrome-providers.tsx"), "VodexSessionIntroGate", "intro wired in chrome", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), "2400", "max intro duration", errors);
     return errors;

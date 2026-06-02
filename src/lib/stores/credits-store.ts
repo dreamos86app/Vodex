@@ -37,6 +37,8 @@ export type CreditSyncReason =
 export type CreditSyncOptions = {
   force?: boolean;
   reason?: CreditSyncReason;
+  /** Override abort timeout for /api/credits?lite=1 (bootstrap uses intro duration). */
+  liteTimeoutMs?: number;
 };
 
 const EMPTY_BUCKET: CanonicalCreditBucket = {
@@ -64,6 +66,8 @@ interface CreditsState {
   applyCanonical: (payload: CanonicalCreditsPayload) => void;
   /** Profile/bootstrap instant values — confirmed after /api/credits?lite=1. */
   applyProfileSeed: (payload: CanonicalCreditsPayload) => void;
+  /** Instant balances for display — no “Syncing…” badge; lite fetch sets isConfirmed. */
+  applyInstantCredits: (payload: CanonicalCreditsPayload) => void;
   /** @deprecated use applyProfileSeed */
   applyProfileHint: (payload: CanonicalCreditsPayload) => void;
   syncFromDB: (options?: CreditSyncOptions) => Promise<CanonicalCreditsPayload | null>;
@@ -152,13 +156,18 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
 
   /** Instant display from profile/bootstrap — refined by /api/credits?lite=1. */
   applyProfileSeed: (payload) => {
+    get().applyInstantCredits(payload);
+    set({ syncing: true });
+  },
+
+  applyInstantCredits: (payload) => {
     set(
       withLegacyFields({
         build: payload.build,
         action: payload.action,
         planId: payload.planId,
         loading: false,
-        syncing: true,
+        syncing: false,
         error: null,
         lastSyncedAt: Date.now(),
         isConfirmed: false,
@@ -168,7 +177,8 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
 
   /** Plan-only hint from profile — never overwrites confirmed credit balances. */
   applyProfileHint: (payload) => {
-    get().applyProfileSeed(payload);
+    if (get().isConfirmed) return;
+    get().applyInstantCredits(payload);
   },
 
   deductOptimistic: (amount) =>
@@ -192,6 +202,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
   syncFromDB: async (options) => {
     const force = options?.force ?? false;
     const reason = options?.reason;
+    const liteTimeoutMs = options?.liteTimeoutMs ?? 1_000;
     const { lastSyncedAt, loading, isConfirmed } = get();
     const userId =
       typeof window !== "undefined" ? sessionStorage.getItem("vodex:last-user-id") : null;
@@ -203,11 +214,13 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
       shouldSkipLiteCreditsFetch(userId)
     ) {
       const s = get();
-      return {
-        build: s.build,
-        action: s.action,
-        planId: normalizePlanId(s.planId) as CanonicalCreditsPayload["planId"],
-      };
+      if (s.isConfirmed) {
+        return {
+          build: s.build,
+          action: s.action,
+          planId: normalizePlanId(s.planId) as CanonicalCreditsPayload["planId"],
+        };
+      }
     }
 
     if (!force && isConfirmed && lastSyncedAt && Date.now() - lastSyncedAt < CREDITS_STALE_MS) {
@@ -225,21 +238,22 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
     }
 
     const hadDisplay =
-      isConfirmed || get().build.available > 0 || get().action.available > 0 || get().syncing;
+      isConfirmed ||
+      get().build.available > 0 ||
+      get().action.available > 0 ||
+      get().lastSyncedAt != null;
     if (!hadDisplay) {
       set({ loading: true, error: null, syncing: false });
-    } else {
-      set({ syncing: true, error: null });
     }
 
     const loadStartedAt = Date.now();
-    const slowSyncTimer = setTimeout(() => {
-      if (!get().isConfirmed) set({ syncing: true, loading: false });
-    }, 1000);
 
     inFlightRequest = (async () => {
       const controller = new AbortController();
-      let abortTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort(), 1000);
+      let abortTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(
+        () => controller.abort(),
+        liteTimeoutMs,
+      );
       try {
         const res = await fetch("/api/credits?lite=1", {
           credentials: "include",
@@ -285,9 +299,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
         if (uid) saveCreditsLocalCache(uid, payload);
         dispatchCreditUpdated(payload);
         if (userId) markLiteCreditsFetched(userId);
-        if (process.env.NODE_ENV !== "development") {
-          /* noop */
-        } else {
+        if (process.env.NODE_ENV === "development") {
           console.info(`[credits] credits_lite_ms=${Math.round(Date.now() - loadStartedAt)}`);
         }
         logCreditSync(reason, "fetched ok");
@@ -299,17 +311,17 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
           : err instanceof Error
             ? err.message
             : "Credit sync failed";
+        const s = get();
         set({
           loading: false,
           syncing: false,
-          isConfirmed: hadDisplay || aborted,
+          isConfirmed: s.isConfirmed || (hadDisplay && aborted),
           error: hadDisplay || aborted ? null : msg,
         });
         logCreditSync(reason, `error — ${msg}`);
         return null;
       } finally {
         if (abortTimer) clearTimeout(abortTimer);
-        clearTimeout(slowSyncTimer);
         inFlightRequest = null;
       }
     })();
