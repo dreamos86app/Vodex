@@ -3,7 +3,7 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import { VodexBrandIcon } from "@/components/brand/vodex-brand-icon";
-import { PREMIUM_EASE } from "@/components/session/intro/intro-constants";
+import { LOGO_TAGLINE_END_S, PREMIUM_EASE } from "@/components/session/intro/intro-constants";
 
 export function IntroLogoReveal({
   visible,
@@ -16,16 +16,28 @@ export function IntroLogoReveal({
 }) {
   const delay = reducedMotion ? 0.08 : 0.05;
   const completeRef = React.useRef(false);
+  const onCompleteRef = React.useRef(onRevealComplete);
+  onCompleteRef.current = onRevealComplete;
+
+  React.useEffect(() => {
+    completeRef.current = false;
+  }, [visible]);
 
   React.useEffect(() => {
     if (!visible || completeRef.current) return;
-    const ms = reducedMotion ? 900 : 1300;
+
+    const animMs = reducedMotion
+      ? 700
+      : Math.ceil((delay + LOGO_TAGLINE_END_S) * 1000);
+
     const t = window.setTimeout(() => {
+      if (completeRef.current) return;
       completeRef.current = true;
-      onRevealComplete?.();
-    }, ms);
+      onCompleteRef.current?.();
+    }, animMs);
+
     return () => window.clearTimeout(t);
-  }, [visible, reducedMotion, onRevealComplete]);
+  }, [visible, reducedMotion, delay]);
 
   return (
     <motion.div

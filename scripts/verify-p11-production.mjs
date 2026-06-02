@@ -242,19 +242,20 @@ const suites = {
     const errors = [];
     const panel = read("src/components/session/intro/CinematicAppPanel.tsx");
     if (panel.includes("IntroFashionScreen")) errors.push("css mock screen in panel");
-    must(panel, "next/image", "next image", errors);
+    must(panel, "IntroReferenceImage", "reference image component", errors);
+    must(read("src/components/session/intro/IntroReferenceImage.tsx"), "unoptimized", "full quality", errors);
     return errors;
   },
   "intro-logo-reveal-not-cut-off": () => {
     const errors = [];
     must(read("src/components/session/vodex-session-intro.tsx"), "revealComplete", "reveal complete gate", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), "onRevealComplete", "reveal callback", errors);
-    must(read("src/components/session/intro/intro-constants.ts"), "INTRO_MIN_MS", "min intro duration", errors);
+    must(read("src/components/session/intro/intro-constants.ts"), "POST_REVEAL_SETTLE_MS", "post reveal settle", errors);
     return errors;
   },
   "intro-animation-completes-before-fade": () => {
     const errors = [];
-    must(read("src/components/session/vodex-session-intro.tsx"), "INTRO_MIN_MS", "min duration", errors);
+    must(read("src/components/session/vodex-session-intro.tsx"), "POST_REVEAL_SETTLE_MS", "post reveal settle", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), "EXIT_FADE_MS", "exit fade", errors);
     if (read("src/components/session/vodex-session-intro.tsx").includes("INTRO_TOTAL_MS")) {
       errors.push("hard INTRO_TOTAL_MS timeout removed");

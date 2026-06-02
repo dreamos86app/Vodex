@@ -8,11 +8,12 @@ import { CinematicAppPanel } from "@/components/session/intro/CinematicAppPanel"
 import { IntroVortex } from "@/components/session/intro/IntroVortex";
 import { IntroLogoReveal } from "@/components/session/intro/IntroLogoReveal";
 import { INTRO_CINEMATIC_APPS } from "@/components/session/intro/intro-apps";
+import { preloadIntroReferenceImages } from "@/components/session/intro/intro-image-preload";
 import {
   COLLAPSE_END_S,
   EXIT_FADE_MS,
-  INTRO_MIN_MS,
   LOGO_REVEAL_START_S,
+  POST_REVEAL_SETTLE_MS,
   SHOWCASE_END_S,
   SHOWCASE_START_S,
 } from "@/components/session/intro/intro-constants";
@@ -47,6 +48,14 @@ export function VodexSessionIntro({
     window.setTimeout(finish, EXIT_FADE_MS);
   }, [finish]);
 
+  const handleRevealComplete = React.useCallback(() => {
+    setRevealComplete(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (show) preloadIntroReferenceImages();
+  }, [show]);
+
   React.useEffect(() => {
     if (!show) {
       setPhase("hidden");
@@ -74,9 +83,7 @@ export function VodexSessionIntro({
 
   React.useEffect(() => {
     if (!show || !revealComplete) return;
-    const elapsed = performance.now() - startedAtRef.current;
-    const wait = Math.max(0, INTRO_MIN_MS - elapsed);
-    const t = window.setTimeout(beginExit, wait);
+    const t = window.setTimeout(beginExit, POST_REVEAL_SETTLE_MS);
     return () => window.clearTimeout(t);
   }, [show, revealComplete, beginExit]);
 
@@ -136,7 +143,7 @@ export function VodexSessionIntro({
         <IntroLogoReveal
           visible={showBrand}
           reducedMotion={Boolean(reducedMotion)}
-          onRevealComplete={() => setRevealComplete(true)}
+          onRevealComplete={handleRevealComplete}
         />
       </motion.div>
     </AnimatePresence>

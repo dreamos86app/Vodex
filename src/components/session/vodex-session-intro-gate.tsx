@@ -17,6 +17,7 @@ import {
   readSessionIntroSeen,
 } from "@/lib/session/session-intro-decision";
 import { logIntroDecision, registerIntroDebugHook } from "@/lib/session/intro-debug";
+import { preloadIntroReferenceImages } from "@/components/session/intro/intro-image-preload";
 import { usePathname } from "next/navigation";
 
 type EntryPhase = "deciding" | "intro" | "ready";
@@ -75,6 +76,7 @@ export function VodexSessionIntroGate({
     });
 
     if (decision.shouldShow) {
+      preloadIntroReferenceImages();
       if (hasPendingCookie) {
         try {
           sessionStorage.removeItem("vodex_intro_seen_session");

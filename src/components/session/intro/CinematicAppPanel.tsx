@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { motion } from "framer-motion";
 import type { IntroAppConfig } from "@/components/session/intro/intro-apps";
 import { IntroAliveOverlay } from "@/components/session/intro/IntroAliveOverlay";
+import { IntroReferenceImage } from "@/components/session/intro/IntroReferenceImage";
 import { COLLAPSE_EASE, PREMIUM_EASE, SHOWCASE_END_S } from "@/components/session/intro/intro-constants";
 
 export function CinematicAppPanel({
@@ -20,8 +20,8 @@ export function CinematicAppPanel({
   const corner = layout === "mobile" ? app.mobile : app.desktop;
   const frameClass =
     layout === "mobile"
-      ? "h-[min(46vh,420px)] w-[min(52vw,240px)]"
-      : "h-[min(46vh,400px)] w-[min(46vw,480px)]";
+      ? "aspect-square w-[min(38vw,178px)] max-h-[38vw]"
+      : "aspect-[5/4] w-[min(46vw,520px)] max-h-[min(46vh,416px)]";
 
   const entered = timeline >= app.enterAt;
   const collapsing = timeline >= SHOWCASE_END_S;
@@ -29,14 +29,11 @@ export function CinematicAppPanel({
 
   const panel = (
     <div className="vodex-intro-p13__image-panel relative h-full w-full overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-sky-300/25">
-      <Image
+      <IntroReferenceImage
         src={app.imageSrc}
         alt={app.imageAlt}
-        fill
-        priority
-        sizes={layout === "mobile" ? "240px" : "480px"}
-        className="object-cover object-top brightness-[1.02] contrast-[1.02]"
-        data-intro-reference-image={app.id}
+        layout={layout}
+        panelId={app.id}
       />
       <IntroAliveOverlay accent={app.accent} />
       <div className="vodex-intro-p13__glass-sheen pointer-events-none absolute inset-0" aria-hidden />
