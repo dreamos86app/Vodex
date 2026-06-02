@@ -1,5 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import {
+  isBuildRelatedUsageMode,
+  isUsageSuccessStatus,
+} from "@/lib/ai/log-provider-ai-usage";
+import {
+  estimateOwnerMarginUsd,
+  estimateOwnerRevenueUsd,
+  estimateProviderCostUsd,
+} from "@/lib/credits/usage-cost";
 
 type AdminClient = SupabaseClient<Database>;
 
@@ -60,32 +69,138 @@ function normalizeAiUsageRow(row: Record<string, unknown>): AiUsageLogRow {
 
 export type AiUsagePromptFilter = "all" | "success" | "failed";
 
-export type AiUsagePromptStats = {
-  total: number;
-  success: number;
-  failed: number;
+export type AiUsageCostBucket = {
+  count: number;
+  credits: number;
+  providerCostUsd: number;
+  userRevenueUsd: number;
+  estimatedMarginUsd: number;
 };
+
+export type AiUsagePromptStatsPayload = {
+  buckets: {
+    all: AiUsageCostBucket;
+    success: AiUsageCostBucket;
+    failed: AiUsageCostBucket;
+  };
+  builds: {
+    total: number;
+    success: number;
+    failed: number;
+  };
+};
+
+const emptyBucket = (): AiUsageCostBucket => ({
+  count: 0,
+  credits: 0,
+  providerCostUsd: 0,
+  userRevenueUsd: 0,
+  estimatedMarginUsd: 0,
+});
+
+function addToBucket(
+  bucket: AiUsageCostBucket,
+  row: {
+    tokens_charged: number;
+    model_id: string;
+    mode: string;
+    tokens_input: number | null;
+    tokens_output: number | null;
+    metadata?: Record<string, unknown> | null;
+    status: string;
+  },
+): void {
+  const charged = row.tokens_charged ?? 0;
+  const meta = row.metadata ?? null;
+  const metaCost =
+    typeof meta?.provider_cost_usd === "number" ? meta.provider_cost_usd : null;
+  const provider =
+    metaCost != null
+      ? metaCost
+      : estimateProviderCostUsd(row.model_id, row.mode, row.tokens_input, row.tokens_output);
+  bucket.count += 1;
+  bucket.credits += charged;
+  bucket.providerCostUsd += provider;
+  bucket.userRevenueUsd += estimateOwnerRevenueUsd(charged);
+  bucket.estimatedMarginUsd += estimateOwnerMarginUsd(charged, provider);
+}
 
 export async function fetchAiUsagePromptStats(
   admin: AdminClient,
   sinceIso: string,
-): Promise<{ stats: AiUsagePromptStats; error?: string }> {
-  const res = await admin
+): Promise<{ stats: AiUsagePromptStatsPayload; error?: string }> {
+  const selectWithMeta =
+    "status,mode,model_id,tokens_charged,tokens_input,tokens_output,metadata";
+  const selectBase = "status,mode,model_id,tokens_charged,tokens_input,tokens_output";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let res: any = await (admin as any)
     .from("ai_usage_logs")
-    .select("status")
-    .gte("created_at", sinceIso);
+    .select(selectWithMeta)
+    .gte("created_at", sinceIso)
+    .limit(8000);
+
+  if (res.error?.message?.includes("metadata")) {
+    res = await (admin as any).from("ai_usage_logs").select(selectBase).gte("created_at", sinceIso).limit(8000);
+  }
+
+  if (res.error?.message?.includes("tokens_charged")) {
+    res = await (admin as any)
+      .from("ai_usage_logs")
+      .select("status,mode,model_id,credits_charged,tokens_input,tokens_output")
+      .gte("created_at", sinceIso)
+      .limit(8000);
+  }
 
   if (res.error) {
-    return { stats: { total: 0, success: 0, failed: 0 }, error: res.error.message };
+    return {
+      stats: {
+        buckets: { all: emptyBucket(), success: emptyBucket(), failed: emptyBucket() },
+        builds: { total: 0, success: 0, failed: 0 },
+      },
+      error: res.error.message,
+    };
   }
 
-  let success = 0;
-  let failed = 0;
-  for (const row of res.data ?? []) {
-    if (row.status === "success") success += 1;
-    else failed += 1;
+  const buckets = { all: emptyBucket(), success: emptyBucket(), failed: emptyBucket() };
+  const builds = { total: 0, success: 0, failed: 0 };
+
+  for (const raw of res.data ?? []) {
+    const row = raw as {
+      status: string;
+      mode: string;
+      model_id: string;
+      tokens_charged?: number;
+      credits_charged?: number;
+      tokens_input: number | null;
+      tokens_output: number | null;
+      metadata?: Record<string, unknown> | null;
+    };
+    const normalized = {
+      status: row.status,
+      mode: row.mode,
+      model_id: row.model_id,
+      tokens_charged: row.tokens_charged ?? row.credits_charged ?? 0,
+      tokens_input: row.tokens_input,
+      tokens_output: row.tokens_output,
+      metadata:
+        row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : null,
+    };
+
+    const ok = isUsageSuccessStatus(normalized.status);
+    addToBucket(buckets.all, normalized);
+    if (ok) addToBucket(buckets.success, normalized);
+    else addToBucket(buckets.failed, normalized);
+
+    if (isBuildRelatedUsageMode(normalized.mode, normalized.metadata)) {
+      builds.total += 1;
+      if (ok) builds.success += 1;
+      else builds.failed += 1;
+    }
   }
-  return { stats: { total: success + failed, success, failed } };
+
+  return { stats: { buckets, builds } };
 }
 
 export async function fetchAiUsageLogs(
@@ -154,7 +269,6 @@ export async function fetchAiUsageSummaryRows(
   const primary = await admin
     .from("ai_usage_logs")
     .select("model_id,mode,tokens_charged,tokens_input,tokens_output,status,conversation_id")
-    .eq("status", "success")
     .gte("created_at", sinceIso);
 
   if (!primary.error) {
@@ -182,7 +296,6 @@ export async function fetchAiUsageSummaryRows(
     const noTok = await admin
       .from("ai_usage_logs")
       .select("model_id,mode,tokens_charged,status,conversation_id")
-      .eq("status", "success")
       .gte("created_at", sinceIso);
     if (!noTok.error) {
       return {
@@ -203,7 +316,6 @@ export async function fetchAiUsageSummaryRows(
   const fallback = await (admin as any)
     .from("ai_usage_logs")
     .select("model_id,mode,credits_charged,tokens_input,tokens_output,status,conversation_id")
-    .eq("status", "success")
     .gte("created_at", sinceIso);
 
   if (fallback.error) {

@@ -103,7 +103,7 @@ const suites = {
     must(intro, "PHASE_MONTAGE_END", "phased montage", errors);
     must(intro, "PHASE_COLLAPSE_END", "phased collapse", errors);
     must(intro, "IntroV3Collapse", "collapse burst", errors);
-    must(intro, "rotateY", "parallax tilt", errors);
+    must(intro, "QuadrantApp", "quadrant layout", errors);
     must(read("src/app/globals.css"), "vodex-intro-v3__chromatic", "chromatic layer", errors);
     return errors;
   },
@@ -112,8 +112,63 @@ const suites = {
     const screens = read("src/components/session/intro-v3-app-screens.tsx");
     must(screens, "data-intro-density=\"desktop-framed\"", "desktop density", errors);
     must(screens, "data-intro-density=\"mobile-framed\"", "mobile density", errors);
-    must(read("src/components/session/vodex-session-intro.tsx"), "min(88vw,780px)", "large desktop frame", errors);
+    must(read("src/components/session/vodex-session-intro.tsx"), "QuadrantApp", "quadrant frames", errors);
     must(read("src/components/session/vodex-session-intro.tsx"), '"mobile" : "desktop"', "layout switch", errors);
+    return errors;
+  },
+  "admin-prompt-stats-filter-cost": () => {
+    const errors = [];
+    must(read("src/lib/admin/admin-query-compat.ts"), "AiUsageCostBucket", "cost bucket type", errors);
+    must(read("src/lib/admin/admin-query-compat.ts"), "buckets", "bucket aggregates", errors);
+    must(read("src/app/api/admin/ai-usage/prompt-stats/route.ts"), "buckets", "api buckets", errors);
+    const panel = read("src/components/admin/admin-prompt-activity-panel.tsx");
+    must(panel, "Provider cost", "provider cost ui", errors);
+    must(panel, "Est. margin", "margin ui", errors);
+    if (panel.includes("Add credits")) errors.push("duplicate add credits");
+    if (panel.includes("Successful live")) errors.push("duplicate pill filters removed");
+    return errors;
+  },
+  "admin-build-success-fail-counts": () => {
+    const errors = [];
+    must(read("src/components/admin/admin-prompt-activity-panel.tsx"), "Total builds", "build total", errors);
+    must(read("src/components/admin/admin-prompt-activity-panel.tsx"), "Successful builds", "build success", errors);
+    must(read("src/components/admin/admin-prompt-activity-panel.tsx"), "Failed builds", "build failed", errors);
+    must(read("src/lib/admin/admin-query-compat.ts"), "builds:", "build stats in compat", errors);
+    must(read("src/lib/ai/log-provider-ai-usage.ts"), "isBuildRelatedUsageMode", "build mode helper", errors);
+    return errors;
+  },
+  "ai-usage-logging-coverage": () => {
+    const errors = [];
+    must(read("src/lib/ai/log-provider-ai-usage.ts"), "logProviderAiUsage", "provider logger", errors);
+    must(read("src/lib/ai/provider-call.ts"), "logProviderAiUsage", "wired in provider-call", errors);
+    must(read("src/lib/credits/charge-ai-operation.ts"), "ai_usage_logs", "chat charge logs", errors);
+    must(read("src/lib/billing/build-credit-audit-log.ts"), "logBuildCreditReconciliation", "build reconcile log", errors);
+    return errors;
+  },
+  "deploy-with-prompt-flow": () => {
+    const errors = [];
+    const imm = read("src/components/create/workspace/immersive-workspace.tsx");
+    must(imm, "PublishModal", "publish modal in builder", errors);
+    must(imm, "publish_request", "publish intent handling", errors);
+    must(imm, "setPublishOpen(true)", "opens publish modal", errors);
+    must(read("src/app/api/projects/[id]/publish/route.ts"), "startPublish", "publish api", errors);
+    return errors;
+  },
+  "intro-app-previews-visible-before-vortex": () => {
+    const errors = [];
+    const intro = read("src/components/session/vodex-session-intro.tsx");
+    must(intro, "PREVIEW_START", "preview start delay", errors);
+    must(intro, "previewsVisible", "previews visible gate", errors);
+    must(intro, "PHASE_MONTAGE_END", "montage end before vortex", errors);
+    must(intro, "INTRO_V3_APPS.map", "four apps at once", errors);
+    return errors;
+  },
+  "intro-vortex-after-previews": () => {
+    const errors = [];
+    const intro = read("src/components/session/vodex-session-intro.tsx");
+    must(intro, "IntroV3Collapse", "vortex collapse", errors);
+    must(intro, "collapsing", "collapse phase", errors);
+    if (intro.includes("CUT_DURATION")) errors.push("sequential cuts removed for quadrant montage");
     return errors;
   },
   "intro-no-start-artifact": () => {

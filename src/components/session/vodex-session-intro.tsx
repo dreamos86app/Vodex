@@ -8,70 +8,79 @@ import { IntroFallingStars } from "@/components/session/intro-falling-stars";
 import { INTRO_V3_APPS } from "@/components/session/intro-v3-app-screens";
 import { IntroV3Collapse } from "@/components/session/intro-v3-collapse";
 
-/** Phase 1 montage · Phase 2 collapse · Phase 3 brand */
+/** Previews visible 0.2–1.8s · vortex 1.8–2.5s · brand 2.5–3.6s */
+const PREVIEW_START = 0.2;
 const PHASE_MONTAGE_END = 1.8;
-const PHASE_COLLAPSE_END = 2.7;
-const INTRO_MS = 4000;
+const PHASE_COLLAPSE_END = 2.5;
+const INTRO_MS = 3600;
 
-const CUT_DURATION = PHASE_MONTAGE_END / INTRO_V3_APPS.length;
+const CORNER_DESKTOP = [
+  { x: "-34%", y: "-30%", rotate: -7, scale: 0.92 },
+  { x: "34%", y: "-30%", rotate: 6, scale: 0.9 },
+  { x: "-34%", y: "30%", rotate: 5, scale: 0.88 },
+  { x: "34%", y: "30%", rotate: -6, scale: 0.9 },
+] as const;
 
-function IntroAppFrame({
+const CORNER_MOBILE = [
+  { x: "-38%", y: "-32%", rotate: -5, scale: 0.88 },
+  { x: "38%", y: "-32%", rotate: 5, scale: 0.86 },
+  { x: "-38%", y: "32%", rotate: 4, scale: 0.84 },
+  { x: "38%", y: "32%", rotate: -4, scale: 0.86 },
+] as const;
+
+function QuadrantApp({
   children,
+  corner,
   layout,
-  active,
-  cutIndex,
-  reducedMotion,
+  visible,
+  collapsing,
 }: {
   children: React.ReactNode;
+  corner: { x: string; y: string; rotate: number; scale: number };
   layout: "desktop" | "mobile";
-  active: boolean;
-  cutIndex: number;
-  reducedMotion: boolean;
+  visible: boolean;
+  collapsing: boolean;
 }) {
-  const start = cutIndex * CUT_DURATION;
-
   const frameClass =
     layout === "mobile"
-      ? "h-[min(72vh,520px)] w-[min(46vw,240px)]"
-      : "h-[min(58vh,440px)] w-[min(88vw,780px)]";
+      ? "h-[min(42vh,380px)] w-[min(44vw,200px)]"
+      : "h-[min(42vh,360px)] w-[min(42vw,420px)]";
 
   return (
     <motion.div
       className={`vodex-intro-v3__screen absolute left-1/2 top-1/2 z-[6] -translate-x-1/2 -translate-y-1/2 ${frameClass}`}
       initial={false}
       animate={
-        reducedMotion
-          ? { opacity: active ? 1 : 0, scale: 1, x: 0, y: 0, rotateX: 0, rotateY: 0, filter: "blur(0px)" }
-          : active
+        collapsing
+          ? {
+              opacity: [1, 1, 0],
+              scale: [corner.scale, corner.scale * 0.95, 0.15],
+              x: ["0%", corner.x, "0%"],
+              y: ["0%", corner.y, "0%"],
+              rotate: corner.rotate,
+              filter: ["blur(0px)", "blur(0px)", "blur(10px)"],
+            }
+          : visible
             ? {
-                opacity: [0, 1, 1, 0],
-                scale: [0.88, 1, 1, 0.92],
-                x: [layout === "mobile" ? 40 : 80, 0, 0, layout === "mobile" ? -30 : -60],
-                y: [20, 0, 0, -10],
-                rotateY: [layout === "mobile" ? 8 : 6, 0, 0, -4],
-                rotateX: [4, 0, 0, 2],
-                filter: ["blur(8px)", "blur(0px)", "blur(0px)", "blur(6px)"],
+                opacity: 1,
+                scale: corner.scale,
+                x: corner.x,
+                y: corner.y,
+                rotate: corner.rotate,
+                filter: "blur(0px)",
               }
-            : { opacity: 0, scale: 0.85, filter: "blur(8px)" }
+            : { opacity: 0, scale: 0.85, filter: "blur(6px)" }
       }
       transition={
-        reducedMotion
-          ? { duration: 0.2 }
-          : {
-              duration: CUT_DURATION + 0.15,
-              delay: start,
-              times: [0, 0.12, 0.82, 1],
-              ease: [0.22, 1, 0.36, 1],
-            }
+        collapsing
+          ? { duration: 0.7, ease: [0.55, 0, 0.2, 1] }
+          : { duration: 0.45, delay: PREVIEW_START, ease: [0.22, 1, 0.36, 1] }
       }
-      style={{
-        perspective: 1200,
-        transformStyle: "preserve-3d",
-        pointerEvents: "none",
-      }}
-      aria-hidden={!active}
+      style={{ perspective: 1200, transformStyle: "preserve-3d" }}
     >
-      <div className="vodex-intro-v3__chromatic relative h-full w-full">{children}</div>
+      <div className="vodex-intro-v3__chromatic relative h-full w-full shadow-[0_32px_80px_-16px_rgba(0,0,0,0.85)]">
+        {children}
+      </div>
     </motion.div>
   );
 }
@@ -118,8 +127,7 @@ export function VodexSessionIntro({
       if (now - t0 < INTRO_MS) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-
-    const exitAt = window.setTimeout(() => setPhase("exit"), INTRO_MS - 420);
+    const exitAt = window.setTimeout(() => setPhase("exit"), INTRO_MS - 400);
     const doneAt = window.setTimeout(finish, INTRO_MS);
     return () => {
       cancelAnimationFrame(raf);
@@ -133,17 +141,14 @@ export function VodexSessionIntro({
   const exiting = phase === "exit";
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   const layout = isMobile ? "mobile" : "desktop";
+  const corners = isMobile ? CORNER_MOBILE : CORNER_DESKTOP;
 
-  const inMontage = timeline < PHASE_MONTAGE_END;
-  const inCollapse = timeline >= PHASE_MONTAGE_END && timeline < PHASE_COLLAPSE_END;
+  const previewsVisible = timeline >= PREVIEW_START && timeline < PHASE_MONTAGE_END;
+  const collapsing = timeline >= PHASE_MONTAGE_END && timeline < PHASE_COLLAPSE_END;
   const inBrand = timeline >= PHASE_COLLAPSE_END;
 
-  const activeCutIndex = reducedMotion
-    ? 0
-    : Math.min(INTRO_V3_APPS.length - 1, Math.floor(timeline / CUT_DURATION));
-
-  const brandDelay = reducedMotion ? 0.12 : 0;
   const showBrand = reducedMotion || inBrand;
+  const brandDelay = reducedMotion ? 0.1 : 0;
 
   return (
     <AnimatePresence>
@@ -156,42 +161,38 @@ export function VodexSessionIntro({
         aria-label="Loading Vodex"
         initial={{ opacity: 1 }}
         animate={{ opacity: exiting ? 0 : 1 }}
-        transition={{ duration: 0.42 }}
+        transition={{ duration: 0.4 }}
       >
         <div className="vodex-intro-v3__cosmos" aria-hidden />
         <IntroFallingStars active={!reducedMotion} />
 
         <motion.div
           className="vodex-intro-v3__energy pointer-events-none absolute inset-0"
-          animate={{
-            opacity: inCollapse || inBrand ? 0.9 : 0.35,
-            scale: inCollapse ? 1.15 : 1,
-          }}
-          transition={{ duration: 0.5 }}
+          animate={{ opacity: collapsing || inBrand ? 0.95 : 0.25 }}
+          transition={{ duration: 0.4 }}
           aria-hidden
         />
 
-        {(inMontage || reducedMotion) && (
+        {!reducedMotion && (previewsVisible || collapsing) ? (
           <div className="pointer-events-none absolute inset-0" aria-hidden>
             {INTRO_V3_APPS.map((app, i) => {
               const Screen = app.Screen;
-              const isActive = reducedMotion ? i === 0 : i === activeCutIndex && inMontage;
               return (
-                <IntroAppFrame
+                <QuadrantApp
                   key={app.id}
+                  corner={corners[i]!}
                   layout={layout}
-                  active={isActive}
-                  cutIndex={i}
-                  reducedMotion={!!reducedMotion}
+                  visible={previewsVisible}
+                  collapsing={collapsing}
                 >
                   <Screen layout={layout} />
-                </IntroAppFrame>
+                </QuadrantApp>
               );
             })}
           </div>
-        )}
+        ) : null}
 
-        <IntroV3Collapse active={inCollapse && !reducedMotion} />
+        <IntroV3Collapse active={collapsing && !reducedMotion} />
 
         <motion.div
           className="relative z-20 flex h-full flex-col items-center justify-center px-6 text-center"
@@ -212,8 +213,8 @@ export function VodexSessionIntro({
             }}
           >
             <motion.div
-              className="absolute inset-0 rounded-full bg-sky-400/25 blur-2xl"
-              animate={showBrand ? { scale: [0.5, 1.4, 1.2], opacity: [0, 0.8, 0.5] } : {}}
+              className="absolute inset-0 rounded-full bg-sky-400/30 blur-2xl"
+              animate={showBrand ? { scale: [0.5, 1.5, 1.2], opacity: [0, 0.9, 0.5] } : {}}
               transition={{ delay: brandDelay, duration: 0.8 }}
             />
             <VodexBrandIcon size="xl" alt="" className="vodex-cinematic-intro__icon relative size-24" />
@@ -227,8 +228,8 @@ export function VodexSessionIntro({
                 initial={{ opacity: 0, y: 18 }}
                 animate={showBrand ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
                 transition={{
-                  delay: brandDelay + 0.15 + i * 0.055,
-                  duration: 0.4,
+                  delay: brandDelay + 0.12 + i * 0.055,
+                  duration: 0.38,
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
@@ -240,7 +241,7 @@ export function VodexSessionIntro({
             className="vodex-cinematic-intro__tagline mt-3 text-sm font-medium tracking-wide text-sky-100/90"
             initial={{ opacity: 0, y: 10 }}
             animate={showBrand ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-            transition={{ delay: brandDelay + 0.55, duration: 0.45 }}
+            transition={{ delay: brandDelay + 0.45, duration: 0.4 }}
           >
             Preparing your workspace
           </motion.p>

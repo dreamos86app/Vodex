@@ -6,10 +6,17 @@ import { Loader2 } from "lucide-react";
 
 type PromptFilter = "all" | "success" | "failed";
 
-type PromptStats = {
-  total: number;
-  success: number;
-  failed: number;
+type CostBucket = {
+  count: number;
+  credits: number;
+  providerCostUsd: number;
+  userRevenueUsd: number;
+  estimatedMarginUsd: number;
+};
+
+type StatsPayload = {
+  buckets: Record<PromptFilter, CostBucket>;
+  builds: { total: number; success: number; failed: number };
 };
 
 type LivePromptRow = {
@@ -26,13 +33,17 @@ type LivePromptRow = {
 
 const FILTER_LABELS: Record<PromptFilter, string> = {
   all: "All",
-  success: "Successful",
+  success: "Success",
   failed: "Failed",
 };
 
+function fmtUsd(n: number) {
+  return `$${n.toFixed(4)}`;
+}
+
 export function AdminPromptActivityPanel() {
   const [filter, setFilter] = React.useState<PromptFilter>("all");
-  const [stats, setStats] = React.useState<PromptStats | null>(null);
+  const [data, setData] = React.useState<StatsPayload | null>(null);
   const [live, setLive] = React.useState<LivePromptRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -43,11 +54,13 @@ export function AdminPromptActivityPanel() {
         fetch("/api/admin/ai-usage/prompt-stats", { credentials: "include" }),
         fetch(`/api/admin/ai-usage?limit=24&filter=${filter}`, { credentials: "include" }),
       ]);
-      const statsJson = (await statsRes.json()) as { stats?: PromptStats; error?: string };
+      const statsJson = (await statsRes.json()) as StatsPayload & { error?: string };
       const liveJson = (await liveRes.json()) as { events?: LivePromptRow[]; error?: string };
       if (statsJson.error) setError(statsJson.error);
       else setError(null);
-      if (statsJson.stats) setStats(statsJson.stats);
+      if (statsJson.buckets) {
+        setData({ buckets: statsJson.buckets, builds: statsJson.builds });
+      }
       if (liveRes.ok) setLive(liveJson.events ?? []);
       else if (liveJson.error) setError(liveJson.error);
     } catch {
@@ -64,17 +77,19 @@ export function AdminPromptActivityPanel() {
     return () => clearInterval(id);
   }, [load]);
 
+  const bucket = data?.buckets[filter];
+
   return (
     <section className="space-y-4 rounded-xl border border-border bg-surface/40 p-4">
       <div>
         <h3 className="text-[14px] font-semibold text-foreground">Prompt usage (90 days)</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          All billed AI operations — includes failed and successful builds. Billing token totals are unchanged;
-          this is read-only observability.
+          Provider calls, build steps, and billed chat operations. Zero-credit rows may be observability-only
+          (refunded builds show in metadata).
         </p>
       </div>
 
-      {loading && !stats ? (
+      {loading && !data ? (
         <div className="flex justify-center py-6">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
@@ -84,29 +99,22 @@ export function AdminPromptActivityPanel() {
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive">{error}</p>
       ) : null}
 
-      {stats ? (
+      {data ? (
         <div className="grid gap-2 sm:grid-cols-3">
           {(
             [
-              ["Total prompts", stats.total, "all"],
-              ["Successful", stats.success, "success"],
-              ["Failed", stats.failed, "failed"],
+              ["Total builds", data.builds.total],
+              ["Successful builds", data.builds.success],
+              ["Failed builds", data.builds.failed],
             ] as const
-          ).map(([label, value, key]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={cn(
-                "rounded-lg px-3 py-2.5 text-left ring-1 transition",
-                filter === key
-                  ? "bg-accent/10 ring-accent/40"
-                  : "bg-background ring-border hover:bg-muted/40",
-              )}
+          ).map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-lg bg-background px-3 py-2.5 ring-1 ring-border"
             >
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
               <p className="mt-1 text-[20px] font-semibold tabular-nums text-foreground">{value}</p>
-            </button>
+            </div>
           ))}
         </div>
       ) : null}
@@ -118,20 +126,33 @@ export function AdminPromptActivityPanel() {
             type="button"
             onClick={() => setFilter(key)}
             className={cn(
-              "rounded-full px-3 py-1 text-[11px] font-medium ring-1",
+              "rounded-full px-3 py-1.5 text-[11px] font-semibold ring-1 transition",
               filter === key
                 ? "bg-accent text-white ring-accent"
-                : "bg-background text-foreground ring-border",
+                : "bg-background text-foreground ring-border hover:bg-muted/40",
             )}
           >
-            {FILTER_LABELS[key]} live
+            {FILTER_LABELS[key]}
           </button>
         ))}
       </div>
 
+      {bucket ? (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric label="Total prompts" value={String(bucket.count)} />
+          <Metric label="Credits charged" value={bucket.credits.toLocaleString()} />
+          <Metric label="Provider cost" value={fmtUsd(bucket.providerCostUsd)} />
+          <Metric
+            label="Est. margin"
+            value={fmtUsd(bucket.estimatedMarginUsd)}
+            valueClass={bucket.estimatedMarginUsd >= 0 ? "text-emerald-600" : "text-destructive"}
+          />
+        </div>
+      ) : null}
+
       <div className="rounded-lg bg-background ring-1 ring-border">
         <p className="border-b border-border px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Live prompts — {FILTER_LABELS[filter]}
+          Recent prompts — {FILTER_LABELS[filter]}
         </p>
         {live.length === 0 ? (
           <p className="px-3 py-6 text-center text-[12px] text-muted-foreground">
@@ -140,7 +161,7 @@ export function AdminPromptActivityPanel() {
         ) : (
           <ul className="max-h-64 divide-y divide-border/60 overflow-y-auto">
             {live.map((row) => {
-              const ok = row.status === "success";
+              const ok = row.status === "success" || row.status === "reconciled" || row.status === "logged";
               return (
                 <li key={row.id} className="flex items-start gap-2 px-3 py-2 text-[11px]">
                   <span
@@ -177,5 +198,22 @@ export function AdminPromptActivityPanel() {
         )}
       </div>
     </section>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-lg bg-background px-3 py-2 ring-1 ring-border">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 text-[15px] font-semibold tabular-nums text-foreground", valueClass)}>{value}</p>
+    </div>
   );
 }

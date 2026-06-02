@@ -57,7 +57,6 @@ export async function GET() {
 
   for (const row of rows) {
     const charged = row.tokens_charged ?? 0;
-    if (charged <= 0) continue;
     const provider = estimateProviderCostUsd(
       row.model_id,
       row.mode,

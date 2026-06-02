@@ -19,8 +19,21 @@ export async function GET() {
   const { stats, error } = await fetchAiUsagePromptStats(admin, sinceIso);
 
   if (error) {
-    return NextResponse.json({ error, stats: { total: 0, success: 0, failed: 0 } }, { status: 200 });
+    return NextResponse.json(
+      {
+        error,
+        buckets: stats.buckets,
+        builds: stats.builds,
+        stats: { total: stats.buckets.all.count, success: stats.buckets.success.count, failed: stats.buckets.failed.count },
+      },
+      { status: 200 },
+    );
   }
 
-  return NextResponse.json({ stats, sinceIso });
+  return NextResponse.json({
+    buckets: stats.buckets,
+    builds: stats.builds,
+    sinceIso,
+    stats: { total: stats.buckets.all.count, success: stats.buckets.success.count, failed: stats.buckets.failed.count },
+  });
 }

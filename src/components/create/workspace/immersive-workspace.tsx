@@ -60,6 +60,11 @@ import { RepairCenter } from "@/components/repair/repair-center";
 import { buildRepairChatPrompt } from "@/lib/repair/repair-chat-prompt";
 import { BuildLiveProgress } from "@/components/create/workspace/build-live-progress";
 import { BuildCreditsUpgradePanel } from "@/components/billing/build-credits-upgrade-panel";
+import {
+  PublishModal,
+  type PublishUiPhase,
+  type PublishUiState,
+} from "@/components/create/workspace/publish-modal";
 import { AdminDiagnosticsFab } from "@/components/create/workspace/admin-diagnostics-fab";
 import {
   persistWorkspaceTask,
@@ -669,6 +674,42 @@ export function ImmersiveWorkspace({
   const approvedBlueprintRef = React.useRef<Record<string, unknown> | null>(null);
   const [intentPreview, setIntentPreview] = React.useState<CreateIntentResult | null>(null);
   const [intentLoading, setIntentLoading] = React.useState(false);
+  const [publishOpen, setPublishOpen] = React.useState(false);
+  const [publishDraft, setPublishDraft] = React.useState<PublishUiState | null>(null);
+  const [publishReady, setPublishReady] = React.useState(false);
+  const [_publishPhase, setPublishPhase] = React.useState<PublishUiPhase>("idle");
+
+  React.useEffect(() => {
+    const meta = effectiveProject?.metadata;
+    if (!meta || typeof meta !== "object" || Array.isArray(meta)) {
+      setPublishDraft(null);
+      return;
+    }
+    const pu = (meta as Record<string, unknown>).publish_ui;
+    if (pu && typeof pu === "object" && !Array.isArray(pu)) {
+      setPublishDraft(pu as PublishUiState);
+    }
+  }, [effectiveProject?.metadata]);
+
+  React.useEffect(() => {
+    const id = effectiveProjectId;
+    if (!id) {
+      setPublishReady(false);
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/projects/${id}/publish/readiness`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { artifactsReady?: boolean; canPublishWeb?: boolean } | null) => {
+        if (!cancelled) setPublishReady(Boolean(data?.artifactsReady ?? data?.canPublishWeb));
+      })
+      .catch(() => {
+        if (!cancelled) setPublishReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveProjectId, projectDataRefresh]);
 
   React.useEffect(() => {
     const text = input.trim();
@@ -1625,6 +1666,22 @@ export function ImmersiveWorkspace({
     if (!text) {
       setDebugBlocked("empty");
       notifySubmitBlocked("empty");
+      return;
+    }
+
+    const wantsPublish =
+      intentPreview?.intent === "publish_request" ||
+      /\b(publish|deploy)\b/i.test(text);
+    if (wantsPublish) {
+      submitInFlightRef.current = false;
+      setPendingUserBubble(null);
+      setShowOptimisticAssistant(false);
+      if (!effectiveProjectId) {
+        toast.error("Open or create an app first, then publish from the builder.");
+        return;
+      }
+      setPublishOpen(true);
+      toast.info("Publish — we'll deploy when readiness checks pass.");
       return;
     }
 
@@ -3154,10 +3211,7 @@ export function ImmersiveWorkspace({
                 planId={profile?.plan_id}
                 activeSection={dashboardSection}
                 onSectionChange={setDashboardSection}
-                onOpenPublish={() => {
-                  setRightTab("preview");
-                  setMobilePanel("preview");
-                }}
+                onOpenPublish={() => setPublishOpen(true)}
               />
             )}
             {rightTab === "code" && (
@@ -3208,6 +3262,25 @@ export function ImmersiveWorkspace({
           </div>
         </div>
       </div>
+
+      <PublishModal
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        projectId={effectiveProjectId}
+        planId={profile?.plan_id}
+        initialDraft={publishDraft}
+        onSaved={(d) => setPublishDraft(d)}
+        artifactsReady={publishReady || Boolean(effectiveProject?.preview_url)}
+        onPublishPhaseChange={(phase, detail) => {
+          setPublishPhase(phase);
+          if (phase === "failed" && detail?.error) {
+            toast.error(detail.error);
+          }
+          if (phase === "published" && detail?.url) {
+            toast.success(`Deployed: ${detail.url}`);
+          }
+        }}
+      />
 
       <AdminDiagnosticsFab
         projectId={effectiveProjectId}

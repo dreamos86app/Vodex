@@ -27,6 +27,7 @@ import { estimateTokenProviderCostUsd } from "@/lib/credits/token-cost";
 import { withGoogleProviderOptions } from "@/lib/ai/gemini-generate-options";
 import { assertProviderSpendAllowed } from "@/lib/credits/provider-spend-guard";
 import { logServerOperation } from "@/lib/ops/server-ops-log";
+import { logProviderAiUsage } from "@/lib/ai/log-provider-ai-usage";
 import { pushRuntimeDiagnostic } from "@/lib/dev/runtime-diagnostics";
 import {
   isProviderTimeoutError,
@@ -265,6 +266,21 @@ export async function callProviderStructured(input: ProviderCallInput): Promise<
       success: true,
     });
 
+    await logProviderAiUsage(input.writer, {
+      userId: input.userId,
+      userEmail: input.userEmail,
+      operationId: input.operationId,
+      operationType: input.operationType,
+      modelId: attemptSpec.modelId,
+      projectId: input.projectId,
+      conversationId: input.conversationId,
+      inputTokens: inTok,
+      outputTokens: outTok,
+      providerCostUsd,
+      status: "success",
+      creditsCharged: 0,
+    });
+
     return {
       text,
       spec: attemptSpec,
@@ -328,6 +344,20 @@ export async function callProviderStructured(input: ProviderCallInput): Promise<
   }
 
   const classified = classifyProviderError(lastErr);
+  const failSpec = providersToTry[providersToTry.length - 1]?.spec;
+  await logProviderAiUsage(input.writer, {
+    userId: input.userId,
+    userEmail: input.userEmail,
+    operationId: input.operationId,
+    operationType: input.operationType,
+    modelId: failSpec?.modelId ?? "unknown",
+    projectId: input.projectId,
+    conversationId: input.conversationId,
+    providerCostUsd: 0,
+    status: "error",
+    errorMessage: classified.raw,
+    creditsCharged: 0,
+  });
   throw new Error(userFacingProviderMessage(classified.errorClass, providersToTry.length > 1));
 }
 
