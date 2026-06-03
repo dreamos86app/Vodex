@@ -286,7 +286,7 @@ export function MarketplaceView() {
           )}
 
           {/* Official badge */}
-          <motion.div variants={variants.fadeUp} initial="hidden" animate="show" transition={{ delay: 0.2 }} className="vodex-pre-footer-spacing mt-8 flex items-center gap-2.5 rounded-[var(--radius-lg)] bg-surface px-4 py-3 ring-1 ring-border">
+          <motion.div variants={variants.fadeUp} initial="hidden" animate="show" transition={{ delay: 0.2 }} className="vodex-pre-footer-spacing mt-8 flex items-center gap-2.5 rounded-[var(--radius-lg)] bg-surface px-4 py-3 ring-1 ring-border dark:bg-surface/80 dark:ring-border/90">
             <Star className="size-4 fill-amber-400 text-amber-400" strokeWidth={0} />
             <p className="text-[12px] text-muted-foreground">
               All templates are maintained by the Vodex team. Each one generates a complete, production-ready codebase.

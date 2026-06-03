@@ -18,6 +18,10 @@ import {
   emitFileWriteEvent,
   type WorkflowStepCtx,
 } from "@/lib/build/workflow-live-events";
+import {
+  injectMobileBaselineIntoBuildFiles,
+  logMobileQualityAfterInject,
+} from "@/lib/build/inject-mobile-baseline";
 
 type Writer = SupabaseClient<Database>;
 
@@ -52,10 +56,18 @@ export async function persistGeneratedBuildFiles(input: {
   executionInstanceId?: string;
   /** Emit per-file workflow events after successful upsert. */
   workflowEmit?: PersistWorkflowEmitOptions;
+  appName?: string;
 }): Promise<PersistBuildFilesResult> {
   const writer = persistenceWriter(input.writer);
-  const normalized = normalizeAppRouterBuildFiles(input.files, { appName: "Dream App" });
-  const renderable = filterRenderableBuildFiles(normalized.files);
+  const normalized = normalizeAppRouterBuildFiles(input.files, {
+    appName: input.appName ?? "Dream App",
+  });
+  const withMobile = injectMobileBaselineIntoBuildFiles(normalized.files, {
+    appName: input.appName ?? "Dream App",
+    projectId: input.projectId,
+  });
+  logMobileQualityAfterInject(withMobile);
+  const renderable = filterRenderableBuildFiles(withMobile);
   if (renderable.length === 0) {
     return {
       ok: false,

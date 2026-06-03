@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { sealIntegrationSecret } from "@/lib/secrets/seal";
+import { getIntegrationProvider } from "@/lib/generated-apps/integration-registry";
+import { logSecurityAudit } from "@/lib/security/audit-events";
+import { redactSecretValue } from "@/lib/secrets/payment-secrets";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +38,17 @@ export async function GET(
     .order("key_name", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const secrets = (rows ?? []).map((r) => ({
+    key_name: r.key_name as string,
+    provider: null as string | null,
+    status: "configured" as string,
+    last_four: null as string | null,
+    updated_at: r.updated_at as string,
+    last_tested_at: null as string | null,
+  }));
   return NextResponse.json({
-    keys: (rows ?? []).map((r) => ({
-      name: r.key_name as string,
-      updated_at: r.updated_at as string,
-    })),
+    secrets,
+    keys: secrets.map((s) => ({ name: s.key_name, updated_at: s.updated_at })),
   });
 }
 
@@ -73,15 +82,17 @@ export async function POST(
     .maybeSingle();
   if (!proj) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  let body: { keyName?: string; value?: string };
+  let body: { keyName?: string; value?: string; provider?: string };
   try {
-    body = (await req.json()) as { keyName?: string; value?: string };
+    body = (await req.json()) as { keyName?: string; value?: string; provider?: string };
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const keyName = typeof body.keyName === "string" ? body.keyName.trim() : "";
   const value = typeof body.value === "string" ? body.value : "";
+  const providerId = typeof body.provider === "string" ? body.provider.trim() : "";
+  const providerDef = providerId ? getIntegrationProvider(providerId) : undefined;
   if (!keyName || !/^[A-Z][A-Z0-9_]{2,64}$/.test(keyName)) {
     return NextResponse.json({ error: "Invalid keyName" }, { status: 400 });
   }
@@ -104,17 +115,39 @@ export async function POST(
     );
   }
 
+  const lastFour = value.trim().slice(-4);
+  const requiredKeys = providerDef?.fields.filter((f) => f.required).map((f) => f.key) ?? [keyName];
+  const { data: existing } = await admin
+    .from("project_secrets")
+    .select("key_name")
+    .eq("project_id", projectId);
+  const configured = new Set((existing ?? []).map((r) => r.key_name as string));
+  configured.add(keyName);
+  const status = requiredKeys.every((k) => configured.has(k)) ? "configured" : "incomplete";
+
   const { error } = await admin.from("project_secrets").upsert(
     {
       project_id: projectId,
       owner_id: user.id,
       key_name: keyName,
       ciphertext: sealed,
+      provider: providerId || null,
+      status,
+      last_four: lastFour,
+      fingerprint: `${keyName}:${lastFour}`,
       updated_at: new Date().toISOString(),
     } as never,
     { onConflict: "project_id,key_name" },
   );
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, keyName });
+
+  void logSecurityAudit({
+    action: "secret_saved",
+    userId: user.id,
+    projectId,
+    metadata: { keyName, provider: providerId || null, status, last_four: redactSecretValue(value) },
+  });
+
+  return NextResponse.json({ ok: true, keyName, status, last_four: lastFour });
 }

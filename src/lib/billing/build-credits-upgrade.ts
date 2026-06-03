@@ -28,8 +28,10 @@ const PERKS: Record<UpgradePlanTarget, string[]> = {
     "200 Build Credits / month",
     "500 Action Credits / month",
     "Unlimited projects",
-    "Discuss, Edit & Build modes",
-    "Custom domains",
+    "Faster generation",
+    "Edit & Build modes",
+    "Priority improvements",
+    "and more…",
   ],
   pro: [
     "500 Build Credits / month",

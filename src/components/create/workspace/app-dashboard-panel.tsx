@@ -31,7 +31,10 @@ import {
   Monitor,
   Wrench,
   CreditCard,
+  Smartphone,
 } from "lucide-react";
+import { MobileWrapperStudio } from "@/components/mobile/mobile-wrapper-studio";
+import { AppSecretsIntegrationsPanel } from "@/components/integrations/app-secrets-integrations-panel";
 import { ProjectPaymentsPanel } from "@/components/payments/project-payments-panel";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/supabase/types";
@@ -88,19 +91,21 @@ export type DashSection = DashboardSectionId;
 
 const MAIN_NAV: Array<{ id: DashSection; label: string; icon: React.ElementType }> = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "mobile", label: "Mobile App", icon: Smartphone },
+  { id: "publish", label: "Publish", icon: Rocket },
+  { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "secrets", label: "Secrets", icon: KeyRound },
   { id: "users", label: "Users", icon: Users },
   { id: "data", label: "Data", icon: Database },
   { id: "analytics", label: "Insights", icon: BarChart3 },
   { id: "marketing", label: "Growth", icon: Megaphone },
   { id: "domains", label: "Domains", icon: Globe },
-  { id: "integrations", label: "Integrations", icon: Plug },
   { id: "payments", label: "Payments", icon: CreditCard },
   { id: "security", label: "Security", icon: Shield },
   { id: "automations", label: "Automations", icon: Workflow },
   { id: "logs", label: "Activity", icon: ScrollText },
   { id: "api", label: "API", icon: Code2 },
   { id: "settings", label: "Settings", icon: Settings },
-  { id: "secrets", label: "Secrets", icon: KeyRound },
 ];
 
 const ADVANCED_TECH: Array<{ id: string; label: string; icon: React.ElementType }> = [
@@ -789,39 +794,64 @@ export function AppDashboardPanel({
             </div>
           </div>
         );
+      case "mobile":
+        return (
+          <SectionCard title="Mobile App (Capacitor)">
+            <p className="mb-3 text-[12px] text-muted-foreground">
+              Capacitor is free. Prepare a wrapper package for Android Studio or Xcode when your web build is ready.
+            </p>
+            <MobileWrapperStudio
+              projectId={projectId}
+              projectName={displayName}
+              planId={planId ?? "free"}
+              fileCount={fileCount}
+              hasPreview={previewReady || hasFiles}
+              iconUrl={dashProject.icon_url ?? undefined}
+              onAskForHelp={() => {
+                window.location.href = `/apps/${projectId}/builder`;
+              }}
+            />
+          </SectionCard>
+        );
+      case "publish":
+        return (
+          <div className="space-y-3">
+            <PublishStatusPanel
+              projectId={projectId}
+              status={canPublish ? "ready" : publishBlockers.length > 0 ? "blocked" : "draft"}
+              readinessBlockers={publishBlockers}
+            />
+            {canPublish ? (
+              <button
+                type="button"
+                onClick={onOpenPublish}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-[13px] font-semibold text-white"
+                data-testid="dashboard-publish-cta"
+              >
+                <Rocket className="size-4" />
+                Publish app
+              </button>
+            ) : null}
+          </div>
+        );
       case "secrets":
         return (
-          <SectionCard title="Secrets">
-            {secretsLoading ? (
-              <EmptyHint text="Loading…" />
-            ) : secretKeys.length > 0 ? (
-              <ul className="space-y-2">
-                {secretKeys.map((s) => (
-                  <li
-                    key={s.name}
-                    className="flex items-center justify-between gap-2 rounded-lg bg-background/80 px-2.5 py-2 ring-1 ring-border/60"
-                  >
-                    <span className="text-[12px] font-medium text-foreground">{s.name}</span>
-                    <span className="text-[10px] text-muted-foreground">Saved securely</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <>
-                <EmptyHint text="Store connection keys securely — values are never displayed after save." />
-                {isZipImport ? (
-                  <div className="mt-3">
-                    <ImportedSecretsSetupPanel
-                      projectId={projectId}
-                      envRequirements={importMeta.env_requirements ?? meta.env_requirements}
-                      onSaved={() => {
-                        readinessFetchedRef.current = null;
-                      }}
-                    />
-                  </div>
-                ) : null}
-              </>
-            )}
+          <SectionCard title="Secrets & Integrations">
+            <AppSecretsIntegrationsPanel
+              projectId={projectId}
+              appPrompt={typeof meta.template_prompt === "string" ? meta.template_prompt : displayDesc ?? ""}
+            />
+            {isZipImport ? (
+              <div className="mt-4 border-t border-border/60 pt-4">
+                <ImportedSecretsSetupPanel
+                  projectId={projectId}
+                  envRequirements={importMeta.env_requirements ?? meta.env_requirements}
+                  onSaved={() => {
+                    readinessFetchedRef.current = null;
+                  }}
+                />
+              </div>
+            ) : null}
           </SectionCard>
         );
       default:

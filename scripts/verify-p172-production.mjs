@@ -90,19 +90,20 @@ const suites = {
     must(read("src/components/layout/footer-iced-birds.tsx"), "footer-iced-birds", "birds testid", errors);
     must(read("src/components/layout/footer-iced-birds.tsx"), "footer-iced-bird-a", "bird a", errors);
     must(read("src/components/layout/footer-iced-birds.tsx"), "footer-iced-bird-b", "bird b", errors);
+    must(read("src/components/layout/icy-bird-svg.tsx"), "IcyBirdSvgA", "real svg bird", errors);
     must(read("src/app/globals.css"), "vodex-footer-birds-layer", "birds layer css", errors);
-    must(read("src/app/globals.css"), "vodex-footer-bird-fly-a", "fly animation", errors);
+    must(read("src/app/globals.css"), "vodex-footer-orbit-spin-a", "orbit animation", errors);
     must(read("src/components/layout/vodex-important-links-footer.tsx"), "FooterIcedBirds", "footer wired", errors);
     return errors;
   },
   "footer-iced-birds-loop": () => {
     const errors = [];
     const css = read("src/app/globals.css");
-    must(css, "vodex-footer-bird-fly-a", "loop a", errors);
-    must(css, "vodex-footer-bird-fly-b", "loop b", errors);
+    must(css, "vodex-footer-orbit-spin-a", "loop a", errors);
+    must(css, "vodex-footer-orbit-spin-b", "loop b", errors);
     must(css, "infinite", "infinite loop", errors);
-    must(css, "vodex-footer-bird-trail-a", "trail a", errors);
-    if (!css.includes("18s linear infinite") && !css.includes("20s linear infinite")) {
+    must(css, "vodex-footer-trail-fade", "trail fade", errors);
+    if (!css.includes("24s linear infinite") && !css.includes("28s linear infinite")) {
       errors.push("loop duration missing");
     }
     return errors;

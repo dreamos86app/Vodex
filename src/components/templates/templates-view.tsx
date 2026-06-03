@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
 import { variants, whileHover, whileTap, transition } from "@/lib/motion";
 import { createClient } from "@/lib/supabase/client";
 import { useTimedLoading } from "@/lib/hooks/use-timed-loading";
-import { Upload, Users, Package } from "lucide-react";
+import { Loader2, Upload, Users, Package } from "lucide-react";
+import { toast } from "@/lib/toast";
 
 // No fake usage statistics — templates show honest metadata only
 
@@ -41,16 +42,35 @@ const complexityLabel = {
   advanced: { label: "Advanced", color: "text-warning bg-warning-muted" },
 };
 
+const TEMPLATE_LOADING_MSG = "Creating your template workspace…";
+
+async function activateOfficialTemplate(template: Template): Promise<void> {
+  const res = await fetch(`/api/templates/${encodeURIComponent(template.id)}/use`, {
+    method: "POST",
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    builderUrl?: string;
+    projectId?: string;
+  };
+  if (!res.ok) {
+    throw new Error(data.error ?? "Could not create template workspace");
+  }
+  window.location.href = data.builderUrl ?? `/apps/${data.projectId}/builder`;
+}
+
 // ─── Template Card ─────────────────────────────────────────────────────────────
 
 function TemplateCard({
   template,
   onUse,
   featured,
+  using,
 }: {
   template: Template;
-  onUse: (prompt: string) => void;
+  onUse: (template: Template) => void;
   featured?: boolean;
+  using?: boolean;
 }) {
   const [hovered, setHovered] = React.useState(false);
   const cx = complexityLabel[template.complexity];
@@ -113,11 +133,16 @@ function TemplateCard({
             >
               <button
                 type="button"
-                onClick={() => onUse(template.prompt)}
-                className="flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-[13px] font-semibold text-background shadow-lg transition hover:scale-105"
+                disabled={using}
+                onClick={() => onUse(template)}
+                className="flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-[13px] font-semibold text-background shadow-lg transition hover:scale-105 disabled:opacity-60"
               >
-                <Sparkles className="size-4" strokeWidth={1.75} />
-                Launch template
+                {using ? (
+                  <Loader2 className="size-4 animate-spin" strokeWidth={1.75} />
+                ) : (
+                  <Sparkles className="size-4" strokeWidth={1.75} />
+                )}
+                {using ? "Creating…" : "Launch template"}
               </button>
               <Link
                 href="/"
@@ -160,10 +185,11 @@ function TemplateCard({
             <div className="mt-auto flex items-center justify-between border-t border-border/60 pt-3">
               <button
                 type="button"
-                onClick={() => onUse(template.prompt)}
-                className="inline-flex items-center gap-1 text-[13px] font-semibold text-accent transition group-hover:gap-1.5"
+                disabled={using}
+                onClick={() => onUse(template)}
+                className="inline-flex items-center gap-1 text-[13px] font-semibold text-accent transition group-hover:gap-1.5 disabled:opacity-50"
               >
-                Use template
+                {using ? "Creating…" : "Use template"}
                 <ArrowUpRight className="size-3.5" strokeWidth={1.75} />
               </button>
               <Link
@@ -185,9 +211,11 @@ function TemplateCard({
 function FeaturedCard({
   template,
   onUse,
+  using,
 }: {
   template: Template;
-  onUse: (prompt: string) => void;
+  onUse: (template: Template) => void;
+  using?: boolean;
 }) {
   const [hovered, setHovered] = React.useState(false);
 
@@ -246,10 +274,15 @@ function FeaturedCard({
               <Button
                 variant="accent"
                 size="sm"
-                onClick={() => onUse(template.prompt)}
+                disabled={using}
+                onClick={() => onUse(template)}
               >
-                <Sparkles className="size-3.5" strokeWidth={1.75} />
-                Use template
+                {using ? (
+                  <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+                ) : (
+                  <Sparkles className="size-3.5" strokeWidth={1.75} />
+                )}
+                {using ? "Creating…" : "Use template"}
               </Button>
               <Link
                 href="/"
@@ -407,6 +440,21 @@ function CommunityTemplatesSection() {
 export function TemplatesView() {
   const [search, setSearch] = React.useState("");
   const [category, setCategory] = React.useState<TemplateCategory | "all">("all");
+  const [loadingTemplateId, setLoadingTemplateId] = React.useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = React.useState<string | null>(null);
+
+  const handleUseTemplate = React.useCallback(async (template: Template) => {
+    setLoadingTemplateId(template.id);
+    setLoadingMessage(TEMPLATE_LOADING_MSG);
+    try {
+      await activateOfficialTemplate(template);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not use template";
+      toast.error(msg);
+      setLoadingTemplateId(null);
+      setLoadingMessage(null);
+    }
+  }, []);
 
   const filtered = React.useMemo(() => {
     return templates.filter((t) => {
@@ -424,14 +472,23 @@ export function TemplatesView() {
   const popular = filtered.filter((t) => t.popular);
   const others = filtered.filter((t) => !t.popular);
 
-  const applySeed = (prompt: string) => {
-    window.location.href = `/create?prompt=${encodeURIComponent(prompt)}`;
-  };
-
   const isFiltered = search || category !== "all";
 
   return (
     <div className="relative mx-auto max-w-6xl">
+      {loadingMessage ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-background/70 backdrop-blur-sm"
+          data-testid="template-workspace-loading"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface px-8 py-6 shadow-xl ring-1 ring-border">
+            <Loader2 className="size-8 animate-spin text-accent" strokeWidth={1.75} />
+            <p className="text-[14px] font-semibold text-foreground">{loadingMessage}</p>
+          </div>
+        </div>
+      ) : null}
       {/* Ambient glow */}
       <div className="pointer-events-none absolute -left-20 top-0 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--accent)_10%,transparent),transparent_68%)] blur-3xl" />
 
@@ -515,7 +572,11 @@ export function TemplatesView() {
           >
             {featured.map((t) => (
               <motion.div key={t.id} variants={variants.staggerItem}>
-                <FeaturedCard template={t} onUse={applySeed} />
+                <FeaturedCard
+                  template={t}
+                  onUse={handleUseTemplate}
+                  using={loadingTemplateId === t.id}
+                />
               </motion.div>
             ))}
           </motion.div>
@@ -547,7 +608,12 @@ export function TemplatesView() {
                 variants={variants.staggerItem}
                 className={i === 0 ? "sm:col-span-2" : ""}
               >
-                <TemplateCard template={t} onUse={applySeed} featured={i === 0} />
+                <TemplateCard
+                  template={t}
+                  onUse={handleUseTemplate}
+                  featured={i === 0}
+                  using={loadingTemplateId === t.id}
+                />
               </motion.div>
             ))}
           </motion.div>
@@ -574,7 +640,11 @@ export function TemplatesView() {
           >
             {others.map((t) => (
               <motion.div key={t.id} variants={variants.staggerItem}>
-                <TemplateCard template={t} onUse={applySeed} />
+                <TemplateCard
+                  template={t}
+                  onUse={handleUseTemplate}
+                  using={loadingTemplateId === t.id}
+                />
               </motion.div>
             ))}
           </motion.div>
@@ -603,7 +673,7 @@ export function TemplatesView() {
         initial="hidden"
         animate="show"
         transition={{ delay: 0.3 }}
-        className="relative mt-16 rounded-[var(--radius-xl)] border border-border bg-surface/60 p-8 text-center backdrop-blur-xl"
+        className="relative mt-16 rounded-[var(--radius-xl)] border border-border bg-surface/80 p-8 text-center shadow-sm backdrop-blur-xl dark:bg-surface/50 dark:ring-1 dark:ring-border/80"
       >
         <p className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
           CAN'T FIND WHAT YOU NEED?

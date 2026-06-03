@@ -1,6 +1,7 @@
 import { quoteActionCredits } from "@/lib/action-credits/action-credit-pricing";
 import { isFreeRuntimeAction } from "@/lib/action-credits/action-catalog";
 import { getActionCreditAvailability } from "@/lib/action-credits/get-action-credit-availability";
+import { shouldSkipActionCreditsForOwnProvider } from "@/lib/action-credits/own-provider-skip";
 
 export const RUNTIME_ACTION_UNAVAILABLE_MESSAGE =
   "This AI feature is temporarily unavailable. Please try again later.";
@@ -40,6 +41,16 @@ export async function assertActionCreditsAffordable(
   });
 
   if (quote.isFree || isFreeRuntimeAction(quote.canonicalType)) {
+    return { ok: true, required: 0, balance: availability.totalAvailable, quote };
+  }
+
+  if (
+    input.projectId &&
+    (await shouldSkipActionCreditsForOwnProvider({
+      projectId: input.projectId,
+      actionType: quote.canonicalType,
+    }))
+  ) {
     return { ok: true, required: 0, balance: availability.totalAvailable, quote };
   }
 

@@ -50,7 +50,7 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
   return (
     <footer
       className={cn(
-        "vodex-important-links-footer relative mt-auto shrink-0 overflow-visible border-t border-sky-200/50",
+        "vodex-important-links-footer relative mt-auto shrink-0 overflow-visible border-t border-sky-200/50 dark:border-sky-500/25",
         className,
       )}
       data-testid="vodex-important-links-footer"

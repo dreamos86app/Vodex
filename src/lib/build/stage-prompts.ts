@@ -143,6 +143,8 @@ export function frontendPrompt(
       : `Brief: ${brief}`,
     `Plan: ${slices ? slices.planSlice : sliceToTokenBudget(planJson, 500)}`,
     `UI plan: ${slices ? slices.uiSlice : sliceToTokenBudget(uiJson, 400)}`,
+    "MOBILE/PWA: Include viewport export, touch-friendly controls (min 44px), overflow-x hidden, safe-area CSS, public/manifest.webmanifest, capacitor.config.ts stub.",
+    "INTEGRATIONS: If email/payments/DB/AI are requested, gate features when env secrets missing — show honest disabled state, never fake API success.",
   ].join("\n");
 }
 

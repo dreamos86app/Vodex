@@ -8,6 +8,10 @@ export type DashboardSectionAccess =
 
 export type DashboardSectionId =
   | "overview"
+  | "mobile"
+  | "preview"
+  | "code"
+  | "publish"
   | "users"
   | "data"
   | "analytics"
@@ -44,8 +48,17 @@ export function isProjectPublished(project: ProjectAccessInput | null | undefine
   );
 }
 
-/** Available before first publish — setup-focused sections only. */
-const PRE_PUBLISH_UNLOCKED: DashboardSectionId[] = ["overview", "settings"];
+/** Available before first publish — setup, mobile, secrets, integrations. */
+const PRE_PUBLISH_UNLOCKED: DashboardSectionId[] = [
+  "overview",
+  "settings",
+  "secrets",
+  "integrations",
+  "mobile",
+  "preview",
+  "code",
+  "publish",
+];
 
 /** Requires live publish before use. */
 const PUBLISH_GATED: DashboardSectionId[] = [
@@ -57,8 +70,6 @@ const PUBLISH_GATED: DashboardSectionId[] = [
   "automations",
   "payments",
   "security",
-  "secrets",
-  "integrations",
   "domains",
 ];
 

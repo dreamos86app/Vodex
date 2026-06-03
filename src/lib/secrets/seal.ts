@@ -5,9 +5,13 @@ const IV_LEN = 12;
 const TAG_LEN = 16;
 
 function getMasterKey(): Buffer {
-  const raw = process.env.DREAMOS_SECRETS_MASTER_KEY?.trim();
+  const raw =
+    process.env.APP_SECRET_ENCRYPTION_KEY?.trim() ??
+    process.env.DREAMOS_SECRETS_MASTER_KEY?.trim();
   if (!raw) {
-    throw new Error("DREAMOS_SECRETS_MASTER_KEY is not set (256-bit hex secret required)");
+    throw new Error(
+      "APP_SECRET_ENCRYPTION_KEY or DREAMOS_SECRETS_MASTER_KEY is not set (256-bit hex secret required)",
+    );
   }
   let hex = raw.startsWith("0x") ? raw.slice(2) : raw;
   if (/^[0-9a-fA-F]+$/.test(hex) && hex.length === 64) {
