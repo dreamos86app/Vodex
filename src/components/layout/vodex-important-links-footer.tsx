@@ -50,18 +50,27 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
   return (
     <footer
       className={cn(
-        "vodex-important-links-footer relative mt-auto shrink-0 overflow-hidden border-t border-sky-300/40 dark:border-cyan-500/30",
+        "vodex-important-links-footer relative mt-auto shrink-0 overflow-hidden",
         className,
       )}
       data-testid="vodex-important-links-footer"
     >
-      <div className="vodex-footer-depth-glow pointer-events-none absolute inset-0" aria-hidden />
-      <div className="vodex-footer-particles pointer-events-none absolute inset-0" aria-hidden />
-      <div className="vodex-footer-snow-crystals pointer-events-none absolute inset-0" aria-hidden />
-      <div className="vodex-footer-ambient pointer-events-none absolute inset-0" aria-hidden />
+      <div className="vodex-footer-depth-glow pointer-events-none absolute inset-0 z-0" aria-hidden />
+      <div className="vodex-footer-particles pointer-events-none absolute inset-0 z-0" aria-hidden />
+      <div className="vodex-footer-snow-crystals pointer-events-none absolute inset-0 z-0" aria-hidden />
+      <div className="vodex-footer-ambient pointer-events-none absolute inset-0 z-0" aria-hidden />
       <FooterIcedBirds />
-      <div className="vodex-footer-glass relative z-[2] mx-auto max-w-6xl px-[var(--page-padding-x)] py-5 sm:py-6">
-        <div className="mb-4 grid gap-5 lg:grid-cols-[1fr_minmax(220px,260px)] lg:items-center lg:gap-6">
+
+      <div className="vodex-footer-glass relative z-[2]">
+        <div className="vodex-footer-discord-standalone mx-auto max-w-6xl px-[var(--page-padding-x)] pb-4 pt-5 sm:pb-5 sm:pt-6">
+          <PremiumDiscordCard
+            variant="footer"
+            testId="footer-discord-social"
+            className="vodex-discord-card-icy--footer mx-auto w-full max-w-md"
+          />
+        </div>
+
+        <div className="mx-auto max-w-6xl border-t border-white/25 px-[var(--page-padding-x)] py-4 dark:border-sky-400/15 sm:py-5">
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
             {COLUMNS.map((col) => (
               <div key={col.title}>
@@ -94,15 +103,10 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
               </div>
             ))}
           </div>
-          <PremiumDiscordCard
-            variant="footer"
-            testId="footer-discord-social"
-            className="vodex-discord-card-icy--footer max-lg:max-w-md"
-          />
+          <p className="mt-5 text-center text-[11px] font-semibold tracking-wide text-slate-600/90 dark:text-slate-400/95">
+            © {new Date().getFullYear()} Vodex · Built for AI-native creators
+          </p>
         </div>
-        <p className="text-center text-[11px] font-semibold tracking-wide text-slate-600/90 dark:text-slate-400/95">
-          © {new Date().getFullYear()} Vodex · Built for AI-native creators
-        </p>
       </div>
     </footer>
   );

@@ -30,6 +30,7 @@ export function VodexSessionIntro({
   const reducedMotion = useReducedMotion();
   const [phase, setPhase] = React.useState<"hidden" | "show" | "exit">("hidden");
   const [timeline, setTimeline] = React.useState(0);
+  const [layout, setLayout] = React.useState<"desktop" | "mobile">("desktop");
   const [revealComplete, setRevealComplete] = React.useState(false);
   const doneRef = React.useRef(false);
   const visibleReported = React.useRef(false);
@@ -72,13 +73,26 @@ export function VodexSessionIntro({
       visibleReported.current = true;
       onVisible?.();
     }
+    const mq = window.matchMedia("(max-width: 767px)");
+    const applyLayout = () => setLayout(mq.matches ? "mobile" : "desktop");
+    applyLayout();
+    mq.addEventListener("change", applyLayout);
+
     let raf = 0;
+    let lastPublish = 0;
     const tick = (now: number) => {
-      setTimeline((now - startedAtRef.current) / 1000);
+      const t = (now - startedAtRef.current) / 1000;
+      if (now - lastPublish >= 32) {
+        lastPublish = now;
+        setTimeline(t);
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      mq.removeEventListener("change", applyLayout);
+    };
   }, [show, onVisible]);
 
   React.useEffect(() => {
@@ -90,9 +104,6 @@ export function VodexSessionIntro({
   if (phase === "hidden") return null;
 
   const exiting = phase === "exit";
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-  const layout = isMobile ? "mobile" : "desktop";
-
   const envReady = timeline >= SHOWCASE_START_S - 0.05;
   const inShowcase = timeline >= SHOWCASE_START_S && timeline < SHOWCASE_END_S;
   const collapsing = timeline >= SHOWCASE_END_S && timeline < COLLAPSE_END_S;
@@ -103,6 +114,7 @@ export function VodexSessionIntro({
     <AnimatePresence>
       <motion.div
         className={`vodex-cinematic-intro vodex-intro-v3 vodex-intro-p13 vodex-intro-p14 fixed inset-0 z-[9999] overflow-hidden ${exiting ? "vodex-cinematic-intro--exit" : ""}`}
+        style={{ contain: "strict" }}
         data-testid="vodex-session-intro"
         data-intro-version="p14"
         role="status"

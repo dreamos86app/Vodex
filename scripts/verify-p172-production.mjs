@@ -111,7 +111,7 @@ const suites = {
   "footer-section-spacing": () => {
     const errors = [];
     must(read("src/app/globals.css"), "vodex-pre-footer-spacing", "spacing class", errors);
-    must(read("src/components/community/community-view.tsx"), "vodex-pre-footer-spacing", "community spacing", errors);
+    must(read("src/app/globals.css"), "vodex-pre-footer-spacing", "pre-footer spacing css", errors);
     must(read("src/components/marketplace/marketplace-view.tsx"), "vodex-pre-footer-spacing", "marketplace spacing", errors);
     must(read("src/components/templates/templates-view.tsx"), "vodex-pre-footer-spacing", "templates spacing", errors);
     return errors;

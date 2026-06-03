@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, MessageSquare, Users, LayoutGrid } from "lucide-react";
+import { Home, Compass, MessageSquare, Users, LayoutGrid, Settings } from "lucide-react";
 import {
   DeferredMobileNav,
   DeferredSidebar,
@@ -135,6 +135,7 @@ const MOBILE_NAV = [
   { href: "/explore", icon: Compass, label: "Explore" },
   { href: "/chat", icon: MessageSquare, label: "Chat" },
   { href: "/community", icon: Users, label: "Community" },
+  { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
 function MobileBottomNav() {
@@ -142,18 +143,28 @@ function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex items-center border-t border-border lg:hidden bg-background/90 backdrop-blur-xl"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      className="vodex-mobile-bottom-nav fixed bottom-0 left-0 right-0 z-40 flex items-stretch border-t border-border bg-background/95 backdrop-blur-md lg:hidden"
+      style={{
+        paddingBottom: "max(env(safe-area-inset-bottom, 0px), 0px)",
+        paddingLeft: "env(safe-area-inset-left, 0px)",
+        paddingRight: "env(safe-area-inset-right, 0px)",
+      }}
+      aria-label="Primary"
     >
       {MOBILE_NAV.map((item) => {
-        const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const active =
+          item.href === "/"
+            ? pathname === "/"
+            : item.href === "/settings"
+              ? pathname === "/settings" || pathname.startsWith("/settings/")
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = item.icon;
         return (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors",
+              "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-2 text-[9px] font-medium leading-none transition-colors sm:text-[10px]",
               active ? "text-accent" : "text-muted-foreground",
             )}
           >
@@ -161,10 +172,10 @@ function MobileBottomNav() {
               <span className="absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-accent" />
             )}
             <Icon
-              className={cn("size-5 transition-transform", active && "scale-110")}
+              className={cn("size-[18px] shrink-0 sm:size-5", active && "scale-105")}
               strokeWidth={active ? 2 : 1.5}
             />
-            <span>{item.label}</span>
+            <span className="max-w-full truncate">{item.label}</span>
           </Link>
         );
       })}
@@ -260,10 +271,10 @@ export function PlatformShell({
         <main
           className={
             isHomeShellScroll
-              ? "relative flex min-h-0 flex-1 min-w-0 flex-col overflow-y-auto overflow-x-hidden"
+              ? "relative flex min-h-0 flex-1 min-w-0 flex-col overflow-y-auto overflow-x-hidden pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
               : isFullBleed
                 ? "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                : "relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-atmosphere px-[var(--page-padding-x)] pt-[var(--page-padding-y)] pb-0"
+                : "relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-atmosphere px-[var(--page-padding-x)] pt-[var(--page-padding-y)] pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
           }
           style={
             isHomeShellScroll || !isFullBleed ? { scrollBehavior: "smooth" } : undefined

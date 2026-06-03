@@ -855,12 +855,40 @@ body {
   top: 8%;
   left: -20%;
   background: radial-gradient(ellipse, rgb(56 189 248 / 0.45), transparent 70%);
+  animation: vodex-intro-aurora-a 8s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 .vodex-intro-p13__aurora--b {
   bottom: 10%;
   right: -25%;
   background: radial-gradient(ellipse, rgb(99 102 241 / 0.35), transparent 72%);
+  animation: vodex-intro-aurora-b 10s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes vodex-intro-aurora-a {
+  0%,
+  100% {
+    transform: translate3d(-8%, 0, 0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate3d(12%, 0, 0);
+    opacity: 0.55;
+  }
+}
+
+@keyframes vodex-intro-aurora-b {
+  0%,
+  100% {
+    transform: translate3d(10%, 0, 0);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translate3d(-6%, 0, 0);
+    opacity: 0.45;
+  }
 }
 
 .vodex-intro-p13__particle {
@@ -1474,23 +1502,49 @@ body {
 }
 
 .vodex-important-links-footer {
+  --vodex-footer-fade: color-mix(in srgb, var(--background) 72%, transparent);
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
   margin-top: clamp(2.5rem, 4.5vw, 3.75rem);
   margin-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+  border-top: 1px solid rgb(186 230 253 / 0.35);
   background:
-    radial-gradient(ellipse 90% 80% at 0% 100%, rgb(56 189 248 / 0.38), transparent 58%),
-    radial-gradient(ellipse 90% 80% at 100% 100%, rgb(14 165 233 / 0.32), transparent 58%),
-    radial-gradient(ellipse 120% 70% at 50% -30%, rgb(255 255 255 / 0.55), transparent 52%),
-    linear-gradient(178deg, #a8daf8 0%, #8ecbf2 38%, #75bde9 72%, #5fafe3 100%);
-  border-top-color: rgb(125 211 252 / 0.75);
+    radial-gradient(ellipse 90% 80% at 0% 100%, rgb(56 189 248 / 0.28), transparent 58%),
+    radial-gradient(ellipse 90% 80% at 100% 100%, rgb(14 165 233 / 0.22), transparent 58%),
+    linear-gradient(
+      180deg,
+      var(--vodex-footer-fade) 0%,
+      rgb(255 255 255 / 0.55) 12%,
+      rgb(224 242 254 / 0.75) 32%,
+      rgb(186 230 253 / 0.85) 58%,
+      rgb(147 197 253 / 0.9) 100%
+    );
+  overflow-x: hidden;
 }
 
 .dark .vodex-important-links-footer {
+  --vodex-footer-fade: color-mix(in srgb, var(--background) 78%, transparent);
+  border-top-color: rgb(34 211 238 / 0.22);
   background:
-    radial-gradient(ellipse 85% 75% at 0% 100%, rgb(34 211 238 / 0.22), transparent 55%),
-    radial-gradient(ellipse 85% 75% at 100% 100%, rgb(59 130 246 / 0.2), transparent 55%),
-    radial-gradient(ellipse 100% 60% at 50% 0%, rgb(56 189 248 / 0.14), transparent 50%),
-    linear-gradient(180deg, #020617 0%, #061525 42%, #0a2340 100%);
-  border-top-color: rgb(34 211 238 / 0.35);
+    radial-gradient(ellipse 85% 75% at 0% 100%, rgb(34 211 238 / 0.16), transparent 55%),
+    radial-gradient(ellipse 85% 75% at 100% 100%, rgb(59 130 246 / 0.14), transparent 55%),
+    linear-gradient(
+      180deg,
+      var(--vodex-footer-fade) 0%,
+      rgb(15 23 42 / 0.35) 14%,
+      rgb(12 35 58 / 0.72) 40%,
+      rgb(8 47 73 / 0.88) 100%
+    );
+}
+
+@media (max-width: 1023px) {
+  .vodex-important-links-footer {
+    margin-top: clamp(0.85rem, 2.5vw, 1.25rem);
+  }
 }
 
 .vodex-footer-depth-glow {
@@ -1613,7 +1667,13 @@ body {
 }
 
 .vodex-footer-glass {
-  backdrop-filter: blur(6px);
+  position: relative;
+  isolation: isolate;
+}
+
+.vodex-footer-discord-standalone {
+  position: relative;
+  z-index: 3;
 }
 
 .vodex-footer-title-glow {
@@ -1628,7 +1688,7 @@ body {
     0 1px 2px rgb(0 0 0 / 0.55);
 }
 
-/* Footer icy birds — static premium PNG, left/right placement */
+/* Footer icy birds — static PNG; desktop dual, mobile single */
 .vodex-footer-birds-arena {
   position: absolute;
   inset: 0;
@@ -1648,7 +1708,7 @@ body {
   width: clamp(100px, 14vw, 168px);
   max-width: 38%;
   line-height: 0;
-  transform: translateY(-50%);
+  transform: translate3d(0, -50%, 0);
 }
 
 .vodex-footer-bird-static--left {
@@ -1668,32 +1728,62 @@ body {
   image-rendering: auto;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  transform: translateZ(0);
-  filter: drop-shadow(0 2px 5px rgb(14 116 144 / 0.22));
+  transform: translate3d(0, 0, 0);
 }
 
 .vodex-footer-bird-png--mirrored {
-  transform: translateZ(0) scaleX(-1);
+  transform: translate3d(0, 0, 0) scaleX(-1);
 }
 
-.dark .vodex-footer-bird-png {
-  filter: drop-shadow(0 2px 8px rgb(34 211 238 / 0.38)) brightness(1.03);
+@media (max-width: 1023px) {
+  .vodex-footer-bird-static--desktop-only {
+    display: none !important;
+  }
+
+  .vodex-footer-bird-static--left {
+    top: auto;
+    bottom: 22%;
+    left: max(0.35rem, env(safe-area-inset-left, 0px));
+    width: clamp(108px, 30vw, 132px);
+    max-width: 46%;
+    transform: translate3d(0, 0, 0);
+    z-index: 1;
+  }
+
+  .vodex-footer-bird-png {
+    image-rendering: auto;
+    opacity: 1;
+    filter: none;
+  }
+
+  .dark .vodex-footer-bird-png {
+    filter: none;
+    opacity: 1;
+  }
 }
 
-.dark .vodex-footer-bird-png--mirrored {
-  filter: drop-shadow(0 2px 8px rgb(34 211 238 / 0.38)) brightness(1.03);
-}
+@media (min-width: 1024px) {
+  .vodex-footer-bird-png {
+    filter: drop-shadow(0 2px 4px rgb(14 116 144 / 0.18));
+  }
 
-@media (max-width: 640px) {
-  .vodex-footer-bird-static {
-    width: clamp(80px, 24vw, 108px);
-    max-width: 34%;
-    opacity: 0.95;
+  .dark .vodex-footer-bird-png {
+    filter: drop-shadow(0 2px 6px rgb(34 211 238 / 0.28));
   }
 }
 
 .vodex-pre-footer-spacing {
   margin-bottom: clamp(1.25rem, 3.5vw, 2rem);
+}
+
+@media (max-width: 1023px) {
+  .vodex-pre-footer-spacing {
+    margin-bottom: clamp(0.5rem, 2vw, 0.85rem);
+  }
+}
+
+.vodex-mobile-bottom-nav {
+  contain: layout style;
 }
 
 .vodex-intro-p13__image-panel img {
@@ -1708,8 +1798,9 @@ body {
   .vodex-footer-ambient::after,
   .vodex-footer-particles,
   .vodex-footer-snow-crystals,
-  .vodex-sparkle-dot {
+  .vodex-sparkle-dot,
+  .vodex-intro-p13__aurora--a,
+  .vodex-intro-p13__aurora--b {
     animation: none !important;
   }
-
 }

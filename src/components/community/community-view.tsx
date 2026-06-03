@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { variants } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import { VodexDiscordCommunityCard } from "@/components/community/vodex-discord-community-card";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import type { Discussion } from "@/lib/supabase/types";
@@ -96,9 +95,6 @@ function CommunityFetchFallback({
         <Button variant="ghost" size="sm" type="button" onClick={onRetry}>
           Retry
         </Button>
-      </div>
-      <div className="mt-8 w-full max-w-xl">
-        <VodexDiscordCommunityCard />
       </div>
     </div>
   );
@@ -1078,15 +1074,6 @@ export function CommunityView() {
         )}
       </AnimatePresence>
 
-      <motion.div
-        variants={variants.fadeUp}
-        initial="hidden"
-        animate="show"
-        transition={{ delay: 0.12 }}
-        className="vodex-pre-footer-spacing relative mt-10"
-      >
-        <VodexDiscordCommunityCard />
-      </motion.div>
     </div>
   );
 }

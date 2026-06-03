@@ -330,8 +330,9 @@ const suites = {
   },
   "discord-community-card": () => {
     const errors = [];
-    must(read("src/components/community/vodex-discord-community-card.tsx"), "Join the Vodex Community", "discord card", errors);
-    must(read("src/components/community/community-view.tsx"), "VodexDiscordCommunityCard", "community wired", errors);
+    must(read("src/components/ui/premium-discord-card.tsx"), "Join the Vodex Community", "discord card", errors);
+    must(read("src/components/layout/vodex-important-links-footer.tsx"), "footer-discord-social", "footer discord", errors);
+    must(read("src/components/layout/vodex-important-links-footer.tsx"), "vodex-footer-discord-standalone", "standalone discord", errors);
     return errors;
   },
   "intro-mobile-image-sizing": () => {
