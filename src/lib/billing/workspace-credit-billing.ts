@@ -65,6 +65,19 @@ export async function resolveCreditBillingTarget(
     if (project) {
       workspaceId = project.workspace_id ?? workspaceId;
       workspaceOwnerId = project.owner_id;
+
+      // Collaborators always bill the app owner (prevents free-account credit bypass).
+      if (project.owner_id && project.owner_id !== actorUserId) {
+        return {
+          actorUserId,
+          billedUserId: project.owner_id,
+          billedToType: "workspace",
+          billingMode,
+          workspaceId,
+          projectId,
+          workspaceOwnerId: project.owner_id,
+        };
+      }
     }
   }
 

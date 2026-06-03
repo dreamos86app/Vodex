@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useCommandCenter } from "@/components/command/command-center";
 import { NotificationBell } from "@/components/notifications/notification-panel";
+import { QuickCollaboratorPopover } from "@/components/layout/quick-collaborator-popover";
 
 type TopBarProps = {
   mode: "create" | "standard";
@@ -74,6 +75,8 @@ export function TopBar({ mode, title, subtitle, onMenuClick }: TopBarProps) {
         </button>
 
         <ThemeToggle />
+
+        <QuickCollaboratorPopover />
 
         {/* Notifications bell — opens in-app panel */}
         <NotificationBell />

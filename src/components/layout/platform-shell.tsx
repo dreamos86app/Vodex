@@ -164,7 +164,7 @@ function MobileBottomNav() {
             key={item.href}
             href={item.href}
             className={cn(
-              "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-2 text-[9px] font-medium leading-none transition-colors sm:text-[10px]",
+              "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-2.5 text-[9px] font-medium leading-none transition-colors sm:py-3 sm:text-[10px]",
               active ? "text-accent" : "text-muted-foreground",
             )}
           >

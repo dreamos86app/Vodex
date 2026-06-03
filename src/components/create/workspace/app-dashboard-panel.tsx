@@ -34,15 +34,17 @@ import {
   Smartphone,
 } from "lucide-react";
 import { MobileWrapperStudio } from "@/components/mobile/mobile-wrapper-studio";
-import { AppSecretsIntegrationsPanel } from "@/components/integrations/app-secrets-integrations-panel";
+import { AppProjectSecretsPanel } from "@/components/integrations/app-project-secrets-panel";
+import { IntegrationsCatalogPanel } from "@/components/integrations/integrations-catalog-panel";
 import { ProjectPaymentsPanel } from "@/components/payments/project-payments-panel";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
-import { ProjectIntegrationsPanel } from "@/components/integrations/project-integrations-panel";
 import { RepairCenter } from "@/components/repair/repair-center";
 import { AppSettingsInlineForm } from "@/components/create/workspace/app-settings-inline-form";
 import { PublishStatusPanel } from "@/components/publish/publish-status-panel";
+import { PublishSetupChecklist } from "@/components/publish/publish-setup-checklist";
+import type { PublishSetupGap } from "@/lib/publish/integration-secret-readiness";
 import { ImportedSecretsSetupPanel } from "@/components/import/imported-secrets-setup-panel";
 import { loadProjectFilePaths } from "@/lib/projects/load-project-files";
 import { isZipImportProject } from "@/lib/projects/imported-project-state";
@@ -65,6 +67,8 @@ import {
   isProjectPublished,
   type DashboardSectionId,
 } from "@/lib/dashboard/section-access";
+import { isPaidPlan } from "@/lib/billing/plan-features";
+import { PublishTemplateModal } from "@/components/templates/publish-template-modal";
 
 type ProjectRow = Pick<
   Tables<"projects">,
@@ -237,6 +241,7 @@ export function AppDashboardPanel({
   activeSection,
   onSectionChange,
   onOpenPublish,
+  onInsertChatPrompt,
   planId = "free",
 }: {
   project: ProjectRow | null;
@@ -245,6 +250,7 @@ export function AppDashboardPanel({
   activeSection?: DashSection;
   onSectionChange?: (section: DashSection) => void;
   onOpenPublish?: () => void;
+  onInsertChatPrompt?: (prompt: string) => void;
   planId?: string;
 }) {
   const supabase = React.useMemo(() => createClient(), []);
@@ -266,9 +272,11 @@ export function AppDashboardPanel({
   const [fileCount, setFileCount] = React.useState(0);
   const [cardStatus, setCardStatus] = React.useState<ProjectCardStatus | null>(null);
   const [publishReady, setPublishReady] = React.useState(false);
+  const [publishTemplateOpen, setPublishTemplateOpen] = React.useState(false);
   const { user, profile } = useAuthStore();
   const isAdmin = isDreamosOwnerEmail(user?.email ?? profile?.email);
   const [publishBlockers, setPublishBlockers] = React.useState<string[]>([]);
+  const [publishSetupGaps, setPublishSetupGaps] = React.useState<PublishSetupGap[]>([]);
   const [previewErrors, setPreviewErrors] = React.useState<
     Array<{ message: string; file?: string; line?: number }>
   >([]);
@@ -323,9 +331,15 @@ export function AppDashboardPanel({
       if (cancelled) return;
       const bs = buildStatusJson as { card_status?: ProjectCardStatus } | null;
       if (bs?.card_status) setCardStatus(bs.card_status);
-      const ready = readyJson as { canPublish?: boolean; canPublishWeb?: boolean; blockers?: string[] } | null;
+      const ready = readyJson as {
+        canPublish?: boolean;
+        canPublishWeb?: boolean;
+        blockers?: string[];
+        setupGaps?: PublishSetupGap[];
+      } | null;
       setPublishReady(Boolean(ready?.canPublish ?? ready?.canPublishWeb));
       setPublishBlockers(ready?.blockers ?? []);
+      setPublishSetupGaps(ready?.setupGaps ?? []);
       const errs = errJson as { errors?: Array<{ message: string; file?: string; line?: number }> };
       setPreviewErrors(errs?.errors ?? []);
     });
@@ -440,6 +454,7 @@ export function AppDashboardPanel({
       normalizedLifecycle === "failed" ||
       normalizedLifecycle === "needs_attention");
   const canPublish = publishReady;
+  const canPublishTemplate = isPaidPlan(planId) && hasFiles;
   const displayName = (dashProject as ProjectRow).app_name?.trim() || dashProject.name || "App";
   const displayDesc =
     (dashProject as ProjectRow).short_description?.trim() ||
@@ -461,32 +476,17 @@ export function AppDashboardPanel({
   const sectionAccess = getDashboardSectionAccess(dashProject, section, planId);
 
   const overviewContent = (
-    <div className="space-y-4">
-      <div className="flex items-start gap-3 rounded-2xl bg-white/95 px-4 py-4 shadow-sm ring-1 ring-accent/10 dark:bg-background/90">
-        <div className="relative size-14 shrink-0 overflow-hidden rounded-2xl ring-1 ring-border">
-          <Image src={iconSrc} alt="" width={56} height={56} className="size-full object-cover" unoptimized />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-[16px] font-semibold text-foreground">{displayName}</p>
-            <span
-              className={cn(
-                "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1",
-                normalizedLifecycle === "published"
-                  ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25"
-                  : isBusy
-                    ? "bg-accent/10 text-accent ring-accent/25"
-                    : "bg-muted text-muted-foreground ring-border",
-              )}
-            >
-              {isBusy && effectiveCardStatus === "building" ? "Building" : cardDisplay.label}
-            </span>
-          </div>
-          {displayDesc ? (
-            <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{displayDesc}</p>
-          ) : null}
-        </div>
-      </div>
+    <div className="space-y-4" data-testid="overview-app-editing">
+      <SectionCard title="App details">
+        <AppSettingsInlineForm
+          projectId={projectId}
+          initialName={displayName}
+          initialDescription={displayDesc ?? ""}
+          initialPublic={Boolean(dashProject.is_public)}
+          iconSrc={iconSrc}
+          onSaved={() => setSettingsRefresh((k) => k + 1)}
+        />
+      </SectionCard>
 
       <div className="flex flex-wrap gap-2">
         <Link
@@ -517,6 +517,17 @@ export function AppDashboardPanel({
         >
           Edit details
         </Link>
+        {canPublishTemplate ? (
+          <button
+            type="button"
+            onClick={() => setPublishTemplateOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-3.5 py-2 text-[12px] font-semibold text-foreground ring-1 ring-border hover:ring-accent/30"
+            data-testid="publish-as-template-button"
+          >
+            <Megaphone className="size-3.5" />
+            Publish as template
+          </button>
+        ) : null}
       </div>
 
       {importedReady && (
@@ -713,7 +724,18 @@ export function AppDashboardPanel({
           </SectionCard>
         );
       case "integrations":
-        return <ProjectIntegrationsPanel projectId={projectId} planId={planId} />;
+        return (
+          <IntegrationsCatalogPanel
+            projectId={projectId}
+            planId={planId}
+            onInsertChatPrompt={(prompt) => {
+              if (onInsertChatPrompt) onInsertChatPrompt(prompt);
+              else {
+                window.location.href = `/apps/${projectId}/builder?insertPrompt=${encodeURIComponent(prompt)}`;
+              }
+            }}
+          />
+        );
       case "payments":
         return <ProjectPaymentsPanel projectId={projectId} planId={planId} published={published} />;
       case "security":
@@ -816,6 +838,9 @@ export function AppDashboardPanel({
       case "publish":
         return (
           <div className="space-y-3">
+            {publishSetupGaps.length > 0 ? (
+              <PublishSetupChecklist projectId={projectId} gaps={publishSetupGaps} />
+            ) : null}
             <PublishStatusPanel
               projectId={projectId}
               status={canPublish ? "ready" : publishBlockers.length > 0 ? "blocked" : "draft"}
@@ -836,8 +861,8 @@ export function AppDashboardPanel({
         );
       case "secrets":
         return (
-          <SectionCard title="Secrets & Integrations">
-            <AppSecretsIntegrationsPanel
+          <SectionCard title="Project secrets">
+            <AppProjectSecretsPanel
               projectId={projectId}
               appPrompt={typeof meta.template_prompt === "string" ? meta.template_prompt : displayDesc ?? ""}
             />
@@ -933,6 +958,13 @@ export function AppDashboardPanel({
   })();
 
   return (
+    <>
+    <PublishTemplateModal
+      open={publishTemplateOpen}
+      onClose={() => setPublishTemplateOpen(false)}
+      projectId={projectId}
+      defaultTitle={displayName}
+    />
     <div className="flex h-full min-h-0 bg-gradient-to-b from-[#f6f9ff] to-background" data-testid="app-dashboard-panel">
       <nav
         className="hidden w-44 shrink-0 flex-col gap-0.5 border-r border-border/60 bg-background/80 p-2 lg:flex"
@@ -982,5 +1014,6 @@ export function AppDashboardPanel({
         <div className="min-h-0 flex-1 overflow-y-auto p-4">{renderSectionBody()}</div>
       </div>
     </div>
+    </>
   );
 }

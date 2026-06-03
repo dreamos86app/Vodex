@@ -7,7 +7,7 @@ import { FooterIcedBirds } from "@/components/layout/footer-iced-birds";
 
 const STATUS_URL = "https://status.vodex.dev";
 
-const COLUMNS = [
+const LINK_COLUMNS = [
   {
     title: "Product",
     links: [
@@ -37,14 +37,54 @@ const COLUMNS = [
       { href: "/contact", label: "Contact" },
     ],
   },
-  {
-    title: "Billing",
-    links: [
-      { href: "/pricing", label: "Pricing" },
-      { href: "/settings/billing", label: "Billing" },
-    ],
-  },
 ] as const;
+
+const BILLING_LINKS = [
+  { href: "/pricing", label: "Pricing" },
+  { href: "/settings/billing", label: "Billing" },
+] as const;
+
+function FooterLinkColumn({
+  title,
+  links,
+  children,
+}: {
+  title: string;
+  links: readonly { href: string; label: string; external?: boolean }[];
+  children?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="vodex-footer-title-glow text-[11px] font-extrabold uppercase tracking-[0.2em] text-sky-800 dark:text-cyan-200">
+        {title}
+      </p>
+      <ul className="mt-2.5 space-y-2">
+        {links.map((link) => (
+          <li key={`${title}-${link.label}`}>
+            {"external" in link && link.external ? (
+              <a
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[12.5px] font-semibold text-slate-700/95 transition hover:text-sky-800 hover:underline dark:text-slate-300/95 dark:hover:text-cyan-200"
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                href={link.href}
+                className="text-[12.5px] font-semibold text-slate-700/95 transition hover:text-sky-800 hover:underline dark:text-slate-300/95 dark:hover:text-cyan-200"
+              >
+                {link.label}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
+      {children}
+    </div>
+  );
+}
 
 export function VodexImportantLinksFooter({ className }: { className?: string }) {
   return (
@@ -62,7 +102,7 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
       <FooterIcedBirds />
 
       <div className="vodex-footer-glass relative z-[2]">
-        <div className="vodex-footer-discord-standalone mx-auto max-w-6xl px-[var(--page-padding-x)] pb-4 pt-5 sm:pb-5 sm:pt-6">
+        <div className="vodex-footer-discord-standalone vodex-footer-discord-mobile mx-auto max-w-6xl px-[var(--page-padding-x)] pb-4 pt-5 sm:pb-5 sm:pt-6 lg:hidden">
           <PremiumDiscordCard
             variant="footer"
             testId="footer-discord-social"
@@ -70,38 +110,20 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
           />
         </div>
 
-        <div className="mx-auto max-w-6xl border-t border-white/25 px-[var(--page-padding-x)] py-4 dark:border-sky-400/15 sm:py-5">
+        <div className="mx-auto max-w-6xl border-t border-white/25 px-[var(--page-padding-x)] py-4 dark:border-sky-400/15 sm:py-5 lg:border-t-0 lg:pt-0">
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
-            {COLUMNS.map((col) => (
-              <div key={col.title}>
-                <p className="vodex-footer-title-glow text-[11px] font-extrabold uppercase tracking-[0.2em] text-sky-800 dark:text-cyan-200">
-                  {col.title}
-                </p>
-                <ul className="mt-2.5 space-y-2">
-                  {col.links.map((link) => (
-                    <li key={`${col.title}-${link.label}`}>
-                      {"external" in link && link.external ? (
-                        <a
-                          href={link.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[12.5px] font-semibold text-slate-700/95 transition hover:text-sky-800 hover:underline dark:text-slate-300/95 dark:hover:text-cyan-200"
-                        >
-                          {link.label}
-                        </a>
-                      ) : (
-                        <Link
-                          href={link.href}
-                          className="text-[12.5px] font-semibold text-slate-700/95 transition hover:text-sky-800 hover:underline dark:text-slate-300/95 dark:hover:text-cyan-200"
-                        >
-                          {link.label}
-                        </Link>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {LINK_COLUMNS.map((col) => (
+              <FooterLinkColumn key={col.title} title={col.title} links={col.links} />
             ))}
+            <FooterLinkColumn title="Billing" links={BILLING_LINKS}>
+              <div className="vodex-footer-discord-desktop mt-4 hidden lg:block">
+                <PremiumDiscordCard
+                  variant="footer"
+                  testId="footer-discord-social-desktop"
+                  className="vodex-discord-card-icy--footer w-full max-w-[260px]"
+                />
+              </div>
+            </FooterLinkColumn>
           </div>
           <p className="mt-5 text-center text-[11px] font-semibold tracking-wide text-slate-600/90 dark:text-slate-400/95">
             © {new Date().getFullYear()} Vodex · Built for AI-native creators

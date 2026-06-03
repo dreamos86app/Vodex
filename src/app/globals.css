@@ -1711,15 +1711,46 @@ body {
   transform: translate3d(0, -50%, 0);
 }
 
+.vodex-footer-bird-aura {
+  position: absolute;
+  inset: -14%;
+  z-index: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(186 230 253 / 0.55) 0%, rgb(56 189 248 / 0.2) 45%, transparent 72%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.dark .vodex-footer-bird-aura {
+  background: radial-gradient(circle, rgb(34 211 238 / 0.4) 0%, rgb(14 165 233 / 0.15) 50%, transparent 72%);
+  opacity: 0.9;
+}
+
 .vodex-footer-bird-static--left {
-  left: clamp(0.5rem, 2.5vw, 1.5rem);
+  left: clamp(8%, 12vw, 14%);
 }
 
 .vodex-footer-bird-static--right {
-  right: clamp(0.5rem, 2.5vw, 1.5rem);
+  right: clamp(8%, 12vw, 14%);
+}
+
+.vodex-footer-bird-static--desktop-only {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .vodex-footer-bird-static--desktop-only {
+    display: block;
+  }
+
+  .vodex-footer-bird-static--mobile-only {
+    display: none !important;
+  }
 }
 
 .vodex-footer-bird-png {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: auto;
   display: block;
@@ -1736,22 +1767,19 @@ body {
 }
 
 @media (max-width: 1023px) {
-  .vodex-footer-bird-static--desktop-only {
-    display: none !important;
-  }
-
-  .vodex-footer-bird-static--left {
+  .vodex-footer-bird-static--mobile-only {
+    display: block;
     top: auto;
-    bottom: 22%;
-    left: max(0.35rem, env(safe-area-inset-left, 0px));
-    width: clamp(108px, 30vw, 132px);
-    max-width: 46%;
+    bottom: 24%;
+    right: max(0.25rem, env(safe-area-inset-right, 0px));
+    left: auto;
+    width: clamp(108px, 32vw, 128px);
+    max-width: 48%;
     transform: translate3d(0, 0, 0);
     z-index: 1;
   }
 
   .vodex-footer-bird-png {
-    image-rendering: auto;
     opacity: 1;
     filter: none;
   }
@@ -1760,6 +1788,11 @@ body {
     filter: none;
     opacity: 1;
   }
+}
+
+.vodex-footer-discord-desktop {
+  position: relative;
+  z-index: 3;
 }
 
 @media (min-width: 1024px) {
@@ -1789,6 +1822,103 @@ body {
 .vodex-intro-p13__image-panel img {
   object-fit: contain !important;
   object-position: center center !important;
+}
+
+.vodex-logout-modal-backdrop {
+  background: rgb(2 6 23 / 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.dark .vodex-logout-modal-backdrop {
+  background: rgb(0 0 0 / 0.65);
+}
+
+.vodex-logout-modal-card__glow {
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    rgb(56 189 248 / 0.12),
+    transparent 70%
+  );
+}
+
+.dark .vodex-logout-modal-card__glow {
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    rgb(34 211 238 / 0.18),
+    transparent 70%
+  );
+}
+
+.vodex-logout-modal-card__cta {
+  background: linear-gradient(135deg, rgb(14 165 233), rgb(99 102 241) 55%, rgb(6 182 212));
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.2) inset,
+    0 4px 14px rgb(14 165 233 / 0.35);
+  transition:
+    filter 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.vodex-logout-modal-card__cta:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.25) inset,
+    0 6px 18px rgb(14 165 233 / 0.45);
+}
+
+.vodex-logout-modal-card__cta:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Premium upgrade CTAs — use on pricing, locks, out-of-credits */
+.vodex-upgrade-cta {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #2563eb 100%);
+  box-shadow:
+    0 4px 18px rgb(37 99 235 / 0.4),
+    0 0 0 1px rgb(99 102 241 / 0.35),
+    0 1px 0 rgb(255 255 255 / 0.22) inset;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.vodex-upgrade-cta::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: conic-gradient(from 120deg, transparent, rgb(255 255 255 / 0.18), transparent 55%);
+  animation: vodex-upgrade-glow-spin 6s linear infinite;
+  pointer-events: none;
+}
+
+.dark .vodex-upgrade-cta {
+  box-shadow:
+    0 6px 24px rgb(59 130 246 / 0.45),
+    0 0 0 1px rgb(129 140 248 / 0.4),
+    0 1px 0 rgb(255 255 255 / 0.12) inset;
+}
+
+.vodex-upgrade-cta:hover:not(:disabled) {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 26px rgb(37 99 235 / 0.5),
+    0 0 0 1px rgb(99 102 241 / 0.45),
+    0 1px 0 rgb(255 255 255 / 0.28) inset;
+}
+
+@keyframes vodex-upgrade-glow-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vodex-upgrade-cta::before {
+    animation: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

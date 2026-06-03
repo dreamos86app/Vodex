@@ -516,6 +516,7 @@ export interface Database {
         Row: {
           id: string;
           created_at: string;
+          updated_at: string;
           name: string;
           description: string;
           category: string;
@@ -527,11 +528,68 @@ export interface Database {
           is_new: boolean;
           prompt: string;
           preview_url: string | null;
+          preview_image_url: string | null;
           uses_count: number;
+          like_count: number;
           plan_required: PlanId | null;
+          owner_id: string | null;
+          creator_id: string | null;
+          visibility: "public" | "unlisted" | "private";
+          is_official: boolean;
+          source_project_id: string | null;
+          slug: string | null;
         };
-        Insert: Omit<Database["public"]["Tables"]["templates"]["Row"], "id" | "created_at">;
+        Insert: Omit<Database["public"]["Tables"]["templates"]["Row"], "id" | "created_at" | "updated_at"> & {
+          updated_at?: string;
+        };
         Update: Partial<Database["public"]["Tables"]["templates"]["Row"]>;
+        Relationships: [];
+      };
+
+      template_likes: {
+        Row: {
+          template_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["template_likes"]["Row"], "created_at"> & {
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["template_likes"]["Row"]>;
+        Relationships: [];
+      };
+
+      template_usage_events: {
+        Row: {
+          id: string;
+          created_at: string;
+          template_id: string;
+          user_id: string;
+          project_id: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["template_usage_events"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["template_usage_events"]["Row"]>;
+        Relationships: [];
+      };
+
+      template_files: {
+        Row: {
+          id: string;
+          created_at: string;
+          template_id: string;
+          path: string;
+          content: string;
+          mime_type: string | null;
+          size_bytes: number;
+        };
+        Insert: Omit<Database["public"]["Tables"]["template_files"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["template_files"]["Row"]>;
         Relationships: [];
       };
 
@@ -703,6 +761,25 @@ export interface Database {
           "id" | "created_at" | "updated_at"
         >;
         Update: Partial<Database["public"]["Tables"]["project_integrations"]["Row"]>;
+        Relationships: [];
+      };
+
+      user_provider_connections: {
+        Row: {
+          user_id: string;
+          provider: string;
+          status: string;
+          display_name: string | null;
+          metadata: Json;
+          encrypted_access_token: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["user_provider_connections"]["Row"],
+          "created_at" | "updated_at"
+        >;
+        Update: Partial<Database["public"]["Tables"]["user_provider_connections"]["Row"]>;
         Relationships: [];
       };
 

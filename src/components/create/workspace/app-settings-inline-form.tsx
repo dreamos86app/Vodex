@@ -31,7 +31,9 @@ export function AppSettingsInlineForm({
   const [saved, setSaved] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [regeneratingLogo, setRegeneratingLogo] = React.useState(false);
+  const [uploadingLogo, setUploadingLogo] = React.useState(false);
   const [logoCost, setLogoCost] = React.useState<number | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     setName(initialName);
@@ -48,6 +50,26 @@ export function AppSettingsInlineForm({
       })
       .catch(() => undefined);
   }, [projectId]);
+
+  async function handleUploadLogo(file: File) {
+    setUploadingLogo(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      fd.set("projectId", projectId);
+      const res = await fetch("/api/upload/project-icon", { method: "POST", body: fd, credentials: "include" });
+      const body = (await res.json()) as { error?: string; iconUrl?: string };
+      if (!res.ok) throw new Error(body.error ?? "Upload failed");
+      if (body.iconUrl) setIconSrc(`${body.iconUrl}?t=${Date.now()}`);
+      toast.success("Logo uploaded");
+      notifyProjectCatalogUpdated(projectId);
+      onSaved?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
 
   async function handleRegenerateLogo() {
     const costLabel =
@@ -112,16 +134,40 @@ export function AppSettingsInlineForm({
           <Image src={iconSrc} alt="" width={56} height={56} className="size-full object-cover" unoptimized />
         </div>
         <div className="min-w-0 flex-1 space-y-3">
-          <button
-            type="button"
-            onClick={() => void handleRegenerateLogo()}
-            disabled={regeneratingLogo}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground ring-1 ring-border hover:bg-muted disabled:opacity-50"
-          >
-            {regeneratingLogo ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
-            Regenerate logo
-            {logoCost != null ? ` (${logoCost} AC)` : null}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingLogo}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground ring-1 ring-border hover:bg-muted disabled:opacity-50"
+              data-testid="upload-app-logo"
+            >
+              {uploadingLogo ? <Loader2 className="size-3 animate-spin" /> : null}
+              Upload logo
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleUploadLogo(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => void handleRegenerateLogo()}
+              disabled={regeneratingLogo}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground ring-1 ring-border hover:bg-muted disabled:opacity-50"
+              data-testid="generate-app-logo"
+            >
+              {regeneratingLogo ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+              Generate logo
+              {logoCost != null ? ` (${logoCost} AC)` : null}
+            </button>
+          </div>
           <div>
             <label htmlFor="app-settings-name" className="text-[11px] font-medium text-muted-foreground">
               App name

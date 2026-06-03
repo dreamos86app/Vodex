@@ -6,6 +6,10 @@ import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build"
 import { requireAuthUser, requireMutationProjectId, isNextResponse } from "@/lib/ids/api-mutation-guard";
 import { checkPublishReadiness } from "@/lib/publish/publish-readiness";
 import {
+  collectPublishSetupGaps,
+  gapsToBlockers,
+} from "@/lib/publish/integration-secret-readiness";
+import {
   isBuildCompleteForProject,
   isZipImportProject,
   readImportMeta,
@@ -115,7 +119,19 @@ export async function GET(
     routeMap,
   });
 
-  const blockers = [...readiness.blockers];
+  const templatePrompt =
+    typeof meta.template_prompt === "string"
+      ? meta.template_prompt
+      : typeof meta.initial_prompt === "string"
+        ? meta.initial_prompt
+        : "";
+
+  const setupGaps = await collectPublishSetupGaps(admin, projectId, {
+    prompt: templatePrompt,
+    files: fileRows,
+  });
+
+  const blockers = [...readiness.blockers, ...gapsToBlockers(setupGaps)];
   if (filesCount === 0 && buildCompleted) {
     blockers.unshift("Build saved no files — check build logs");
   }
@@ -177,6 +193,7 @@ export async function GET(
     issues,
     scannedAt: new Date().toISOString(),
     blockers: [...new Set(blockers)],
+    setupGaps,
     reconciled: buildReconcile.reconciled,
     lifecycleStatus: typeof meta.lifecycle === "string" ? meta.lifecycle : null,
     validationOk: readiness.validationOk,

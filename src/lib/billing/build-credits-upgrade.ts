@@ -39,6 +39,8 @@ const PERKS: Record<UpgradePlanTarget, string[]> = {
     "All frontier models",
     "5 collaborators",
     "ZIP import & API access",
+    "Publish & custom domains",
+    "and more…",
   ],
   infinity: [
     "1,000–13,000 Build Credits / month",
@@ -46,6 +48,8 @@ const PERKS: Record<UpgradePlanTarget, string[]> = {
     "Dedicated compute",
     "White-label & SSO",
     "Priority support",
+    "Mobile wrapper workflows",
+    "and more…",
   ],
 };
 

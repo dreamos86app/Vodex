@@ -115,12 +115,13 @@ export function CreditsUpgradeModal({ onClose, currentPlanId = "free" }: Credits
                   {isCurrent ? (
                     <span className="text-[11px] text-muted-foreground">Current</span>
                   ) : (
-                    <Button size="sm" asChild>
-                      <Link href="/pricing">
-                        Upgrade
-                        <ArrowRight className="size-3.5" />
-                      </Link>
-                    </Button>
+                    <Link
+                      href="/pricing"
+                      className="vodex-upgrade-cta inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold"
+                    >
+                      Upgrade
+                      <ArrowRight className="size-3.5" />
+                    </Link>
                   )}
                 </div>
               </div>

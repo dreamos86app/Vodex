@@ -1424,6 +1424,142 @@ See [Generated app payments vs Vodex billing](/help/docs/app-payments-vs-vodex-b
 
 Contact [support@vodex.dev](mailto:support@vodex.dev) if you need clarification on any policy.`,
   },
+
+  {
+    slug: "capacitor-export",
+    title: "Capacitor Export for Generated Apps",
+    description: "Export a Vodex-generated web app as a Capacitor project for iOS and Android.",
+    category: "Mobile",
+    readMinutes: 6,
+    keywords: ["Capacitor", "export", "iOS", "Android", "wrapper"],
+    content: `## What Capacitor export does
+
+Vodex is designed to prepare generated apps for **web, PWA, and mobile wrapper workflows**. From your app dashboard you can export a Capacitor-ready project that wraps your published web app in a native shell.
+
+## When to use it
+
+- You want a Play Store or App Store listing using a **Trusted Web Activity (TWA)** or WebView shell
+- You already published the web app and need a native project to sign and upload
+- You plan to add RevenueCat or other native SDKs in a later phase
+
+## Steps
+
+1. Open your app → **Mobile** tab in the dashboard.
+2. Review the mobile readiness checklist (icons, start URL, HTTPS).
+3. Download or sync the Capacitor export bundle Vodex generates.
+4. Open the project in Android Studio or Xcode locally.
+5. Follow [Play Store readiness](/help/docs/play-store-readiness) before submitting.
+
+## Limitations
+
+- Vodex does not submit to stores on your behalf.
+- Native code changes after export are your responsibility.
+- Some providers (OAuth, payments) require **production URLs** on your custom domain.`,
+  },
+
+  {
+    slug: "web-to-mobile-app",
+    title: "Turning a Generated Web App into a Mobile App",
+    description: "End-to-end path from Vodex web app to installable mobile experience.",
+    category: "Mobile",
+    readMinutes: 7,
+    keywords: ["PWA", "mobile", "wrapper", "install"],
+    content: `## Recommended path
+
+1. **Ship the web app** — publish on Vodex hosting or your domain.
+2. **Enable PWA basics** — manifest, icons, and HTTPS (included in Vodex mobile baseline).
+3. **Validate on real devices** — open the live URL in Chrome/Safari.
+4. **Export Capacitor** when you need a store listing (see [Capacitor export](/help/docs/capacitor-export)).
+
+Vodex focuses on making the **web codebase** mobile-ready first. Store packaging is a second step using Capacitor or TWA.
+
+## What Vodex injects
+
+Generated apps receive a mobile baseline: viewport meta, safe-area friendly layout hooks, and PWA-oriented defaults. You still configure store-specific IDs, signing keys, and provider URLs.
+
+## Custom domains
+
+If you use a custom domain, update Supabase redirect URLs, \`NEXT_PUBLIC_APP_URL\`, and payment webhooks before testing mobile installs. See [Custom domains](/help/docs/custom-domains).`,
+  },
+
+  {
+    slug: "play-store-readiness",
+    title: "Play Store Readiness Checklist",
+    description: "Package ID, signing, asset links, and testing before Google Play submission.",
+    category: "Mobile",
+    readMinutes: 6,
+    keywords: ["Play Store", "TWA", "SHA256", "assetlinks"],
+    content: `## Before you upload
+
+- [ ] Production HTTPS URL on your own domain
+- [ ] \`assetlinks.json\` served at \`https://YOUR_DOMAIN/.well-known/assetlinks.json\`
+- [ ] SHA-256 certificate fingerprints from your signing key
+- [ ] Package name matches Vodex mobile settings
+- [ ] Privacy policy URL (link to your hosted app policy page)
+
+## Testing
+
+Use an internal testing track first. Verify login, payments, and deep links on a physical Android device — emulators miss some OAuth flows.
+
+## Related
+
+- [Play Store setup](/help/docs/play-store-setup) — TWA overview
+- [Capacitor export](/help/docs/capacitor-export)`,
+  },
+
+  {
+    slug: "app-secrets-integrations",
+    title: "App Secrets & Integrations",
+    description: "Store API keys safely and connect providers in your generated app dashboard.",
+    category: "Deploy",
+    readMinutes: 5,
+    keywords: ["secrets", "API keys", "integrations", "OpenAI"],
+    content: `## App secrets (encrypted)
+
+In your app dashboard → **Secrets**, add provider keys (OpenAI, Resend, Stripe, etc.). Values are **encrypted at rest** and never returned in plaintext to the browser.
+
+## Best practices
+
+- Use **separate keys** for development and production where possible
+- Rotate keys if exposed
+- Run the connection test after saving
+
+## Integrations tab
+
+Connect services your template expects. Vodex records status and last test time. Missing secrets block publish readiness checks when the app requires them.
+
+## Action Credits
+
+Runtime calls from your **published** app consume **Action Credits** on your Vodex account — not Build Credits. See [Generated app owner runtime billing](/help/docs/generated-app-runtime-billing).`,
+  },
+
+  {
+    slug: "publishing-and-custom-domains",
+    title: "Publishing & Custom Domains",
+    description: "Publish flow, readiness checks, and connecting your own domain.",
+    category: "Deploy",
+    readMinutes: 6,
+    keywords: ["publish", "domain", "DNS", "SSL"],
+    content: `## Publishing
+
+1. Open the app dashboard → **Publish**.
+2. Resolve readiness warnings (files, secrets, build status).
+3. Deploy to Vodex hosting or connect external hosting per your plan.
+
+## Custom domains
+
+Point DNS to Vodex, verify the domain, then update:
+
+- Supabase auth redirect URLs
+- \`NEXT_PUBLIC_APP_URL\` in the generated app
+- Stripe/Paddle webhooks and OAuth callbacks
+
+See [Custom domains](/help/docs/custom-domains) for DNS record examples.
+
+## After go-live
+
+Monitor Action Credits, enable status subscriptions, and test mobile/PWA install on production URLs only.`,
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

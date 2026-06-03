@@ -157,6 +157,13 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                   const isWelcome =
                     md?.kind === "welcome" ||
                     (typeof n.title === "string" && n.title.startsWith("Welcome to Vodex"));
+                  const isPremium = Boolean(md?.premium) || isWelcome;
+                  const effectKey =
+                    typeof md?.effect_key === "string"
+                      ? md.effect_key
+                      : isWelcome
+                        ? "stars"
+                        : "glow";
                   return (
                     <button
                       key={n.id}
@@ -165,11 +172,14 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                       className={cn(
                         "flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-surface/60",
                         !n.read && "bg-accent/3",
-                        isWelcome &&
-                          "relative overflow-hidden rounded-xl border border-sky-200/60 bg-gradient-to-br from-sky-50 via-indigo-50/80 to-violet-100/70",
+                        isPremium &&
+                          "relative overflow-hidden rounded-xl border border-sky-200/60 bg-gradient-to-br from-sky-50 via-indigo-50/80 to-violet-100/70 dark:from-slate-900/80 dark:via-indigo-950/40 dark:to-violet-950/30",
+                        effectKey === "frost" &&
+                          isPremium &&
+                          "border-cyan-200/60 from-cyan-50/90 via-sky-50/70 to-blue-50/80",
                       )}
                     >
-                      {isWelcome ? (
+                      {isPremium && (effectKey === "stars" || isWelcome) ? (
                         <div
                           className="pointer-events-none absolute inset-0 opacity-40"
                           aria-hidden
@@ -263,9 +273,10 @@ export function NotificationBell() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ type: "spring", stiffness: 520, damping: 26 }}
-              className="absolute -right-1 -top-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-rose-600 px-1 text-[10px] font-bold leading-none text-white shadow-[0_0_12px_rgba(239,68,68,0.65)] ring-2 ring-background"
+              className="absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white shadow-[0_0_10px_rgba(220,38,38,0.75)] ring-2 ring-background"
+              data-testid="notification-unread-badge"
             >
-              +{unreadCount > 99 ? "99" : unreadCount}
+              {unreadCount > 99 ? "99+" : unreadCount}
             </motion.span>
           )}
         </AnimatePresence>

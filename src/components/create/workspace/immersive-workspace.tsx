@@ -436,7 +436,50 @@ export function ImmersiveWorkspace({
   const lastSubmitFingerprintRef = React.useRef<{ text: string; at: number } | null>(null);
   const pendingOperationIdRef = React.useRef<string | null>(null);
   const [dashboardSection, setDashboardSection] = React.useState<DashSection>("overview");
+  const insertPromptConsumedRef = React.useRef(false);
   const [lastSubmitAt, setLastSubmitAt] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    const section = searchParams.get("section");
+    if (!section) return;
+    const allowed: DashSection[] = [
+      "overview",
+      "mobile",
+      "publish",
+      "integrations",
+      "secrets",
+      "users",
+      "data",
+      "analytics",
+      "payments",
+      "domains",
+      "security",
+      "automations",
+      "logs",
+      "marketing",
+    ];
+    if (!allowed.includes(section as DashSection)) return;
+    setDashboardSection(section as DashSection);
+    setRightTab("dashboard");
+  }, [searchParams]);
+
+  React.useEffect(() => {
+    const raw = searchParams.get("insertPrompt");
+    if (!raw?.trim() || insertPromptConsumedRef.current) return;
+    insertPromptConsumedRef.current = true;
+    try {
+      setComposerLiveText(decodeURIComponent(raw));
+      setMobilePanel("chat");
+      toast.info("Prompt added to chat — review and press Submit");
+    } catch {
+      setComposerLiveText(raw);
+    }
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("insertPrompt");
+    const qs = next.toString();
+    const target = qs ? `${pathname}?${qs}` : pathname || "/create";
+    replaceBrowserUrl(target);
+  }, [pathname, searchParams]);
   const [lastApiUrl, setLastApiUrl] = React.useState<string | null>(null);
   const [lastApiStatus, setLastApiStatus] = React.useState<string | null>(null);
   const [editNeedsApp, setEditNeedsApp] = React.useState(false);
@@ -2892,11 +2935,12 @@ export function ImmersiveWorkspace({
                         }
                       : undefined
                   }
-                  className="mx-2"
+                  className="w-full px-1"
                 />
               )}
               {(creditError || showUpgradeCard) && (
                 <BuildCreditsUpgradePanel
+                  className="w-full px-1"
                   planId={planId}
                   resetAt={resetAt}
                   onDismiss={() => setCreditError(false)}
@@ -3250,6 +3294,11 @@ export function ImmersiveWorkspace({
                 activeSection={dashboardSection}
                 onSectionChange={setDashboardSection}
                 onOpenPublish={() => setPublishOpen(true)}
+                onInsertChatPrompt={(prompt) => {
+                  setComposerLiveText(prompt);
+                  setMobilePanel("chat");
+                  toast.info("Prompt added to chat — review and press Submit");
+                }}
               />
             )}
             {rightTab === "code" && (

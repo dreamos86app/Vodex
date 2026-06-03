@@ -14,6 +14,9 @@ export async function POST(request: Request) {
     actionUrl?: string;
     playSound?: boolean;
     targetEmail?: string;
+    templateId?: string;
+    iconKey?: string;
+    effectKey?: string;
   };
 
   const title = body.title?.trim();
@@ -57,6 +60,9 @@ export async function POST(request: Request) {
       kind: "admin_broadcast",
       play_sound: body.playSound !== false,
       premium: true,
+      template_id: body.templateId ?? "custom",
+      icon_key: body.iconKey ?? "bell",
+      effect_key: body.effectKey ?? "glow",
     },
   }));
 

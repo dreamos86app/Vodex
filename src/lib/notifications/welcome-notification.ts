@@ -30,7 +30,14 @@ export async function ensureWelcomeNotification(
     body: "Welcome to Vodex — we added free credits so you can start building your first app.",
     read: false,
     action_url: "/",
-    metadata: { kind: "welcome", premium: true, free_credits: true },
+    metadata: {
+      kind: "welcome",
+      premium: true,
+      free_credits: true,
+      icon_key: "sparkles",
+      effect_key: "stars",
+      play_sound: true,
+    },
   } as never);
 
   return !error;

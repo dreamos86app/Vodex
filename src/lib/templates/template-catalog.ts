@@ -1,7 +1,8 @@
 /**
  * Structured template metadata for generation planning and UI.
  */
-import { templates, type Template } from "@/lib/data";
+import { OFFICIAL_TEMPLATES } from "@/lib/templates/official-templates";
+import type { Template } from "@/lib/templates/template-types";
 import { quoteGenerationCost } from "@/lib/billing/credit-profit-guard";
 import {
   CORE_TEMPLATES,
@@ -52,7 +53,7 @@ export function enrichTemplate(t: Template): TemplateBlueprint {
   };
 }
 
-export const TEMPLATE_CATALOG: TemplateBlueprint[] = templates.map(enrichTemplate);
+export const TEMPLATE_CATALOG: TemplateBlueprint[] = OFFICIAL_TEMPLATES.map(enrichTemplate);
 
 export function getTemplateById(id: string): TemplateBlueprint | undefined {
   const resolved = resolveTemplateId(id) ?? id;

@@ -68,7 +68,7 @@ export function BuildCreditsUpgradePanel({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "build-credits-upgrade-panel relative mx-auto w-full max-w-[min(100%,340px)] overflow-hidden rounded-2xl",
+        "build-credits-upgrade-panel relative w-full max-w-none overflow-hidden rounded-2xl",
         "ring-1 ring-sky-300/80 shadow-[0_12px_40px_-8px_rgba(37,99,235,0.35)]",
         "dark:ring-sky-500/35 dark:shadow-[0_16px_48px_-12px_rgba(14,116,244,0.45)]",
         className,
@@ -112,8 +112,11 @@ export function BuildCreditsUpgradePanel({
           </button>
         ) : null}
 
-        <ul className="mt-3 space-y-1.5 rounded-xl bg-surface/50 px-3 py-2.5 ring-1 ring-border/70 dark:bg-slate-950/40">
-          {offer.perks.map((p) => (
+        <ul
+          className="mt-3 space-y-1.5 rounded-xl bg-surface/60 px-3 py-2.5 ring-1 ring-border/70 dark:bg-slate-950/50"
+          data-testid="build-credits-upgrade-perks"
+        >
+          {offer.perks.slice(0, 7).map((p) => (
             <li
               key={p}
               className="flex items-start gap-2 text-[11.5px] font-medium leading-snug text-foreground"
@@ -128,7 +131,7 @@ export function BuildCreditsUpgradePanel({
           type="button"
           disabled={busy}
           onClick={runUpgrade}
-          className="build-credits-upgrade-panel__cta mt-3 flex w-full min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-bold text-white disabled:opacity-60"
+          className="vodex-upgrade-cta build-credits-upgrade-panel__cta mt-3 flex w-full min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-bold disabled:opacity-60"
           data-testid="upgrade-panel-primary-cta"
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-3.5 opacity-90" />}

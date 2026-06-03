@@ -4,8 +4,13 @@ import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Search, ArrowUpRight, Sparkles, Zap, Smartphone,
-  LayoutDashboard, ShoppingCart, Users, Globe, Loader2,
+  Search,
+  ArrowUpRight,
+  Zap,
+  Users,
+  Loader2,
+  Globe,
+  Lightbulb,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useTimedLoading } from "@/lib/hooks/use-timed-loading";
@@ -13,120 +18,47 @@ import { Button } from "@/components/ui/button";
 import { variants, whileHover, whileTap, transition } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-// ─── Official showcase: what Vodex can build ─────────────────────────────
-// These are demonstrative capability examples, not fake community apps.
+const IDEA_CATEGORIES = ["All", "SaaS", "Mobile", "AI", "Commerce", "Social"] as const;
+type IdeaCategory = (typeof IDEA_CATEGORIES)[number];
 
-interface ShowcaseItem {
-  id: string;
-  name: string;
-  tagline: string;
-  category: string;
-  gradient: string;
-  dark: string;
-  icon: React.ElementType;
-  templateId: string;
-}
-
-const SHOWCASE: ShowcaseItem[] = [
+const APP_IDEAS = [
   {
-    id: "ai-saas",
-    name: "AI SaaS Starter",
-    tagline: "Full auth + billing + AI chat + credit system. Production-ready from day one.",
-    category: "AI · SaaS",
-    gradient: "from-blue-100/80 via-white to-indigo-100/70",
-    dark: "dark:from-blue-950/40 dark:via-surface dark:to-indigo-950/30",
-    icon: Sparkles,
-    templateId: "ai-saas-starter",
+    id: "creator-crm",
+    name: "Creator CRM",
+    tagline: "Manage sponsors, deliverables, and payouts in one workspace.",
+    category: "SaaS",
   },
   {
-    id: "mobile-twa",
-    name: "Mobile TWA",
-    tagline: "Web app → Play Store. Next.js + Capacitor + TWA manifest with SHA256 setup.",
-    category: "Mobile · Android",
-    gradient: "from-green-100/80 via-white to-emerald-100/70",
-    dark: "dark:from-green-950/40 dark:via-surface dark:to-emerald-950/30",
-    icon: Smartphone,
-    templateId: "mobile-twa",
+    id: "local-booking",
+    name: "Local booking hub",
+    tagline: "Appointments, reminders, and staff calendars for service businesses.",
+    category: "SaaS",
   },
   {
-    id: "dashboard",
-    name: "Analytics Dashboard",
-    tagline: "Real-time charts, data tables, role-based views, and export. Supabase-backed.",
-    category: "SaaS · Analytics",
-    gradient: "from-cyan-100/80 via-white to-sky-100/70",
-    dark: "dark:from-cyan-950/40 dark:via-surface dark:to-sky-950/30",
-    icon: LayoutDashboard,
-    templateId: "dashboard-starter",
+    id: "fitness-coach",
+    name: "Fitness coach app",
+    tagline: "Programs, check-ins, and progress photos for coaching clients.",
+    category: "Mobile",
   },
   {
-    id: "marketplace",
-    name: "Marketplace",
-    tagline: "Multi-vendor with Stripe Connect, seller onboarding, reviews, and payouts.",
+    id: "ai-knowledge",
+    name: "Team knowledge AI",
+    tagline: "Ask questions over your docs with cited answers and access control.",
+    category: "AI",
+  },
+  {
+    id: "vendor-market",
+    name: "Neighborhood marketplace",
+    tagline: "Listings, messaging, and escrow-style checkout for local sellers.",
     category: "Commerce",
-    gradient: "from-amber-100/80 via-white to-orange-100/70",
-    dark: "dark:from-amber-950/40 dark:via-surface dark:to-orange-950/30",
-    icon: ShoppingCart,
-    templateId: "marketplace-starter",
   },
   {
-    id: "community",
-    name: "Community Platform",
-    tagline: "Posts, DMs, reactions, moderation, real-time notifications. Supabase Realtime.",
+    id: "fan-community",
+    name: "Fan community hub",
+    tagline: "Channels, events, and member tiers for niche communities.",
     category: "Social",
-    gradient: "from-rose-100/80 via-white to-pink-100/70",
-    dark: "dark:from-rose-950/40 dark:via-surface dark:to-pink-950/30",
-    icon: Users,
-    templateId: "community-platform",
   },
-  {
-    id: "waitlist",
-    name: "Landing + Waitlist",
-    tagline: "Conversion-optimised launch page with email capture, countdown, and referral.",
-    category: "Publishing",
-    gradient: "from-indigo-100/80 via-white to-violet-100/70",
-    dark: "dark:from-indigo-950/40 dark:via-surface dark:to-violet-950/30",
-    icon: Globe,
-    templateId: "landing-waitlist",
-  },
-];
-
-const TABS = ["All", "AI", "Mobile", "SaaS", "Commerce", "Publishing"] as const;
-type Tab = typeof TABS[number];
-
-function ShowcaseCard({ item }: { item: ShowcaseItem }) {
-  const Icon = item.icon;
-  return (
-    <motion.article whileHover={whileHover.lift} whileTap={whileTap.press} transition={transition.card}>
-      <div className="group overflow-hidden rounded-[var(--radius-xl)] bg-glass shadow-[var(--shadow-glass)] ring-1 ring-white/60 dark:ring-white/[0.07] transition-shadow hover:shadow-[var(--shadow-glass-hover)]">
-        <div className={cn("relative min-h-[130px] overflow-hidden", `bg-gradient-to-br ${item.gradient} ${item.dark}`)}>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(255,255,255,0.7),transparent_55%)] opacity-90 dark:opacity-20" />
-          <div className="pointer-events-none absolute inset-0 ds-preview-grid opacity-20" />
-          <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-surface/70 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground ring-1 ring-border/60 backdrop-blur-md">
-            <Icon className="size-2.5" strokeWidth={2} />
-            {item.category}
-          </div>
-        </div>
-        <div className="p-4">
-          <h3 className="text-[15px] font-semibold tracking-[-0.03em] text-foreground">{item.name}</h3>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">{item.tagline}</p>
-          <div className="mt-3 flex gap-2">
-            <Button
-              variant="accent"
-              size="xs"
-              className="flex-1 gap-1"
-              asChild
-            >
-              <Link href={`/marketplace?template=${item.templateId}`}>
-                Use template
-                <ArrowUpRight className="size-3" strokeWidth={2} />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    </motion.article>
-  );
-}
+] as const;
 
 interface PublicProject {
   id: string;
@@ -134,15 +66,88 @@ interface PublicProject {
   description: string | null;
   gradient: string;
   category: string | null;
-  owner_name: string | null;
   updated_at: string;
 }
 
-function CommunityBuilds() {
+function PublicAppCard({ project }: { project: PublicProject }) {
+  return (
+    <motion.article
+      whileHover={whileHover.lift}
+      whileTap={whileTap.press}
+      transition={transition.card}
+      className="group overflow-hidden rounded-[var(--radius-xl)] bg-glass ring-1 ring-border transition hover:ring-accent/30 hover:shadow-[var(--shadow-glass-hover)]"
+      data-testid="explore-public-app-card"
+    >
+      <div
+        className={cn(
+          "relative min-h-[100px] bg-gradient-to-br",
+          project.gradient || "from-sky-500/20 to-violet-500/20",
+        )}
+      >
+        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-surface/80 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground ring-1 ring-border backdrop-blur-md">
+          <Globe className="size-2.5" />
+          Public app
+        </div>
+      </div>
+      <div className="p-4">
+        <h3 className="text-[15px] font-semibold text-foreground">{project.name}</h3>
+        {project.description ? (
+          <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{project.description}</p>
+        ) : null}
+        <div className="mt-3 flex items-center justify-between">
+          {project.category ? (
+            <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {project.category}
+            </span>
+          ) : (
+            <span />
+          )}
+          <span className="text-[10px] text-muted-foreground">
+            {new Date(project.updated_at).toLocaleDateString()}
+          </span>
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
+function IdeaCard({
+  name,
+  tagline,
+  category,
+}: {
+  name: string;
+  tagline: string;
+  category: string;
+}) {
+  return (
+    <div
+      className="rounded-[var(--radius-xl)] bg-surface p-4 ring-1 ring-border transition hover:ring-accent/25"
+      data-testid="explore-idea-card"
+    >
+      <div className="flex items-center gap-2">
+        <Lightbulb className="size-4 text-amber-500" strokeWidth={1.75} />
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {category}
+        </span>
+      </div>
+      <h3 className="mt-2 text-[15px] font-semibold text-foreground">{name}</h3>
+      <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{tagline}</p>
+      <Link
+        href={`/create?prompt=${encodeURIComponent(`Build: ${name}. ${tagline}`)}`}
+        className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-accent"
+      >
+        Try in Create <ArrowUpRight className="size-3.5" />
+      </Link>
+    </div>
+  );
+}
+
+function CommunityPublicApps() {
   const supabase = createClient();
   const [projects, setProjects] = React.useState<PublicProject[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const isLoading = useTimedLoading(loading, 1000);
+  const isLoading = useTimedLoading(loading, 800);
 
   React.useEffect(() => {
     supabase
@@ -150,65 +155,40 @@ function CommunityBuilds() {
       .select("id, name, description, gradient, category, updated_at")
       .eq("is_public", true)
       .order("updated_at", { ascending: false })
-      .limit(9)
+      .limit(12)
       .then(({ data, error }) => {
         if (!error) setProjects((data as PublicProject[]) ?? []);
         setLoading(false);
       });
-  }, []);
+  }, [supabase]);
 
   if (isLoading) {
     return (
-      <div className="mt-6 flex items-center justify-center py-16">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" strokeWidth={1.75} />
+      <div className="flex justify-center py-16">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (projects.length === 0) {
     return (
-      <div className="mt-6 flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-16 text-center ring-1 ring-border">
-        <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
-          <Users className="size-7 text-accent" strokeWidth={1.5} />
-        </div>
-        <p className="text-[15px] font-semibold text-foreground">No public apps yet</p>
-        <p className="mt-2 max-w-sm text-[13px] text-muted-foreground">
-          Apps published publicly by Vodex builders will appear here. Build something and make it public.
+      <div className="rounded-[var(--radius-xl)] bg-surface py-14 text-center ring-1 ring-border">
+        <Users className="mx-auto size-7 text-accent" />
+        <p className="mt-3 text-[15px] font-semibold text-foreground">No public apps yet</p>
+        <p className="mx-auto mt-2 max-w-sm text-[13px] text-muted-foreground">
+          When builders publish apps publicly, they appear here for discovery.
         </p>
-        <Button variant="accent" size="sm" className="mt-6 gap-1.5" asChild>
-          <Link href="/create">
-            <Zap className="size-3.5" strokeWidth={1.75} />
-            Start building
-          </Link>
+        <Button variant="accent" size="sm" className="mt-6" asChild>
+          <Link href="/create">Start building</Link>
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {projects.map((p, i) => (
-        <motion.div
-          key={p.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.04 }}
-          className="group overflow-hidden rounded-[var(--radius-xl)] bg-surface ring-1 ring-border transition hover:ring-accent/30 hover:shadow-md"
-        >
-          <div className={`h-24 w-full bg-gradient-to-br ${p.gradient} opacity-80`} />
-          <div className="p-4">
-            <p className="text-[14px] font-semibold text-foreground">{p.name}</p>
-            {p.description && (
-              <p className="mt-0.5 text-[12px] text-muted-foreground line-clamp-2">{p.description}</p>
-            )}
-            <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
-              {p.category && (
-                <span className="rounded-full bg-muted/60 px-2 py-0.5 font-medium">{p.category}</span>
-              )}
-              <span>{new Date(p.updated_at).toLocaleDateString()}</span>
-            </div>
-          </div>
-        </motion.div>
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {projects.map((p) => (
+        <PublicAppCard key={p.id} project={p} />
       ))}
     </div>
   );
@@ -216,109 +196,112 @@ function CommunityBuilds() {
 
 export function ExploreView() {
   const [search, setSearch] = React.useState("");
-  const [tab, setTab] = React.useState<Tab>("All");
+  const [category, setCategory] = React.useState<IdeaCategory>("All");
 
-  const filtered = SHOWCASE.filter((item) => {
-    const matchTab =
-      tab === "All" ||
-      item.category.toLowerCase().includes(tab.toLowerCase()) ||
-      item.templateId.includes(tab.toLowerCase());
+  const filteredIdeas = APP_IDEAS.filter((item) => {
+    const matchCat = category === "All" || item.category === category;
+    const q = search.toLowerCase();
     const matchSearch =
-      !search ||
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.tagline.toLowerCase().includes(search.toLowerCase());
-    return matchTab && matchSearch;
+      !q ||
+      item.name.toLowerCase().includes(q) ||
+      item.tagline.toLowerCase().includes(q);
+    return matchCat && matchSearch;
   });
 
   return (
-    <div className="relative mx-auto max-w-6xl">
+    <div className="relative mx-auto max-w-6xl" data-testid="explore-view">
       <div className="pointer-events-none absolute -left-20 top-0 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--accent)_8%,transparent),transparent_68%)] blur-3xl" />
 
       <motion.div variants={variants.fadeUp} initial="hidden" animate="show">
         <p className="text-[11px] font-semibold tracking-[0.2em] text-muted-foreground">EXPLORE</p>
         <h1 className="mt-3 text-balance text-[clamp(1.75rem,3.5vw,2.6rem)] font-semibold tracking-[-0.055em] text-foreground">
-          Discover what&apos;s possible
+          Discover apps & ideas
         </h1>
-        <p className="mt-2 text-[14px] text-muted-foreground">
-          Official templates and capabilities. Pick one and ship something real.
+        <p className="mt-2 max-w-xl text-[14px] text-muted-foreground">
+          Browse public community apps and app ideas to inspire your next build. Official starters live on{" "}
+          <Link href="/templates" className="font-medium text-accent hover:underline">
+            Templates
+          </Link>
+          .
         </p>
+      </motion.div>
 
-        <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+      <motion.div
+        variants={variants.fadeUp}
+        initial="hidden"
+        animate="show"
+        transition={{ delay: 0.06 }}
+        className="mt-8"
+      >
+        <p className="mb-4 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+          PUBLIC COMMUNITY APPS
+        </p>
+        <CommunityPublicApps />
+      </motion.div>
+
+      <motion.div
+        variants={variants.fadeUp}
+        initial="hidden"
+        animate="show"
+        transition={{ delay: 0.12 }}
+        className="mt-14"
+        data-testid="explore-ideas-section"
+      >
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+            APP IDEAS
+          </p>
           <div className="relative max-w-xs flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.55} />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="search"
-              placeholder="Search templates…"
+              placeholder="Search ideas…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-full rounded-[var(--radius-md)] bg-surface pl-9 pr-4 text-[13px] text-foreground ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground/60"
+              className="h-9 w-full rounded-[var(--radius-md)] bg-surface pl-9 pr-4 text-[13px] ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {TABS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={cn(
-                  "rounded-full px-3 py-1 text-[12px] font-medium transition",
-                  tab === t
-                    ? "bg-foreground text-background"
-                    : "bg-surface text-muted-foreground ring-1 ring-border hover:text-foreground",
-                )}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+        </div>
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {IDEA_CATEGORIES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setCategory(t)}
+              className={cn(
+                "rounded-full px-3 py-1 text-[12px] font-medium transition",
+                category === t
+                  ? "bg-foreground text-background"
+                  : "bg-surface text-muted-foreground ring-1 ring-border",
+              )}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredIdeas.map((item) => (
+            <IdeaCard key={item.id} {...item} />
+          ))}
         </div>
       </motion.div>
 
-      {/* Showcase grid */}
       <motion.div
         variants={variants.fadeUp}
         initial="hidden"
         animate="show"
-        transition={{ delay: 0.08 }}
-        className="relative mt-10"
+        transition={{ delay: 0.18 }}
+        className="mt-14 rounded-[var(--radius-xl)] border border-border bg-surface/80 p-6 text-center"
       >
-        <p className="mb-4 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-          OFFICIAL TEMPLATES
+        <p className="text-[13px] text-muted-foreground">
+          Want a full starter codebase? Use an official template — real files, not mock cards.
         </p>
-
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center py-14 text-center">
-            <p className="text-[14px] font-medium text-foreground">No results</p>
-            <p className="mt-1 text-[13px] text-muted-foreground">Try a different filter</p>
-          </div>
-        ) : (
-          <motion.div
-            variants={variants.staggerContainer}
-            initial="hidden"
-            animate="show"
-            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {filtered.map((item) => (
-              <motion.div key={item.id} variants={variants.staggerItem}>
-                <ShowcaseCard item={item} />
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </motion.div>
-
-      {/* Community builds — honest empty state */}
-      <motion.div
-        variants={variants.fadeUp}
-        initial="hidden"
-        animate="show"
-        transition={{ delay: 0.15 }}
-        className="relative mt-10"
-      >
-        <p className="mb-4 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-          COMMUNITY BUILDS
-        </p>
-        <CommunityBuilds />
+        <Button variant="accent" size="sm" className="mt-4 gap-1.5" asChild>
+          <Link href="/templates">
+            <Zap className="size-3.5" />
+            Open Templates
+          </Link>
+        </Button>
       </motion.div>
     </div>
   );

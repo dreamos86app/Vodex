@@ -151,3 +151,38 @@ export async function POST(
 
   return NextResponse.json({ ok: true, keyName, status, last_four: lastFour });
 }
+
+/** Delete a secret (owner only). */
+export async function DELETE(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const { id: projectId } = await ctx.params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { data: proj } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!proj) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const url = new URL(req.url);
+  const keyName = url.searchParams.get("key")?.trim();
+  if (!keyName) return NextResponse.json({ error: "key query required" }, { status: 400 });
+
+  const admin = createServiceRoleClient() ?? supabase;
+  const { error } = await admin
+    .from("project_secrets")
+    .delete()
+    .eq("project_id", projectId)
+    .eq("key_name", keyName);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

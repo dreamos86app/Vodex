@@ -32,6 +32,13 @@ export const TEMPLATE_ID_ALIASES: Record<string, CoreTemplateId | null> = {
   "team-wiki": "internal-tool",
   "mobile-app": "mobile-habit",
   "community-platform": "social-platform",
+  "ai-saas-starter": "ai-assistant",
+  "mobile-twa-play-store": "mobile-habit",
+  "mobile-twa": "mobile-habit",
+  "analytics-dashboard": "analytics-dashboard",
+  "dashboard-starter": "analytics-dashboard",
+  "marketplace-starter": "marketplace",
+  "landing-waitlist": "saas-landing",
 };
 
 export type TemplateArchetype = {

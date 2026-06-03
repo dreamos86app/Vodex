@@ -3,7 +3,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LogOut, X, Loader2 } from "lucide-react";
+import { LogOut, X, Loader2, Sparkles } from "lucide-react";
 import { runFullSignOut } from "@/lib/auth/sign-out-client";
 
 interface LogoutConfirmModalProps {
@@ -11,17 +11,13 @@ interface LogoutConfirmModalProps {
   onClose: () => void;
 }
 
-/**
- * Logout confirmation modal.
- *
- * Uses createPortal so it always renders at the document body level,
- * guaranteeing correct stacking regardless of parent overflow/z-index.
- */
 export function LogoutConfirmModal({ open, onClose }: LogoutConfirmModalProps) {
   const [loading, setLoading] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
 
-  React.useEffect(() => { setMounted(true); }, []);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function confirmLogout() {
     setLoading(true);
@@ -34,7 +30,9 @@ export function LogoutConfirmModal({ open, onClose }: LogoutConfirmModalProps) {
 
   React.useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !loading) onClose();
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose, loading]);
@@ -49,76 +47,67 @@ export function LogoutConfirmModal({ open, onClose }: LogoutConfirmModalProps) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 99998,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-            background: "rgba(15,23,60,0.45)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-          }}
+          className="vodex-logout-modal-backdrop fixed inset-0 z-[99998] flex items-center justify-center p-4"
           onClick={loading ? undefined : onClose}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 8 }}
+            initial={{ opacity: 0, scale: 0.94, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 8 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            style={{ width: "100%", maxWidth: "22rem", zIndex: 99999 }}
+            exit={{ opacity: 0, scale: 0.94, y: 10 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="vodex-logout-modal-card relative w-full max-w-[23rem] overflow-hidden rounded-2xl bg-background shadow-2xl ring-1 ring-sky-200/60 dark:ring-sky-500/25"
             onClick={(e) => e.stopPropagation()}
+            data-testid="logout-confirm-modal"
           >
-            <div className="overflow-hidden rounded-2xl bg-background ring-1 ring-accent/20 shadow-[0_0_0_1px_hsl(var(--accent)/0.12),0_8px_32px_-4px_hsl(var(--accent)/0.18),0_24px_64px_-8px_hsl(var(--accent)/0.10)]">
-              <div className="h-1 w-full bg-gradient-to-r from-accent via-violet-500 to-accent" />
+            <div className="vodex-logout-modal-card__glow pointer-events-none absolute inset-0" aria-hidden />
+            <div className="h-1 w-full bg-gradient-to-r from-sky-400 via-violet-500 to-cyan-400" />
 
-              <div className="flex items-start justify-between gap-3 px-6 pt-5">
-                <div className="flex items-center gap-3.5">
-                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 ring-1 ring-accent/20">
-                    <LogOut className="size-5 text-accent" strokeWidth={1.65} />
-                  </div>
-                  <div>
-                    <p className="text-[15px] font-semibold text-foreground">Log out of Vodex?</p>
-                    <p className="mt-0.5 text-[12px] text-muted-foreground leading-relaxed">
-                      You&apos;ll be redirected to sign in.
-                    </p>
-                  </div>
+            <div className="relative px-6 pb-6 pt-5">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-surface hover:text-foreground"
+                aria-label="Close"
+              >
+                <X className="size-4" strokeWidth={1.75} />
+              </button>
+
+              <div className="flex flex-col items-center text-center">
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/15 to-violet-500/15 ring-1 ring-sky-300/50 dark:from-sky-400/20 dark:to-violet-500/20 dark:ring-sky-500/30">
+                  <LogOut className="size-7 text-sky-600 dark:text-sky-300" strokeWidth={1.65} />
                 </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={loading}
-                  className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-surface hover:text-foreground"
-                >
-                  <X className="size-3.5" strokeWidth={1.75} />
-                </button>
+                <h2 className="mt-4 text-[17px] font-bold tracking-tight text-foreground">
+                  Sign out of Vodex?
+                </h2>
+                <p className="mt-2 max-w-[16rem] text-[13px] leading-relaxed text-muted-foreground">
+                  You&apos;ll return to the sign-in screen. Unsaved drafts in open tabs may be lost.
+                </p>
               </div>
 
-              <div className="flex items-center gap-2.5 px-6 py-5">
+              <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={loading}
-                  className="flex-1 rounded-xl bg-surface py-2.5 text-[13px] font-medium text-foreground ring-1 ring-border transition hover:bg-surface-raised disabled:opacity-50"
+                  className="flex-1 rounded-xl bg-surface py-3 text-[13px] font-semibold text-foreground ring-1 ring-border transition hover:bg-surface-raised disabled:opacity-50"
                 >
-                  Cancel
+                  Stay signed in
                 </button>
                 <button
                   type="button"
                   onClick={confirmLogout}
                   disabled={loading}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-accent to-violet-500 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_16px_-2px_hsl(var(--accent)/0.40)] transition hover:opacity-90 active:scale-[0.98] disabled:opacity-70 disabled:shadow-none"
+                  className="vodex-logout-modal-card__cta flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-[13px] font-bold text-white disabled:opacity-70"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+                      <Loader2 className="size-4 animate-spin" />
                       Signing out…
                     </>
                   ) : (
                     <>
-                      <LogOut className="size-3.5" strokeWidth={2} />
+                      <Sparkles className="size-3.5 opacity-90" />
                       Log out
                     </>
                   )}
@@ -129,6 +118,6 @@ export function LogoutConfirmModal({ open, onClose }: LogoutConfirmModalProps) {
         </motion.div>
       )}
     </AnimatePresence>,
-    document.body
+    document.body,
   );
 }

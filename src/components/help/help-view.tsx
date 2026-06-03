@@ -72,6 +72,7 @@ const POPULAR_GUIDES = [
   { label: "How credits work", href: "/help/docs/how-credits-work", icon: CreditCard },
   { label: "OAuth setup", href: "/help/docs/oauth-setup", icon: KeyRound },
   { label: "Policies & legal", href: "/help/docs/policies", icon: Scale },
+  { label: "Mobile & Capacitor", href: "/help/docs/capacitor-export", icon: Rocket },
 ] as const;
 
 function HelpWelcomeStrip() {
