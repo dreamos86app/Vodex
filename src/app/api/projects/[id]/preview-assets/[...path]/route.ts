@@ -45,12 +45,21 @@ export async function GET(
   const admin = createSupabaseAdmin();
   if (!admin) return new NextResponse("Service unavailable", { status: 503 });
 
-  const rel = pathParts?.length ? pathParts.join("/") : "index.html";
-  const file = await downloadPreviewArtifactFile({
+  let rel = pathParts?.length ? pathParts.join("/") : "index.html";
+  let file = await downloadPreviewArtifactFile({
     admin,
     artifactPath,
     relativePath: rel,
   });
+
+  if (!file && rel !== "index.html" && !rel.includes(".")) {
+    rel = "index.html";
+    file = await downloadPreviewArtifactFile({
+      admin,
+      artifactPath,
+      relativePath: rel,
+    });
+  }
 
   if (!file) return new NextResponse("Not found", { status: 404 });
 

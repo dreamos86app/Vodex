@@ -33,6 +33,32 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   const admin = createSupabaseAdmin();
   const jobDiagnostics = admin ? await loadLatestPreviewDiagnostics(admin, projectId) : null;
+
+  let jobRow: {
+    id: string;
+    status: string;
+    created_at: string;
+    artifact_path: string | null;
+    source_snapshot_path: string | null;
+    locked_by: string | null;
+  } | null = null;
+
+  if (admin) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (admin as any)
+      .from("preview_build_jobs")
+      .select("id, status, created_at, artifact_path, source_snapshot_path, locked_by")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    jobRow = data ?? null;
+  }
+
+  const jobStatus = jobRow?.status ?? null;
+  const queuedAt = jobRow?.created_at ? new Date(jobRow.created_at).getTime() : 0;
+  const workerUnavailable =
+    jobStatus === "queued" && queuedAt > 0 && Date.now() - queuedAt > 5 * 60 * 1000;
   const diag =
     jobDiagnostics ??
     (meta.preview_diagnostics && typeof meta.preview_diagnostics === "object"
@@ -71,6 +97,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     lastPreviewBuildAt:
       (typeof diag?.lastPreviewBuildAt === "string" ? diag.lastPreviewBuildAt : null) ??
       (typeof meta.last_preview_build_at === "string" ? meta.last_preview_build_at : null),
-    jobId: (diag?.jobId as string | null) ?? null,
+    jobId: jobRow?.id ?? (diag?.jobId as string | null) ?? null,
+    jobStatus,
+    artifactPath: jobRow?.artifact_path ?? (diag?.artifactPath as string | null) ?? null,
+    sourceSnapshotPath: jobRow?.source_snapshot_path ?? null,
+    lockedBy: jobRow?.locked_by ?? null,
+    workerUnavailable,
+    workerUnavailableMessage: workerUnavailable
+      ? "Preview worker has not picked up this job — start npm run preview-worker:dev or deploy the worker service."
+      : null,
   });
 }

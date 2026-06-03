@@ -28,6 +28,12 @@ import {
   type ImportPreviewDiagnostics,
 } from "@/lib/imports/import-diagnostics";
 import type { ZipImportFile } from "@/lib/import/zip-file-validator";
+import {
+  canExecuteInlinePreviewBuild,
+  frameworkNeedsWorkerBuild,
+  queuePreviewBuildJob,
+} from "@/lib/imports/preview-build-queue";
+import type { DetectedFrameworkId } from "@/lib/imports/framework-detector";
 
 const execFileAsync = promisify(execFile);
 
@@ -39,13 +45,9 @@ export type PreviewBuildRunResult = {
   jobId: string | null;
 };
 
+/** @deprecated Use canExecuteInlinePreviewBuild from preview-build-queue */
 export function canExecuteNpmPreviewBuild(): boolean {
-  if (process.env.VERCEL === "1") return false;
-  return process.env.PREVIEW_RUNTIME_BUILD === "1";
-}
-
-function isServerlessProduction(): boolean {
-  return process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME != null;
+  return canExecuteInlinePreviewBuild();
 }
 
 async function runCommand(
@@ -177,17 +179,6 @@ export async function runImportPreviewBuild(input: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = input.admin as any;
 
-  await db.from("preview_build_jobs").upsert({
-    id: jobId,
-    project_id: input.projectId,
-    owner_id: input.userId,
-    status: "running",
-    framework: analysis.framework.id,
-    started_at: now,
-    updated_at: now,
-    diagnostics,
-  });
-
   if (analysis.blockers.length > 0) {
     diagnostics = {
       ...diagnostics,
@@ -211,12 +202,32 @@ export async function runImportPreviewBuild(input: {
     return { diagnostics, jobId };
   }
 
+  const fw = analysis.framework.id as DetectedFrameworkId;
+  if (frameworkNeedsWorkerBuild(fw) && !canExecuteInlinePreviewBuild()) {
+    return queuePreviewBuildJob({
+      admin: input.admin,
+      userId: input.userId,
+      projectId: input.projectId,
+      files: input.files,
+      jobId,
+    });
+  }
+
+  await db.from("preview_build_jobs").upsert({
+    id: jobId,
+    project_id: input.projectId,
+    owner_id: input.userId,
+    status: "running",
+    framework: analysis.framework.id,
+    started_at: now,
+    updated_at: now,
+    diagnostics,
+  });
+
   const sourceFiles = input.files.map((f) => ({ path: f.path, content: f.content }));
   let buildLogs = "";
   let artifactPath: string | null = null;
   let htmlForHealth = "";
-
-  const fw = analysis.framework.id;
 
   if (fw === "static") {
     diagnostics = { ...diagnostics, previewStatus: "serving", buildStrategy: "static" };
@@ -241,7 +252,7 @@ export async function runImportPreviewBuild(input: {
     }
   } else if (
     ["vite", "cra", "react", "lovable", "base44", "bolt", "v0"].includes(fw) &&
-    canExecuteNpmPreviewBuild() &&
+    canExecuteInlinePreviewBuild() &&
     analysis.framework.scripts.build
   ) {
     diagnostics = { ...diagnostics, previewStatus: "installing", buildStrategy: "vite_build" };
@@ -295,7 +306,7 @@ export async function runImportPreviewBuild(input: {
     }
   } else if (
     ["nextjs_app", "nextjs_pages", "base44", "lovable"].includes(fw) &&
-    canExecuteNpmPreviewBuild() &&
+    canExecuteInlinePreviewBuild() &&
     analysis.framework.scripts.build &&
     !analysis.framework.isSsrNext
   ) {
@@ -331,24 +342,6 @@ export async function runImportPreviewBuild(input: {
       }
     } finally {
       await cleanupSandbox(sandbox.rootDir);
-    }
-  } else if (isServerlessProduction() && !["static", "unknown"].includes(fw)) {
-    diagnostics = {
-      ...diagnostics,
-      previewStatus: "queued",
-      buildStrategy: "queued_worker",
-      blockedReason: null,
-      warnings: [
-        ...diagnostics.warnings,
-        "Preview worker unavailable: dependency install/build runtime is not configured on this host. Set PREVIEW_RUNTIME_BUILD=1 on a Node worker, or use static snapshot below.",
-      ],
-    };
-    const snap = buildStaticSnapshotHtml(input.files, input.projectId, analysis);
-    buildLogs = snap.logs;
-    const upload = await writeHtmlArtifact(input.admin, input.projectId, buildId, snap.html);
-    if (upload.ok) {
-      artifactPath = upload.artifactPath;
-      htmlForHealth = snap.html;
     }
   } else {
     diagnostics = {
@@ -389,9 +382,9 @@ export async function runImportPreviewBuild(input: {
       : [
           health.blockedReason ?? "Preview validation failed",
           "Open build logs for details",
-          canExecuteNpmPreviewBuild()
+          canExecuteInlinePreviewBuild()
             ? "Retry rebuild from the import dashboard"
-            : "Enable PREVIEW_RUNTIME_BUILD=1 on a Node preview worker for full Vite/Next builds",
+            : "Start the dedicated preview worker (npm run preview-worker:dev) or set PREVIEW_RUNTIME_BUILD=1 locally",
         ],
     lastPreviewBuildAt: new Date().toISOString(),
     jobId,
@@ -440,7 +433,16 @@ export async function loadLatestPreviewDiagnostics(
     buildLogs: data.build_logs ?? d.buildLogs,
     jobId: data.id,
     lastPreviewBuildAt: data.finished_at ?? d.lastPreviewBuildAt,
-    previewStatus: data.status === "succeeded" ? "ready" : data.status === "failed" ? "failed" : d.previewStatus,
+    previewStatus:
+      data.status === "succeeded"
+        ? "ready"
+        : data.status === "failed"
+          ? "failed"
+          : data.status === "queued"
+            ? "queued"
+            : data.status === "running"
+              ? "building"
+              : d.previewStatus,
   };
 }
 

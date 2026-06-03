@@ -283,6 +283,7 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
       previewReady?: boolean;
       blockedReason?: string | null;
       previewStatus?: string;
+      diagnostics?: { previewStatus?: string };
     };
 
     if (!res.ok) {
@@ -325,7 +326,7 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
       framework: j.framework ?? "unknown",
       previewReady: j.previewReady === true,
       blockedReason: j.blockedReason ?? null,
-      previewStatus: j.previewStatus ?? "failed",
+      previewStatus: j.previewStatus ?? j.diagnostics?.previewStatus ?? "failed",
     });
     setScanResult(
       scanResultFromImportApi({
@@ -532,13 +533,17 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                     <p className="text-[13px] font-medium text-foreground">
                       {importResult?.previewReady
                         ? `Preview ready — ${scanResult.framework}`
-                        : `Files imported — ${scanResult.framework} (preview not renderable)`}
+                        : importResult?.previewStatus === "queued"
+                          ? `Files imported — ${scanResult.framework} (preview queued)`
+                          : `Files imported — ${scanResult.framework} (preview not renderable)`}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       {importResult?.previewReady
                         ? "Runnable preview validated. You can publish after reviewing integrations."
-                        : (importResult?.blockedReason ??
-                          "Open the app dashboard to rebuild preview or review build logs.")}
+                        : importResult?.previewStatus === "queued"
+                          ? "Preview build queued for the dedicated worker. Open the app dashboard to track progress."
+                          : (importResult?.blockedReason ??
+                            "Open the app dashboard to rebuild preview or review build logs.")}
                     </p>
                   </div>
                 </div>

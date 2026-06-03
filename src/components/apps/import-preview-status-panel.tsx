@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  Server,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ import { toast } from "@/lib/toast";
 type PreviewImportStatus = {
   previewRenderable: boolean;
   previewStatus: string;
+  jobStatus: string | null;
   framework: string | null;
   frameworkLabel: string | null;
   entryFile: string | null;
@@ -25,18 +27,23 @@ type PreviewImportStatus = {
   buildLogs: string | null;
   lastPreviewBuildAt: string | null;
   jobId: string | null;
+  artifactPath: string | null;
+  workerUnavailable: boolean;
+  workerUnavailableMessage: string | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
   imported: "Files saved",
   analyzing: "Analyzing source",
   installing: "Installing dependencies",
-  building: "Building preview",
+  building: "Preview building",
   serving: "Serving preview",
   validating: "Validating render",
   ready: "Preview ready",
   failed: "Preview failed",
-  queued: "Build queued",
+  queued: "Preview queued",
+  running: "Worker running",
+  succeeded: "Preview ready",
 };
 
 export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
@@ -53,6 +60,7 @@ export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
       setStatus({
         previewRenderable: Boolean(j.previewRenderable),
         previewStatus: String(j.previewStatus ?? "unknown"),
+        jobStatus: typeof j.jobStatus === "string" ? j.jobStatus : null,
         framework: typeof j.framework === "string" ? j.framework : null,
         frameworkLabel: typeof j.frameworkLabel === "string" ? j.frameworkLabel : null,
         entryFile: typeof j.entryFile === "string" ? j.entryFile : null,
@@ -63,6 +71,10 @@ export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
         lastPreviewBuildAt:
           typeof j.lastPreviewBuildAt === "string" ? j.lastPreviewBuildAt : null,
         jobId: typeof j.jobId === "string" ? j.jobId : null,
+        artifactPath: typeof j.artifactPath === "string" ? j.artifactPath : null,
+        workerUnavailable: Boolean(j.workerUnavailable),
+        workerUnavailableMessage:
+          typeof j.workerUnavailableMessage === "string" ? j.workerUnavailableMessage : null,
       });
     } finally {
       setLoading(false);
@@ -73,12 +85,31 @@ export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
     void load();
   }, [load]);
 
+  React.useEffect(() => {
+    if (!status) return;
+    const pending =
+      status.jobStatus === "queued" ||
+      status.jobStatus === "running" ||
+      status.previewStatus === "queued" ||
+      status.previewStatus === "building";
+    if (!pending) return;
+    const t = setInterval(() => void load(), 5000);
+    return () => clearInterval(t);
+  }, [status, load]);
+
   async function rebuild() {
     setRebuilding(true);
     try {
       const res = await fetch(`/api/apps/${appId}/preview/build`, { method: "POST" });
-      const j = (await res.json()) as { ok?: boolean; blockedReason?: string };
-      if (j.ok) {
+      const j = (await res.json()) as {
+        ok?: boolean;
+        queued?: boolean;
+        blockedReason?: string;
+        message?: string;
+      };
+      if (j.queued) {
+        toast.info(j.message ?? "Preview build queued for worker");
+      } else if (j.ok) {
         toast.success("Preview is ready");
       } else {
         toast.error(j.blockedReason ?? "Preview build did not produce a renderable app");
@@ -103,19 +134,30 @@ export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
   if (!status) return null;
 
   const ready = status.previewRenderable;
-  const statusLabel = STATUS_LABELS[status.previewStatus] ?? status.previewStatus;
+  const isPending =
+    status.jobStatus === "queued" ||
+    status.jobStatus === "running" ||
+    (!ready && status.previewStatus === "queued");
+  const statusKey = ready
+    ? "ready"
+    : status.jobStatus && STATUS_LABELS[status.jobStatus]
+      ? status.jobStatus
+      : status.previewStatus;
+  const statusLabel = STATUS_LABELS[statusKey] ?? statusKey;
 
   return (
     <div className="rounded-xl bg-surface ring-1 ring-border overflow-hidden">
       <div
         className={cn(
           "flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3",
-          ready ? "bg-positive/8" : "bg-amber-500/8",
+          ready ? "bg-positive/8" : isPending ? "bg-accent/8" : "bg-amber-500/8",
         )}
       >
         <div className="flex items-center gap-2 min-w-0">
           {ready ? (
             <CheckCircle2 className="size-4 shrink-0 text-positive" />
+          ) : isPending ? (
+            <Loader2 className="size-4 shrink-0 animate-spin text-accent" />
           ) : (
             <AlertCircle className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
           )}
@@ -131,7 +173,7 @@ export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
           variant="secondary"
           size="sm"
           className="gap-1.5 shrink-0"
-          disabled={rebuilding}
+          disabled={rebuilding || isPending}
           onClick={() => void rebuild()}
         >
           {rebuilding ? (
@@ -143,13 +185,22 @@ export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
         </Button>
       </div>
 
+      {status.workerUnavailable && (
+        <div className="flex items-start gap-2 border-b border-border bg-destructive/8 px-4 py-2.5 text-[11px] text-destructive">
+          <Server className="mt-0.5 size-3.5 shrink-0" />
+          {status.workerUnavailableMessage ??
+            "Worker not connected — preview job is still queued."}
+        </div>
+      )}
+
       <div className="grid gap-2 px-4 py-3 text-[12px] sm:grid-cols-2">
-        <Row label="Build status" value={statusLabel} />
+        <Row label="Job status" value={status.jobStatus ?? status.previewStatus} />
         <Row
           label="Preview"
           value={ready ? "Renderable" : status.blockedReason ?? "Not renderable"}
           warn={!ready}
         />
+        {status.artifactPath && <Row label="Artifact" value={status.artifactPath} />}
         {status.legacyPlatform && (
           <Row label="Legacy platform" value={status.legacyPlatform} warn />
         )}

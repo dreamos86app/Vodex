@@ -34,13 +34,21 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     projectId,
   });
 
+  const queued = diagnostics.previewStatus === "queued";
+
   return NextResponse.json({
     ok: diagnostics.previewRenderable,
+    queued,
     jobId,
     previewRenderable: diagnostics.previewRenderable,
     previewStatus: diagnostics.previewStatus,
     blockedReason: diagnostics.blockedReason,
     previewUrl: diagnostics.previewUrl,
+    message: queued
+      ? "Preview build queued for dedicated worker"
+      : diagnostics.previewRenderable
+        ? "Preview is ready"
+        : diagnostics.blockedReason,
     diagnostics,
   });
 }

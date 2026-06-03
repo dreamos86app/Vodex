@@ -20,9 +20,12 @@ export async function applyPreviewBuildToProject(input: {
       ? (project.metadata as Record<string, unknown>)
       : {};
 
+  const isQueued = input.diagnostics.previewStatus === "queued";
   const lifecycleStatus = input.diagnostics.previewRenderable
     ? "imported_preview_ready"
-    : "imported";
+    : isQueued
+      ? "imported"
+      : "imported";
 
   const importMeta =
     prevMeta.import && typeof prevMeta.import === "object"
@@ -39,6 +42,8 @@ export async function applyPreviewBuildToProject(input: {
         imported_framework: input.diagnostics.framework,
         import_status: input.diagnostics.previewStatus,
         preview_status: input.diagnostics.previewStatus,
+        preview_job_id: input.diagnostics.jobId,
+        preview_worker_queued: isQueued,
         preview_url: input.diagnostics.previewUrl,
         preview_artifact_path: input.diagnostics.artifactPath,
         preview_blocked_reason: input.diagnostics.blockedReason,
