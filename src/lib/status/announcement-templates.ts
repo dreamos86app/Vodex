@@ -3,8 +3,12 @@ export type BannerTemplateId =
   | "builder_affected"
   | "preview_issue"
   | "scheduled_maintenance"
+  | "service_restored"
   | "big_sale"
-  | "new_feature";
+  | "new_feature"
+  | "billing_notice"
+  | "integration_outage"
+  | "platform_update";
 
 export type BannerTemplate = {
   id: BannerTemplateId;
@@ -118,6 +122,66 @@ export const BANNER_TEMPLATES: BannerTemplate[] = [
     textColor: "#ffffff",
     iconType: "sparkles",
     priority: 60,
+  },
+  {
+    id: "service_restored",
+    label: "Service restored",
+    title: "All systems operational",
+    message: "The incident has been resolved. Thank you for your patience.",
+    linkLabel: "Status page",
+    linkUrl: "https://status.vodex.dev",
+    bannerType: "success",
+    severity: "success",
+    gradientFrom: "#059669",
+    gradientTo: "#10B981",
+    textColor: "#ffffff",
+    iconType: "sparkles",
+    priority: 15,
+  },
+  {
+    id: "billing_notice",
+    label: "Billing / payment notice",
+    title: "Billing update",
+    message: "There is an update regarding your subscription or payment method.",
+    linkLabel: "Billing settings",
+    linkUrl: "/settings/billing",
+    bannerType: "warning",
+    severity: "warning",
+    gradientFrom: "#B45309",
+    gradientTo: "#F59E0B",
+    textColor: "#ffffff",
+    iconType: "alert",
+    priority: 45,
+  },
+  {
+    id: "integration_outage",
+    label: "Integration outage",
+    title: "Third-party integration issue",
+    message: "A connected provider may be temporarily unavailable. Your apps and data are safe.",
+    linkLabel: "View status",
+    linkUrl: "https://status.vodex.dev",
+    bannerType: "warning",
+    severity: "warning",
+    gradientFrom: "#7C3AED",
+    gradientTo: "#EC4899",
+    textColor: "#ffffff",
+    iconType: "alert",
+    priority: 35,
+  },
+  {
+    id: "platform_update",
+    label: "Platform update",
+    title: "Platform update rolling out",
+    message: "We're deploying improvements across Vodex. You may notice brief UI refreshes.",
+    linkLabel: "Changelog",
+    linkUrl: "/changelog",
+    bannerType: "info",
+    severity: "info",
+    gradientFrom: "#0EA5E9",
+    gradientTo: "#6366F1",
+    textColor: "#ffffff",
+    iconType: "sparkles",
+    priority: 70,
   },
 ];
 

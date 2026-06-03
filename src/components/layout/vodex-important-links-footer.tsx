@@ -110,8 +110,8 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
           />
         </div>
 
-        <div className="mx-auto max-w-6xl border-t border-white/25 px-[var(--page-padding-x)] py-4 dark:border-sky-400/15 sm:py-5 lg:border-t-0 lg:pt-0">
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
+        <div className="vodex-footer-columns mx-auto max-w-6xl border-t border-white/20 px-[var(--page-padding-x)] pb-2 pt-6 dark:border-sky-400/10 sm:pt-8 lg:border-t-0 lg:pt-2">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5 lg:pt-4">
             {LINK_COLUMNS.map((col) => (
               <FooterLinkColumn key={col.title} title={col.title} links={col.links} />
             ))}
@@ -125,7 +125,7 @@ export function VodexImportantLinksFooter({ className }: { className?: string })
               </div>
             </FooterLinkColumn>
           </div>
-          <p className="mt-5 text-center text-[11px] font-semibold tracking-wide text-slate-600/90 dark:text-slate-400/95">
+          <p className="vodex-footer-copyright mt-6 text-center text-[11px] font-semibold tracking-wide text-slate-600/90 dark:text-slate-400/95">
             © {new Date().getFullYear()} Vodex · Built for AI-native creators
           </p>
         </div>

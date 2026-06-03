@@ -23,6 +23,7 @@ import { resolveClientUserId } from "@/lib/chat/resolve-client-user";
 import { cn } from "@/lib/utils";
 import { getCanonicalOAuthRedirectTo } from "@/lib/auth/oauth-redirect";
 import { persistAuthReturnToForBrowser } from "@/lib/auth/oauth-prep";
+import { PresenceSettingsSection } from "@/components/settings/presence-settings-section";
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -839,6 +840,10 @@ export function AccountSettings() {
         {/* Profile */}
         <motion.div variants={variants.staggerItem}>
           <ProfileSection />
+        </motion.div>
+
+        <motion.div variants={variants.staggerItem}>
+          <PresenceSettingsSection />
         </motion.div>
 
         {/* Password */}

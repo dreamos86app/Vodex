@@ -29,7 +29,7 @@ export async function ensureWelcomeNotification(
     title,
     body: "Welcome to Vodex — we added free credits so you can start building your first app.",
     read: false,
-    action_url: "/",
+    action_url: "/create",
     metadata: {
       kind: "welcome",
       premium: true,

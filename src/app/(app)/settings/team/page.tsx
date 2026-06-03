@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import Image from "next/image";
+import { PresenceDot } from "@/components/presence/presence-dot";
+import type { VisiblePresenceStatus } from "@/lib/presence/user-presence";
 
 type ApiMember = {
   user_id: string;
@@ -25,6 +27,7 @@ type ApiMember = {
   avatar_url: string | null;
   role: string;
   is_you: boolean;
+  visible_status?: VisiblePresenceStatus;
 };
 
 type ApiInvite = {
@@ -202,12 +205,17 @@ export default function TeamSettingsPage() {
               const label = displayRoleLabel(m.role);
               return (
                 <div key={m.user_id} className="flex items-center gap-4 px-6 py-4">
-                  <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-400 to-purple-600 text-[13px] font-bold text-white shadow-[var(--shadow-xs)] ring-1 ring-border">
-                    {m.avatar_url ? (
-                      <Image src={m.avatar_url} alt="" width={40} height={40} className="size-full object-cover" unoptimized />
-                    ) : (
-                      memberInitials(m) || "?"
-                    )}
+                  <div className="relative size-10 shrink-0">
+                    <div className="flex size-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-400 to-purple-600 text-[13px] font-bold text-white shadow-[var(--shadow-xs)] ring-1 ring-border">
+                      {m.avatar_url ? (
+                        <Image src={m.avatar_url} alt="" width={40} height={40} className="size-full object-cover" unoptimized />
+                      ) : (
+                        memberInitials(m) || "?"
+                      )}
+                    </div>
+                    <span className="pointer-events-none absolute -bottom-0.5 -right-0.5">
+                      <PresenceDot status={m.visible_status ?? "offline"} size="sm" />
+                    </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-medium text-foreground">

@@ -4,6 +4,16 @@ import * as React from "react";
 import { Users, Loader2, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { PresenceDot } from "@/components/presence/presence-dot";
+import type { VisiblePresenceStatus } from "@/lib/presence/user-presence";
+
+type TeamMember = {
+  user_id: string;
+  display_name: string | null;
+  email: string | null;
+  is_you: boolean;
+  visible_status?: VisiblePresenceStatus;
+};
 
 export function QuickCollaboratorPopover() {
   const [open, setOpen] = React.useState(false);
@@ -12,15 +22,20 @@ export function QuickCollaboratorPopover() {
   const [scope, setScope] = React.useState<"workspace" | "app">("workspace");
   const [busy, setBusy] = React.useState(false);
   const [workspaceId, setWorkspaceId] = React.useState<string | null>(null);
+  const [members, setMembers] = React.useState<TeamMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
+    setLoadingMembers(true);
     void fetch("/api/team", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((json: { workspace_id?: string } | null) => {
+      .then((json: { workspace_id?: string; members?: TeamMember[] } | null) => {
         if (json?.workspace_id) setWorkspaceId(json.workspace_id);
+        setMembers(json?.members ?? []);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setLoadingMembers(false));
   }, [open]);
 
   async function invite() {
@@ -47,6 +62,8 @@ export function QuickCollaboratorPopover() {
       setBusy(false);
     }
   }
+
+  const teammates = members.filter((m) => !m.is_you).slice(0, 6);
 
   return (
     <div className="relative" data-testid="quick-collaborator-popover">
@@ -78,6 +95,30 @@ export function QuickCollaboratorPopover() {
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Usage is billed to this workspace owner — not collaborator accounts.
               </p>
+
+              {loadingMembers ? (
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Loading workspace…
+                </div>
+              ) : teammates.length > 0 ? (
+                <div className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2">
+                  <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    In workspace
+                  </p>
+                  <ul className="space-y-1.5">
+                    {teammates.map((m) => (
+                      <li key={m.user_id} className="flex items-center gap-2 text-[12px]">
+                        <PresenceDot status={m.visible_status ?? "offline"} size="sm" />
+                        <span className="truncate text-foreground">
+                          {m.display_name || m.email?.split("@")[0] || "Member"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               <label className="block text-[11px] font-medium text-muted-foreground">
                 Scope
                 <select

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { siteUrl } from "@/lib/app-url";
 import { sendWorkspaceInviteEmail } from "@/lib/email/workspace-invite-email";
+import { createUserNotification } from "@/lib/notifications/create-user-notification";
 import { generateInviteToken, hashInviteToken } from "@/lib/team/invite-tokens";
 import type { WorkspaceAccess } from "@/lib/team/workspace-access";
 
@@ -91,6 +92,24 @@ export async function createWorkspaceInvitation(
     acceptUrl,
     expiresAt: new Date(expires_at),
   });
+
+  const { data: inviteeProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (inviteeProfile?.id) {
+    await createUserNotification(admin, {
+      userId: inviteeProfile.id,
+      kind: "workspace_invite_received",
+      title: `Invitation to ${input.workspaceName}`,
+      body: `${input.inviterName} invited you as ${input.role}. Open the invite to join.`,
+      actionUrl: acceptUrl,
+      iconKey: "users",
+      effectKey: "glow",
+    });
+  }
 
   return {
     invite: row as WorkspaceInviteRow,
@@ -199,6 +218,32 @@ export async function acceptWorkspaceInvitation(
       } as never)
       .eq("id", pendingTeam.id);
   }
+
+  const { data: workspace } = await admin
+    .from("workspaces")
+    .select("name, owner_id")
+    .eq("id", inv.workspace_id)
+    .maybeSingle();
+
+  if (inv.invited_by) {
+    await createUserNotification(admin, {
+      userId: inv.invited_by as string,
+      kind: "workspace_invite_accepted",
+      title: `${normalizedUserEmail} joined your workspace`,
+      body: `${normalizedUserEmail} accepted the invite as ${role}.`,
+      actionUrl: "/settings/team",
+      iconKey: "users",
+    });
+  }
+
+  await createUserNotification(admin, {
+    userId,
+    kind: "workspace_member_joined",
+    title: `You joined ${workspace?.name ?? "a workspace"}`,
+    body: `You now have ${role} access. Usage is billed to the workspace owner.`,
+    actionUrl: "/projects",
+    iconKey: "users",
+  });
 
   return { workspaceId: inv.workspace_id, role };
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireApiUser, requireServiceAdmin } from "@/lib/team/api-auth";
 import { getWorkspaceAccess } from "@/lib/team/workspace-access";
+import { getVisiblePresenceForUsers } from "@/lib/presence/user-presence";
+import type { VisiblePresenceStatus } from "@/lib/presence/user-presence";
 
 export async function GET(
   _req: Request,
@@ -48,6 +50,11 @@ export async function GET(
     .eq("id", workspaceId)
     .maybeSingle();
 
+  const presenceByUser =
+    userIds.length > 0
+      ? await getVisiblePresenceForUsers(adminWrap.admin, userIds)
+      : {};
+
   const members = (wm ?? []).map((row) => {
     const p = profileById.get(row.user_id);
     const isOwner = ownerRow?.owner_id === row.user_id;
@@ -59,6 +66,7 @@ export async function GET(
       avatar_url: p?.avatar_url ?? null,
       role: isOwner ? "owner" : row.role,
       is_you: row.user_id === auth.user.id,
+      visible_status: (presenceByUser[row.user_id] ?? "offline") as VisiblePresenceStatus,
     };
   });
 

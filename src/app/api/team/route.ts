@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { ensurePersonalWorkspace } from "@/lib/identity/ensure-personal-workspace";
+import { getVisiblePresenceForUsers } from "@/lib/presence/user-presence";
+import type { VisiblePresenceStatus } from "@/lib/presence/user-presence";
 
 export type TeamMemberRow = {
   user_id: string;
@@ -10,6 +12,7 @@ export type TeamMemberRow = {
   avatar_url: string | null;
   role: string;
   is_you: boolean;
+  visible_status: VisiblePresenceStatus;
 };
 
 export type TeamInviteRow = {
@@ -83,6 +86,11 @@ export async function GET() {
       }
     }
 
+    const presenceByUser =
+      userIds.length > 0 && admin
+        ? await getVisiblePresenceForUsers(admin, userIds)
+        : {};
+
     for (const uid of userIds) {
       const p = profileById.get(uid);
       const role = roleByUser.get(uid) ?? "member";
@@ -93,6 +101,7 @@ export async function GET() {
         avatar_url: p?.avatar_url ?? null,
         role,
         is_you: uid === user.id,
+        visible_status: presenceByUser[uid] ?? "offline",
       });
     }
 
@@ -134,6 +143,8 @@ export async function GET() {
   }
 
   if (members.length === 0) {
+    const soloStatus =
+      admin ? (await getVisiblePresenceForUsers(admin, [user.id]))[user.id] ?? "offline" : "offline";
     members.push({
       user_id: user.id,
       email: user.email ?? null,
@@ -141,6 +152,7 @@ export async function GET() {
       avatar_url: null,
       role: "owner",
       is_you: true,
+      visible_status: soloStatus,
     });
   }
 

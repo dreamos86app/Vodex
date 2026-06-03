@@ -24,7 +24,8 @@ import { resolveDisplayName } from "@/lib/profile-display";
 import { cn } from "@/lib/utils";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { LogoutConfirmModal } from "@/components/auth/logout-confirm-modal";
-import { Avatar } from "@/components/ui/avatar";
+import { PresenceAvatar } from "@/components/presence/presence-avatar";
+import { usePresenceStore } from "@/lib/stores/presence-store";
 
 type MenuItem = {
   id: string;
@@ -78,6 +79,9 @@ export function UserMenu() {
   const syncing = useCreditsStore((s) => s.syncing);
   const syncFromDB = useCreditsStore((s) => s.syncFromDB);
   const hydrated = useHydrated();
+  const visibleStatus = usePresenceStore((s) => s.visibleStatus);
+  const presenceLabel = usePresenceStore((s) => s.label);
+  const presenceLoaded = usePresenceStore((s) => s.loaded);
   const [open, setOpen] = React.useState(false);
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -138,11 +142,13 @@ export function UserMenu() {
           <p className="truncate text-[12px] font-medium tracking-[-0.01em]">{dreamLabel}</p>
           {hydrated ? <PlanBadge planId={effectivePlanId} size="xs" className="shrink-0" /> : null}
         </div>
-        <Avatar
+        <PresenceAvatar
           name={displayName || dreamLabel}
           src={safeProfile?.avatar_url}
           size="md"
           className="ring-2 ring-accent/20"
+          status={presenceLoaded ? visibleStatus : null}
+          statusLabel={presenceLabel}
         />
       </button>
 
@@ -158,10 +164,12 @@ export function UserMenu() {
           >
             <div className="shrink-0 border-b border-border/60 bg-gradient-to-br from-accent/[0.06] via-background to-background px-4 py-3">
               <div className="flex items-start gap-3">
-                <Avatar
+                <PresenceAvatar
                   name={displayName || dreamLabel}
                   src={safeProfile?.avatar_url}
                   size="lg"
+                  status={presenceLoaded ? visibleStatus : null}
+                  statusLabel={presenceLabel}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">

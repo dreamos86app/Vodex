@@ -74,6 +74,8 @@ export interface Database {
           signup_heard_about: string | null;
           signup_referral_code: string | null;
           last_active_at: string | null;
+          marketing_emails_opt_in: boolean;
+          presence_mode: "auto" | "online" | "offline" | "invisible";
           subscription_status: string | null;
           account_status: string | null;
           monthly_token_limit: number | null;
@@ -764,6 +766,22 @@ export interface Database {
         Relationships: [];
       };
 
+      user_presence: {
+        Row: {
+          user_id: string;
+          last_seen_at: string;
+          current_status: "online" | "offline";
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          last_seen_at?: string;
+          current_status?: "online" | "offline";
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["user_presence"]["Insert"]>;
+        Relationships: [];
+      };
       user_provider_connections: {
         Row: {
           user_id: string;

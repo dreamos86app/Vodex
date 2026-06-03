@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotificationsStore } from "@/lib/stores/notifications-store";
+import {
+  INBOX_TABS,
+  notificationMatchesTab,
+  readNotificationKind,
+  type NotificationInboxTab,
+} from "@/lib/notifications/notification-kinds";
 import Link from "next/link";
 
 // ─── Notification type icons ───────────────────────────────────────────────────
@@ -54,7 +60,13 @@ interface NotificationPanelProps {
 
 export function NotificationPanel({ anchorRef, open, onClose }: NotificationPanelProps) {
   const { notifications, unreadCount, markRead, markAllRead } = useNotificationsStore();
+  const [activeTab, setActiveTab] = React.useState<NotificationInboxTab>("main");
   const [mounted, setMounted] = React.useState(false);
+
+  const filtered = React.useMemo(
+    () => notifications.filter((n) => notificationMatchesTab(n, activeTab)),
+    [notifications, activeTab],
+  );
   const panelRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => { setMounted(true); }, []);
@@ -134,28 +146,40 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
             </div>
           </div>
 
+          <div className="flex gap-1 overflow-x-auto border-b border-border px-2 py-2" data-testid="notification-inbox-tabs">
+            {INBOX_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setActiveTab(t.id)}
+                className={cn(
+                  "shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition",
+                  activeTab === t.id
+                    ? "bg-accent text-white"
+                    : "bg-muted/60 text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
           {/* Content */}
-          <div className="max-h-[420px] overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-surface ring-1 ring-border">
-                  <Bell className="size-6 text-muted-foreground/40" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <p className="text-[13.5px] font-medium text-foreground">All clear</p>
-                  <p className="mt-0.5 text-[12px] text-muted-foreground">
-                    Notifications for deployments, builds, credits, and collaborators appear here.
-                  </p>
-                </div>
+          <div className="max-h-[380px] overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
+                <Bell className="size-8 text-muted-foreground/35" strokeWidth={1.5} />
+                <p className="text-[13px] font-medium text-muted-foreground">No notifications yet</p>
               </div>
             ) : (
               <div className="divide-y divide-border/60">
-                {notifications.slice(0, 20).map((n) => {
+                {filtered.slice(0, 25).map((n) => {
                   const meta = getMeta(n.type ?? "system");
                   const Icon = meta.icon;
                   const md = n.metadata as Record<string, unknown> | null;
+                  const kind = readNotificationKind(n);
                   const isWelcome =
-                    md?.kind === "welcome" ||
+                    kind === "welcome" ||
                     (typeof n.title === "string" && n.title.startsWith("Welcome to Vodex"));
                   const isPremium = Boolean(md?.premium) || isWelcome;
                   const effectKey =
@@ -170,7 +194,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                       type="button"
                       onClick={() => markRead(n.id)}
                       className={cn(
-                        "flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-surface/60",
+                        "flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-surface/60",
                         !n.read && "bg-accent/3",
                         isPremium &&
                           "relative overflow-hidden rounded-xl border border-sky-200/60 bg-gradient-to-br from-sky-50 via-indigo-50/80 to-violet-100/70 dark:from-slate-900/80 dark:via-indigo-950/40 dark:to-violet-950/30",
@@ -233,7 +257,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
               className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground transition hover:text-foreground"
             >
               <Settings className="size-3.5" strokeWidth={1.65} />
-              Notification settings
+              Notification sounds
             </Link>
           </div>
         </motion.div>

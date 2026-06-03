@@ -846,6 +846,8 @@
     "verify:no-code-in-dashboard": "node scripts/verify-no-code-in-dashboard.mjs",
     "verify:integrations-plan-gate": "node scripts/verify-integrations-plan-gate.mjs",
     "verify:p2-production": "node scripts/verify-p2-production.mjs",
+    "verify:control-center-notifications": "node scripts/verify-control-center-notifications.mjs",
+    "verify:user-presence": "node scripts/verify-user-presence.mjs",
     "verify:one-click-github-connect": "node scripts/verify-p2-production.mjs one-click-github-connect",
     "verify:one-click-supabase-connect": "node scripts/verify-p2-production.mjs one-click-supabase-connect",
     "verify:integrations-pro-lock": "node scripts/verify-p2-production.mjs integrations-pro-lock",

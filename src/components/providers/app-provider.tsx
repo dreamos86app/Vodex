@@ -49,11 +49,11 @@ import {
   refreshNotificationPrefsFromApi,
 } from "@/lib/notifications/notification-prefs-cache";
 import {
-  shouldDeliverInApp,
   shouldPlaySound,
   normalizeNotificationPrefs,
 } from "@/lib/notifications/notification-preferences";
 import { playNotificationChime } from "@/lib/notifications/notification-sound";
+import { usePresenceHeartbeat } from "@/hooks/use-presence-heartbeat";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -71,6 +71,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const loading = useAuthStore((s) => s.loading);
   const creditsSyncEnabled = Boolean(user?.id ?? profile?.id) && !lightweightPublic;
   useCreditsSync(creditsSyncEnabled);
+  usePresenceHeartbeat(creditsSyncEnabled);
 
   const profileId = profile?.id;
   const profilePlanId = profile?.plan_id;
@@ -169,9 +170,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           (payload) => {
             const row = payload.new as Notification;
             const prefs = getCachedNotificationPrefs();
-            if (!shouldDeliverInApp(prefs, row.type)) return;
+            const md = row.metadata as Record<string, unknown> | null;
+            const allowSound = md?.play_sound !== false;
             addNotification(row);
             if (
+              allowSound &&
               shouldPlaySound(prefs, row.type) &&
               Date.now() - lastChimeAt > 2000
             ) {
@@ -295,16 +298,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const prefs = await refreshNotificationPrefsFromApi();
-        const visible = (rows as Notification[]).filter((n) =>
-          shouldDeliverInApp(prefs, n.type),
-        );
+        const visible = rows as Notification[];
         setNotifications(visible);
 
         if (coreProfile) {
           setCachedBootstrap(userId, {
             profile: coreProfile as Profile,
-            notifications: visible,
+            notifications: visible as Notification[],
           });
         }
       })();

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSessionUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { createUserNotification } from "@/lib/notifications/create-user-notification";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,27 @@ export async function POST(_req: Request, context: RouteContext) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const admin = createServiceRoleClient();
+  if (admin) {
+    const { data: tpl } = await admin
+      .from("templates")
+      .select("name, owner_id, creator_id")
+      .eq("id", templateId)
+      .maybeSingle();
+    const ownerId = (tpl?.owner_id ?? tpl?.creator_id) as string | undefined;
+    if (ownerId && ownerId !== user.id) {
+      await createUserNotification(admin, {
+        userId: ownerId,
+        kind: "template_liked",
+        title: "Someone liked your template",
+        body: `Your template "${tpl?.name ?? "Community template"}" received a new like.`,
+        actionUrl: "/templates",
+        iconKey: "sparkles",
+        effectKey: "stars",
+      });
+    }
   }
 
   return NextResponse.json({ liked: true });
