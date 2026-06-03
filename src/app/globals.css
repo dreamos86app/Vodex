@@ -1644,18 +1644,19 @@ body {
 
 .vodex-footer-bird-static {
   position: absolute;
-  bottom: 12%;
-  width: clamp(96px, 13vw, 152px);
-  max-width: 42%;
+  top: 50%;
+  width: clamp(100px, 14vw, 168px);
+  max-width: 38%;
   line-height: 0;
+  transform: translateY(-50%);
 }
 
 .vodex-footer-bird-static--left {
-  left: clamp(0.25rem, 2vw, 1.25rem);
+  left: clamp(0.5rem, 2.5vw, 1.5rem);
 }
 
 .vodex-footer-bird-static--right {
-  right: clamp(0.25rem, 2vw, 1.25rem);
+  right: clamp(0.5rem, 2.5vw, 1.5rem);
 }
 
 .vodex-footer-bird-png {
@@ -1664,22 +1665,30 @@ body {
   display: block;
   object-fit: contain;
   user-select: none;
-  filter: drop-shadow(0 2px 6px rgb(14 116 144 / 0.28));
+  image-rendering: auto;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  filter: drop-shadow(0 2px 5px rgb(14 116 144 / 0.22));
 }
 
 .vodex-footer-bird-png--mirrored {
-  transform: scaleX(-1);
+  transform: translateZ(0) scaleX(-1);
 }
 
 .dark .vodex-footer-bird-png {
-  filter: drop-shadow(0 2px 10px rgb(34 211 238 / 0.4)) brightness(1.04) contrast(1.02);
+  filter: drop-shadow(0 2px 8px rgb(34 211 238 / 0.38)) brightness(1.03);
+}
+
+.dark .vodex-footer-bird-png--mirrored {
+  filter: drop-shadow(0 2px 8px rgb(34 211 238 / 0.38)) brightness(1.03);
 }
 
 @media (max-width: 640px) {
   .vodex-footer-bird-static {
-    width: clamp(72px, 22vw, 100px);
-    bottom: 8%;
-    opacity: 0.92;
+    width: clamp(80px, 24vw, 108px);
+    max-width: 34%;
+    opacity: 0.95;
   }
 }
 
