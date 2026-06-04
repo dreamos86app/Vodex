@@ -1,9 +1,16 @@
+import { previewFrameUrlWithRoute } from "@/lib/preview/rewrite-preview-artifact-html";
+
 /** Iframe src for project preview — HTML is served by the API, never inlined in React state. */
-export function projectPreviewFrameUrl(projectId: string, cacheBust?: number | string): string {
-  const base = `/api/projects/${encodeURIComponent(projectId)}/preview-html?format=frame`;
-  if (cacheBust == null || cacheBust === "") return base;
-  return `${base}&v=${encodeURIComponent(String(cacheBust))}`;
+export function projectPreviewFrameUrl(
+  projectId: string,
+  cacheBust?: number | string,
+  route?: string | null,
+  artifactBuildId?: string | null,
+): string {
+  return previewFrameUrlWithRoute(projectId, cacheBust, route, artifactBuildId);
 }
+
+export { previewFrameUrlWithRoute };
 
 export type ProjectPreviewStatus = {
   ready: boolean;

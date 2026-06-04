@@ -32,7 +32,8 @@ async function main() {
     if (next.validation.framework.id !== "nextjs") errors.push("next framework not detected");
     if (next.validation.routes.length < 2) errors.push("next routes missing");
     if (next.validation.qualityScore < 90) errors.push(`next quality too low: ${next.validation.qualityScore}`);
-    if (!next.validation.previewReady) errors.push("next should be preview ready");
+    if (next.validation.previewReady) errors.push("previewReady must stay false until runtime build completes");
+    if (!next.validation.previewEntry) errors.push("next should have a preview entry after import");
   }
 
   // Vite valid
@@ -51,7 +52,13 @@ async function main() {
   const staticZip = await makeZip({ "index.html": "<html><body>Hi</body></html>" });
   const stat = await extractAndAnalyzeZip(staticZip);
   if (!stat.ok) errors.push(`static zip: ${stat.error}`);
-  else if (stat.validation.framework.id !== "static") errors.push("static not detected");
+  else {
+    if (stat.validation.framework.id !== "static") errors.push("static not detected");
+    if (!stat.validation.previewEntry || stat.validation.previewEntry.kind !== "html") {
+      errors.push("static should expose html preview entry");
+    }
+    if (stat.validation.previewReady) errors.push("static previewReady must be false until build");
+  }
 
   // .env excluded
   const envZip = await makeZip({

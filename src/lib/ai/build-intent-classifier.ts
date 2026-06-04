@@ -34,9 +34,6 @@ const EDIT_VERBS =
   /\b(edit|update|change|fix the|modify|refactor|improve|tweak|adjust|make it darker|make it lighter|change layout|change the button)\b/i;
 const QUESTION_START =
   /^(how|what|why|when|where|who|can i|should i|is there|do i)\b/i;
-const PURE_DISCUSS =
-  /^(how|what|why|when|where|who|can you explain|tell me about|is it possible)\b/i;
-
 export function classifyBuildIntent(prompt: string): BuildIntentResult {
   const text = prompt.trim();
   const lower = text.toLowerCase();
@@ -107,7 +104,7 @@ export function shouldStartBuildPipeline(
   return intent.intent === "build_app" || intent.intent === "edit_app";
 }
 
-/** Existing project builder: honor Build unless clearly a pure platform question. */
+/** Existing project builder: same bar as new builds — only explicit build/edit requests. */
 export function shouldStartBuildPipelineInProject(
   mode: string,
   projectId: string | null | undefined,
@@ -117,16 +114,5 @@ export function shouldStartBuildPipelineInProject(
   const text = prompt.trim();
   if (text.length < 3) return false;
   if (/^(hi|hello|hey|thanks|test|ok)[\s!.?]*$/i.test(text)) return false;
-
-  const intent = classifyBuildIntent(text);
-  if (intent.intent === "build_app" || intent.intent === "edit_app") return true;
-
-  const pureDiscuss =
-    intent.intent === "discuss_question" &&
-    PURE_DISCUSS.test(text) &&
-    !BUILD_VERBS.test(text) &&
-    !APP_NOUNS.test(text) &&
-    text.length < 80;
-
-  return !pureDiscuss;
+  return shouldStartBuildPipeline(mode, classifyBuildIntent(text));
 }

@@ -12,7 +12,7 @@ mustInclude(
   ["shouldStartBuildPipelineInProject", "checkout", "ticket"],
   errors,
 );
-mustInclude(root, "src/app/api/chat/route.ts", ["shouldStartBuildPipelineInProject", "!projectId"], errors);
+mustInclude(root, "src/app/api/chat/route.ts", ["shouldStartBuildPipeline", "buildIntent"], errors);
 mustInclude(root, "src/lib/intent/create-intent-classifier.ts", ["hasProjectId && (buildSignals"], errors);
 
 mustInclude(

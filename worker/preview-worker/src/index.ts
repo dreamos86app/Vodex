@@ -1,7 +1,15 @@
 import { config } from "./config.js";
 import { log } from "./logger.js";
-import { claimNextJob } from "./supabase.js";
+import { claimNextJob, supabase } from "./supabase.js";
 import { runJob } from "./job-runner.js";
+
+async function heartbeat(): Promise<void> {
+  await supabase.from("preview_worker_heartbeats").upsert({
+    worker_id: config.workerId,
+    last_seen_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+}
 
 let active = 0;
 
@@ -25,6 +33,7 @@ async function main(): Promise<void> {
   });
   for (;;) {
     try {
+      await heartbeat();
       await pollOnce();
     } catch (e) {
       log("error", "poll failed", { error: e instanceof Error ? e.message : String(e) });

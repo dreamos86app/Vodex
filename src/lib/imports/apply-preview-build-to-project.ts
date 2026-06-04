@@ -52,7 +52,9 @@ export async function applyPreviewBuildToProject(input: {
         source_integrity_ok: input.diagnostics.sourceIntegrityOk,
         last_preview_build_at: input.diagnostics.lastPreviewBuildAt,
         preview_ready: input.diagnostics.previewRenderable,
-        preview_honest: input.diagnostics.previewRenderable,
+        preview_honest:
+          input.diagnostics.previewRenderable &&
+          input.diagnostics.previewStatus !== "queued",
         import: {
           ...importMeta,
           framework: {

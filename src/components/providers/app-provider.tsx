@@ -218,7 +218,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         void refreshUserNotificationsFromApi();
       };
       pollNotifications();
-      const pollTimer = window.setInterval(pollNotifications, 45_000);
+      const pollTimer = window.setInterval(pollNotifications, 30_000);
 
       realtimeDispose = () => {
         window.clearInterval(pollTimer);
@@ -276,42 +276,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       void (async () => {
-        const { data: notificationRows } = await supabase
-          .from("notifications")
-          .select("*")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        let rows = notificationRows ?? [];
-
         if (coreProfile) {
           try {
-            const welcomeRes = await fetch("/api/notifications/welcome", {
+            await fetch("/api/notifications/welcome", {
               method: "POST",
               credentials: "include",
             });
-            if (welcomeRes.ok) {
-              const payload = (await welcomeRes.json()) as { created?: boolean };
-              if (payload.created) {
-                const { data: refreshed } = await supabase
-                  .from("notifications")
-                  .select("*")
-                  .eq("user_id", userId)
-                  .order("created_at", { ascending: false })
-                  .limit(50);
-                if (refreshed) rows = refreshed;
-              }
-            }
           } catch {
             /* welcome is best-effort */
           }
         }
 
-        const visible = rows as Notification[];
-        setNotifications(visible);
+        await refreshUserNotificationsFromApi();
+        const visible = useNotificationsStore.getState().notifications;
 
-        if (coreProfile) {
+        if (coreProfile && visible.length >= 0) {
           setCachedBootstrap(userId, {
             profile: coreProfile as Profile,
             notifications: visible as Notification[],

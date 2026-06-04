@@ -22,6 +22,12 @@ export function isStatusTableMissingError(error: unknown): boolean {
 }
 
 /** Column missing — table exists; reload schema cache or apply latest migration. */
+export function isStatusPermissionDeniedError(error: unknown): boolean {
+  const msg = errorMessage(error);
+  const code = errorCode(error);
+  return code === "42501" || msg.includes("permission denied");
+}
+
 export function isStatusColumnMissingError(error: unknown): boolean {
   const msg = errorMessage(error);
   const code = errorCode(error);

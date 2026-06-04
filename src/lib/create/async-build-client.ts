@@ -64,7 +64,7 @@ export async function enqueueAsyncBuild(input: {
       ...input.body,
       mode: "build",
       strategy: input.body.strategy ?? "build_now",
-      forceBuildPipeline: input.body.forceBuildPipeline ?? input.body.strategy === "build_now",
+      forceBuildPipeline: input.body.forceBuildPipeline === true,
       planFirstOnly:
         input.body.planFirstOnly ??
         (input.body.strategy === "plan_first" && input.body.forceBuildPipeline !== true),

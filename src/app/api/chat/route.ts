@@ -96,7 +96,6 @@ import {
 import {
   classifyBuildIntent,
   shouldStartBuildPipeline,
-  shouldStartBuildPipelineInProject,
 } from "@/lib/ai/build-intent-classifier";
 import { ensureUserProfileServer } from "@/lib/auth/ensure-user-profile-server";
 import { getChargeTokensProbeCached } from "@/lib/db/charge-probe-cache";
@@ -438,10 +437,7 @@ export async function POST(request: Request) {
   }
   const buildIntent =
     mode === "build" && userTextEarly ? classifyBuildIntent(userTextEarly) : null;
-  let startBuildPipeline =
-    projectId && mode === "build" && userTextEarly
-      ? shouldStartBuildPipelineInProject(mode, projectId, userTextEarly)
-      : shouldStartBuildPipeline(mode, buildIntent);
+  let startBuildPipeline = shouldStartBuildPipeline(mode, buildIntent);
   if (planFirstOnly) {
     startBuildPipeline = false;
   }
@@ -500,10 +496,11 @@ export async function POST(request: Request) {
   });
 
   if (wantsAsyncBuild && mode === "build" && projectId && userTextEarly.trim().length >= 3) {
-    if (
-      (forceBuildPipeline && explicitStrategy === "build_now") ||
-      shouldStartBuildPipelineInProject(mode, projectId, userTextEarly)
-    ) {
+    if (forceBuildPipeline && explicitStrategy === "build_now") {
+      startBuildPipeline = true;
+      chargeMode = "build";
+      planFirstOnly = false;
+    } else if (shouldStartBuildPipeline(mode, buildIntent)) {
       startBuildPipeline = true;
       chargeMode = "build";
       planFirstOnly = false;

@@ -7,6 +7,9 @@ import { analyzeLegacyAdapter, injectPreviewShims } from "@/lib/imports/base44-l
 import { detectImportedFramework } from "@/lib/imports/framework-detector";
 import { analyzePreviewHtml } from "@/lib/preview/preview-html-diagnostics";
 import { loadProjectFilesWithContent } from "@/lib/preview/project-preview-html";
+import { rewritePreviewArtifactHtml } from "@/lib/preview/rewrite-preview-artifact-html";
+import { loadPreviewRuntimeStatus } from "@/lib/preview/load-preview-runtime-status";
+import { buildPreviewStatusHtml } from "@/lib/preview/preview-status-html";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +22,19 @@ function wantsHtmlFrame(req: Request): boolean {
   return accept.includes("text/html");
 }
 
-/** Preview status (JSON) or inline HTML frame (`?format=frame`) — never both in one response. */
+function artifactBuildIdFromPath(
+  artifactPath: string | null,
+  projectId: string,
+  queryBuild: string | null,
+): string | null {
+  if (queryBuild) return queryBuild;
+  if (!artifactPath) return null;
+  const parts = artifactPath.split("/");
+  if (parts[0] === projectId && parts[1]) return parts[1];
+  return parts[parts.length - 1] ?? null;
+}
+
+/** Preview status (JSON) or inline HTML frame (`?format=frame`) — never blank success. */
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id: projectId } = await ctx.params;
   const supabase = await createClient();
@@ -54,13 +69,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const artifactPath =
     (typeof meta.preview_artifact_path === "string" && meta.preview_artifact_path) ||
     (artifactBuild ? `${projectId}/${artifactBuild}` : null);
+  const buildId = artifactBuildIdFromPath(artifactPath, projectId, artifactBuild ?? null);
+
+  const runtime = await loadPreviewRuntimeStatus(supabase, projectId, meta);
 
   let html = "";
   let fileCount = 0;
   let archetypeId: string | null = null;
   let diagnostics = analyzePreviewHtml("", []);
+  let servedFromArtifact = false;
 
-  if (artifactPath && meta.preview_renderable === true) {
+  const metaRenderable = meta.preview_renderable === true && meta.preview_honest === true;
+
+  if (artifactPath && buildId && metaRenderable) {
     const admin = createSupabaseAdmin();
     const file = admin
       ? await downloadPreviewArtifactFile({
@@ -80,10 +101,25 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       const fw = detectImportedFramework(zipFiles);
       const legacy = analyzeLegacyAdapter(zipFiles, fw);
       html = injectPreviewShims(file.data.toString("utf8"), legacy);
+      html = rewritePreviewArtifactHtml(html, projectId, buildId);
       diagnostics = analyzePreviewHtml(
         html,
         zipFiles.map((f) => ({ path: f.path, content: f.content })),
       );
+      servedFromArtifact = true;
+
+      if (!diagnostics.previewRenderable) {
+        runtime.blockedReason =
+          runtime.blockedReason ??
+          "Artifact served but no meaningful HTML rendered (missing root or empty document).";
+        runtime.previewRenderable = false;
+      } else {
+        runtime.previewRenderable = true;
+      }
+    } else if (metaRenderable) {
+      runtime.previewRenderable = false;
+      runtime.blockedReason =
+        "Preview marked ready but artifact index.html is missing from storage.";
     }
   }
 
@@ -93,20 +129,37 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     fileCount = resolved.fileCount;
     archetypeId = resolved.archetypeId;
     diagnostics = resolved.diagnostics;
+    runtime.previewRenderable = diagnostics.previewRenderable && meta.preview_honest !== false;
   }
+
+  const frameRenderable = runtime.previewRenderable && diagnostics.previewRenderable && html.trim().length > 80;
 
   const cacheHeaders = {
     "Cache-Control": "no-store, max-age=0",
   };
 
   if (wantsHtmlFrame(req)) {
-    const body = diagnostics.previewRenderable && html?.trim() ? html : "";
-    return new NextResponse(body || "<!DOCTYPE html><html><body><p>Preview not ready</p></body></html>", {
-      status: body ? 200 : 503,
+    if (!frameRenderable) {
+      const statusHtml = buildPreviewStatusHtml(runtime, runtime.buildLogs ?? undefined);
+      return new NextResponse(statusHtml, {
+        status: 200,
+        headers: {
+          ...cacheHeaders,
+          "Content-Type": "text/html; charset=utf-8",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Preview-Renderable": "false",
+        },
+      });
+    }
+
+    return new NextResponse(html, {
+      status: 200,
       headers: {
         ...cacheHeaders,
         "Content-Type": "text/html; charset=utf-8",
         "X-Frame-Options": "SAMEORIGIN",
+        "X-Preview-Renderable": "true",
+        "X-Preview-Artifact": servedFromArtifact ? "1" : "0",
       },
     });
   }
@@ -120,22 +173,23 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   return NextResponse.json(
     {
-      ready: diagnostics.previewRenderable,
-      previewRenderable: diagnostics.previewRenderable,
+      ready: frameRenderable,
+      previewRenderable: frameRenderable,
+      previewHonest: meta.preview_honest === true,
       fileCount,
       archetypeId,
       previewHtmlLength: html.length,
-      blockedReason: diagnostics.errorCode ?? null,
-      errorMessage: diagnostics.errorMessage ?? null,
+      blockedReason: runtime.blockedReason ?? diagnostics.errorCode ?? null,
+      errorMessage: runtime.blockedReason ?? diagnostics.errorMessage ?? null,
       sourceIntegrityOk: diagnostics.sourceIntegrityOk,
       hasRootElement: diagnostics.hasRootElement,
-      runtime: {
-        framework: importMeta?.framework ?? meta.import_framework ?? null,
-        entryFile: importMeta?.entryFile ?? meta.import_entry ?? null,
-        previewEntry: importMeta?.previewEntry ?? null,
-        legacyPlatform,
-        buildCommand: importMeta?.buildCommand ?? null,
-      },
+      servedFromArtifact,
+      runtime,
+      framework: importMeta?.framework ?? meta.imported_framework ?? null,
+      entryFile: importMeta?.entryFile ?? meta.import_entry ?? null,
+      previewEntry: importMeta?.previewEntry ?? null,
+      legacyPlatform,
+      buildCommand: importMeta?.buildCommand ?? null,
     },
     { headers: cacheHeaders },
   );

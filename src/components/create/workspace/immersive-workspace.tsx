@@ -84,6 +84,7 @@ import {
 } from "@/lib/billing/partial-build-credits";
 import { useBuildJobProgress, type BuildJobPollState } from "@/hooks/use-build-job-progress";
 import { enqueueAsyncBuild } from "@/lib/create/async-build-client";
+import { classifyBuildIntent, shouldStartBuildPipeline } from "@/lib/ai/build-intent-classifier";
 import {
   replaceBrowserUrl,
   syncProjectIdInAddressBar,
@@ -99,11 +100,6 @@ import { BuilderAssistantMessage } from "@/components/builder/builder-event-ui";
 import { ComposerPromptQueue } from "@/components/create/workspace/composer-prompt-queue";
 import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
 import { OptimisticAssistantRow } from "@/components/create/workspace/optimistic-assistant-row";
-import {
-  PREVIEW_POLL_INTERVAL_MS,
-  PREVIEW_POLL_MAX_ATTEMPTS,
-  previewStateFromPoll,
-} from "@/lib/preview/preview-readiness-poll";
 import {
   parseBuildPlanCard,
   taskProgressIndex,
@@ -136,10 +132,12 @@ import { pushRuntimeDiagnostic } from "@/lib/dev/runtime-diagnostics";
 import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
 import { notifyProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
 import { isUuid } from "@/lib/utils/uuid";
+import { projectPreviewFrameUrl } from "@/lib/preview/preview-frame-url";
+import type { PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
 import {
-  projectPreviewFrameUrl,
-  type ProjectPreviewStatus,
-} from "@/lib/preview/preview-frame-url";
+  detectPreviewRoutesFromFiles,
+  type PreviewRouteEntry,
+} from "@/lib/preview/detect-preview-routes";
 import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build";
 import { resolveDisplayName } from "@/lib/profile-display";
 import {
@@ -596,8 +594,6 @@ export function ImmersiveWorkspace({
           mode: taskMode,
           mode_at_submit: taskMode,
           strategy: taskMode === "build" ? buildStrategyRef.current : undefined,
-          forceBuildPipeline:
-            taskMode === "build" && buildStrategyRef.current === "build_now",
           scope: scopeRef.current ?? undefined,
           editTarget: editTargetRef.current ?? undefined,
           projectId: projectIdRef.current ?? undefined,
@@ -1691,13 +1687,13 @@ export function ImmersiveWorkspace({
     }
     const text = pendingBuildTextRef.current;
     pendingBuildTextRef.current = null;
-    if (text) await runSubmitRef.current("button", text);
+    if (text) await runSubmitRef.current("button", text, { forceBuild: true });
   }
 
   const runSubmit = React.useCallback(async (
     source: "button" | "enter" | "form" | "url-auto" = "button",
     overrideText?: string,
-    options?: { queueOnly?: boolean },
+    options?: { queueOnly?: boolean; forceBuild?: boolean },
   ) => {
     setDebugClicked(true);
     setSubmitStatusLabel("Submit started");
@@ -1973,9 +1969,14 @@ export function ImmersiveWorkspace({
       setSendCooldownUntil(Date.now() + SEND_COOLDOWN_MS);
 
       const asyncProjectId = projectIdRef.current ?? effectiveProjectId;
+      const buildIntent = classifyBuildIntent(text);
+      const wantsBuildPipeline =
+        options?.forceBuild === true ||
+        shouldStartBuildPipeline(submitMode, buildIntent);
       const useAsyncBuild =
         submitMode === "build" &&
         Boolean(asyncProjectId) &&
+        wantsBuildPipeline &&
         !(buildStrategyRef.current === "plan_first" && !blueprintApprovedRef.current);
 
       if (useAsyncBuild && asyncProjectId) {
@@ -1995,8 +1996,8 @@ export function ImmersiveWorkspace({
             modelId,
             mode: submitMode,
             mode_at_submit: submitMode,
-            strategy: submitMode === "build" ? "build_now" : undefined,
-            forceBuildPipeline: submitMode === "build",
+            strategy: buildStrategyRef.current,
+            forceBuildPipeline: options?.forceBuild === true,
             planFirstOnly: false,
             projectId: asyncProjectId,
             conversationId: conversationIdRef.current ?? undefined,
@@ -2413,77 +2414,74 @@ export function ImmersiveWorkspace({
     if (projectFiles.length > 0) return projectFiles;
     return parsedSourceFiles;
   }, [projectFiles, parsedSourceFiles]);
-  const [previewStatus, setPreviewStatus] = React.useState<ProjectPreviewStatus | null>(null);
+  const [previewRuntime, setPreviewRuntime] = React.useState<PreviewRuntimeStatusPayload | null>(
+    null,
+  );
+  const [previewRoutes, setPreviewRoutes] = React.useState<PreviewRouteEntry[]>([
+    { path: "/", label: "Home", source: "default" },
+  ]);
+  const [previewRoute, setPreviewRoute] = React.useState("/");
+
+  React.useEffect(() => {
+    if (codeFiles.length > 0) {
+      setPreviewRoutes(
+        detectPreviewRoutesFromFiles(
+          codeFiles.map((f) => ({ path: f.path, content: f.content })),
+        ),
+      );
+    }
+  }, [codeFiles]);
+
   React.useEffect(() => {
     if (!effectiveProjectId || projectFiles.length === 0) {
-      setPreviewStatus(null);
+      setPreviewRuntime(null);
       return;
     }
     let cancelled = false;
-    let attempts = 0;
 
     const poll = async () => {
       if (cancelled) return;
-      attempts += 1;
       try {
-        const r = await fetch(`/api/projects/${effectiveProjectId}/preview-html`, {
+        const r = await fetch(`/api/projects/${effectiveProjectId}/preview/import-status`, {
           credentials: "include",
           cache: "no-store",
         });
-        const body = (r.ok ? await r.json() : null) as ProjectPreviewStatus | null;
-        if (cancelled) return;
-        if (body?.previewRenderable) {
-          setPreviewStatus({
-            ready: Boolean(body.ready),
-            previewRenderable: true,
-            fileCount: body.fileCount ?? 0,
-            archetypeId: body.archetypeId ?? null,
-            previewHtmlLength: body.previewHtmlLength ?? 0,
-            blockedReason: body.blockedReason ?? null,
-          });
-          return;
-        }
-        const state = previewStateFromPoll({
-          previewRenderable: false,
-          error: body?.blockedReason ?? null,
-          attempts,
-        });
-        setPreviewStatus(
-          body
-            ? {
-                ready: Boolean(body.ready),
-                previewRenderable: false,
-                fileCount: body.fileCount ?? 0,
-                archetypeId: body.archetypeId ?? null,
-                previewHtmlLength: body.previewHtmlLength ?? 0,
-                blockedReason:
-                  state === "timeout"
-                    ? "Preview is taking longer than expected. Files are saved. Retry preview or repair."
-                    : body.blockedReason ?? null,
-              }
-            : null,
-        );
-        if (state === "renderable" || state === "timeout" || state === "failed") return;
-        if (attempts < PREVIEW_POLL_MAX_ATTEMPTS) {
-          setTimeout(poll, PREVIEW_POLL_INTERVAL_MS);
-        }
+        if (!r.ok || cancelled) return;
+        const body = (await r.json()) as PreviewRuntimeStatusPayload;
+        setPreviewRuntime(body);
       } catch {
-        if (!cancelled && attempts < PREVIEW_POLL_MAX_ATTEMPTS) {
-          setTimeout(poll, PREVIEW_POLL_INTERVAL_MS);
-        }
+        /* ignore */
       }
     };
 
     void poll();
+    const pending =
+      previewRuntime?.jobStatus === "queued" ||
+      previewRuntime?.jobStatus === "running" ||
+      previewRuntime?.previewStatus === "queued";
+    const interval = pending ? 5000 : 12_000;
+    const t = window.setInterval(() => void poll(), interval);
     return () => {
       cancelled = true;
+      window.clearInterval(t);
     };
-  }, [effectiveProjectId, projectDataRefresh, projectFiles.length]);
+  }, [
+    effectiveProjectId,
+    projectDataRefresh,
+    projectFiles.length,
+    previewRuntime?.jobStatus,
+    previewRuntime?.previewStatus,
+  ]);
 
   const previewFrameUrl = effectiveProjectId
-    ? projectPreviewFrameUrl(effectiveProjectId, projectDataRefresh)
+    ? projectPreviewFrameUrl(
+        effectiveProjectId,
+        projectDataRefresh,
+        previewRoute,
+        previewRuntime?.jobId ?? null,
+      )
     : null;
-  const previewSrcRenderable = previewStatus?.previewRenderable === true;
+  const previewSrcRenderable = previewRuntime?.previewRenderable === true;
   const activeMode = lockedTaskMode ?? mode;
   const buildActive =
     activeMode === "build" &&
@@ -3241,20 +3239,27 @@ export function ImmersiveWorkspace({
             {rightTab === "preview" && (
               <div className="relative h-full min-h-0">
               <PreviewPanel
-                url={effectiveProject?.preview_url ?? previewFrameUrl}
+                url={previewFrameUrl}
                 appName={effectiveProject?.name ?? null}
-                buildActive={buildActive}
+                buildActive={buildActive && !previewRuntime?.jobId}
                 thinking={buildActive || (isBusy && !previewSrcRenderable)}
                 editMode={mode === "edit"}
                 hasGenerated={
-                  !!effectiveProject?.preview_url ||
                   previewSrcRenderable ||
-                  codeFiles.length > 0
+                  codeFiles.length > 0 ||
+                  Boolean(previewRuntime?.jobId)
                 }
                 previewState={previewShellState}
                 buildStepIndex={buildStepIndex}
                 buildStepLabel={buildStepLabel}
                 modelLabel={null}
+                runtimeStatus={previewRuntime}
+                previewRoutes={previewRoutes}
+                previewRoute={previewRoute}
+                onPreviewRouteChange={(path) => {
+                  setPreviewRoute(path);
+                  setProjectDataRefresh((n) => n + 1);
+                }}
                 onEditTarget={(info) => {
                   setEditTarget(info.section);
                   setScope(info.section.toLowerCase().replace(/\s+/g, "_") as EditScope);

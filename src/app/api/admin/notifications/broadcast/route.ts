@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireDreamosOwner } from "@/lib/admin/require-owner";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import {
+  notificationMatchesTab,
+  readNotificationKind,
+} from "@/lib/notifications/notification-kinds";
+import type { Notification } from "@/lib/supabase/types";
 
 type TargetPlan = "all" | "free" | "starter" | "pro" | "infinity";
 
@@ -166,15 +171,45 @@ export async function POST(request: Request) {
   }
 
   const verifyUserId = insertedUserIds[0] ?? userIds[0];
+  const sampleNotificationIds: string[] = [];
   let readableCount = 0;
+  let visibleOnMain = false;
+  let visibleOnAll = false;
+
   if (verifyUserId) {
-    const { count } = await db
+    const { data: sampleRows } = await db
       .from("notifications")
-      .select("id", { count: "exact", head: true })
+      .select("id, user_id, title, body, type, read, metadata, created_at")
       .eq("user_id", verifyUserId)
       .eq("title", title)
-      .eq("read", false);
-    readableCount = count ?? 0;
+      .order("created_at", { ascending: false })
+      .limit(5);
+    for (const row of sampleRows ?? []) {
+      if (row.id) sampleNotificationIds.push(row.id);
+    }
+    readableCount = sampleRows?.length ?? 0;
+    const sample = sampleRows?.[0] as Notification | undefined;
+    if (sample) {
+      visibleOnMain = notificationMatchesTab(sample, "main");
+      visibleOnAll = notificationMatchesTab(sample, "all");
+      if (!visibleOnMain) {
+        const kind = readNotificationKind(sample);
+        return NextResponse.json(
+          {
+            error:
+              "Notification was inserted but would be hidden on the Main inbox tab. Fix metadata.kind or category.",
+            insertedCount: inserted,
+            recipientCount: inserted,
+            verifySampleUserId: verifyUserId,
+            sampleNotificationIds,
+            visibleOnMain,
+            visibleOnAll,
+            detectedKind: kind,
+          },
+          { status: 422 },
+        );
+      }
+    }
   }
 
   if (inserted === 0) {
@@ -213,12 +248,29 @@ export async function POST(request: Request) {
     console.warn("[broadcast] notifications delivered but audit log failed:", auditErr.message);
   }
 
+  if (readableCount === 0 && inserted > 0) {
+    return NextResponse.json(
+      {
+        error: "Notifications inserted but read-back verification found zero rows for sample user.",
+        insertedCount: inserted,
+        recipientCount: inserted,
+        verifySampleUserId: verifyUserId,
+        sampleRecipientIds: insertedUserIds.slice(0, 5),
+      },
+      { status: 422 },
+    );
+  }
+
   return NextResponse.json({
     ok: true,
     recipientCount: inserted,
     insertedCount: inserted,
     verifySampleUserId: verifyUserId,
     verifyUnreadForSample: readableCount,
+    sampleNotificationIds,
+    sampleRecipientIds: insertedUserIds.slice(0, 5),
+    visibleOnMain,
+    visibleOnAll,
     table: "notifications",
   });
 }

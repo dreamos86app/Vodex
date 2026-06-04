@@ -29,6 +29,7 @@ type PreviewImportStatus = {
   jobId: string | null;
   artifactPath: string | null;
   workerUnavailable: boolean;
+  workerConnected: boolean;
   workerUnavailableMessage: string | null;
 };
 
@@ -73,6 +74,7 @@ export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
         jobId: typeof j.jobId === "string" ? j.jobId : null,
         artifactPath: typeof j.artifactPath === "string" ? j.artifactPath : null,
         workerUnavailable: Boolean(j.workerUnavailable),
+        workerConnected: Boolean(j.workerConnected),
         workerUnavailableMessage:
           typeof j.workerUnavailableMessage === "string" ? j.workerUnavailableMessage : null,
       });
@@ -201,6 +203,17 @@ export function ImportPreviewStatusPanel({ appId }: { appId: string }) {
           warn={!ready}
         />
         {status.artifactPath && <Row label="Artifact" value={status.artifactPath} />}
+        <Row
+          label="Worker"
+          value={
+            status.workerConnected
+              ? "Connected"
+              : status.workerUnavailable
+                ? "Not connected"
+                : "Unknown"
+          }
+          warn={status.workerUnavailable && !status.workerConnected}
+        />
         {status.legacyPlatform && (
           <Row label="Legacy platform" value={status.legacyPlatform} warn />
         )}

@@ -17,6 +17,10 @@ import {
 import { cn } from "@/lib/utils";
 import { BuildPreviewSurface } from "@/components/create/workspace/build-preview-surface";
 import { PreviewEditOverlay } from "@/components/preview/preview-edit-overlay";
+import { PreviewRuntimeStatusPanel } from "@/components/create/workspace/preview-runtime-status-panel";
+import { PreviewPageSwitcher } from "@/components/create/workspace/preview-page-switcher";
+import type { PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
+import type { PreviewRouteEntry } from "@/lib/preview/detect-preview-routes";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 
@@ -44,6 +48,10 @@ export interface PreviewPanelProps {
   modelLabel?: string | null;
   /** When true, show the building shell instead of empty/unrenderable preview. */
   buildActive?: boolean;
+  runtimeStatus?: PreviewRuntimeStatusPayload | null;
+  previewRoutes?: PreviewRouteEntry[];
+  previewRoute?: string;
+  onPreviewRouteChange?: (path: string) => void;
 }
 
 function isUnrenderableSrcDoc(doc: string | null | undefined): boolean {
@@ -66,6 +74,10 @@ export function PreviewPanel({
   tokensEstimate = null,
   modelLabel = null,
   buildActive = false,
+  runtimeStatus = null,
+  previewRoutes = [],
+  previewRoute = "/",
+  onPreviewRouteChange,
 }: PreviewPanelProps) {
   const [viewport, setViewport] = React.useState<Viewport>("desktop");
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -82,7 +94,10 @@ export function PreviewPanel({
 
   const hasInline = !!srcDoc?.trim() && !isUnrenderableSrcDoc(srcDoc);
   const hasPreviewArtifact = !!url || hasInline;
-  const showArtifact = hasPreviewArtifact && !thinking && !buildActive;
+  const iframeRenderable = runtimeStatus?.previewRenderable === true;
+  const showBuildShell = buildActive || thinking;
+  const showArtifact = hasPreviewArtifact && !showBuildShell;
+  const showRuntimeOverlay = showArtifact && runtimeStatus && !iframeRenderable;
   const shellState =
     buildActive || thinking
       ? previewState === "compiling"
@@ -116,19 +131,27 @@ export function PreviewPanel({
           <span className="size-2.5 rounded-full bg-green-400/70" />
         </div>
 
-        {/* URL bar */}
-        <div className="flex flex-1 items-center gap-1.5 rounded-md bg-background/80 px-2.5 py-1 ring-1 ring-border/60">
-          <Globe className="size-3 shrink-0 text-muted-foreground/60" strokeWidth={1.75} />
-          <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">
-            {displayHost}
-          </span>
-          {(hasPreviewArtifact && iframeLoading) && (
-            <Wifi className="size-3 shrink-0 animate-pulse text-accent/60" strokeWidth={1.75} />
-          )}
-          {(hasPreviewArtifact && !iframeLoading && !iframeError) && (
-            <span className="size-1.5 shrink-0 rounded-full bg-green-400" />
-          )}
-        </div>
+        {previewRoutes.length > 0 && onPreviewRouteChange ? (
+          <PreviewPageSwitcher
+            routes={previewRoutes}
+            currentPath={previewRoute}
+            onSelect={onPreviewRouteChange}
+            disabled={!hasPreviewArtifact}
+          />
+        ) : (
+          <div className="flex flex-1 items-center gap-1.5 rounded-md bg-background/80 px-2.5 py-1 ring-1 ring-border/60">
+            <Globe className="size-3 shrink-0 text-muted-foreground/60" strokeWidth={1.75} />
+            <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">
+              {displayHost}
+            </span>
+            {(hasPreviewArtifact && iframeLoading) && (
+              <Wifi className="size-3 shrink-0 animate-pulse text-accent/60" strokeWidth={1.75} />
+            )}
+            {(hasPreviewArtifact && !iframeLoading && !iframeError && iframeRenderable) && (
+              <span className="size-1.5 shrink-0 rounded-full bg-green-400" />
+            )}
+          </div>
+        )}
 
         {/* Viewport switch */}
         <div className="flex items-center gap-0.5 rounded-md bg-background p-0.5 ring-1 ring-border">
@@ -209,6 +232,12 @@ export function PreviewPanel({
               onEditTarget?.({ x: 0, y: 0, section: `${section} (${tag})`, tag })
             }
           />
+        )}
+
+        {showRuntimeOverlay && runtimeStatus && (
+          <div className="absolute inset-x-3 top-3 z-30 max-w-lg mx-auto">
+            <PreviewRuntimeStatusPanel status={runtimeStatus} />
+          </div>
         )}
 
         {!showArtifact && (

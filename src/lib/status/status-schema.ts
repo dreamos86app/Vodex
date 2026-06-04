@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import {
   isStatusColumnMissingError,
+  isStatusPermissionDeniedError,
   isStatusSchemaMissingError,
   isStatusTableMissingError,
 } from "@/lib/status/status-db";
@@ -98,6 +99,13 @@ export async function loadPlatformAnnouncementsAdmin(): Promise<{
     if (!res.error) return { rows: res.data ?? [], error: null };
     if (isStatusTableMissingError(res.error)) {
       return { rows: [], error: res.error.message ?? "Table missing" };
+    }
+    if (isStatusPermissionDeniedError(res.error)) {
+      return {
+        rows: [],
+        error:
+          "Permission denied loading platform_announcements — ensure SUPABASE_SERVICE_ROLE_KEY is set on the server (admin routes require service role, not the anon key).",
+      };
     }
     if (!isStatusColumnMissingError(res.error) && !isStatusSchemaMissingError(res.error)) {
       return { rows: [], error: res.error.message ?? "Query failed" };

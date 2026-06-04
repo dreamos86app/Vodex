@@ -40,6 +40,9 @@ must("src/app/api/projects/[id]/preview/build/route.ts", "runProjectPreviewBuild
 must("supabase/migrations/20260803120000_p30_zip_preview_runtime_worker.sql", "preview_build_jobs", "jobs table migration");
 must("supabase/migrations/20260804120000_p31_dedicated_preview_worker.sql", "claim_preview_build_job", "P31 worker lock");
 must("src/lib/imports/preview-build-queue.ts", "queuePreviewBuildJob", "worker queue");
+must("src/lib/preview/rewrite-preview-artifact-html.ts", "rewritePreviewArtifactHtml", "artifact URL rewrite");
+must("src/components/create/workspace/preview-runtime-status-panel.tsx", "PreviewRuntimeStatusPanel", "runtime status panel");
+must("supabase/migrations/20260805120000_p32_announcements_notifications_preview_fix.sql", "preview_worker_heartbeats", "worker heartbeat");
 
 if (errors.length) {
   console.error("verify:preview-runtime-worker FAILED\n", errors.map((e) => `  - ${e}`).join("\n"));
