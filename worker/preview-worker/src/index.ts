@@ -1,3 +1,8 @@
+import "dotenv/config";
+import { sanitizeInheritedNodeOptionsForWorkerBoot } from "./sanitize-node-options.js";
+
+sanitizeInheritedNodeOptionsForWorkerBoot();
+
 import { config } from "./config.js";
 import { log } from "./logger.js";
 import { claimNextJob, supabase } from "./supabase.js";

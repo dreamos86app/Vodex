@@ -1,0 +1,6 @@
+# Railway Nixpacks — do not pass NODE_OPTIONS into the worker Node process.
+[start]
+cmd = "sh start.sh"
+
+[phases.build]
+cmds = ["npm ci", "npm run build"]

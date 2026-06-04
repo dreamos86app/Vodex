@@ -13,4 +13,7 @@ COPY src ./src
 RUN npm install typescript && npx tsc -p tsconfig.json && npm uninstall typescript
 
 ENV NODE_ENV=production
-CMD ["node", "dist/index.js"]
+# Do not set NODE_OPTIONS here — heap is applied only to Vite child builds in build-memory.ts
+COPY start.sh ./start.sh
+RUN chmod +x start.sh
+CMD ["./start.sh"]

@@ -8,8 +8,9 @@ import { redactSecrets } from "../logger.js";
 const execFileAsync = promisify(execFile);
 /** Install must include devDependencies (vite, plugins). */
 function previewInstallEnv() {
+    const { NODE_OPTIONS: _inherited, ...baseEnv } = process.env;
     return {
-        ...process.env,
+        ...baseEnv,
         NODE_ENV: "development",
         NPM_CONFIG_PRODUCTION: "false",
         CI: "true",

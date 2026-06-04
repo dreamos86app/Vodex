@@ -41,8 +41,9 @@ Set `PREVIEW_RUNTIME_BUILD=1` on the Next.js app to run npm builds in-process wi
 ## Deploy (Railway / Render)
 
 1. Build context: `worker/preview-worker`
-2. Dockerfile included, or start command: `npm run build && npm run start`
+2. Dockerfile included, or Nixpacks `start.sh` / `npm run build && npm run start`
 3. Set all env vars from `.env.example`
+4. **Do not set `NODE_OPTIONS` on the Railway service** — heap is applied only to Vite child builds via `PREVIEW_NODE_MAX_OLD_SPACE_MB` (numeric, e.g. `4096`, never `$4096`).
 4. Scale to 1 instance per worker ID (or unique `PREVIEW_WORKER_ID` per replica)
 
 ## Debug SQL (latest jobs)
@@ -63,7 +64,7 @@ limit 10;
 
 ## Railway memory (required for Vite builds)
 
-Vite/React production builds use Node with `NODE_OPTIONS=--max-old-space-size=<MB>` (default **4096** via `PREVIEW_NODE_MAX_OLD_SPACE_MB`). The worker exits at startup with `PREVIEW_WORKER_MEMORY_TOO_LOW` if container RAM is below heap + 512MB headroom.
+Vite/React production builds run as child processes with `NODE_OPTIONS=--max-old-space-size=<MB>` only (default **4096** via `PREVIEW_NODE_MAX_OLD_SPACE_MB`). The **worker** process itself starts via `start.sh` with `NODE_OPTIONS` unset so Railway/Nixpacks cannot inject invalid flags. The worker exits at startup with `PREVIEW_WORKER_MEMORY_TOO_LOW` if container RAM is below heap + 512MB headroom.
 
 | ZIP profile | Recommended Railway memory |
 |-------------|----------------------------|

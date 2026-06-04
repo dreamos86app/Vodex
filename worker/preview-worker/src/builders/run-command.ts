@@ -16,8 +16,9 @@ export type CommandRunMeta = {
 
 /** Install must include devDependencies (vite, plugins). */
 function previewInstallEnv(): NodeJS.ProcessEnv {
+  const { NODE_OPTIONS: _inherited, ...baseEnv } = process.env;
   return {
-    ...process.env,
+    ...baseEnv,
     NODE_ENV: "development",
     NPM_CONFIG_PRODUCTION: "false",
     CI: "true",

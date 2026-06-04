@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import { config } from "./config.js";
+import { childBuildNodeOptions } from "./sanitize-node-options.js";
 import { log } from "./logger.js";
 export const VITE_BUILD_OOM_CODE = "VITE_BUILD_OOM";
 export const PREVIEW_WORKER_MEMORY_TOO_LOW = "PREVIEW_WORKER_MEMORY_TOO_LOW";
@@ -42,24 +43,19 @@ export function assertWorkerMemoryForNodeHeap(requestedHeapMb, containerLimitMb)
     }
     return null;
 }
+/** @deprecated Use childBuildNodeOptions — never merge inherited NODE_OPTIONS. */
 export function mergeNodeOptions(maxOldSpaceMb) {
-    const heap = `--max-old-space-size=${maxOldSpaceMb}`;
-    const existing = process.env.NODE_OPTIONS?.trim() ?? "";
-    if (!existing)
-        return heap;
-    if (/max-old-space-size=\d+/.test(existing)) {
-        return existing.replace(/max-old-space-size=\d+/, heap);
-    }
-    return `${existing} ${heap}`;
+    return childBuildNodeOptions(maxOldSpaceMb);
 }
 export function previewBuildEnv() {
     const maxMb = config.nodeMaxOldSpaceMb;
+    const { NODE_OPTIONS: _inherited, ...baseEnv } = process.env;
     return {
-        ...process.env,
+        ...baseEnv,
         NODE_ENV: "production",
         NPM_CONFIG_PRODUCTION: "false",
         CI: "true",
-        NODE_OPTIONS: mergeNodeOptions(maxMb),
+        NODE_OPTIONS: childBuildNodeOptions(maxMb),
     };
 }
 export async function validateBuildMemoryAtStartup() {
@@ -77,6 +73,6 @@ export async function validateBuildMemoryAtStartup() {
     log("info", "build memory config", {
         nodeMaxOldSpaceMb: config.nodeMaxOldSpaceMb,
         containerLimitMb: limitMb,
-        nodeOptions: mergeNodeOptions(config.nodeMaxOldSpaceMb),
+        nodeOptions: childBuildNodeOptions(config.nodeMaxOldSpaceMb),
     });
 }
