@@ -101,7 +101,9 @@ export function PreviewPanel({
   const iframeRenderable = runtimeStatus?.previewRenderable === true;
   const showBuildShell = buildActive || thinking;
   const showArtifact = hasPreviewArtifact && !showBuildShell;
-  const showRuntimeOverlay = showArtifact && runtimeStatus && !iframeRenderable;
+  const showIframe = showArtifact && iframeRenderable;
+  const showBlockedPreview = showArtifact && !iframeRenderable && Boolean(runtimeStatus);
+  const showRuntimeOverlay = showBlockedPreview;
   const shellState =
     buildActive || thinking
       ? previewState === "compiling"
@@ -238,16 +240,6 @@ export function PreviewPanel({
           />
         )}
 
-        {showRuntimeOverlay && runtimeStatus && (
-          <div className="absolute inset-x-3 top-3 z-30 max-w-lg mx-auto">
-            <PreviewRuntimeStatusPanel
-              status={runtimeStatus}
-              onRebuild={onRebuildPreview}
-              rebuilding={previewRebuilding}
-            />
-          </div>
-        )}
-
         {!showArtifact && (
           <BuildPreviewSurface
             state={shellState}
@@ -257,7 +249,20 @@ export function PreviewPanel({
           />
         )}
 
-        {showArtifact && (
+        {showBlockedPreview && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-atmosphere p-6">
+            {runtimeStatus ? (
+              <PreviewRuntimeStatusPanel
+                status={runtimeStatus}
+                onRebuild={onRebuildPreview}
+                rebuilding={previewRebuilding}
+                className="max-w-lg w-full shadow-lg"
+              />
+            ) : null}
+          </div>
+        )}
+
+        {showIframe && (
           <div
             className={cn(
               "absolute inset-0 flex items-center justify-center overflow-auto p-3",

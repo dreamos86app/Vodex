@@ -23,12 +23,26 @@ interface DetectedItem {
   icon: React.ElementType;
 }
 
+type ZipCreditEstimate = {
+  tier: number;
+  baseCredits: number;
+  multiplier: number;
+  estimatedActionCredits: number;
+  estimatedFiles: number;
+  estimatedSizeMb: number;
+  framework: string;
+  frameworkLabel: string;
+};
+
 interface ScanResult {
   framework: string;
   packageManager: string;
   detected: DetectedItem[];
   warnings: string[];
   estimatedRestore: string;
+  creditEstimate?: ZipCreditEstimate | null;
+  workerConnected?: boolean;
+  workerUnavailableMessage?: string | null;
   scanStats?: {
     rawEntries: number;
     acceptedFiles: number;
@@ -213,6 +227,18 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
   } | null>(null);
   const [projectName, setProjectName] = React.useState("");
   const [importError, setImportError] = React.useState<Record<string, unknown> | null>(null);
+  const [scanPayload, setScanPayload] = React.useState<{
+    creditEstimate: ZipCreditEstimate;
+    workerConnected: boolean;
+    workerUnavailableMessage: string | null;
+    fileCount: number;
+    framework: string;
+    frameworkLabel: string;
+    qualityScore?: number;
+    routes?: string[];
+    warnings?: string[];
+    scanStats?: ScanResult["scanStats"];
+  } | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const isDev = process.env.NODE_ENV !== "production";
@@ -262,8 +288,91 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
 
     const fd = new FormData();
     fd.append("file", file);
-    if (projectName.trim()) fd.append("name", projectName.trim());
 
+    const res = await fetch("/api/import/zip/preview", { method: "POST", body: fd });
+    const j = (await res.json()) as {
+      error?: string;
+      code?: string;
+      fileCount?: number;
+      framework?: { id?: string; label?: string };
+      qualityScore?: number;
+      routes?: string[];
+      warnings?: string[];
+      scanStats?: ScanResult["scanStats"];
+      creditEstimate?: ZipCreditEstimate;
+      workerConnected?: boolean;
+      workerUnavailableMessage?: string | null;
+    };
+
+    if (!res.ok) {
+      setPipeline((prev) =>
+        prev.map((s, i) =>
+          i === 0 ? { ...s, status: "error" } : { ...s, status: "pending" },
+        ),
+      );
+      setImportError({ userMessage: j.error, code: j.code, status: res.status });
+      toast.error(j.error ?? "ZIP scan failed");
+      setStep("idle");
+      return;
+    }
+
+    await tick(PIPELINE.length - 1, "done");
+    setPipeline(PIPELINE.map((s) => ({ ...s, status: "done" as const })));
+
+    const fwId = j.framework?.id ?? "unknown";
+    const fwLabel = j.framework?.label;
+    setScanPayload({
+      creditEstimate: j.creditEstimate!,
+      workerConnected: j.workerConnected === true,
+      workerUnavailableMessage: j.workerUnavailableMessage ?? null,
+      fileCount: j.fileCount ?? 0,
+      framework: fwId,
+      frameworkLabel: fwLabel ?? fwId,
+      qualityScore: j.qualityScore,
+      routes: j.routes,
+      warnings: j.warnings,
+      scanStats: j.scanStats,
+    });
+    setScanResult(
+      scanResultFromImportApi({
+        fileCount: j.fileCount ?? 0,
+        framework: fwId,
+        frameworkLabel: fwLabel,
+        qualityScore: j.qualityScore,
+        routes: j.routes,
+        warnings: j.warnings,
+        scanStats: j.scanStats,
+      }),
+    );
+    if (j.creditEstimate) {
+      setScanResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              creditEstimate: j.creditEstimate,
+              workerConnected: j.workerConnected,
+              workerUnavailableMessage: j.workerUnavailableMessage,
+            }
+          : prev,
+      );
+    }
+    setStep("results");
+  }
+
+  async function confirmImport() {
+    if (!file || !scanPayload) return;
+    if (!scanPayload.workerConnected) {
+      toast.error(
+        scanPayload.workerUnavailableMessage ??
+          "Preview worker not connected. Start or deploy the worker before importing.",
+      );
+      return;
+    }
+    setStep("scanning");
+    setImportError(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    if (projectName.trim()) fd.append("name", projectName.trim());
     const res = await fetch("/api/projects/import-zip", { method: "POST", body: fd });
     const j = (await res.json()) as {
       error?: string;
@@ -274,24 +383,13 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
       fileCount?: number;
       framework?: string;
       frameworkLabel?: string;
-      qualityScore?: number;
-      routes?: string[];
-      warnings?: string[];
-      scanStats?: ScanResult["scanStats"];
       projectId?: string;
       redirectTo?: string;
       previewReady?: boolean;
       blockedReason?: string | null;
       previewStatus?: string;
-      diagnostics?: { previewStatus?: string };
     };
-
     if (!res.ok) {
-      setPipeline((prev) =>
-        prev.map((s, i) =>
-          i === 0 ? { ...s, status: "error" } : { ...s, status: "pending" },
-        ),
-      );
       const diagnostics = {
         step: (j.adminDetail as { step?: string } | undefined)?.step ?? "unknown",
         code: j.code,
@@ -301,44 +399,19 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
         status: res.status,
       };
       setImportError(diagnostics);
-      console.error("[ZIP import failed]", diagnostics);
-
-      const userMsg =
-        isDev && j.devError
-          ? j.devError
-          : j.code === "IMPORT_STORAGE_NOT_CONFIGURED"
-            ? (j.error ?? "Import storage is not configured yet. Please contact the workspace owner or try again after setup.")
-            : j.code === "IMPORT_SCHEMA_UPDATING" || j.code === "IMPORT_APP_FILES_FAILED"
-              ? (j.error ?? "Import setup is updating. Please refresh and try again.")
-              : (j.error ?? "Import failed");
-      toast.error(userMsg);
-      setStep("idle");
+      toast.error(j.error ?? "Import failed");
+      setStep("results");
       return;
     }
-
-    await tick(PIPELINE.length - 1, "done");
-    setPipeline(PIPELINE.map((s) => ({ ...s, status: "done" as const })));
-
     setImportResult({
       projectId: j.projectId!,
       redirectTo: j.redirectTo!,
       fileCount: j.fileCount ?? 0,
-      framework: j.framework ?? "unknown",
+      framework: j.framework ?? scanPayload.framework,
       previewReady: j.previewReady === true,
       blockedReason: j.blockedReason ?? null,
-      previewStatus: j.previewStatus ?? j.diagnostics?.previewStatus ?? "failed",
+      previewStatus: j.previewStatus ?? "queued",
     });
-    setScanResult(
-      scanResultFromImportApi({
-        fileCount: j.fileCount ?? 0,
-        framework: j.framework ?? "unknown",
-        frameworkLabel: j.frameworkLabel,
-        qualityScore: j.qualityScore,
-        routes: j.routes,
-        warnings: j.warnings,
-        scanStats: j.scanStats,
-      }),
-    );
     setStep("results");
   }
 
@@ -461,13 +534,13 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                 <div className="flex justify-end gap-2">
                   <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
                   <Button variant="accent" size="sm" disabled={!file} onClick={startScan}>
-                    Scan & import
+                    Scan ZIP
                     <ChevronRight className="size-3.5" strokeWidth={2} />
                   </Button>
                 </div>
 
                 <p className="text-center text-[11px] text-muted-foreground">
-                  Scan uses deterministic checks — no AI credits required. Exclude{" "}
+                  Scan is free. Preview build uses Action Credits after you confirm. Exclude{" "}
                   <code className="font-mono">node_modules</code> and{" "}
                   <code className="font-mono">.next</code> from your ZIP for best results.
                 </p>
@@ -521,32 +594,61 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                     "flex items-center gap-3 rounded-lg px-4 py-3 ring-1",
                     importResult?.previewReady
                       ? "bg-positive/8 ring-positive/20"
-                      : "bg-amber-500/8 ring-amber-500/20",
+                      : scanPayload?.workerConnected
+                        ? "bg-accent/8 ring-accent/20"
+                        : "bg-destructive/8 ring-destructive/20",
                   )}
                 >
                   {importResult?.previewReady ? (
                     <CheckCircle2 className="size-4 text-positive" strokeWidth={1.75} />
+                  ) : scanPayload?.workerConnected ? (
+                    <CheckCircle2 className="size-4 text-accent" strokeWidth={1.75} />
                   ) : (
-                    <AlertCircle className="size-4 text-amber-600 dark:text-amber-400" strokeWidth={1.75} />
+                    <AlertCircle className="size-4 text-destructive" strokeWidth={1.75} />
                   )}
                   <div>
                     <p className="text-[13px] font-medium text-foreground">
-                      {importResult?.previewReady
-                        ? `Preview ready — ${scanResult.framework}`
-                        : importResult?.previewStatus === "queued"
-                          ? `Files imported — ${scanResult.framework} (preview queued)`
-                          : `Files imported — ${scanResult.framework} (preview not renderable)`}
+                      {importResult
+                        ? importResult.previewReady
+                          ? `Preview ready — ${scanResult.framework}`
+                          : importResult.previewStatus === "queued"
+                            ? `Imported — preview queued (${scanResult.framework})`
+                            : `Imported — ${scanResult.framework}`
+                        : `Scan complete — ${scanResult.framework}`}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {importResult?.previewReady
-                        ? "Runnable preview validated. You can publish after reviewing integrations."
-                        : importResult?.previewStatus === "queued"
-                          ? "Preview build queued for the dedicated worker. Open the app dashboard to track progress."
-                          : (importResult?.blockedReason ??
-                            "Open the app dashboard to rebuild preview or review build logs.")}
+                      {importResult
+                        ? importResult.previewReady
+                          ? "Runnable preview validated."
+                          : importResult.previewStatus === "queued"
+                            ? "Preview build queued for the dedicated worker."
+                            : (importResult.blockedReason ?? "Review build logs in the dashboard.")
+                        : scanPayload?.workerConnected
+                          ? "Confirm import to reserve Action Credits and queue the preview build."
+                          : (scanPayload?.workerUnavailableMessage ??
+                            "Preview worker must be connected before import.")}
                     </p>
                   </div>
                 </div>
+
+                {scanPayload?.creditEstimate && !importResult ? (
+                  <div className="rounded-xl bg-surface p-4 ring-1 ring-border space-y-2">
+                    <p className="text-[13px] font-semibold text-foreground">Import ZIP Project</p>
+                    <p className="text-[12px] text-muted-foreground">
+                      Detected: <strong>{scanPayload.creditEstimate.frameworkLabel}</strong>
+                      <br />
+                      Files: {scanPayload.creditEstimate.estimatedFiles.toLocaleString()}
+                      <br />
+                      Size: {scanPayload.creditEstimate.estimatedSizeMb} MB
+                    </p>
+                    <p className="text-[14px] font-semibold text-foreground">
+                      Estimated Preview Cost: {scanPayload.creditEstimate.estimatedActionCredits} Action Credits
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Charged only after a successful worker preview build (×{scanPayload.creditEstimate.multiplier} platform multiplier).
+                    </p>
+                  </div>
+                ) : null}
 
                 {/* Detected technologies */}
                 <div className="rounded-[var(--radius-xl)] bg-surface ring-1 ring-border overflow-hidden">
@@ -587,10 +689,23 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                   <Button variant="secondary" size="sm" onClick={() => setStep("idle")}>
                     Start over
                   </Button>
-                  <Button variant="accent" size="sm" onClick={handleOpen} className="gap-1.5">
-                    Open in workspace
-                    <ExternalLink className="size-3.5" strokeWidth={2} />
-                  </Button>
+                  {importResult ? (
+                    <Button variant="accent" size="sm" onClick={handleOpen} className="gap-1.5">
+                      Open in workspace
+                      <ExternalLink className="size-3.5" strokeWidth={2} />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="accent"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={!scanPayload?.workerConnected}
+                      onClick={() => void confirmImport()}
+                    >
+                      Import & Build Preview
+                      <ChevronRight className="size-3.5" strokeWidth={2} />
+                    </Button>
+                  )}
                 </div>
               </motion.div>
             )}

@@ -3,9 +3,9 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { loadLatestPreviewDiagnostics } from "@/lib/imports/runtime-build-runner";
 import { formatJobAge, type PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
 import { isServerlessHost } from "@/lib/imports/preview-build-queue";
+import { WORKER_CONNECTED_THRESHOLD_MS } from "@/lib/preview/preview-worker-status";
 
 const WORKER_STALE_MS = 5 * 60 * 1000;
-const WORKER_CONNECTED_MS = 2 * 60 * 1000;
 const WORKER_QUEUE_GRACE_MS = 8_000;
 
 export async function loadPreviewRuntimeStatus(
@@ -59,7 +59,8 @@ export async function loadPreviewRuntimeStatus(
       .limit(1)
       .maybeSingle();
     if (hb?.last_seen_at) {
-      workerConnected = Date.now() - new Date(hb.last_seen_at).getTime() < WORKER_CONNECTED_MS;
+      workerConnected =
+        Date.now() - new Date(hb.last_seen_at).getTime() < WORKER_CONNECTED_THRESHOLD_MS;
     }
   }
 

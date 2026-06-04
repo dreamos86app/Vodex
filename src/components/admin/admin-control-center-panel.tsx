@@ -6,14 +6,16 @@ import { AdminInboxMessagesPanel } from "@/components/admin/admin-inbox-messages
 import { AdminAnnouncementsPanel } from "@/components/admin/admin-announcements-panel";
 import { AdminEmailMarketingPanel } from "@/components/admin/admin-email-marketing-panel";
 import { AdminSystemStatusPanel } from "@/components/admin/admin-system-status-panel";
+import { AdminPreviewRuntimePanel } from "@/components/admin/admin-preview-runtime-panel";
 
-type Tab = "inbox" | "announcements" | "email" | "status";
+type Tab = "inbox" | "announcements" | "email" | "status" | "preview";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "inbox", label: "User inbox" },
   { id: "announcements", label: "Top-bar alerts" },
   { id: "email", label: "Email marketing" },
   { id: "status", label: "Status page" },
+  { id: "preview", label: "Preview runtime" },
 ];
 
 export function AdminControlCenterPanel() {
@@ -51,6 +53,7 @@ export function AdminControlCenterPanel() {
       {tab === "announcements" ? <AdminAnnouncementsPanel /> : null}
       {tab === "email" ? <AdminEmailMarketingPanel /> : null}
       {tab === "status" ? <AdminSystemStatusPanel /> : null}
+      {tab === "preview" ? <AdminPreviewRuntimePanel /> : null}
     </div>
   );
 }

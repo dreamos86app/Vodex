@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { extractAndAnalyzeZip } from "@/lib/import/zip-import-service";
+import { estimateZipPreviewCreditsWithPlatformMultiplier } from "@/lib/imports/zip-preview-action-credits";
+import { loadPreviewWorkerStatus } from "@/lib/preview/preview-worker-status";
 
 export const runtime = "nodejs";
 
@@ -41,6 +43,13 @@ export async function POST(req: Request) {
   }
 
   const { validation, rejectedSecrets, rejectedPaths } = extracted;
+  const creditEstimate = await estimateZipPreviewCreditsWithPlatformMultiplier({
+    sizeBytes: buf.length,
+    fileCount: extracted.files.length,
+    frameworkId: validation.framework.id,
+    frameworkLabel: validation.framework.label,
+  });
+  const worker = await loadPreviewWorkerStatus();
 
   return NextResponse.json({
     fileCount: extracted.files.length,
@@ -71,5 +80,10 @@ export async function POST(req: Request) {
     blockers: validation.blockers,
     rejectedSecrets,
     rejectedPaths: rejectedPaths.slice(0, 20),
+    creditEstimate,
+    workerConnected: worker.connected,
+    workerUnavailableMessage: worker.connected
+      ? null
+      : "Preview Worker Not Connected — deploy or start the preview worker before importing ZIP projects.",
   });
 }

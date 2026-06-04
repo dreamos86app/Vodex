@@ -9,6 +9,7 @@ import { uploadSourceSnapshot } from "@/lib/imports/preview-source-snapshot";
 import type { ImportPreviewDiagnostics } from "@/lib/imports/import-diagnostics";
 import type { ZipImportFile } from "@/lib/import/zip-file-validator";
 import type { DetectedFrameworkId } from "@/lib/imports/framework-detector";
+import { loadPreviewWorkerStatus } from "@/lib/preview/preview-worker-status";
 
 export function isServerlessHost(): boolean {
   return process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME != null;
@@ -40,6 +41,19 @@ export async function queuePreviewBuildJob(input: {
     lastPreviewBuildAt: now,
     jobId,
   });
+
+  const worker = await loadPreviewWorkerStatus();
+  if (!worker.connected) {
+    diagnostics = {
+      ...diagnostics,
+      previewStatus: "failed",
+      previewRenderable: false,
+      blockedReason:
+        "Preview Worker Not Connected — deploy or start the preview worker before queueing ZIP builds.",
+      buildLogs: "Worker heartbeat missing (90s threshold).",
+    };
+    return { diagnostics, jobId };
+  }
 
   if (analysis.blockers.length > 0) {
     diagnostics = {

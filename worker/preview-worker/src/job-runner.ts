@@ -18,6 +18,7 @@ import { buildNext } from "./builders/next-builder.js";
 import { uploadArtifacts } from "./upload-artifacts.js";
 import { checkPreviewHealth } from "./health-check.js";
 import { detectLegacy } from "./adapters/base44-adapter.js";
+import { captureZipPreviewCredits, cancelZipPreviewHold } from "./zip-credits.js";
 
 async function downloadSourceZip(snapshotPath: string): Promise<WorkspaceFile[]> {
   const { data, error } = await supabase.storage.from(config.sourceBucket).download(snapshotPath);
@@ -123,6 +124,7 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
 
     logs += result.logs;
     if (!result.ok) {
+      await cancelZipPreviewHold(job.project_id);
       await finishJob(job, {
         status: "failed",
         blockedReason: result.blockedReason,
@@ -187,6 +189,7 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
       artifactPath: upload.artifactPath,
       diagnostics,
     });
+    await captureZipPreviewCredits(job.project_id, job.owner_id);
     log("info", "job succeeded", { jobId: job.id, files: upload.fileCount });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Job failed";

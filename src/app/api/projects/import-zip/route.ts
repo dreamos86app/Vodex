@@ -27,6 +27,15 @@ import {
 import { lifecyclePatch } from "@/lib/projects/project-lifecycle";
 import type { Json } from "@/lib/supabase/types";
 import { runProjectPreviewBuild } from "@/lib/imports/run-project-preview-build";
+import { loadPreviewWorkerStatus } from "@/lib/preview/preview-worker-status";
+import {
+  estimateZipPreviewCreditsWithPlatformMultiplier,
+  reserveZipPreviewActionCredits,
+  refundZipPreviewActionCredits,
+  captureZipPreviewActionCredits,
+} from "@/lib/imports/zip-preview-action-credits";
+import { frameworkNeedsWorkerBuild } from "@/lib/imports/preview-build-queue";
+import type { DetectedFrameworkId } from "@/lib/imports/framework-detector";
 
 export const runtime = "nodejs";
 
@@ -137,11 +146,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: extracted.error }, { status: 400 });
   }
 
+  const worker = await loadPreviewWorkerStatus();
+  const detectedFrameworkId = extracted.validation.framework.id as DetectedFrameworkId;
+  const needsWorker = frameworkNeedsWorkerBuild(detectedFrameworkId);
+  if (needsWorker && !worker.connected) {
+    return NextResponse.json(
+      {
+        error: "Preview Worker Not Connected",
+        code: "PREVIEW_WORKER_NOT_CONNECTED",
+        hint:
+          "This project requires the Preview Runtime Worker. Deploy or reconnect the worker before importing ZIP projects.",
+        workerUnavailableMessage:
+          "ZIP builds cannot run on Vercel serverless. Start npm run preview-worker:dev locally or deploy worker/preview-worker.",
+      },
+      { status: 503 },
+    );
+  }
+
+  const creditEstimate = await estimateZipPreviewCreditsWithPlatformMultiplier({
+    sizeBytes: buf.length,
+    fileCount: extracted.files.length,
+    frameworkId: extracted.validation.framework.id,
+    frameworkLabel: extracted.validation.framework.label,
+  });
+
   const { files, validation, rejectedSecrets, rejectedPaths } = extracted;
   const baseSlug = slugFromName(file.name);
   const slug = `${baseSlug}-${Date.now().toString(36)}`;
   const defaultTitle = baseSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  const frameworkId = validation.framework.id;
+  const frameworkId = detectedFrameworkId;
 
   const lifecycleStatus = "imported";
   const importPaths = files.map((f) => f.path);
@@ -313,6 +346,26 @@ export async function POST(req: Request) {
     return importFail("imported_projects_insert", importedErr.message, { projectId }, 503);
   }
 
+  const reserve =
+    creditEstimate.estimatedActionCredits > 0
+      ? await reserveZipPreviewActionCredits({
+          userId: user.id,
+          projectId,
+          estimate: creditEstimate,
+        })
+      : { ok: true as const, operationId: "", credits: 0 };
+
+  if (!reserve.ok) {
+    await rollbackImport({ admin, supabase, userId: user.id, projectId, storagePath });
+    return NextResponse.json(
+      {
+        error: reserve.error,
+        code: reserve.code === "insufficient" ? "insufficient_action_credits" : "zip_credit_reserve_failed",
+      },
+      { status: reserve.code === "insufficient" ? 402 : 500 },
+    );
+  }
+
   let previewBuild: Awaited<ReturnType<typeof runProjectPreviewBuild>> | null = null;
   try {
     previewBuild = await runProjectPreviewBuild({
@@ -323,10 +376,27 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     console.error("[import-zip] preview build failed:", e);
+    await refundZipPreviewActionCredits({
+      userId: user.id,
+      projectId,
+      reason: "preview_build_exception",
+    });
   }
 
   const diagnostics = previewBuild?.diagnostics;
   const previewReady = diagnostics?.previewRenderable === true;
+
+  if (previewReady) {
+    await captureZipPreviewActionCredits({ userId: user.id, projectId });
+  } else if (diagnostics?.previewStatus === "queued") {
+    /* Worker will capture on success; hold stays reserved. */
+  } else {
+    await refundZipPreviewActionCredits({
+      userId: user.id,
+      projectId,
+      reason: diagnostics?.blockedReason ?? "preview_not_renderable",
+    });
+  }
   const publishReady = previewReady && diagnostics?.sourceIntegrityOk === true;
 
   return NextResponse.json({
@@ -334,6 +404,9 @@ export async function POST(req: Request) {
     fileCount: files.length,
     scanStats: extracted.stats,
     estimatedAiCostUsd: 0,
+    creditEstimate,
+    actionCreditsReserved: reserve.credits,
+    workerConnected: worker.connected,
     aiRepairOptional: true,
     framework: diagnostics?.framework ?? frameworkId,
     frameworkLabel: diagnostics?.frameworkLabel ?? validation.framework.label,

@@ -20,6 +20,10 @@ must("src/lib/imports/framework-detector.ts", "detectImportedFramework", "framew
 must("src/lib/imports/base44-lovable-adapter.ts", "injectPreviewShims", "preview shims");
 must("src/lib/imports/preview-health-check.ts", "previewRenderable", "health check");
 must("src/app/api/projects/import-zip/route.ts", "runProjectPreviewBuild", "zip import runs preview build");
+must("src/app/api/projects/import-zip/route.ts", "PREVIEW_WORKER_NOT_CONNECTED", "worker gate on import");
+must("src/app/api/projects/import-zip/route.ts", "reserveZipPreviewActionCredits", "zip import reserves credits");
+must("src/app/api/import/zip/preview/route.ts", "estimateZipPreviewCreditsWithPlatformMultiplier", "scan estimates credits");
+must("src/lib/imports/preview-build-queue.ts", "loadPreviewWorkerStatus", "queue refuses offline worker");
 must("src/lib/publish/publish-readiness.ts", "preview_renderable", "publish gates on renderable");
 
 if (errors.length) {
