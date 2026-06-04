@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { loadLatestPreviewDiagnostics } from "@/lib/imports/runtime-build-runner";
-import { formatJobAge, type PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
+import {
+  formatJobAge,
+  type PreviewBuildMeta,
+  type PreviewRuntimeStatusPayload,
+} from "@/lib/preview/preview-runtime-status";
 import { isServerlessHost } from "@/lib/imports/preview-build-queue";
 import { WORKER_CONNECTED_THRESHOLD_MS } from "@/lib/preview/preview-worker-status";
 
@@ -126,5 +130,12 @@ export async function loadPreviewRuntimeStatus(
         : null) ??
       (typeof importMeta?.entry_file === "string" ? importMeta.entry_file : null),
     warnings: Array.isArray(diag?.warnings) ? diag.warnings.map(String) : [],
+    previewBuildMeta: (() => {
+      const raw =
+        diag && typeof diag === "object" && "previewBuildMeta" in diag
+          ? (diag as Record<string, unknown>).previewBuildMeta
+          : null;
+      return raw && typeof raw === "object" ? (raw as PreviewBuildMeta) : null;
+    })(),
   };
 }

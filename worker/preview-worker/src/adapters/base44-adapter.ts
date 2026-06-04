@@ -7,7 +7,22 @@ export function injectPreviewEnvShims(html: string, legacy: { base44: boolean; l
   if (${legacy.base44}) {
     g.process = g.process || { env: {} };
     g.process.env.VITE_BASE44_APP_ID = g.process.env.VITE_BASE44_APP_ID || 'preview-mock';
-    g.process.env.VITE_BASE44_API_URL = g.process.env.VITE_BASE44_API_URL || '';
+    g.process.env.VITE_BASE44_API_URL = g.process.env.VITE_BASE44_API_URL || 'https://preview.invalid';
+    g.__BASE44_PREVIEW_MOCK__ = true;
+    if (typeof fetch === 'function' && !g.__VODEX_BASE44_FETCH__) {
+      g.__VODEX_BASE44_FETCH__ = true;
+      var realFetch = fetch.bind(g);
+      g.fetch = function(input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (/base44/i.test(url)) {
+          return Promise.resolve(new Response(JSON.stringify({ ok: true, preview: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+        return realFetch(input, init);
+      };
+    }
   }
   if (${legacy.lovable}) {
     g.process = g.process || { env: {} };

@@ -20,6 +20,25 @@ must("src/lib/preview/preview-worker-status.ts", "WORKER_CONNECTED_THRESHOLD_MS 
 must("src/lib/preview/preview-worker-status.ts", "preview_worker_heartbeats", "heartbeat table query");
 must("worker/preview-worker/src/index.ts", "HEARTBEAT_MS", "worker heartbeat interval");
 must("worker/preview-worker/src/index.ts", "preview_worker_heartbeats", "worker upsert heartbeat");
+must("worker/preview-worker/src/supabase.ts", "Authorization: `Bearer", "service role Authorization header");
+must("worker/preview-worker/src/supabase.ts", "apikey: config.supabaseServiceRoleKey", "service role apikey header");
+must("worker/preview-worker/src/supabase.ts", "assertServiceRoleDbAccess", "startup DB probe");
+must("worker/preview-worker/src/startup-checks.ts", 'from "./supabase.js"', "startup uses shared worker client");
+must(
+  "worker/preview-worker/src/startup-checks.ts",
+  "serviceRoleKeyPrefix",
+  "startup logs key prefix only",
+);
+must(
+  "supabase/migrations/20260807120000_p32_preview_worker_service_role_grants.sql",
+  "grant select, insert, update, delete on table public.preview_build_jobs",
+  "service_role table grants",
+);
+
+const startupSrc = fs.readFileSync(path.join(root, "worker/preview-worker/src/startup-checks.ts"), "utf8");
+if (startupSrc.includes('from "@supabase/supabase-js"')) {
+  errors.push("startup-checks must not create its own Supabase client");
+}
 must("worker/preview-worker/src/health-server.ts", 'status: "ok"', "Railway /health JSON");
 must("worker/preview-worker/src/health-server.ts", "workerId", "health exposes workerId");
 must("src/components/admin/admin-preview-runtime-panel.tsx", "Preview Runtime", "control center panel");

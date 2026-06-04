@@ -24,14 +24,14 @@ export async function buildNext(
   }
 
   let logs = "";
-  const install = await npmInstall(root, framework.packageManager);
-  logs += `[install]\n${install.logs}\n`;
+  const install = await npmInstall(root, framework.packageManager, { preferInstall: true });
+  logs += `[install] ${install.meta.command} ${install.meta.args.join(" ")}\n${install.logs}\n`;
   if (!install.ok) {
     return { ok: false, logs, blockedReason: "Next.js dependency install failed" };
   }
 
   const build = await npmRunBuild(root, framework.packageManager, "build");
-  logs += `[build]\n${build.logs}\n`;
+  logs += `[build] ${build.meta.command} ${build.meta.args.join(" ")}\n${build.logs}\n`;
   if (!build.ok) {
     return { ok: false, logs, blockedReason: "Next.js build failed" };
   }

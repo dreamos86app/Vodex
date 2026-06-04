@@ -1,10 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
-import { config } from "./config.js";
+import { config, serviceRoleKeyPrefix } from "./config.js";
 import { log } from "./logger.js";
+import { assertServiceRoleDbAccess, supabase } from "./supabase.js";
 
-const REQUIRED_ENV = [
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const;
+
+const FORBIDDEN_KEY_ENV = [
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "VITE_SUPABASE_ANON_KEY",
+  "SUPABASE_ANON_KEY",
 ] as const;
 
 export async function runStartupChecks(): Promise<void> {
@@ -15,14 +18,27 @@ export async function runStartupChecks(): Promise<void> {
     }
   }
 
+  const hasServiceRoleKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
+  log("info", "supabase credentials", {
+    hasServiceRoleKey,
+    serviceRoleKeyPrefix: serviceRoleKeyPrefix(),
+    supabaseUrl: config.supabaseUrl,
+  });
+
+  for (const name of FORBIDDEN_KEY_ENV) {
+    const anon = process.env[name]?.trim();
+    if (anon && anon === config.supabaseServiceRoleKey) {
+      log("error", `${name} is set to the same value as SUPABASE_SERVICE_ROLE_KEY — use the service role JWT only`, {
+        env: name,
+      });
+      process.exit(1);
+    }
+  }
+
   log("info", "environment ok", {
     artifactBucket: config.artifactBucket,
     sourceBucket: config.sourceBucket,
     workerId: config.workerId,
-  });
-
-  const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
   });
 
   for (const bucket of [config.artifactBucket, config.sourceBucket]) {
@@ -34,19 +50,28 @@ export async function runStartupChecks(): Promise<void> {
     log("info", `bucket ok: ${bucket}`);
   }
 
-  const { error: tableError } = await supabase.from("preview_build_jobs").select("id").limit(1);
-  if (tableError) {
-    log("error", "preview_build_jobs table unavailable", { error: tableError.message });
+  try {
+    await assertServiceRoleDbAccess();
+  } catch (e) {
+    log("error", e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
-  log("info", "preview_build_jobs table ok");
+  log("info", "preview_build_jobs table ok (service role)");
 
   const { error: rpcError } = await supabase.rpc("claim_preview_build_job", {
     p_worker_id: config.workerId,
     p_stale_lock_minutes: 30,
   });
   if (rpcError) {
-    log("error", "claim_preview_build_job RPC missing or failed", { error: rpcError.message });
+    if (rpcError.code === "42501" || /permission denied/i.test(rpcError.message ?? "")) {
+      log(
+        "error",
+        "Service role key is not being used or RLS is blocking service-role access.",
+        { rpc: "claim_preview_build_job" },
+      );
+    } else {
+      log("error", "claim_preview_build_job RPC missing or failed", { error: rpcError.message });
+    }
     process.exit(1);
   }
   log("info", "claim_preview_build_job RPC ok");

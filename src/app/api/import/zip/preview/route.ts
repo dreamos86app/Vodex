@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { extractAndAnalyzeZip } from "@/lib/import/zip-import-service";
 import { estimateZipPreviewCreditsWithPlatformMultiplier } from "@/lib/imports/zip-preview-action-credits";
+import { getActionCreditAvailability } from "@/lib/action-credits/get-action-credit-availability";
 import { loadPreviewWorkerStatus } from "@/lib/preview/preview-worker-status";
 
 export const runtime = "nodejs";
@@ -50,6 +51,11 @@ export async function POST(req: Request) {
     frameworkLabel: validation.framework.label,
   });
   const worker = await loadPreviewWorkerStatus();
+  const actionCredits = await getActionCreditAvailability(user.id, {
+    actionType: "zip_preview_build",
+  });
+  const actionCreditsRequired = creditEstimate.estimatedActionCredits;
+  const actionCreditsSufficient = actionCredits.totalAvailable >= actionCreditsRequired;
 
   return NextResponse.json({
     fileCount: extracted.files.length,
@@ -81,6 +87,9 @@ export async function POST(req: Request) {
     rejectedSecrets,
     rejectedPaths: rejectedPaths.slice(0, 20),
     creditEstimate,
+    actionCreditBalance: actionCredits.totalAvailable,
+    actionCreditsSufficient,
+    actionCreditsRequired,
     workerConnected: worker.connected,
     workerUnavailableMessage: worker.connected
       ? null

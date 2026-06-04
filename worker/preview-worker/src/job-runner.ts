@@ -105,13 +105,17 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
     if (legacy.lovable) warnings.push("Lovable/Supabase env may be missing — preview uses mock values");
 
     let result:
-      | { ok: true; outputDir: string; logs: string }
-      | { ok: false; logs: string; blockedReason: string };
+      | { ok: true; outputDir: string; logs: string; buildMeta?: Record<string, unknown> }
+      | { ok: false; logs: string; blockedReason: string; buildMeta?: Record<string, unknown> };
 
     const fw = framework.id;
     if (fw === "static") result = await buildStatic(workspace, files);
     else if (["vite", "react", "base44", "lovable", "bolt", "v0", "cra"].includes(fw)) {
-      result = await buildVite(workspace, framework, files);
+      const viteResult = await buildVite(workspace, framework, files);
+      result = {
+        ...viteResult,
+        buildMeta: viteResult.buildMeta as unknown as Record<string, unknown>,
+      };
     } else if (fw === "nextjs_app" || fw === "nextjs_pages") {
       result = await buildNext(workspace, framework, files);
     } else {
@@ -123,6 +127,7 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
     }
 
     logs += result.logs;
+    const previewBuildMeta = result.buildMeta ?? null;
     if (!result.ok) {
       await cancelZipPreviewHold(job.project_id);
       await finishJob(job, {
@@ -132,6 +137,7 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
         previewRenderable: false,
         framework: fw,
         warnings,
+        previewBuildMeta,
       });
       return;
     }
@@ -174,6 +180,7 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
       artifactPath: upload.artifactPath,
       previewUrl,
       buildLogs: redactSecrets(logs).slice(0, 50000),
+      previewBuildMeta,
       warnings,
       lastPreviewBuildAt: new Date().toISOString(),
       jobId: job.id,
@@ -218,6 +225,7 @@ async function finishJob(
     warnings: string[];
     artifactPath?: string;
     diagnostics?: Record<string, unknown>;
+    previewBuildMeta?: Record<string, unknown> | null;
   },
 ): Promise<void> {
   const diagnostics =
@@ -229,6 +237,7 @@ async function finishJob(
       sourceIntegrityOk: input.previewRenderable,
       blockedReason: input.blockedReason,
       buildLogs: input.logs,
+      previewBuildMeta: input.previewBuildMeta ?? null,
       warnings: input.warnings,
       lastPreviewBuildAt: new Date().toISOString(),
       jobId: job.id,

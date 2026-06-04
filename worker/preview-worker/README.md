@@ -45,10 +45,29 @@ Set `PREVIEW_RUNTIME_BUILD=1` on the Next.js app to run npm builds in-process wi
 3. Set all env vars from `.env.example`
 4. Scale to 1 instance per worker ID (or unique `PREVIEW_WORKER_ID` per replica)
 
+## Debug SQL (latest jobs)
+
+`preview_build_jobs` uses **`locked_by`** (worker id), not `worker_id`:
+
+```sql
+select
+  id,
+  status,
+  locked_by,
+  blocked_reason,
+  updated_at
+from preview_build_jobs
+order by updated_at desc
+limit 10;
+```
+
 ## Safety
 
 - Temp workspaces deleted after each job
-- `npm ci` / `npm install` uses `--ignore-scripts` unless `PREVIEW_ALLOW_NPM_SCRIPTS=1`
+- Preview installs use `NODE_ENV=development` and `NPM_CONFIG_PRODUCTION=false` so **devDependencies** (Vite, plugins) install
+- `npm install` is preferred when package repair injects Vite; otherwise `npm ci` when lockfile exists
+- `--ignore-scripts` unless `PREVIEW_ALLOW_NPM_SCRIPTS=1`
+- Base44 exports may get automatic `vite` / `@vitejs/plugin-react` injection when missing from `package.json`
 - Install/build timeouts enforced
 - Secrets stripped from logs
 - Next.js SSR apps are **not** faked — blocked with explicit `blockedReason`

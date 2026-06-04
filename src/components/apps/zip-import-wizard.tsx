@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 // ─── Detection types ──────────────────────────────────────────────────────────
 
@@ -202,7 +203,7 @@ const STATUS_ICONS: Record<DetectedItem["status"], React.ElementType> = {
 
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
-type WizardStep = "idle" | "scanning" | "results" | "done";
+type WizardStep = "idle" | "scanning" | "confirm" | "importing" | "results" | "done";
 
 interface ZipImportWizardProps {
   onClose: () => void;
@@ -231,6 +232,9 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
     creditEstimate: ZipCreditEstimate;
     workerConnected: boolean;
     workerUnavailableMessage: string | null;
+    actionCreditBalance: number;
+    actionCreditsSufficient: boolean;
+    actionCreditsRequired: number;
     fileCount: number;
     framework: string;
     frameworkLabel: string;
@@ -302,6 +306,9 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
       creditEstimate?: ZipCreditEstimate;
       workerConnected?: boolean;
       workerUnavailableMessage?: string | null;
+      actionCreditBalance?: number;
+      actionCreditsSufficient?: boolean;
+      actionCreditsRequired?: number;
     };
 
     if (!res.ok) {
@@ -319,12 +326,23 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
     await tick(PIPELINE.length - 1, "done");
     setPipeline(PIPELINE.map((s) => ({ ...s, status: "done" as const })));
 
+    if (!j.creditEstimate) {
+      toast.error("Could not estimate preview Action Credits for this ZIP.");
+      setStep("idle");
+      return;
+    }
+
     const fwId = j.framework?.id ?? "unknown";
     const fwLabel = j.framework?.label;
+    const required = j.actionCreditsRequired ?? j.creditEstimate.estimatedActionCredits;
+    const balance = j.actionCreditBalance ?? 0;
     setScanPayload({
-      creditEstimate: j.creditEstimate!,
+      creditEstimate: j.creditEstimate,
       workerConnected: j.workerConnected === true,
       workerUnavailableMessage: j.workerUnavailableMessage ?? null,
+      actionCreditBalance: balance,
+      actionCreditsSufficient: j.actionCreditsSufficient === true || balance >= required,
+      actionCreditsRequired: required,
       fileCount: j.fileCount ?? 0,
       framework: fwId,
       frameworkLabel: fwLabel ?? fwId,
@@ -356,7 +374,7 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
           : prev,
       );
     }
-    setStep("results");
+    setStep("confirm");
   }
 
   async function confirmImport() {
@@ -368,7 +386,11 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
       );
       return;
     }
-    setStep("scanning");
+    if (!scanPayload.actionCreditsSufficient) {
+      toast.error("Not enough Action Credits for this ZIP preview build.");
+      return;
+    }
+    setStep("importing");
     setImportError(null);
     const fd = new FormData();
     fd.append("file", file);
@@ -399,8 +421,15 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
         status: res.status,
       };
       setImportError(diagnostics);
-      toast.error(j.error ?? "Import failed");
-      setStep("results");
+      if (j.code === "insufficient_action_credits" || res.status === 402) {
+        toast.error(j.error ?? "Not enough Action Credits for this ZIP preview.");
+        setScanPayload((prev) =>
+          prev ? { ...prev, actionCreditsSufficient: false } : prev,
+        );
+      } else {
+        toast.error(j.error ?? "Import failed");
+      }
+      setStep("confirm");
       return;
     }
     setImportResult({
@@ -579,7 +608,96 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
               </motion.div>
             )}
 
-            {/* Step 3: Results */}
+            {/* Step 3: Confirm import (required before queue/build) */}
+            {step === "confirm" && scanResult && scanPayload && (
+              <motion.div
+                key="confirm"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="space-y-4"
+              >
+                <div className="rounded-xl bg-accent/8 p-4 ring-1 ring-accent/25 space-y-3">
+                  <p className="text-[15px] font-semibold text-foreground">Import ZIP Project</p>
+                  <p className="text-[12px] text-muted-foreground leading-relaxed">
+                    Scan complete (free). Confirm below to reserve Action Credits and queue the preview build.
+                  </p>
+                  <dl className="grid gap-2 text-[12px] sm:grid-cols-2">
+                    <div>
+                      <dt className="text-muted-foreground">Framework</dt>
+                      <dd className="font-medium text-foreground">{scanPayload.creditEstimate.frameworkLabel}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Files</dt>
+                      <dd className="font-medium text-foreground">{scanPayload.creditEstimate.estimatedFiles.toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">ZIP size</dt>
+                      <dd className="font-medium text-foreground">{scanPayload.creditEstimate.estimatedSizeMb} MB</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Your Action Credits</dt>
+                      <dd className="font-medium text-foreground">
+                        {scanPayload.actionCreditBalance.toLocaleString()} available
+                      </dd>
+                    </div>
+                  </dl>
+                  <p className="text-[16px] font-semibold text-foreground">
+                    Estimated preview cost: {scanPayload.creditEstimate.estimatedActionCredits} Action Credits
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Charged only after a successful worker preview build (×{scanPayload.creditEstimate.multiplier} platform multiplier). Scan is always free.
+                  </p>
+                  {!scanPayload.actionCreditsSufficient ? (
+                    <div className="rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive ring-1 ring-destructive/20">
+                      You need {scanPayload.actionCreditsRequired} credits but only have {scanPayload.actionCreditBalance}.{" "}
+                      <Link href="/credits" className="font-semibold underline">
+                        Buy Action Credits
+                      </Link>
+                    </div>
+                  ) : null}
+                  {!scanPayload.workerConnected ? (
+                    <div className="rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive ring-1 ring-destructive/20">
+                      {scanPayload.workerUnavailableMessage ??
+                        "Preview worker must be connected before import."}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => setStep("idle")}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={!scanPayload.workerConnected || !scanPayload.actionCreditsSufficient}
+                    onClick={() => void confirmImport()}
+                  >
+                    Import & Build Preview
+                    <ChevronRight className="size-3.5" strokeWidth={2} />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 4: Importing */}
+            {step === "importing" && (
+              <motion.div
+                key="importing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center gap-3 py-12"
+              >
+                <Loader2 className="size-8 animate-spin text-accent" />
+                <p className="text-[14px] font-medium text-foreground">Importing & queueing preview build…</p>
+                <p className="text-[12px] text-muted-foreground">Reserving Action Credits and uploading sources.</p>
+              </motion.div>
+            )}
+
+            {/* Step 5: Results */}
             {step === "results" && scanResult && (
               <motion.div
                 key="results"
@@ -623,32 +741,10 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                           : importResult.previewStatus === "queued"
                             ? "Preview build queued for the dedicated worker."
                             : (importResult.blockedReason ?? "Review build logs in the dashboard.")
-                        : scanPayload?.workerConnected
-                          ? "Confirm import to reserve Action Credits and queue the preview build."
-                          : (scanPayload?.workerUnavailableMessage ??
-                            "Preview worker must be connected before import.")}
+                        : "Import complete."}
                     </p>
                   </div>
                 </div>
-
-                {scanPayload?.creditEstimate && !importResult ? (
-                  <div className="rounded-xl bg-surface p-4 ring-1 ring-border space-y-2">
-                    <p className="text-[13px] font-semibold text-foreground">Import ZIP Project</p>
-                    <p className="text-[12px] text-muted-foreground">
-                      Detected: <strong>{scanPayload.creditEstimate.frameworkLabel}</strong>
-                      <br />
-                      Files: {scanPayload.creditEstimate.estimatedFiles.toLocaleString()}
-                      <br />
-                      Size: {scanPayload.creditEstimate.estimatedSizeMb} MB
-                    </p>
-                    <p className="text-[14px] font-semibold text-foreground">
-                      Estimated Preview Cost: {scanPayload.creditEstimate.estimatedActionCredits} Action Credits
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      Charged only after a successful worker preview build (×{scanPayload.creditEstimate.multiplier} platform multiplier).
-                    </p>
-                  </div>
-                ) : null}
 
                 {/* Detected technologies */}
                 <div className="rounded-[var(--radius-xl)] bg-surface ring-1 ring-border overflow-hidden">
@@ -695,15 +791,8 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                       <ExternalLink className="size-3.5" strokeWidth={2} />
                     </Button>
                   ) : (
-                    <Button
-                      variant="accent"
-                      size="sm"
-                      className="gap-1.5"
-                      disabled={!scanPayload?.workerConnected}
-                      onClick={() => void confirmImport()}
-                    >
-                      Import & Build Preview
-                      <ChevronRight className="size-3.5" strokeWidth={2} />
+                    <Button variant="accent" size="sm" onClick={() => setStep("confirm")}>
+                      Back to confirmation
                     </Button>
                   )}
                 </div>

@@ -23,6 +23,20 @@ export type PreviewRuntimeStatusPayload = {
   lastPreviewBuildAt: string | null;
   entryFile: string | null;
   warnings: string[];
+  previewBuildMeta: PreviewBuildMeta | null;
+};
+
+export type PreviewBuildMeta = {
+  installCommand?: string;
+  buildCommand?: string;
+  packageManager?: string;
+  packageRepair?: {
+    viteInjected?: boolean;
+    pluginReactInjected?: boolean;
+    viteConfigCreated?: boolean;
+    summary?: string;
+    repairs?: string[];
+  };
 };
 
 export function formatJobAge(seconds: number): string {

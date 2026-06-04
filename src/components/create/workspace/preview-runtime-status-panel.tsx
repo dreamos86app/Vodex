@@ -107,8 +107,30 @@ export function PreviewRuntimeStatusPanel({
                 : "Unknown"
           }
         />
-        {status.lockedBy ? <Item label="Worker id" value={status.lockedBy} mono /> : null}
+        {status.lockedBy ? <Item label="Locked by" value={status.lockedBy} mono /> : null}
       </dl>
+
+      {status.previewBuildMeta ? (
+        <dl className="mt-2 grid gap-1 border-t border-border/60 pt-2 sm:grid-cols-2">
+          {status.previewBuildMeta.installCommand ? (
+            <Item label="Install" value={status.previewBuildMeta.installCommand} mono />
+          ) : null}
+          {status.previewBuildMeta.buildCommand ? (
+            <Item label="Build" value={status.previewBuildMeta.buildCommand} mono />
+          ) : null}
+          {status.previewBuildMeta.packageManager ? (
+            <Item label="Package manager" value={status.previewBuildMeta.packageManager} />
+          ) : null}
+          {status.previewBuildMeta.packageRepair?.viteInjected ? (
+            <Item label="Vite injected" value="yes" />
+          ) : null}
+          {status.previewBuildMeta.packageRepair?.summary ? (
+            <div className="sm:col-span-2">
+              <Item label="Package repair" value={status.previewBuildMeta.packageRepair.summary} />
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
 
       {status.buildLogs ? (
         <div className="mt-2 border-t border-border/60 pt-2">
