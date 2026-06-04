@@ -63,3 +63,50 @@ export function resolveOutputDir(framework: string, root: string): string {
   if (framework.startsWith("next")) return path.join(root, "out");
   return path.join(root, "dist");
 }
+
+/** Locate index.html after Vite/CRA builds (dist/ or nested dist/client/). */
+export async function findIndexHtmlPath(outputDir: string): Promise<string | null> {
+  const direct = path.join(outputDir, "index.html");
+  try {
+    await fs.access(direct);
+    return direct;
+  } catch {
+    /* search shallow tree */
+  }
+  const queue = [outputDir];
+  let depth = 0;
+  while (queue.length > 0 && depth < 4) {
+    const level = queue.length;
+    for (let i = 0; i < level; i++) {
+      const dir = queue.shift()!;
+      let entries: string[];
+      try {
+        entries = await fs.readdir(dir);
+      } catch {
+        continue;
+      }
+      for (const name of entries) {
+        const abs = path.join(dir, name);
+        if (name === "index.html") {
+          try {
+            await fs.access(abs);
+            return abs;
+          } catch {
+            continue;
+          }
+        }
+        let st;
+        try {
+          st = await fs.stat(abs);
+        } catch {
+          continue;
+        }
+        if (st.isDirectory() && !name.startsWith(".") && name !== "node_modules") {
+          queue.push(abs);
+        }
+      }
+    }
+    depth += 1;
+  }
+  return null;
+}

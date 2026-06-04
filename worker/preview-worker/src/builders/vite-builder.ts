@@ -12,6 +12,7 @@ import {
 } from "../package-repair.js";
 import { VITE_BINARY_MISSING_CODE, VITE_BUILD_OOM_CODE } from "../package-repair-diagnostics.js";
 import { resolveNpmProjectLayout, packageJsonCandidates } from "../resolve-npm-root.js";
+import { findIndexHtmlPath } from "../sandbox.js";
 import {
   isOomOutput,
   previewBuildEnv,
@@ -255,15 +256,23 @@ export async function buildVite(
 
   const outKey = framework.id === "cra" ? "cra" : "vite";
   const outDir = resolveOutputDir(outKey, projectRoot);
-  const indexPath = path.join(outDir, "index.html");
+  const indexPath = await findIndexHtmlPath(outDir);
+  if (!indexPath) {
+    return {
+      ok: false,
+      logs: `${logs}\nMissing dist/index.html`,
+      blockedReason: "Build output missing index.html",
+      buildMeta,
+    };
+  }
   try {
     let html = await fs.readFile(indexPath, "utf8");
     html = injectPreviewEnvShims(html, legacy);
     await fs.writeFile(indexPath, html, "utf8");
-  } catch {
+  } catch (e) {
     return {
       ok: false,
-      logs: `${logs}\nMissing dist/index.html`,
+      logs: `${logs}\nFailed to read built index.html: ${e instanceof Error ? e.message : String(e)}`,
       blockedReason: "Build output missing index.html",
       buildMeta,
     };

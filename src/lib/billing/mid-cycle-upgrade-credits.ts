@@ -25,8 +25,8 @@ export function computeUpgradeCycleCredits(input: {
 }): MidCycleCreditCalc {
   const oldPlan = normalizePlanId(input.oldPlan) as PlanId;
   const newPlan = normalizePlanId(input.newPlan) as PlanId;
-  const midCyclePreserveUsage =
-    oldPlan !== "free" && isPlanUpgrade(oldPlan, newPlan);
+  /** Any paid upgrade (including Free → paid) preserves usage; only top-up the allowance delta. */
+  const midCyclePreserveUsage = isPlanUpgrade(oldPlan, newPlan);
 
   const oldBuildCap = monthlyTokensForPlan(oldPlan) + input.explicitBuildBonus;
   const newBuildCap = monthlyTokensForPlan(newPlan) + input.explicitBuildBonus;
@@ -34,10 +34,10 @@ export function computeUpgradeCycleCredits(input: {
   const newActionCap = monthlyActionCreditsForPlan(newPlan) + input.explicitActionBonus;
 
   const buildUsed = midCyclePreserveUsage
-    ? Math.max(0, Math.min(oldBuildCap, oldBuildCap - input.buildRemainingBefore))
+    ? Math.max(0, oldBuildCap - Math.max(0, input.buildRemainingBefore))
     : 0;
   const actionUsed = midCyclePreserveUsage
-    ? Math.max(0, Math.min(oldActionCap, oldActionCap - input.actionRemainingBefore))
+    ? Math.max(0, oldActionCap - Math.max(0, input.actionRemainingBefore))
     : 0;
 
   const buildCredits = midCyclePreserveUsage

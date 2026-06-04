@@ -521,13 +521,13 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/30 backdrop-blur-md p-4">
+    <div className="fixed inset-0 z-[80] flex min-h-[100dvh] items-center justify-center bg-black/55 p-4 backdrop-blur-md">
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-2xl overflow-hidden rounded-[var(--radius-xl)] bg-background shadow-2xl ring-1 ring-border"
+        className="relative flex max-h-[min(92dvh,900px)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-xl)] bg-background shadow-2xl ring-1 ring-border"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">

@@ -3,7 +3,36 @@
  * Real-time notification state via Supabase Realtime.
  */
 import { create } from "zustand";
+import { readNotificationKind } from "@/lib/notifications/notification-kinds";
 import type { Notification } from "@/lib/supabase/types";
+
+function dedupeNotifications(notifications: Notification[]): Notification[] {
+  const byId = new Map<string, Notification>();
+  for (const n of notifications) {
+    if (!byId.has(n.id)) byId.set(n.id, n);
+  }
+  let list = [...byId.values()];
+  const welcomes = list.filter(
+    (n) =>
+      readNotificationKind(n) === "welcome" ||
+      (typeof n.title === "string" && n.title.startsWith("Welcome to Vodex")),
+  );
+  if (welcomes.length > 1) {
+    welcomes.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    const keepId = welcomes[0]!.id;
+    list = list.filter((n) => {
+      const isWelcome =
+        readNotificationKind(n) === "welcome" ||
+        (typeof n.title === "string" && n.title.startsWith("Welcome to Vodex"));
+      return !isWelcome || n.id === keepId;
+    });
+  }
+  return list.sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+}
 
 interface NotificationsState {
   notifications: Notification[];
@@ -23,11 +52,13 @@ export const useNotificationsStore = create<NotificationsState>()((set) => ({
   unreadCount: 0,
   loading: false,
 
-  setNotifications: (notifications) =>
+  setNotifications: (notifications) => {
+    const next = dedupeNotifications(notifications);
     set({
-      notifications,
-      unreadCount: notifications.filter((n) => !n.read).length,
-    }),
+      notifications: next,
+      unreadCount: next.filter((n) => !n.read).length,
+    });
+  },
 
   addNotification: (notification) =>
     set((s) => {

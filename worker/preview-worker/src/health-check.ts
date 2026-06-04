@@ -1,8 +1,24 @@
+function isViteSpaShell(trimmed: string): boolean {
+  const hasRoot =
+    /id=["']root["']/i.test(trimmed) ||
+    /id=["']app["']/i.test(trimmed) ||
+    trimmed.includes("generated-app-preview-root");
+  if (!hasRoot || trimmed.length < 120) return false;
+  return (
+    /<script\s+[^>]*type=["']module["']/i.test(trimmed) ||
+    /\/assets\//i.test(trimmed) ||
+    /src=["'][^"']+\.js["']/i.test(trimmed)
+  );
+}
+
 export function checkPreviewHealth(html: string): {
   previewRenderable: boolean;
   blockedReason: string | null;
 } {
   const trimmed = html.trim();
+  if (isViteSpaShell(trimmed)) {
+    return { previewRenderable: true, blockedReason: null };
+  }
   if (trimmed.length < 80) {
     return { previewRenderable: false, blockedReason: "Preview HTML is empty or too short" };
   }

@@ -15,6 +15,7 @@ import {
   PROFILE_REQUIRED_SELECT,
 } from "@/lib/supabase/load-user-profile";
 import { ensureWelcomeNotification } from "@/lib/notifications/welcome-notification";
+import { repairStuckUpgradeCreditsIfNeeded } from "@/lib/billing/repair-stuck-upgrade-credits";
 
 /**
  * Ensures a `public.profiles` row exists for the signed-in user (service role).
@@ -87,6 +88,12 @@ export async function POST() {
       );
     } catch {
       /* welcome is best-effort */
+    }
+
+    try {
+      await repairStuckUpgradeCreditsIfNeeded(admin, user.id);
+    } catch {
+      /* repair is best-effort */
     }
 
     if (!core) {

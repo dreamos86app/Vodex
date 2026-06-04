@@ -6,6 +6,7 @@ import { supabase, type PreviewBuildJobRow } from "./supabase.js";
 import {
   cleanupWorkspace,
   createWorkspace,
+  findIndexHtmlPath,
   writeWorkspaceFiles,
   type WorkspaceFile,
   norm,
@@ -167,7 +168,10 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
       return;
     }
 
-    const indexHtml = await fs.readFile(`${result.outputDir}/index.html`, "utf8").catch(() => "");
+    const indexFile = await findIndexHtmlPath(result.outputDir);
+    const indexHtml = indexFile
+      ? await fs.readFile(indexFile, "utf8").catch(() => "")
+      : "";
     const health = checkPreviewHealth(indexHtml);
     if (!health.previewRenderable) {
       await finishJob(job, {

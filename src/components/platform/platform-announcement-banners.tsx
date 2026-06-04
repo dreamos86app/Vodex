@@ -123,14 +123,14 @@ export function PlatformAnnouncementBanners() {
                 <div className="min-w-0 flex-1 text-[12px] leading-relaxed sm:text-[13px]">
                   <p className="font-semibold">{a.title}</p>
                   <p className="mt-0.5 opacity-90">{a.message}</p>
-                  {a.link_label ? (
+                  {a.link_label || a.link_url ? (
                     <Link
                       href={href}
-                      className="mt-1 inline-block font-semibold underline underline-offset-2"
+                      className="mt-2 inline-flex items-center justify-center rounded-lg bg-white px-3.5 py-1.5 text-[12px] font-semibold text-[#2563eb] shadow-md transition hover:bg-white/95"
                       target={href.startsWith("http") ? "_blank" : undefined}
                       rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
                     >
-                      {a.link_label}
+                      {a.link_label?.trim() || "Visit"}
                     </Link>
                   ) : null}
                 </div>

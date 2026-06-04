@@ -10,6 +10,7 @@ import {
   detectBrokenPreviewSnapshot,
   isStaticPreviewHtmlHealthy,
 } from "@/lib/preview/broken-preview-snapshot";
+import { isViteSpaPreviewShell } from "@/lib/preview/vite-spa-preview-shell";
 
 function truncatePreviewSnippet(html: string): string {
   return truncateLargeDiagnosticString(html, 2000);
@@ -40,7 +41,8 @@ export function analyzePreviewHtml(
   options?: { previewSessionOk?: boolean },
 ): PreviewHtmlDiagnostics {
   const htmlLength = html.length;
-  const hasRootElement = html.includes("generated-app-preview-root");
+  const viteShell = isViteSpaPreviewShell(html);
+  const hasRootElement = html.includes("generated-app-preview-root") || viteShell;
   const sourceFileCount = files.length;
   const integrity = evaluateSourceIntegrity(files, {
     previewHtmlLength: htmlLength,
@@ -49,11 +51,13 @@ export function analyzePreviewHtml(
   });
 
   const brokenSnapshot = detectBrokenPreviewSnapshot(html);
-  const staticSnapshotHealthy = isStaticPreviewSnapshotHealthy(html, sourceFileCount);
+  const staticSnapshotHealthy =
+    isStaticPreviewSnapshotHealthy(html, sourceFileCount) || viteShell;
 
   const hasFailure =
     brokenSnapshot.broken ||
     (!staticSnapshotHealthy &&
+      !viteShell &&
       (!integrity.previewRenderable ||
         !integrity.sourceIntegrityOk ||
         !hasRootElement ||
@@ -85,7 +89,9 @@ export function analyzePreviewHtml(
 
   const previewRenderable =
     !brokenSnapshot.broken &&
-    ((integrity.previewRenderable && !errorCode) || (staticSnapshotHealthy && !errorCode));
+    ((viteShell && htmlLength >= 120) ||
+      (integrity.previewRenderable && !errorCode) ||
+      (staticSnapshotHealthy && !errorCode));
 
   return {
     htmlLength,

@@ -57,10 +57,7 @@ export function BuildCreditsUpgradePanel({
     );
   };
 
-  const ctaLabel =
-    offer.nextPlanId === "starter"
-      ? `Upgrade to Starter — $${offer.monthlyPriceUsd}/mo`
-      : offer.ctaLabel;
+  const ctaLabel = offer.ctaLabel;
 
   return (
     <motion.div

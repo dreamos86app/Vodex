@@ -2015,20 +2015,36 @@ body {
   background: transparent;
 }
 
-/* Notification inbox — horizontal category tabs */
+/* Notification inbox — horizontal tabs: scrollable, scrollbar hidden */
 .notification-tabs-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground) / 0.22) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
 }
 
 .notification-tabs-scroll::-webkit-scrollbar {
-  height: 3px;
+  display: none;
+  height: 0;
+  width: 0;
 }
 
-.notification-tabs-scroll::-webkit-scrollbar-thumb {
+/* Notification list — ultra-thin scrollbar */
+.notification-list-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.18) transparent;
+}
+
+.notification-list-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.notification-list-scroll::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: hsl(var(--muted-foreground) / 0.25);
+  background: hsl(var(--muted-foreground) / 0.2);
+}
+
+.notification-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Control Center — premium animated backgrounds */

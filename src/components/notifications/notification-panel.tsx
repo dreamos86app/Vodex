@@ -13,6 +13,7 @@ import {
   Users,
   X,
   Settings,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotificationsStore } from "@/lib/stores/notifications-store";
@@ -238,7 +239,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                   ))}
                 </div>
 
-                <div className="max-h-[min(50vh,380px)] overflow-y-auto overflow-x-hidden">
+                <div className="notification-list-scroll max-h-[min(50vh,380px)] overflow-y-auto overflow-x-hidden">
                   {filtered.length === 0 ? (
                     <div className="flex w-full flex-col items-center justify-center gap-2 px-4 py-12 text-center">
                       <Bell className="size-8 text-muted-foreground/35" strokeWidth={1.5} />
@@ -274,13 +275,24 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                               ? "vodex_welcome"
                               : null;
                         const effectCls = effectPreset ? effectOverlayClass(effectPreset) : null;
+                        const actionUrl =
+                          typeof n.action_url === "string" && n.action_url.trim()
+                            ? n.action_url.trim()
+                            : null;
+                        const actionExternal =
+                          actionUrl?.startsWith("http://") || actionUrl?.startsWith("https://");
+
                         return (
-                          <button
+                          <div
                             key={n.id}
-                            type="button"
+                            role="button"
+                            tabIndex={0}
                             onClick={() => markRead(n.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") markRead(n.id);
+                            }}
                             className={cn(
-                              "flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-surface/60",
+                              "flex w-full cursor-pointer items-start gap-3 px-4 py-2.5 text-left transition hover:bg-surface/60",
                               !n.read && !isPremium && "bg-accent/3",
                               isPremium &&
                                 cn(
@@ -327,11 +339,27 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                               <p className="mt-1 text-[10.5px] text-muted-foreground/60">
                                 {relativeTime(n.created_at)}
                               </p>
+                              {actionUrl ? (
+                                <Link
+                                  href={actionUrl}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markRead(n.id);
+                                    onClose();
+                                  }}
+                                  target={actionExternal ? "_blank" : undefined}
+                                  rel={actionExternal ? "noopener noreferrer" : undefined}
+                                  className="mt-2 inline-flex items-center gap-1 rounded-lg bg-[#2563eb] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8]"
+                                >
+                                  Visit
+                                  <ExternalLink className="size-3 opacity-90" strokeWidth={2} />
+                                </Link>
+                              ) : null}
                             </div>
                             {!n.read && (
-                              <span className="mt-1 size-1.5 shrink-0 rounded-full bg-accent" />
+                              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-accent" />
                             )}
-                          </button>
+                          </div>
                         );
                       })}
                     </div>

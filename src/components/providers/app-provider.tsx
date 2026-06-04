@@ -201,14 +201,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           (payload) => {
             const current = useAuthStore.getState().profile;
             if (!current || current.id !== userId) return;
+            const prevPlan = current.plan_id;
+            const patch = payload.new as Partial<Profile>;
             setProfile({
               ...current,
-              ...(payload.new as Partial<Profile>),
+              ...patch,
             });
             if (creditRefreshTimer) clearTimeout(creditRefreshTimer);
+            const planChanged = patch.plan_id != null && patch.plan_id !== prevPlan;
             creditRefreshTimer = setTimeout(
-              () => void refreshCredits({ reason: "profile-realtime" }),
-              1500,
+              () =>
+                void refreshCredits({
+                  reason: planChanged ? "plan-change" : "profile-realtime",
+                  force: planChanged,
+                }),
+              planChanged ? 200 : 1500,
             );
           },
         )
