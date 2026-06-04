@@ -88,6 +88,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     jobAgeLabel: runtime.jobAgeLabel,
     requiresDeployedWorker: runtime.requiresDeployedWorker,
     previewBuildMeta: runtime.previewBuildMeta,
+    packageRepairDiagnostics: runtime.packageRepairDiagnostics,
     lockedBy: runtime.lockedBy,
   });
 }

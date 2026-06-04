@@ -2,16 +2,19 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { WorkspaceFile } from "./sandbox.js";
 import { norm } from "./sandbox.js";
+import { log } from "./logger.js";
+import {
+  emptyPackageRepairDiagnostics,
+  truncateForDiagnostics,
+  VITE_BINARY_MISSING_CODE,
+  type PackageRepairDiagnostics,
+} from "./package-repair-diagnostics.js";
+import type { NpmProjectLayout } from "./resolve-npm-root.js";
 
-export type PackageRepairSummary = {
+export type PackageRepairSummary = PackageRepairDiagnostics & {
   packageManager: "npm" | "pnpm" | "yarn";
   buildUsesVite: boolean;
-  viteInjected: boolean;
-  pluginReactInjected: boolean;
-  viteConfigCreated: boolean;
   base44ShimReady: boolean;
-  repairs: string[];
-  summary: string;
 };
 
 type PkgJson = {
@@ -49,8 +52,9 @@ function usesPluginReact(files: WorkspaceFile[], deps: Record<string, string>): 
 export function repairPackageJsonContent(
   raw: string,
   input: { files: WorkspaceFile[]; isBase44: boolean },
-): { content: string; summary: PackageRepairSummary } {
+): { content: string; summary: Omit<PackageRepairSummary, "packageManager" | "buildUsesVite" | "base44ShimReady"> } {
   const repairs: string[] = [];
+
   let parsed: PkgJson;
   try {
     parsed = JSON.parse(raw) as PkgJson;
@@ -58,14 +62,14 @@ export function repairPackageJsonContent(
     return {
       content: raw,
       summary: {
-        packageManager: "npm",
-        buildUsesVite: false,
-        viteInjected: false,
-        pluginReactInjected: false,
-        viteConfigCreated: false,
-        base44ShimReady: input.isBase44,
+        ...emptyPackageRepairDiagnostics(),
+        executed: true,
+        viteDetectedInOriginal: false,
+        originalPackageJson: truncateForDiagnostics(raw),
+        finalPackageJson: truncateForDiagnostics(raw),
         repairs: ["package.json parse failed — skipped repair"],
         summary: "package.json invalid",
+        errorCode: "PACKAGE_JSON_PARSE_FAILED",
       },
     };
   }
@@ -74,6 +78,7 @@ export function repairPackageJsonContent(
   const dependencies = { ...(parsed.dependencies ?? {}) };
   const devDependencies = { ...(parsed.devDependencies ?? {}) };
   const allDeps = { ...dependencies, ...devDependencies };
+  const viteDetectedInOriginal = hasDep(allDeps, "vite");
 
   const buildUsesVite = scriptUsesVite(scripts) || input.isBase44;
   const needsVite =
@@ -116,13 +121,6 @@ export function repairPackageJsonContent(
     repairs.push('Set package.json type="module"');
   }
 
-  const paths = input.files.map((f) => norm(f.path));
-  const pm = paths.includes("pnpm-lock.yaml")
-    ? "pnpm"
-    : paths.includes("yarn.lock")
-      ? "yarn"
-      : "npm";
-
   const content = `${JSON.stringify(
     {
       ...parsed,
@@ -134,48 +132,82 @@ export function repairPackageJsonContent(
     2,
   )}\n`;
 
-  const summary: PackageRepairSummary = {
-    packageManager: pm,
-    buildUsesVite: buildUsesVite || needsVite,
-    viteInjected,
-    pluginReactInjected,
-    viteConfigCreated: false,
-    base44ShimReady: input.isBase44,
-    repairs,
-    summary: repairs.length ? repairs.join("; ") : "No package.json changes needed",
-  };
+  const repairChanged = content.trim() !== raw.trim();
 
-  return { content, summary };
+  return {
+    content,
+    summary: {
+      executed: true,
+      repairChanged: repairChanged || viteInjected || pluginReactInjected,
+      viteDetectedInOriginal,
+      viteInjected,
+      pluginReactInjected,
+      viteConfigCreated: false,
+      packageJsonRelative: null,
+      projectRoot: null,
+      originalPackageJson: truncateForDiagnostics(raw),
+      finalPackageJson: truncateForDiagnostics(content),
+      beforeInstall: {
+        buildScript: scripts.build ?? null,
+        dependencies,
+        devDependencies,
+      },
+      afterInstall: null,
+      repairs,
+      summary: repairs.length ? repairs.join("; ") : "No package.json changes needed",
+      errorCode: null,
+    },
+  };
 }
 
 export async function applyPackageRepair(
-  root: string,
+  layout: NpmProjectLayout,
   files: WorkspaceFile[],
   isBase44: boolean,
 ): Promise<PackageRepairSummary> {
-  const pkgPath = path.join(root, "package.json");
+  const { packageJsonPath, projectRoot, packageJsonRelative } = layout;
+  const paths = files.map((f) => norm(f.path));
+  const pm = paths.includes("pnpm-lock.yaml")
+    ? "pnpm"
+    : paths.includes("yarn.lock")
+      ? "yarn"
+      : "npm";
+
   let summary: PackageRepairSummary = {
-    packageManager: "npm",
+    ...emptyPackageRepairDiagnostics(),
+    packageManager: pm,
     buildUsesVite: false,
-    viteInjected: false,
-    pluginReactInjected: false,
-    viteConfigCreated: false,
     base44ShimReady: isBase44,
-    repairs: [],
-    summary: "No package.json in archive",
+    packageJsonRelative,
+    projectRoot,
   };
 
   try {
-    const raw = await fs.readFile(pkgPath, "utf8");
+    const raw = await fs.readFile(packageJsonPath, "utf8");
+    log("info", "package-repair: original package.json", {
+      packageJsonRelative,
+      projectRoot,
+      body: truncateForDiagnostics(raw, 4000),
+    });
+
     const repaired = repairPackageJsonContent(raw, { files, isBase44 });
-    await fs.writeFile(pkgPath, repaired.content, "utf8");
-    summary = repaired.summary;
+    await fs.writeFile(packageJsonPath, repaired.content, "utf8");
+    summary = {
+      ...repaired.summary,
+      packageManager: pm,
+      buildUsesVite: scriptUsesVite(
+        (JSON.parse(repaired.content) as PkgJson).scripts ?? {},
+      ),
+      base44ShimReady: isBase44,
+      packageJsonRelative,
+      projectRoot,
+    };
 
     const hasViteConfig = files.some((f) => /vite\.config\.(ts|js|mjs)$/i.test(norm(f.path)));
+    const viteConfigAtProject = path.join(projectRoot, "vite.config.js");
     if ((summary.buildUsesVite || summary.viteInjected) && !hasViteConfig && usesReact(files)) {
-      const configPath = path.join(root, "vite.config.js");
       await fs.writeFile(
-        configPath,
+        viteConfigAtProject,
         `import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -186,32 +218,87 @@ export default defineConfig({
         "utf8",
       );
       summary.viteConfigCreated = true;
+      summary.repairChanged = true;
       summary.repairs.push("Created minimal vite.config.js");
       summary.summary = summary.repairs.join("; ");
     }
-  } catch {
-    summary.repairs.push("package.json missing — skipped repair");
+
+    log("info", "package-repair: completed", {
+      executed: summary.executed,
+      repairChanged: summary.repairChanged,
+      viteDetectedInOriginal: summary.viteDetectedInOriginal,
+      viteInjected: summary.viteInjected,
+      pluginReactInjected: summary.pluginReactInjected,
+      viteConfigCreated: summary.viteConfigCreated,
+      packageJsonRelative,
+      projectRoot,
+      finalPackageJson: summary.finalPackageJson,
+    });
+  } catch (e) {
+    summary.executed = false;
+    summary.repairs.push(
+      e instanceof Error ? e.message : "package.json missing — skipped repair",
+    );
     summary.summary = summary.repairs.join("; ");
+    summary.errorCode = "PACKAGE_JSON_NOT_FOUND";
+    log("error", "package-repair: failed", {
+      packageJsonRelative,
+      projectRoot,
+      error: summary.summary,
+    });
   }
 
   return summary;
 }
 
-export async function assertViteBinaryPresent(
-  root: string,
-): Promise<{ ok: true } | { ok: false; blockedReason: string }> {
-  const binUnix = path.join(root, "node_modules", ".bin", "vite");
+export async function listNodeModulesBin(projectRoot: string): Promise<string[]> {
+  const binDir = path.join(projectRoot, "node_modules", ".bin");
+  try {
+    const entries = await fs.readdir(binDir);
+    return entries.sort();
+  } catch {
+    return [];
+  }
+}
+
+export async function viteBinaryExists(projectRoot: string): Promise<boolean> {
+  const binUnix = path.join(projectRoot, "node_modules", ".bin", "vite");
   const binWin = `${binUnix}.cmd`;
   for (const p of [binUnix, binWin]) {
     try {
       await fs.access(p);
-      return { ok: true };
+      return true;
     } catch {
-      /* try next */
+      continue;
     }
   }
-  return {
-    ok: false,
-    blockedReason: "Vite dependency missing after install",
-  };
+  return false;
+}
+
+export async function assertViteBinaryPresent(
+  projectRoot: string,
+  diagnostics: PackageRepairDiagnostics,
+): Promise<{ ok: true; diagnostics: PackageRepairDiagnostics } | { ok: false; blockedReason: string; diagnostics: PackageRepairDiagnostics }> {
+  const binListing = await listNodeModulesBin(projectRoot);
+  const exists = await viteBinaryExists(projectRoot);
+  const afterInstall = { binListing, viteBinaryExists: exists };
+  const next = { ...diagnostics, afterInstall };
+
+  log("info", "package-repair: post-install binary check", {
+    viteBinaryExists: exists,
+    binCount: binListing.length,
+    binListing: binListing.slice(0, 40),
+    hasViteInListing: binListing.some((b) => b === "vite" || b.startsWith("vite")),
+  });
+
+  if (!exists) {
+    next.errorCode = VITE_BINARY_MISSING_CODE;
+    log("error", VITE_BINARY_MISSING_CODE, { projectRoot, binListing: binListing.slice(0, 80) });
+    return {
+      ok: false,
+      blockedReason: VITE_BINARY_MISSING_CODE,
+      diagnostics: next,
+    };
+  }
+  return { ok: true, diagnostics: next };
 }

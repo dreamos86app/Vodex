@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { promisify } from "node:util";
 import { config } from "../config.js";
 import { redactSecrets } from "../logger.js";
@@ -97,4 +99,30 @@ export async function npmRunBuild(
     return runCommand("yarn", [script], cwd, config.buildTimeoutMs, previewBuildEnv());
   }
   return runCommand("npm", ["run", script], cwd, config.buildTimeoutMs, previewBuildEnv());
+}
+
+async function resolveViteCli(cwd: string): Promise<string | null> {
+  for (const name of ["vite", "vite.cmd"]) {
+    const p = path.join(cwd, "node_modules", ".bin", name);
+    try {
+      await fs.access(p);
+      return p;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/** Invoke local Vite CLI directly (avoids PATH issues when npm script runs `vite`). */
+export async function runViteBuild(
+  cwd: string,
+  pm: "npm" | "pnpm" | "yarn",
+  script = "build",
+): Promise<{ ok: boolean; logs: string; meta: CommandRunMeta }> {
+  const viteCli = await resolveViteCli(cwd);
+  if (viteCli) {
+    return runCommand(viteCli, ["build"], cwd, config.buildTimeoutMs, previewBuildEnv());
+  }
+  return npmRunBuild(cwd, pm, script);
 }

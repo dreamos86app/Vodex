@@ -19,7 +19,8 @@ must("worker/preview-worker/src/package-repair.ts", "assertViteBinaryPresent", "
 must("worker/preview-worker/src/builders/vite-builder.ts", "applyPackageRepair", "vite builder repairs package");
 must("worker/preview-worker/src/builders/run-command.ts", "NPM_CONFIG_PRODUCTION", "devDependencies install env");
 must("worker/preview-worker/src/builders/run-command.ts", 'NODE_ENV: "development"', "development install NODE_ENV");
-must("worker/preview-worker/src/package-repair.ts", "Vite dependency missing after install", "clear blocked reason");
+must("worker/preview-worker/src/package-repair-diagnostics.ts", "VITE_BINARY_MISSING_AFTER_INSTALL", "vite missing error code");
+must("worker/preview-worker/src/resolve-npm-root.ts", "resolveNpmProjectLayout", "nested npm root");
 must("worker/preview-worker/src/adapters/base44-adapter.ts", "__BASE44_PREVIEW_MOCK__", "base44 fetch mock");
 must("src/components/apps/zip-import-wizard.tsx", 'step === "confirm"', "confirm step before import");
 must("src/app/api/import/zip/preview/route.ts", "actionCreditBalance", "scan returns credit balance");

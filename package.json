@@ -864,6 +864,7 @@
     "verify:zip-credit-refund": "node scripts/verify-zip-credit-refund.mjs",
     "verify:preview-runtime-status": "node scripts/verify-preview-runtime-status.mjs",
     "verify:base44-vite-repair": "node scripts/verify-base44-vite-repair.mjs",
+    "verify:package-repair-diagnostics": "node scripts/verify-package-repair-diagnostics.mjs",
     "verify:preview-worker-architecture": "node scripts/verify-preview-worker-architecture.mjs",
     "verify:preview-runtime-worker": "node scripts/verify-preview-runtime-worker.mjs",
     "verify:device-preview": "node scripts/verify-device-preview.mjs",

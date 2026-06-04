@@ -109,6 +109,7 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
       | { ok: false; logs: string; blockedReason: string; buildMeta?: Record<string, unknown> };
 
     const fw = framework.id;
+    log("info", "build route selected", { frameworkId: fw, packageManager: framework.packageManager });
     if (fw === "static") result = await buildStatic(workspace, files);
     else if (["vite", "react", "base44", "lovable", "bolt", "v0", "cra"].includes(fw)) {
       const viteResult = await buildVite(workspace, framework, files);
@@ -228,6 +229,14 @@ async function finishJob(
     previewBuildMeta?: Record<string, unknown> | null;
   },
 ): Promise<void> {
+  const previewBuildMeta = input.previewBuildMeta ?? null;
+  const packageRepairDiagnostics =
+    previewBuildMeta &&
+    typeof previewBuildMeta === "object" &&
+    "packageRepair" in previewBuildMeta
+      ? (previewBuildMeta as { packageRepair?: unknown }).packageRepair
+      : null;
+
   const diagnostics =
     input.diagnostics ??
     ({
@@ -237,7 +246,8 @@ async function finishJob(
       sourceIntegrityOk: input.previewRenderable,
       blockedReason: input.blockedReason,
       buildLogs: input.logs,
-      previewBuildMeta: input.previewBuildMeta ?? null,
+      previewBuildMeta,
+      packageRepairDiagnostics,
       warnings: input.warnings,
       lastPreviewBuildAt: new Date().toISOString(),
       jobId: job.id,

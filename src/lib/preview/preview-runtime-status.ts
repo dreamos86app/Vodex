@@ -24,19 +24,36 @@ export type PreviewRuntimeStatusPayload = {
   entryFile: string | null;
   warnings: string[];
   previewBuildMeta: PreviewBuildMeta | null;
+  packageRepairDiagnostics: PackageRepairDiagnosticsPayload | null;
+};
+
+export type PackageRepairDiagnosticsPayload = {
+  executed?: boolean;
+  repairChanged?: boolean;
+  viteDetectedInOriginal?: boolean;
+  viteInjected?: boolean;
+  pluginReactInjected?: boolean;
+  viteConfigCreated?: boolean;
+  packageJsonRelative?: string | null;
+  projectRoot?: string | null;
+  afterInstall?: {
+    binListing?: string[];
+    viteBinaryExists?: boolean;
+  } | null;
+  repairs?: string[];
+  summary?: string;
+  errorCode?: string | null;
 };
 
 export type PreviewBuildMeta = {
   installCommand?: string;
   buildCommand?: string;
   packageManager?: string;
-  packageRepair?: {
-    viteInjected?: boolean;
-    pluginReactInjected?: boolean;
-    viteConfigCreated?: boolean;
-    summary?: string;
-    repairs?: string[];
-  };
+  npmProjectRoot?: string;
+  packageJsonRelative?: string | null;
+  packageJsonCandidates?: string[];
+  frameworkId?: string;
+  packageRepair?: PackageRepairDiagnosticsPayload;
 };
 
 export function formatJobAge(seconds: number): string {

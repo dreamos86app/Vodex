@@ -110,27 +110,39 @@ export function PreviewRuntimeStatusPanel({
         {status.lockedBy ? <Item label="Locked by" value={status.lockedBy} mono /> : null}
       </dl>
 
-      {status.previewBuildMeta ? (
-        <dl className="mt-2 grid gap-1 border-t border-border/60 pt-2 sm:grid-cols-2">
-          {status.previewBuildMeta.installCommand ? (
-            <Item label="Install" value={status.previewBuildMeta.installCommand} mono />
-          ) : null}
-          {status.previewBuildMeta.buildCommand ? (
-            <Item label="Build" value={status.previewBuildMeta.buildCommand} mono />
-          ) : null}
-          {status.previewBuildMeta.packageManager ? (
-            <Item label="Package manager" value={status.previewBuildMeta.packageManager} />
-          ) : null}
-          {status.previewBuildMeta.packageRepair?.viteInjected ? (
-            <Item label="Vite injected" value="yes" />
-          ) : null}
-          {status.previewBuildMeta.packageRepair?.summary ? (
-            <div className="sm:col-span-2">
-              <Item label="Package repair" value={status.previewBuildMeta.packageRepair.summary} />
-            </div>
-          ) : null}
-        </dl>
-      ) : null}
+      {(() => {
+        const repair = status.packageRepairDiagnostics ?? status.previewBuildMeta?.packageRepair;
+        const meta = status.previewBuildMeta;
+        if (!repair && !meta?.installCommand) return null;
+        return (
+          <dl className="mt-2 grid gap-1 border-t border-border/60 pt-2 sm:grid-cols-2">
+            <Item label="Package repair executed" value={repair?.executed === true ? "yes" : repair ? "no" : "—"} />
+            <Item label="Vite injected" value={repair?.viteInjected === true ? "yes" : "no"} />
+            <Item
+              label="Vite binary exists"
+              value={
+                repair?.afterInstall?.viteBinaryExists === true
+                  ? "yes"
+                  : repair?.afterInstall
+                    ? "no"
+                    : "—"
+              }
+            />
+            {meta?.npmProjectRoot ? <Item label="npm cwd" value={meta.npmProjectRoot} mono /> : null}
+            {meta?.packageJsonRelative ? (
+              <Item label="package.json" value={meta.packageJsonRelative} mono />
+            ) : null}
+            {meta?.installCommand ? <Item label="Install" value={meta.installCommand} mono /> : null}
+            {meta?.buildCommand ? <Item label="Build" value={meta.buildCommand} mono /> : null}
+            {repair?.errorCode ? <Item label="Repair error" value={repair.errorCode} mono /> : null}
+            {repair?.summary ? (
+              <div className="sm:col-span-2">
+                <Item label="Repair summary" value={repair.summary} />
+              </div>
+            ) : null}
+          </dl>
+        );
+      })()}
 
       {status.buildLogs ? (
         <div className="mt-2 border-t border-border/60 pt-2">

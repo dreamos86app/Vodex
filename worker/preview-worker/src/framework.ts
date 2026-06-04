@@ -25,7 +25,11 @@ export type FrameworkInfo = {
 };
 
 function readPkg(files: WorkspaceFile[]) {
-  const pkg = files.find((f) => norm(f.path) === "package.json");
+  const pkg =
+    files.find((f) => norm(f.path) === "package.json") ??
+    files
+      .filter((f) => norm(f.path).endsWith("/package.json"))
+      .sort((a, b) => norm(a.path).split("/").length - norm(b.path).split("/").length)[0];
   if (!pkg) return null;
   try {
     const j = JSON.parse(pkg.content) as {

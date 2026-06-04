@@ -3,6 +3,7 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { loadLatestPreviewDiagnostics } from "@/lib/imports/runtime-build-runner";
 import {
   formatJobAge,
+  type PackageRepairDiagnosticsPayload,
   type PreviewBuildMeta,
   type PreviewRuntimeStatusPayload,
 } from "@/lib/preview/preview-runtime-status";
@@ -136,6 +137,18 @@ export async function loadPreviewRuntimeStatus(
           ? (diag as Record<string, unknown>).previewBuildMeta
           : null;
       return raw && typeof raw === "object" ? (raw as PreviewBuildMeta) : null;
+    })(),
+    packageRepairDiagnostics: (() => {
+      const d = diag as Record<string, unknown> | null;
+      const fromDiag = d?.packageRepairDiagnostics;
+      if (fromDiag && typeof fromDiag === "object") {
+        return fromDiag as PackageRepairDiagnosticsPayload;
+      }
+      const meta =
+        d?.previewBuildMeta && typeof d.previewBuildMeta === "object"
+          ? (d.previewBuildMeta as PreviewBuildMeta)
+          : null;
+      return meta?.packageRepair ?? null;
     })(),
   };
 }
