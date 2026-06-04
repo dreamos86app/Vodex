@@ -319,7 +319,7 @@ ZIP import lets you bring an existing codebase into Vodex. The import pipeline:
 ## How to import
 
 1. Go to **Projects → Import ZIP**
-2. Upload your ZIP file (max 100MB)
+2. Upload your ZIP file (max 250MB)
 3. Watch the detection pipeline run
 4. Review the detected technologies
 5. Click **Open in Workspace**

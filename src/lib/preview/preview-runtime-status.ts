@@ -8,6 +8,8 @@ export type PreviewRuntimeStatusPayload = {
   frameworkLabel: string | null;
   artifactPath: string | null;
   blockedReason: string | null;
+  errorCode: string | null;
+  userMessage: string | null;
   buildLogs: string | null;
   lockedBy: string | null;
   workerUnavailable: boolean;
@@ -25,6 +27,10 @@ export type PreviewRuntimeStatusPayload = {
   warnings: string[];
   previewBuildMeta: PreviewBuildMeta | null;
   packageRepairDiagnostics: PackageRepairDiagnosticsPayload | null;
+  estimatedActionCredits: number | null;
+  chargedActionCredits: number | null;
+  creditsCharged: boolean;
+  chargeStatus: "pending" | "charged" | "refunded" | "cancelled" | "none" | null;
 };
 
 export type PackageRepairDiagnosticsPayload = {
@@ -53,8 +59,14 @@ export type PreviewBuildMeta = {
   packageJsonRelative?: string | null;
   packageJsonCandidates?: string[];
   frameworkId?: string;
+  nodeMaxOldSpaceMb?: number;
+  nodeOptions?: string;
+  errorCode?: string | null;
+  userMessage?: string | null;
   packageRepair?: PackageRepairDiagnosticsPayload;
 };
+
+export const VITE_BUILD_OOM_CODE = "VITE_BUILD_OOM";
 
 export function formatJobAge(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -78,6 +90,9 @@ export function previewRuntimeStateLabel(status: PreviewRuntimeStatusPayload): s
   }
   if (status.jobStatus === "queued" || status.previewStatus === "queued") {
     return status.workerConnected ? "Queued — worker connected" : "Preview queued";
+  }
+  if (status.errorCode === VITE_BUILD_OOM_CODE || status.blockedReason === "Vite build out of memory") {
+    return "Preview build out of memory";
   }
   if (status.jobStatus === "failed" || status.previewStatus === "failed") return "Preview failed";
   if (status.workerUnavailable) return "Worker unavailable";

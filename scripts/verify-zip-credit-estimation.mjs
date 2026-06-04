@@ -15,9 +15,16 @@ function tierForSizeMb(sizeMb) {
 
 const TIER_BASE = { 1: 10, 2: 25, 3: 50, 4: 100 };
 
-function estimate(sizeMb, multiplier = 1) {
+function dependencySurcharge(count) {
+  if (count > 400) return 100;
+  if (count > 200) return 50;
+  if (count > 100) return 25;
+  return 0;
+}
+
+function estimate(sizeMb, multiplier = 1, dependencyCount = 0) {
   const tier = tierForSizeMb(sizeMb);
-  return Math.ceil(TIER_BASE[tier] * multiplier);
+  return Math.ceil(TIER_BASE[tier] * multiplier) + dependencySurcharge(dependencyCount);
 }
 
 const cases = [
@@ -38,8 +45,25 @@ for (const [sizeMb, mult, expected] of cases) {
   }
 }
 
+const depCases = [
+  [101, 25],
+  [201, 50],
+  [401, 100],
+  [100, 0],
+];
+for (const [count, surcharge] of depCases) {
+  if (dependencySurcharge(count) !== surcharge) {
+    errors.push(`dependency surcharge ${count}: expected ${surcharge}, got ${dependencySurcharge(count)}`);
+  }
+}
+if (estimate(4, 1, 150) !== 10 + 25) {
+  errors.push("combined size + dependency estimate mismatch");
+}
+
 const src = fs.readFileSync(path.join(root, "src/lib/imports/zip-preview-action-credits.ts"), "utf8");
 if (!src.includes("tierForSizeMb")) errors.push("missing tierForSizeMb export");
+if (!src.includes("dependencySurchargeCredits")) errors.push("missing dependencySurchargeCredits");
+if (!src.includes("sizeBaseCredits")) errors.push("missing sizeBaseCredits");
 if (!src.includes("getPreviewCostMultiplier")) errors.push("missing platform multiplier");
 if (!src.includes("zip_preview_action_holds")) errors.push("missing holds table usage");
 
@@ -53,8 +77,10 @@ if (!fs.existsSync(migration)) {
 }
 
 const wizard = fs.readFileSync(path.join(root, "src/components/apps/zip-import-wizard.tsx"), "utf8");
-if (!wizard.includes("Import & Build Preview")) errors.push("wizard missing confirm import CTA");
+if (!wizard.includes("Build Preview (")) errors.push("wizard missing build preview CTA");
 if (!wizard.includes("estimatedActionCredits")) errors.push("wizard missing credit display");
+if (!wizard.includes("Preview Build Summary")) errors.push("wizard missing preview build summary");
+if (!wizard.includes("NOT charging Action Credits")) errors.push("wizard missing not-charged notice");
 
 if (!fs.readFileSync(path.join(root, "package.json"), "utf8").includes("verify:zip-credit-estimation")) {
   errors.push("verify script not registered");

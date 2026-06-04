@@ -1,7 +1,13 @@
+import {
+  ZIP_IMPORT_MAX_BYTES,
+  ZIP_IMPORT_MAX_MB,
+  ZIP_IMPORT_UPLOAD_LIMITS,
+} from "@/lib/import/zip-import-limits";
+
 /** Private Supabase Storage bucket for ZIP import archives (not public). */
 export const ZIP_IMPORT_BUCKET = "zip-imports";
 
-export const ZIP_IMPORT_MAX_BYTES = 25 * 1024 * 1024;
+export { ZIP_IMPORT_MAX_BYTES, ZIP_IMPORT_MAX_MB, ZIP_IMPORT_UPLOAD_LIMITS };
 
 export const ZIP_IMPORT_ALLOWED_MIMES = [
   "application/zip",

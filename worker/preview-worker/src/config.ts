@@ -48,10 +48,12 @@ export const config = {
   jobConcurrency: Math.max(1, num("PREVIEW_JOB_CONCURRENCY", 1)),
   installTimeoutMs: num("PREVIEW_INSTALL_TIMEOUT_MS", 180_000),
   buildTimeoutMs: num("PREVIEW_BUILD_TIMEOUT_MS", 180_000),
-  maxFiles: num("PREVIEW_MAX_FILES", 5000),
-  maxSourceMb: num("PREVIEW_MAX_SOURCE_MB", 200),
+  maxFiles: num("PREVIEW_MAX_FILES", 20_000),
+  maxSourceMb: num("PREVIEW_MAX_SOURCE_MB", 250),
   pollIntervalMs: num("PREVIEW_POLL_INTERVAL_MS", 5000),
   allowNpmScripts: process.env.PREVIEW_ALLOW_NPM_SCRIPTS === "1",
+  /** V8 heap for Vite/React production builds (MB). */
+  nodeMaxOldSpaceMb: Math.max(512, num("PREVIEW_NODE_MAX_OLD_SPACE_MB", 4096)),
 };
 
 export function serviceRoleKeyPrefix(): string {

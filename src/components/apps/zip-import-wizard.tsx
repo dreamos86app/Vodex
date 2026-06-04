@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ZIP_IMPORT_MAX_MB } from "@/lib/import/zip-import-limits";
 
 // ─── Detection types ──────────────────────────────────────────────────────────
 
@@ -28,6 +29,9 @@ type ZipCreditEstimate = {
   tier: number;
   baseCredits: number;
   multiplier: number;
+  sizeBaseCredits: number;
+  dependencyCount: number;
+  dependencySurchargeCredits: number;
   estimatedActionCredits: number;
   estimatedFiles: number;
   estimatedSizeMb: number;
@@ -255,6 +259,10 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
 
   function handleFile(f: File) {
     if (!f.name.endsWith(".zip")) {
+      return;
+    }
+    if (f.size > ZIP_IMPORT_MAX_MB * 1024 * 1024) {
+      toast.error(`ZIP is too large. Maximum size: ${ZIP_IMPORT_MAX_MB} MB`);
       return;
     }
     setFile(f);
@@ -523,7 +531,9 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                   ) : (
                     <div className="text-center">
                       <p className="text-[14px] font-medium text-foreground">Drop your ZIP here</p>
-                      <p className="text-[12px] text-muted-foreground">or click to browse · max 25MB</p>
+                      <p className="text-[12px] text-muted-foreground">
+                        or click to browse · maximum size: {ZIP_IMPORT_MAX_MB} MB
+                      </p>
                     </div>
                   )}
                 </div>
@@ -608,7 +618,7 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
               </motion.div>
             )}
 
-            {/* Step 3: Confirm import (required before queue/build) */}
+            {/* Step 3: Preview build summary (required before import/build) */}
             {step === "confirm" && scanResult && scanPayload && (
               <motion.div
                 key="confirm"
@@ -617,49 +627,93 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                 exit={{ opacity: 0 }}
                 className="space-y-4"
               >
-                <div className="rounded-xl bg-accent/8 p-4 ring-1 ring-accent/25 space-y-3">
-                  <p className="text-[15px] font-semibold text-foreground">Import ZIP Project</p>
-                  <p className="text-[12px] text-muted-foreground leading-relaxed">
-                    Scan complete (free). Confirm below to reserve Action Credits and queue the preview build.
-                  </p>
-                  <dl className="grid gap-2 text-[12px] sm:grid-cols-2">
+                <div className="rounded-xl bg-accent/8 p-4 ring-1 ring-accent/25 space-y-4">
+                  <div>
+                    <p className="text-[16px] font-semibold text-foreground">Preview Build Summary</p>
+                    <p className="mt-1 text-[12px] text-muted-foreground">
+                      ZIP scan is complete and free. Review cost below before starting the preview build.
+                    </p>
+                  </div>
+
+                  <dl className="grid gap-2.5 text-[12px] sm:grid-cols-2">
                     <div>
                       <dt className="text-muted-foreground">Framework</dt>
                       <dd className="font-medium text-foreground">{scanPayload.creditEstimate.frameworkLabel}</dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Files</dt>
-                      <dd className="font-medium text-foreground">{scanPayload.creditEstimate.estimatedFiles.toLocaleString()}</dd>
+                      <dd className="font-medium text-foreground">
+                        {scanPayload.creditEstimate.estimatedFiles.toLocaleString()}
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">ZIP size</dt>
                       <dd className="font-medium text-foreground">{scanPayload.creditEstimate.estimatedSizeMb} MB</dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground">Your Action Credits</dt>
-                      <dd className="font-medium text-foreground">
-                        {scanPayload.actionCreditBalance.toLocaleString()} available
+                      <dt className="text-muted-foreground">Estimated preview cost</dt>
+                      <dd className="font-semibold text-foreground tabular-nums">
+                        {scanPayload.creditEstimate.estimatedActionCredits} Action Credits
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Your balance</dt>
+                      <dd className="font-medium text-foreground tabular-nums">
+                        {scanPayload.actionCreditBalance.toLocaleString()} Action Credits
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Preview worker</dt>
+                      <dd
+                        className={cn(
+                          "font-medium",
+                          scanPayload.workerConnected ? "text-positive" : "text-destructive",
+                        )}
+                      >
+                        {scanPayload.workerConnected ? "Ready" : "Not connected"}
                       </dd>
                     </div>
                   </dl>
-                  <p className="text-[16px] font-semibold text-foreground">
-                    Estimated preview cost: {scanPayload.creditEstimate.estimatedActionCredits} Action Credits
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Charged only after a successful worker preview build (×{scanPayload.creditEstimate.multiplier} platform multiplier). Scan is always free.
-                  </p>
+
+                  {scanPayload.creditEstimate.dependencySurchargeCredits > 0 ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Includes +{scanPayload.creditEstimate.dependencySurchargeCredits} AC for large dependency
+                      graph ({scanPayload.creditEstimate.dependencyCount} packages).
+                    </p>
+                  ) : null}
+
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-[12px] text-amber-950 dark:text-amber-100 space-y-2">
+                    <p className="font-semibold">We are NOT charging Action Credits yet.</p>
+                    <p className="leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+                      Action Credits are only charged after you click &quot;Build Preview&quot; and the preview build
+                      successfully completes on the worker. Scanning this ZIP is always free.
+                    </p>
+                    <ul className="list-disc space-y-1 pl-4 text-[11px] text-amber-900/80 dark:text-amber-100/80">
+                      <li>If the preview fails before the build starts, no credits are charged.</li>
+                      <li>If you cancel before the build runs, no credits are charged.</li>
+                      <li>If the preview never becomes renderable, existing refund rules apply.</li>
+                    </ul>
+                  </div>
+
                   {!scanPayload.actionCreditsSufficient ? (
-                    <div className="rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive ring-1 ring-destructive/20">
-                      You need {scanPayload.actionCreditsRequired} credits but only have {scanPayload.actionCreditBalance}.{" "}
-                      <Link href="/credits" className="font-semibold underline">
-                        Buy Action Credits
-                      </Link>
+                    <div className="rounded-lg bg-destructive/10 px-3 py-2.5 text-[12px] text-destructive ring-1 ring-destructive/20 space-y-2">
+                      <p>
+                        You need{" "}
+                        {Math.max(
+                          0,
+                          scanPayload.actionCreditsRequired - scanPayload.actionCreditBalance,
+                        ).toLocaleString()}{" "}
+                        more Action Credits.
+                      </p>
+                      <Button variant="accent" size="sm" asChild>
+                        <Link href="/credits">Buy Credits</Link>
+                      </Button>
                     </div>
                   ) : null}
                   {!scanPayload.workerConnected ? (
                     <div className="rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive ring-1 ring-destructive/20">
                       {scanPayload.workerUnavailableMessage ??
-                        "Preview worker must be connected before import."}
+                        "Preview worker must be connected before you can build a preview."}
                     </div>
                   ) : null}
                 </div>
@@ -675,7 +729,7 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                     disabled={!scanPayload.workerConnected || !scanPayload.actionCreditsSufficient}
                     onClick={() => void confirmImport()}
                   >
-                    Import & Build Preview
+                    Build Preview ({scanPayload.creditEstimate.estimatedActionCredits} AC)
                     <ChevronRight className="size-3.5" strokeWidth={2} />
                   </Button>
                 </div>
@@ -693,7 +747,9 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
               >
                 <Loader2 className="size-8 animate-spin text-accent" />
                 <p className="text-[14px] font-medium text-foreground">Importing & queueing preview build…</p>
-                <p className="text-[12px] text-muted-foreground">Reserving Action Credits and uploading sources.</p>
+                <p className="text-[12px] text-muted-foreground">
+                  Importing sources and queueing the preview build. Credits are not charged until the build succeeds.
+                </p>
               </motion.div>
             )}
 

@@ -35,6 +35,7 @@ import {
 } from "@/lib/imports/preview-build-queue";
 import type { DetectedFrameworkId } from "@/lib/imports/framework-detector";
 import { repairImportedThinFiles } from "@/lib/imports/repair-imported-thin-files";
+import type { PreviewZipBillingDiagnostics } from "@/lib/imports/zip-preview-billing";
 
 const execFileAsync = promisify(execFile);
 
@@ -166,6 +167,7 @@ export async function runImportPreviewBuild(input: {
   projectId: string;
   files: ZipImportFile[];
   existingJobId?: string | null;
+  previewBilling?: PreviewZipBillingDiagnostics;
 }): Promise<PreviewBuildRunResult> {
   const repaired = repairImportedThinFiles(input.files);
   const files = repaired.files;
@@ -213,6 +215,7 @@ export async function runImportPreviewBuild(input: {
       projectId: input.projectId,
       files,
       jobId,
+      previewBilling: input.previewBilling,
     });
   }
 

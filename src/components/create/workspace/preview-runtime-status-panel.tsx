@@ -4,7 +4,10 @@ import * as React from "react";
 import { ChevronDown, ChevronUp, Loader2, RefreshCw, Server } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
-import { previewRuntimeStateLabel } from "@/lib/preview/preview-runtime-status";
+import {
+  previewRuntimeStateLabel,
+  VITE_BUILD_OOM_CODE,
+} from "@/lib/preview/preview-runtime-status";
 import { Button } from "@/components/ui/button";
 
 export function PreviewRuntimeStatusPanel({
@@ -29,13 +32,19 @@ export function PreviewRuntimeStatusPanel({
 
   if (status.previewRenderable && !compact) return null;
 
+  const oom =
+    status.errorCode === VITE_BUILD_OOM_CODE ||
+    status.blockedReason === "Vite build out of memory";
   const subline =
-    status.workerUnavailable && (status.jobStatus === "queued" || status.previewStatus === "queued")
-      ? (status.workerUnavailableMessage ??
-        (status.requiresDeployedWorker
-          ? "Deploy the preview worker for production builds."
-          : "Start the preview worker locally."))
-      : status.blockedReason ?? "Waiting for a renderable preview build.";
+    oom
+      ? (status.userMessage ??
+        "This ZIP is too large for the current preview worker memory. Increase worker memory or reduce bundle size.")
+      : status.workerUnavailable && (status.jobStatus === "queued" || status.previewStatus === "queued")
+        ? (status.workerUnavailableMessage ??
+          (status.requiresDeployedWorker
+            ? "Deploy the preview worker for production builds."
+            : "Start the preview worker locally."))
+        : status.blockedReason ?? "Waiting for a renderable preview build.";
 
   return (
     <div
@@ -108,6 +117,40 @@ export function PreviewRuntimeStatusPanel({
           }
         />
         {status.lockedBy ? <Item label="Locked by" value={status.lockedBy} mono /> : null}
+        {status.estimatedActionCredits != null ? (
+          <Item label="Estimated cost" value={`${status.estimatedActionCredits} AC`} />
+        ) : null}
+        <Item
+          label="Charged"
+          value={
+            status.creditsCharged
+              ? "Yes"
+              : status.chargeStatus === "cancelled" || status.chargeStatus === "refunded"
+                ? "No"
+                : status.chargeStatus === "pending"
+                  ? "No (reserved)"
+                  : "No"
+          }
+        />
+        {status.chargeStatus ? (
+          <Item
+            label="Charge status"
+            value={
+              status.chargeStatus === "pending"
+                ? "Pending"
+                : status.chargeStatus === "charged"
+                  ? "Charged"
+                  : status.chargeStatus === "refunded"
+                    ? "Refunded"
+                    : status.chargeStatus === "cancelled"
+                      ? "Cancelled"
+                      : "—"
+            }
+          />
+        ) : null}
+        {status.chargedActionCredits != null ? (
+          <Item label="Charged amount" value={`${status.chargedActionCredits} AC`} />
+        ) : null}
       </dl>
 
       {(() => {
@@ -134,6 +177,8 @@ export function PreviewRuntimeStatusPanel({
             ) : null}
             {meta?.installCommand ? <Item label="Install" value={meta.installCommand} mono /> : null}
             {meta?.buildCommand ? <Item label="Build" value={meta.buildCommand} mono /> : null}
+            {meta?.nodeOptions ? <Item label="NODE_OPTIONS" value={meta.nodeOptions} mono /> : null}
+            {status.errorCode ? <Item label="Error code" value={status.errorCode} mono /> : null}
             {repair?.errorCode ? <Item label="Repair error" value={repair.errorCode} mono /> : null}
             {repair?.summary ? (
               <div className="sm:col-span-2">

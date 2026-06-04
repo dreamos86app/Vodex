@@ -131,6 +131,11 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
     const previewBuildMeta = result.buildMeta ?? null;
     if (!result.ok) {
       await cancelZipPreviewHold(job.project_id);
+      const buildMeta = previewBuildMeta as Record<string, unknown> | null;
+      const errorCode =
+        buildMeta && typeof buildMeta.errorCode === "string" ? buildMeta.errorCode : null;
+      const userMessage =
+        buildMeta && typeof buildMeta.userMessage === "string" ? buildMeta.userMessage : null;
       await finishJob(job, {
         status: "failed",
         blockedReason: result.blockedReason,
@@ -139,6 +144,25 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
         framework: fw,
         warnings,
         previewBuildMeta,
+        diagnostics: {
+          framework: fw,
+          frameworkLabel: framework.label,
+          previewStatus: "failed",
+          previewRenderable: false,
+          sourceIntegrityOk: false,
+          blockedReason: result.blockedReason,
+          errorCode,
+          userMessage,
+          buildLogs: redactSecrets(logs).slice(0, 50000),
+          previewBuildMeta,
+          packageRepairDiagnostics:
+            buildMeta && typeof buildMeta.packageRepair === "object"
+              ? buildMeta.packageRepair
+              : null,
+          warnings,
+          lastPreviewBuildAt: new Date().toISOString(),
+          jobId: job.id,
+        },
       });
       return;
     }

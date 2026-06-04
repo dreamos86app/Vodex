@@ -1,4 +1,5 @@
 import { config, serviceRoleKeyPrefix } from "./config.js";
+import { validateBuildMemoryAtStartup } from "./build-memory.js";
 import { log } from "./logger.js";
 import { assertServiceRoleDbAccess, supabase } from "./supabase.js";
 
@@ -39,7 +40,10 @@ export async function runStartupChecks(): Promise<void> {
     artifactBucket: config.artifactBucket,
     sourceBucket: config.sourceBucket,
     workerId: config.workerId,
+    nodeMaxOldSpaceMb: config.nodeMaxOldSpaceMb,
   });
+
+  await validateBuildMemoryAtStartup();
 
   for (const bucket of [config.artifactBucket, config.sourceBucket]) {
     const { error } = await supabase.storage.from(bucket).list("", { limit: 1 });

@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import { config } from "../config.js";
+import { previewBuildEnv } from "../build-memory.js";
 import { redactSecrets } from "../logger.js";
 
 const execFileAsync = promisify(execFile);
@@ -10,6 +11,7 @@ const execFileAsync = promisify(execFile);
 export type CommandRunMeta = {
   command: string;
   args: string[];
+  nodeOptions?: string;
 };
 
 /** Install must include devDependencies (vite, plugins). */
@@ -22,14 +24,6 @@ function previewInstallEnv(): NodeJS.ProcessEnv {
   };
 }
 
-function previewBuildEnv(): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    NODE_ENV: "production",
-    CI: "true",
-  };
-}
-
 export async function runCommand(
   cmd: string,
   args: string[],
@@ -37,12 +31,16 @@ export async function runCommand(
   timeoutMs: number,
   env: NodeJS.ProcessEnv,
 ): Promise<{ ok: boolean; logs: string; meta: CommandRunMeta }> {
-  const meta: CommandRunMeta = { command: cmd, args: [...args] };
+  const meta: CommandRunMeta = {
+    command: cmd,
+    args: [...args],
+    nodeOptions: env.NODE_OPTIONS,
+  };
   try {
     const { stdout, stderr } = await execFileAsync(cmd, args, {
       cwd,
       timeout: timeoutMs,
-      maxBuffer: 8 * 1024 * 1024,
+      maxBuffer: 16 * 1024 * 1024,
       env,
     });
     return {
@@ -82,7 +80,7 @@ export async function npmInstall(
   }
 
   const hasLock = await import("node:fs/promises")
-    .then((fs) => fs.access(`${cwd}/package-lock.json`).then(() => true))
+    .then((fsMod) => fsMod.access(`${cwd}/package-lock.json`).then(() => true))
     .catch(() => false);
 
   const useCi = hasLock && !opts?.preferInstall;
@@ -95,10 +93,11 @@ export async function npmRunBuild(
   pm: "npm" | "pnpm" | "yarn",
   script = "build",
 ): Promise<{ ok: boolean; logs: string; meta: CommandRunMeta }> {
+  const env = previewBuildEnv();
   if (pm === "yarn") {
-    return runCommand("yarn", [script], cwd, config.buildTimeoutMs, previewBuildEnv());
+    return runCommand("yarn", [script], cwd, config.buildTimeoutMs, env);
   }
-  return runCommand("npm", ["run", script], cwd, config.buildTimeoutMs, previewBuildEnv());
+  return runCommand("npm", ["run", script], cwd, config.buildTimeoutMs, env);
 }
 
 async function resolveViteCli(cwd: string): Promise<string | null> {
@@ -114,15 +113,16 @@ async function resolveViteCli(cwd: string): Promise<string | null> {
   return null;
 }
 
-/** Invoke local Vite CLI directly (avoids PATH issues when npm script runs `vite`). */
+/** Invoke local Vite CLI directly with production build memory limits. */
 export async function runViteBuild(
   cwd: string,
   pm: "npm" | "pnpm" | "yarn",
   script = "build",
 ): Promise<{ ok: boolean; logs: string; meta: CommandRunMeta }> {
+  const env = previewBuildEnv();
   const viteCli = await resolveViteCli(cwd);
   if (viteCli) {
-    return runCommand(viteCli, ["build"], cwd, config.buildTimeoutMs, previewBuildEnv());
+    return runCommand(viteCli, ["build"], cwd, config.buildTimeoutMs, env);
   }
   return npmRunBuild(cwd, pm, script);
 }

@@ -56,7 +56,7 @@ async function main() {
 
   const { error: createErr } = await admin.storage.createBucket(bucketId, {
     public: false,
-    fileSizeLimit: 25 * 1024 * 1024,
+    fileSizeLimit: 250 * 1024 * 1024,
     allowedMimeTypes: ["application/zip", "application/x-zip-compressed"],
   });
 

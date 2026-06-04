@@ -9,6 +9,7 @@ import {
 } from "@/lib/preview/preview-runtime-status";
 import { isServerlessHost } from "@/lib/imports/preview-build-queue";
 import { WORKER_CONNECTED_THRESHOLD_MS } from "@/lib/preview/preview-worker-status";
+import { loadZipPreviewBillingForProject } from "@/lib/imports/zip-preview-billing";
 
 const WORKER_STALE_MS = 5 * 60 * 1000;
 const WORKER_QUEUE_GRACE_MS = 8_000;
@@ -87,6 +88,40 @@ export async function loadPreviewRuntimeStatus(
   const previewRenderable = Boolean(meta.preview_renderable ?? diag?.previewRenderable);
   const previewHonest = Boolean(meta.preview_honest ?? previewRenderable);
 
+  const diagRecord = diag as Record<string, unknown> | null;
+  const diagBilling =
+    diagRecord?.previewBilling && typeof diagRecord.previewBilling === "object"
+      ? (diagRecord.previewBilling as {
+          estimated_action_credits?: number;
+          charged_action_credits?: number | null;
+          charge_status?: string;
+        })
+      : null;
+  const billingFromDiag =
+    diagBilling ??
+    (diagRecord?.estimated_action_credits != null
+      ? {
+          estimated_action_credits: Number(diagRecord.estimated_action_credits),
+          charged_action_credits:
+            diagRecord.charged_action_credits != null
+              ? Number(diagRecord.charged_action_credits)
+              : null,
+          charge_status: String(diagRecord.charge_status ?? "none"),
+        }
+      : null);
+  const billing =
+    billingFromDiag ??
+    (await loadZipPreviewBillingForProject(projectId).catch(() => null));
+
+  const chargeStatus =
+    billing?.charge_status === "pending" ||
+    billing?.charge_status === "charged" ||
+    billing?.charge_status === "refunded" ||
+    billing?.charge_status === "cancelled" ||
+    billing?.charge_status === "none"
+      ? billing.charge_status
+      : null;
+
   return {
     previewRenderable,
     previewHonest,
@@ -104,6 +139,32 @@ export async function loadPreviewRuntimeStatus(
     artifactPath: jobRow?.artifact_path ?? (diag?.artifactPath as string | null) ?? null,
     blockedReason:
       (diag?.blockedReason as string | null) ?? (meta.preview_blocked_reason as string | null) ?? null,
+    errorCode: (() => {
+      const d = diag as Record<string, unknown> | null;
+      const fromDiag = d?.errorCode;
+      if (typeof fromDiag === "string") return fromDiag;
+      const bm =
+        diag && typeof diag === "object" && "previewBuildMeta" in diag
+          ? (diag as Record<string, unknown>).previewBuildMeta
+          : null;
+      if (bm && typeof bm === "object" && typeof (bm as { errorCode?: string }).errorCode === "string") {
+        return (bm as { errorCode: string }).errorCode;
+      }
+      return null;
+    })(),
+    userMessage: (() => {
+      const d = diag as Record<string, unknown> | null;
+      const fromDiag = d?.userMessage;
+      if (typeof fromDiag === "string") return fromDiag;
+      const bm =
+        diag && typeof diag === "object" && "previewBuildMeta" in diag
+          ? (diag as Record<string, unknown>).previewBuildMeta
+          : null;
+      if (bm && typeof bm === "object" && typeof (bm as { userMessage?: string }).userMessage === "string") {
+        return (bm as { userMessage: string }).userMessage;
+      }
+      return null;
+    })(),
     buildLogs:
       (typeof jobRow?.logs === "string" ? jobRow.logs : null) ??
       (typeof jobRow?.build_logs === "string" ? jobRow.build_logs : null) ??
@@ -150,5 +211,9 @@ export async function loadPreviewRuntimeStatus(
           : null;
       return meta?.packageRepair ?? null;
     })(),
+    estimatedActionCredits: billing?.estimated_action_credits ?? null,
+    chargedActionCredits: billing?.charged_action_credits ?? null,
+    creditsCharged: billing?.charge_status === "charged",
+    chargeStatus,
   };
 }

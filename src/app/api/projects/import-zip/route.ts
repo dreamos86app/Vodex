@@ -10,12 +10,15 @@ import {
   ZIP_IMPORT_BUCKET,
   ZIP_IMPORT_ALLOWED_MIMES,
   ZIP_IMPORT_MAX_BYTES,
+  ZIP_IMPORT_UPLOAD_LIMITS,
   buildZipImportStoragePath,
   formatImportStorageError,
   importStorageNotConfiguredUserMessage,
   importStorageSetupDetail,
   isStorageBucketMissingError,
 } from "@/lib/import/zip-storage";
+import { zipTooLargeErrorPayload } from "@/lib/import/zip-import-limits";
+import { previewZipBillingDiagnostics } from "@/lib/imports/zip-preview-billing";
 import {
   buildZipImportAppFileRows,
   ZIP_IMPORT_APP_FILE_INSERT_KEYS,
@@ -134,10 +137,7 @@ export async function POST(req: Request) {
   }
 
   if (file.size > MAX_UPLOAD_BYTES) {
-    return NextResponse.json(
-      { error: `ZIP too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB)` },
-      { status: 400 },
-    );
+    return NextResponse.json(zipTooLargeErrorPayload(), { status: 400 });
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
@@ -168,6 +168,7 @@ export async function POST(req: Request) {
     fileCount: extracted.files.length,
     frameworkId: extracted.validation.framework.id,
     frameworkLabel: extracted.validation.framework.label,
+    dependencyCount: extracted.validation.dependencies.dependencyCount,
   });
 
   const { files, validation, rejectedSecrets, rejectedPaths } = extracted;
@@ -373,6 +374,7 @@ export async function POST(req: Request) {
       writer: supabase,
       userId: user.id,
       projectId,
+      creditEstimate,
     });
   } catch (e) {
     console.error("[import-zip] preview build failed:", e);
@@ -399,7 +401,10 @@ export async function POST(req: Request) {
   }
   const publishReady = previewReady && diagnostics?.sourceIntegrityOk === true;
 
+  const billing = previewZipBillingDiagnostics(creditEstimate, reserve.ok ? "reserved" : "none");
+
   return NextResponse.json({
+    ...ZIP_IMPORT_UPLOAD_LIMITS,
     projectId,
     fileCount: files.length,
     scanStats: extracted.stats,
@@ -418,6 +423,7 @@ export async function POST(req: Request) {
     previewUrl: diagnostics?.previewUrl ?? null,
     diagnostics,
     jobId: previewBuild?.jobId ?? null,
+    previewBilling: billing,
     routes: validation.routes,
     warnings: [...validation.warnings, ...(diagnostics?.warnings ?? [])],
     rejectedSecrets,

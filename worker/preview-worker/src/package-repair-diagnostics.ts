@@ -25,6 +25,7 @@ export type PackageRepairDiagnostics = {
 };
 
 export const VITE_BINARY_MISSING_CODE = "VITE_BINARY_MISSING_AFTER_INSTALL";
+export const VITE_BUILD_OOM_CODE = "VITE_BUILD_OOM";
 
 export function truncateForDiagnostics(text: string, max = 12_000): string {
   if (text.length <= max) return text;

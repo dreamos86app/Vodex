@@ -10,8 +10,15 @@ import {
   assertViteBinaryPresent,
   type PackageRepairSummary,
 } from "../package-repair.js";
-import { VITE_BINARY_MISSING_CODE } from "../package-repair-diagnostics.js";
+import { VITE_BINARY_MISSING_CODE, VITE_BUILD_OOM_CODE } from "../package-repair-diagnostics.js";
 import { resolveNpmProjectLayout, packageJsonCandidates } from "../resolve-npm-root.js";
+import {
+  isOomOutput,
+  previewBuildEnv,
+  VITE_BUILD_OOM_USER_MESSAGE,
+  PREVIEW_WORKER_MEMORY_TOO_LOW,
+} from "../build-memory.js";
+import { config } from "../config.js";
 import { log } from "../logger.js";
 
 export type ViteBuildMeta = {
@@ -23,6 +30,10 @@ export type ViteBuildMeta = {
   packageJsonCandidates: string[];
   packageRepair: PackageRepairSummary;
   frameworkId: string;
+  nodeMaxOldSpaceMb: number;
+  nodeOptions: string;
+  errorCode?: string | null;
+  userMessage?: string | null;
 };
 
 function formatCmd(meta: { command: string; args: string[] }): string {
@@ -39,6 +50,13 @@ export async function buildVite(
 > {
   const legacy = detectLegacy(files);
   const pkgCandidates = packageJsonCandidates(files);
+  const buildEnv = previewBuildEnv();
+  const defaultNodeOptions =
+    buildEnv.NODE_OPTIONS ?? `--max-old-space-size=${config.nodeMaxOldSpaceMb}`;
+  const memoryMeta = {
+    nodeMaxOldSpaceMb: config.nodeMaxOldSpaceMb,
+    nodeOptions: defaultNodeOptions,
+  };
 
   log("info", "vite-builder: start", {
     frameworkId: framework.id,
@@ -78,6 +96,7 @@ export async function buildVite(
         base44ShimReady: legacy.base44,
       },
       frameworkId: framework.id,
+      ...memoryMeta,
     };
     return {
       ok: false,
@@ -134,6 +153,7 @@ export async function buildVite(
         packageJsonCandidates: pkgCandidates,
         packageRepair,
         frameworkId: framework.id,
+        ...memoryMeta,
       },
     };
   }
@@ -157,14 +177,23 @@ export async function buildVite(
         packageJsonCandidates: pkgCandidates,
         packageRepair,
         frameworkId: framework.id,
+        ...memoryMeta,
       },
     };
   }
 
   const buildScript = framework.scripts.build ? "build" : "build";
+  const nodeOptions = defaultNodeOptions;
+  logs += `[build-env] NODE_ENV=production NPM_CONFIG_PRODUCTION=false NODE_OPTIONS=${nodeOptions}\n`;
+  log("info", "vite-builder: starting build", {
+    nodeMaxOldSpaceMb: config.nodeMaxOldSpaceMb,
+    nodeOptions,
+    projectRoot,
+  });
+
   const build = await runViteBuild(projectRoot, framework.packageManager, buildScript);
   const buildCommand = formatCmd(build.meta);
-  logs += `[build] ${buildCommand}\n${build.logs}\n`;
+  logs += `[build] ${buildCommand} ${nodeOptions}\n${build.logs}\n`;
 
   const buildMeta: ViteBuildMeta = {
     installCommand,
@@ -175,19 +204,53 @@ export async function buildVite(
     packageJsonCandidates: pkgCandidates,
     packageRepair,
     frameworkId: framework.id,
+    nodeMaxOldSpaceMb: config.nodeMaxOldSpaceMb,
+    nodeOptions,
   };
 
   log("info", "vite-builder: build finished", {
     ok: build.ok,
     buildCommand,
+    nodeMaxOldSpaceMb: config.nodeMaxOldSpaceMb,
+    nodeOptions,
     blockedReason: build.ok ? null : build.logs.slice(0, 200),
   });
 
   if (!build.ok) {
+    if (isOomOutput(build.logs)) {
+      return {
+        ok: false,
+        logs,
+        blockedReason: "Vite build out of memory",
+        buildMeta: {
+          ...buildMeta,
+          errorCode: VITE_BUILD_OOM_CODE,
+          userMessage: VITE_BUILD_OOM_USER_MESSAGE,
+        },
+      };
+    }
+    if (build.logs.includes(PREVIEW_WORKER_MEMORY_TOO_LOW)) {
+      return {
+        ok: false,
+        logs,
+        blockedReason: PREVIEW_WORKER_MEMORY_TOO_LOW,
+        buildMeta: {
+          ...buildMeta,
+          errorCode: PREVIEW_WORKER_MEMORY_TOO_LOW,
+          userMessage:
+            "Preview worker container memory is lower than PREVIEW_NODE_MAX_OLD_SPACE_MB requires. Upgrade Railway memory.",
+        },
+      };
+    }
     const hint = /vite:\s*not found|sh:\s*1:\s*vite:/i.test(build.logs)
       ? VITE_BINARY_MISSING_CODE
       : "Vite build failed";
-    return { ok: false, logs, blockedReason: hint, buildMeta };
+    return {
+      ok: false,
+      logs,
+      blockedReason: hint,
+      buildMeta: { ...buildMeta, errorCode: hint },
+    };
   }
 
   const outKey = framework.id === "cra" ? "cra" : "vite";

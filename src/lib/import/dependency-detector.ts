@@ -1,6 +1,8 @@
 import type { ZipImportFile } from "@/lib/import/zip-file-validator";
 
 export type DependencySummary = {
+  /** Total keys in dependencies + devDependencies */
+  dependencyCount: number;
   production: string[];
   dev: string[];
   hasSupabase: boolean;
@@ -13,6 +15,7 @@ export type DependencySummary = {
 export function detectDependencies(files: ZipImportFile[]): DependencySummary {
   const pkg = files.find((f) => f.path === "package.json" || f.path.endsWith("/package.json"));
   const empty: DependencySummary = {
+    dependencyCount: 0,
     production: [],
     dev: [],
     hasSupabase: false,
@@ -29,8 +32,10 @@ export function detectDependencies(files: ZipImportFile[]): DependencySummary {
     };
     const prod = Object.keys(j.dependencies ?? {});
     const dev = Object.keys(j.devDependencies ?? {});
+    const dependencyCount = prod.length + dev.length;
     const all = [...prod, ...dev].map((d) => d.toLowerCase());
     return {
+      dependencyCount,
       production: prod.slice(0, 40),
       dev: dev.slice(0, 40),
       hasSupabase: all.some((d) => d.includes("supabase")),

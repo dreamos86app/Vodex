@@ -1,4 +1,5 @@
 import type { SupabaseAdminClient } from "@/lib/supabase/admin";
+import { ZIP_IMPORT_MAX_BYTES } from "@/lib/import/zip-import-limits";
 
 export type EnsureBucketResult =
   | { ok: true }
@@ -55,7 +56,7 @@ export async function ensurePrivateBucket(
     allowedMimeTypes?: string[];
   },
 ): Promise<EnsureBucketResult> {
-  const fileSizeLimit = options?.fileSizeLimit ?? 25 * 1024 * 1024;
+  const fileSizeLimit = options?.fileSizeLimit ?? ZIP_IMPORT_MAX_BYTES;
   const allowedMimeTypes = options?.allowedMimeTypes ?? [
     "application/zip",
     "application/x-zip-compressed",

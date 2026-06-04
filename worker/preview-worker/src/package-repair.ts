@@ -9,6 +9,7 @@ import {
   VITE_BINARY_MISSING_CODE,
   type PackageRepairDiagnostics,
 } from "./package-repair-diagnostics.js";
+import { ensureMemorySafeViteConfig } from "./vite-config-repair.js";
 import type { NpmProjectLayout } from "./resolve-npm-root.js";
 
 export type PackageRepairSummary = PackageRepairDiagnostics & {
@@ -203,23 +204,16 @@ export async function applyPackageRepair(
       projectRoot,
     };
 
-    const hasViteConfig = files.some((f) => /vite\.config\.(ts|js|mjs)$/i.test(norm(f.path)));
-    const viteConfigAtProject = path.join(projectRoot, "vite.config.js");
-    if ((summary.buildUsesVite || summary.viteInjected) && !hasViteConfig && usesReact(files)) {
-      await fs.writeFile(
-        viteConfigAtProject,
-        `import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-
-export default defineConfig({
-  plugins: [react()],
-});
-`,
-        "utf8",
-      );
-      summary.viteConfigCreated = true;
-      summary.repairChanged = true;
-      summary.repairs.push("Created minimal vite.config.js");
+    if (summary.buildUsesVite || summary.viteInjected) {
+      const viteCfg = await ensureMemorySafeViteConfig(projectRoot, files);
+      if (viteCfg.created) {
+        summary.viteConfigCreated = true;
+        summary.repairChanged = true;
+        summary.repairs.push("Created minimal vite.config.js (sourcemap off, esbuild minify)");
+      } else if (viteCfg.patched) {
+        summary.repairChanged = true;
+        summary.repairs.push("Patched vite.config build options for preview memory");
+      }
       summary.summary = summary.repairs.join("; ");
     }
 

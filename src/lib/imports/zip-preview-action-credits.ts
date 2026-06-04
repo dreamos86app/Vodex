@@ -5,6 +5,7 @@ import { assertActionCreditsAffordable } from "@/lib/action-credits/assert-actio
 import { chargeActionCredit } from "@/lib/action-credits/charge-action-credit";
 import { refundActionCredit } from "@/lib/action-credits/refund-action-credit";
 import { getPreviewCostMultiplier } from "@/lib/platform/platform-settings";
+import { patchLatestPreviewJobBilling, previewZipBillingDiagnostics } from "@/lib/imports/zip-preview-billing";
 
 export type ZipPreviewCreditTier = 1 | 2 | 3 | 4;
 
@@ -12,12 +13,24 @@ export type ZipPreviewCreditEstimate = {
   tier: ZipPreviewCreditTier;
   baseCredits: number;
   multiplier: number;
+  /** Tier base × platform multiplier (ZIP size only). */
+  sizeBaseCredits: number;
+  dependencyCount: number;
+  dependencySurchargeCredits: number;
   estimatedActionCredits: number;
   estimatedFiles: number;
   estimatedSizeMb: number;
   framework: string;
   frameworkLabel: string;
 };
+
+/** Extra Action Credits for large dependency graphs (additive, not multiplied). */
+export function dependencySurchargeCredits(dependencyCount: number): number {
+  if (dependencyCount > 400) return 100;
+  if (dependencyCount > 200) return 50;
+  if (dependencyCount > 100) return 25;
+  return 0;
+}
 
 const TIER_BASE: Record<ZipPreviewCreditTier, number> = {
   1: 10,
@@ -39,17 +52,24 @@ export function estimateZipPreviewCredits(input: {
   frameworkId: string;
   frameworkLabel?: string;
   multiplier?: number;
+  dependencyCount?: number;
 }): ZipPreviewCreditEstimate {
   const estimatedSizeMb = Math.max(0.01, input.sizeBytes / (1024 * 1024));
   const tier = tierForSizeMb(estimatedSizeMb);
   const baseCredits = TIER_BASE[tier];
   const multiplier = input.multiplier ?? 1;
-  const estimatedActionCredits = Math.ceil(baseCredits * multiplier);
+  const sizeBaseCredits = Math.ceil(baseCredits * multiplier);
+  const dependencyCount = Math.max(0, input.dependencyCount ?? 0);
+  const dependencySurcharge = dependencySurchargeCredits(dependencyCount);
+  const estimatedActionCredits = sizeBaseCredits + dependencySurcharge;
 
   return {
     tier,
     baseCredits,
     multiplier,
+    sizeBaseCredits,
+    dependencyCount,
+    dependencySurchargeCredits: dependencySurcharge,
     estimatedActionCredits,
     estimatedFiles: input.fileCount,
     estimatedSizeMb: Math.round(estimatedSizeMb * 10) / 10,
@@ -112,6 +132,9 @@ export async function reserveZipPreviewActionCredits(input: {
       metadata: {
         base_credits: input.estimate.baseCredits,
         multiplier: input.estimate.multiplier,
+        size_base_credits: input.estimate.sizeBaseCredits,
+        dependency_count: input.estimate.dependencyCount,
+        dependency_surcharge_credits: input.estimate.dependencySurchargeCredits,
       },
       updated_at: new Date().toISOString(),
     },
@@ -161,6 +184,12 @@ export async function captureZipPreviewActionCredits(input: {
     .update({ status: "charged", updated_at: new Date().toISOString() })
     .eq("operation_id", operationId);
 
+  await patchLatestPreviewJobBilling(
+    admin,
+    input.projectId,
+    previewZipBillingDiagnostics({ estimatedActionCredits: credits }, "charged", charge.charged),
+  );
+
   return { ok: true, charged: charge.charged };
 }
 
@@ -176,11 +205,12 @@ export async function refundZipPreviewActionCredits(input: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: hold } = await (admin as any)
     .from("zip_preview_action_holds")
-    .select("status")
+    .select("status, credits")
     .eq("operation_id", operationId)
     .maybeSingle();
 
   if (!hold) return { ok: true, refunded: 0 };
+  const holdCredits = Number(hold.credits) || 0;
   if (hold.status === "charged") {
     const refund = await refundActionCredit({
       ownerUserId: input.userId,
@@ -192,6 +222,11 @@ export async function refundZipPreviewActionCredits(input: {
       .from("zip_preview_action_holds")
       .update({ status: "refunded", updated_at: new Date().toISOString() })
       .eq("operation_id", operationId);
+    await patchLatestPreviewJobBilling(
+      admin,
+      input.projectId,
+      previewZipBillingDiagnostics({ estimatedActionCredits: holdCredits }, "refunded"),
+    );
     return { ok: refund.ok, refunded: refund.refunded };
   }
 
@@ -200,6 +235,14 @@ export async function refundZipPreviewActionCredits(input: {
       .from("zip_preview_action_holds")
       .update({ status: "cancelled", updated_at: new Date().toISOString() })
       .eq("operation_id", operationId);
+    await patchLatestPreviewJobBilling(
+      admin,
+      input.projectId,
+      previewZipBillingDiagnostics(
+        { estimatedActionCredits: holdCredits },
+        "cancelled",
+      ),
+    );
     return { ok: true, refunded: 0 };
   }
 

@@ -10,6 +10,10 @@ import type { ImportPreviewDiagnostics } from "@/lib/imports/import-diagnostics"
 import type { ZipImportFile } from "@/lib/import/zip-file-validator";
 import type { DetectedFrameworkId } from "@/lib/imports/framework-detector";
 import { loadPreviewWorkerStatus } from "@/lib/preview/preview-worker-status";
+import {
+  mergeBillingIntoDiagnostics,
+  type PreviewZipBillingDiagnostics,
+} from "@/lib/imports/zip-preview-billing";
 
 export function isServerlessHost(): boolean {
   return process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME != null;
@@ -31,6 +35,7 @@ export async function queuePreviewBuildJob(input: {
   projectId: string;
   files: ZipImportFile[];
   jobId?: string;
+  previewBilling?: PreviewZipBillingDiagnostics;
 }): Promise<{ diagnostics: ImportPreviewDiagnostics; jobId: string }> {
   const analysis = analyzeImportedProjectFiles(input.files);
   const jobId = input.jobId ?? crypto.randomUUID();
@@ -115,6 +120,13 @@ export async function queuePreviewBuildJob(input: {
     ],
   };
 
+  const diagnosticsWithBilling = input.previewBilling
+    ? (mergeBillingIntoDiagnostics(
+        diagnostics as unknown as Record<string, unknown>,
+        input.previewBilling,
+      ) as typeof diagnostics)
+    : diagnostics;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (input.admin as any).from("preview_build_jobs").insert({
     id: jobId,
@@ -125,7 +137,7 @@ export async function queuePreviewBuildJob(input: {
     build_strategy: "queued_worker",
     source_snapshot_path: snapshot.sourceSnapshotPath,
     runtime_mode: analysis.framework.isSsrNext ? "ssr_blocked" : "static_or_spa",
-    diagnostics,
+    diagnostics: diagnosticsWithBilling,
     preview_renderable: false,
     source_integrity_ok: false,
     created_at: now,

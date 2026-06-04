@@ -25,6 +25,10 @@ must("src/app/api/projects/import-zip/route.ts", "reserveZipPreviewActionCredits
 must("src/app/api/import/zip/preview/route.ts", "estimateZipPreviewCreditsWithPlatformMultiplier", "scan estimates credits");
 must("src/components/apps/zip-import-wizard.tsx", 'step === "confirm"', "wizard confirm step before import");
 must("src/components/apps/zip-import-wizard.tsx", "actionCreditBalance", "wizard shows credit balance");
+must("src/components/apps/zip-import-wizard.tsx", "Preview Build Summary", "wizard preview build summary");
+must("src/components/apps/zip-import-wizard.tsx", "Build Preview (", "wizard build preview CTA");
+must("src/components/apps/zip-import-wizard.tsx", "NOT charging Action Credits", "wizard not-charged notice");
+must("src/lib/import/zip-import-limits.ts", "ZIP_IMPORT_MAX_MB = 250", "250MB zip limit");
 must("src/lib/imports/preview-build-queue.ts", "loadPreviewWorkerStatus", "queue refuses offline worker");
 must("src/lib/publish/publish-readiness.ts", "preview_renderable", "publish gates on renderable");
 

@@ -40,15 +40,60 @@ export async function captureZipPreviewCredits(projectId: string, ownerId: strin
       .from("zip_preview_action_holds")
       .update({ status: "charged", updated_at: new Date().toISOString() })
       .eq("operation_id", op);
+    await patchJobBilling(projectId, {
+      estimated_action_credits: credits,
+      charged_action_credits: credits,
+      charge_status: "charged",
+    });
     log("info", "zip preview credits captured", { projectId, credits });
   }
 }
 
 export async function cancelZipPreviewHold(projectId: string): Promise<void> {
   const op = operationId(projectId);
+  const { data: hold } = await supabase
+    .from("zip_preview_action_holds")
+    .select("credits")
+    .eq("operation_id", op)
+    .maybeSingle();
   await supabase
     .from("zip_preview_action_holds")
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("operation_id", op)
     .eq("status", "reserved");
+  const credits = Number(hold?.credits) || 0;
+  await patchJobBilling(projectId, {
+    estimated_action_credits: credits,
+    charged_action_credits: null,
+    charge_status: "cancelled",
+  });
+}
+
+async function patchJobBilling(
+  projectId: string,
+  billing: {
+    estimated_action_credits: number;
+    charged_action_credits: number | null;
+    charge_status: string;
+  },
+): Promise<void> {
+  const { data: job } = await supabase
+    .from("preview_build_jobs")
+    .select("id, diagnostics")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!job?.id) return;
+  const prev =
+    job.diagnostics && typeof job.diagnostics === "object" && !Array.isArray(job.diagnostics)
+      ? (job.diagnostics as Record<string, unknown>)
+      : {};
+  await supabase
+    .from("preview_build_jobs")
+    .update({
+      diagnostics: { ...prev, ...billing, previewBilling: billing },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", job.id);
 }

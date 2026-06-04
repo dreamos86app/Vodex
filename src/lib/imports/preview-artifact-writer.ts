@@ -7,7 +7,9 @@ import { ensurePrivateBucket } from "@/lib/supabase/ensure-storage-bucket";
 
 export const PREVIEW_ARTIFACTS_BUCKET = "preview-artifacts";
 
-const MAX_ARTIFACT_BYTES = 25 * 1024 * 1024;
+import { ZIP_IMPORT_MAX_BYTES } from "@/lib/import/zip-import-limits";
+
+const MAX_ARTIFACT_BYTES = ZIP_IMPORT_MAX_BYTES;
 
 async function walkDir(dir: string, base = dir): Promise<Array<{ rel: string; abs: string }>> {
   const out: Array<{ rel: string; abs: string }> = [];

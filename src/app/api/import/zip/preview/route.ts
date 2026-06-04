@@ -4,10 +4,13 @@ import { extractAndAnalyzeZip } from "@/lib/import/zip-import-service";
 import { estimateZipPreviewCreditsWithPlatformMultiplier } from "@/lib/imports/zip-preview-action-credits";
 import { getActionCreditAvailability } from "@/lib/action-credits/get-action-credit-availability";
 import { loadPreviewWorkerStatus } from "@/lib/preview/preview-worker-status";
+import {
+  ZIP_IMPORT_MAX_BYTES,
+  ZIP_IMPORT_UPLOAD_LIMITS,
+  zipTooLargeErrorPayload,
+} from "@/lib/import/zip-import-limits";
 
 export const runtime = "nodejs";
-
-const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
 
 /** POST — analyze ZIP without creating a project (review step). */
 export async function POST(req: Request) {
@@ -33,8 +36,8 @@ export async function POST(req: Request) {
   if (!file.name.toLowerCase().endsWith(".zip")) {
     return NextResponse.json({ error: "Only .zip archives are supported" }, { status: 400 });
   }
-  if (file.size > MAX_PREVIEW_BYTES) {
-    return NextResponse.json({ error: "ZIP too large for preview scan" }, { status: 400 });
+  if (file.size > ZIP_IMPORT_MAX_BYTES) {
+    return NextResponse.json(zipTooLargeErrorPayload(), { status: 400 });
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
@@ -49,6 +52,7 @@ export async function POST(req: Request) {
     fileCount: extracted.files.length,
     frameworkId: validation.framework.id,
     frameworkLabel: validation.framework.label,
+    dependencyCount: validation.dependencies.dependencyCount,
   });
   const worker = await loadPreviewWorkerStatus();
   const actionCredits = await getActionCreditAvailability(user.id, {
@@ -58,6 +62,7 @@ export async function POST(req: Request) {
   const actionCreditsSufficient = actionCredits.totalAvailable >= actionCreditsRequired;
 
   return NextResponse.json({
+    ...ZIP_IMPORT_UPLOAD_LIMITS,
     fileCount: extracted.files.length,
     scanStats: extracted.stats,
     estimatedAiCostUsd: 0,
