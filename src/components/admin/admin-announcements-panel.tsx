@@ -258,9 +258,11 @@ export function AdminAnnouncementsPanel() {
         Publish announcement
       </button>
 
-      {announcements.length > 0 ? (
+      {announcements.filter((a) => a.is_active).length > 0 ? (
         <ul className="space-y-2 border-t border-border pt-4">
-          {announcements.map((a) => (
+          {announcements
+            .filter((a) => a.is_active)
+            .map((a) => (
             <li
               key={a.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-background/60 px-3 py-2 text-[12px]"
@@ -274,14 +276,18 @@ export function AdminAnnouncementsPanel() {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void toggleAnnouncement(a.id, !a.is_active)}
-                className="rounded-md border border-border px-2 py-1 text-[11px]"
+                onClick={() => void toggleAnnouncement(a.id, false)}
+                className="rounded-md border border-border px-2 py-1 text-[11px] text-destructive"
               >
-                {a.is_active ? "Deactivate" : "Activate"}
+                Deactivate
               </button>
             </li>
           ))}
         </ul>
+      ) : announcements.length > 0 ? (
+        <p className="border-t border-border pt-4 text-[11px] text-muted-foreground">
+          No active alerts. Publish a new one above to show the top bar banner.
+        </p>
       ) : null}
     </div>
   );

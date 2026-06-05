@@ -11,6 +11,7 @@ const bodySchema = z.object({
 });
 
 import { planAllowsAndroidWrap } from "@/lib/mobile/entitlements";
+import { assertMobileReadinessGate } from "@/lib/mobile/readiness-gate";
 
 function planAllowsAndroid(planId: string | null | undefined): boolean {
   return planAllowsAndroidWrap(planId);
@@ -90,6 +91,21 @@ export async function POST(
       },
       { status: 403 },
     );
+  }
+
+  if (kind === "android_apk" || kind === "android_aab") {
+    const gate = await assertMobileReadinessGate(supabase, projectId, user.id);
+    if (!gate.ok) {
+      return NextResponse.json(
+        {
+          error: gate.state.message,
+          code: gate.state.code,
+          locked: true,
+          criticalCount: gate.state.criticalCount,
+        },
+        { status: gate.status },
+      );
+    }
   }
 
   if (kind === "web_deploy") {

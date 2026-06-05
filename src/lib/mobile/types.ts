@@ -46,6 +46,8 @@ export type MobileAppConfig = {
   store_draft: Record<string, unknown>;
   icon_url: string | null;
   splash_url: string | null;
+  /** Splash display time in ms (Capacitor / TWA). */
+  splash_duration_ms?: number | null;
   readiness_android: number | null;
   readiness_ios: number | null;
   readiness_store: number | null;

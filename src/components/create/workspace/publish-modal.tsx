@@ -21,6 +21,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PlaceholderRepairCard, type PlaceholderFindingUi } from "@/components/publish/placeholder-repair-card";
+import { PublishSuccessPanel } from "@/components/publish/publish-success-panel";
 import { fetchDedupe, getCached, invalidateCache } from "@/lib/cache/fetch-dedupe";
 import { toast } from "@/lib/toast";
 
@@ -112,6 +113,9 @@ export function PublishModal({
   const localRef = React.useRef(local);
   localRef.current = local;
   const [mobilePlatform, setMobilePlatform] = React.useState<"ios" | "android">("android");
+  const [publishSuccessUrl, setPublishSuccessUrl] = React.useState<string | null>(null);
+  const [mobileGatePassed, setMobileGatePassed] = React.useState(false);
+  const [mobileScanning, setMobileScanning] = React.useState(false);
 
   React.useEffect(() => {
     if (open && initialDraft) setLocal(initialDraft);
@@ -122,6 +126,8 @@ export function PublishModal({
       setPublishInfo(null);
       setReadiness(null);
       setLastWrapJob(null);
+      setPublishSuccessUrl(null);
+      setMobileGatePassed(false);
       return;
     }
     let cancelled = false;
@@ -225,9 +231,13 @@ export function PublishModal({
       const next = (await verifyRes.json()) as PublishApiPayload;
       setPhase("finalizing");
       await refreshPublishAfterAllocate(next);
-      setPhase("published", { url: next.publicWebUrl ?? undefined });
-      toast.success("Live web URL is ready on Vodex.");
-      onClose();
+      const liveUrl = next.publicWebUrl ?? null;
+      setPhase("published", { url: liveUrl ?? undefined });
+      if (liveUrl) {
+        setPublishSuccessUrl(liveUrl);
+        setTab("web");
+      }
+      toast.success("Your app is live — share the link below.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Publish failed";
       setPublishError(msg);
@@ -303,6 +313,37 @@ export function PublishModal({
         : !readiness?.buildCompleted
           ? "Finish a successful build first"
           : "Complete build requirements to publish");
+
+  async function runMobileEligibilityScan() {
+    if (!projectId) return;
+    setMobileScanning(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/mobile/readiness`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      const json = (await res.json()) as { gatePassed?: boolean; blockers?: string[]; error?: string };
+      if (!res.ok) {
+        toast.error(json.error ?? "Scan failed");
+        return;
+      }
+      setMobileGatePassed(Boolean(json.gatePassed));
+      if (json.gatePassed) {
+        toast.success("Mobile eligibility passed");
+      } else {
+        toast.error(
+          json.blockers?.length
+            ? `Fix blockers: ${json.blockers.slice(0, 3).join(", ")}`
+            : "Open Mobile App tab to fix blockers",
+        );
+      }
+      refreshReadiness();
+    } finally {
+      setMobileScanning(false);
+    }
+  }
 
   function refreshReadiness() {
     if (!projectId) return;
@@ -482,6 +523,16 @@ export function PublishModal({
 
           {tab === "web" && (
             <div className="space-y-3">
+              {publishSuccessUrl ? (
+                <PublishSuccessPanel
+                  appName={readiness?.appName ?? "Your app"}
+                  publicUrl={publishSuccessUrl}
+                  customDomainHint={
+                    customAllowed ? undefined : "Upgrade to connect a custom domain."
+                  }
+                  onClose={() => setPublishSuccessUrl(null)}
+                />
+              ) : null}
               <div className="rounded-2xl bg-surface/60 p-4 ring-1 ring-border/80">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Live app URL</p>
                 <p className="mt-2 text-[13px] text-muted-foreground">
@@ -585,6 +636,21 @@ export function PublishModal({
 
           {tab === "mobile" && (
             <div className="space-y-3">
+              {!getEntitlements(planId).canUseMobileWrapping ? (
+                <div className="rounded-xl border border-border bg-muted/30 px-3 py-3 text-center">
+                  <Lock className="mx-auto size-6 text-muted-foreground" />
+                  <p className="mt-2 text-[13px] font-semibold text-foreground">Mobile packaging requires Pro+</p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    You can preview the checklist, but APK/AAB and store builds unlock on a paid plan.
+                  </p>
+                  <Link
+                    href="/pricing"
+                    className="mt-3 inline-flex rounded-lg bg-accent px-4 py-2 text-[12px] font-semibold text-white"
+                  >
+                    View plans
+                  </Link>
+                </div>
+              ) : null}
               <div className="flex items-start gap-2 rounded-xl bg-violet-500/10 px-3 py-2 text-[12px] text-violet-950 dark:text-violet-100 ring-1 ring-violet-500/20">
                 <Smartphone className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
                 <div>
@@ -596,6 +662,38 @@ export function PublishModal({
                 </div>
               </div>
 
+              <div className="rounded-2xl bg-background/80 p-4 ring-1 ring-border/80">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Step 1 · Eligibility scan
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={!projectId || mobileScanning}
+                    onClick={() => void runMobileEligibilityScan()}
+                  >
+                    {mobileScanning ? <Loader2 className="size-3.5 animate-spin" /> : "Run full app scan"}
+                  </Button>
+                </div>
+                {!mobileGatePassed ? (
+                  <p className="mt-2 text-[11px] text-amber-800 dark:text-amber-200">
+                    Run the scan and pass all blockers before Android / iOS packaging unlocks.
+                  </p>
+                ) : (
+                  <p className="mt-2 flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="size-3.5" /> Eligible for packaging
+                  </p>
+                )}
+              </div>
+
+              <div
+                className={cn(
+                  "space-y-3",
+                  !mobileGatePassed && "pointer-events-none select-none opacity-45",
+                )}
+              >
               <div className="rounded-2xl bg-background/80 p-4 ring-1 ring-border/80">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ship checklist</p>
                 <ol className="mt-3 list-none space-y-2.5 text-[12px] text-muted-foreground">
@@ -647,39 +745,6 @@ export function PublishModal({
                 </button>
               </div>
 
-              {mobilePlatform === "ios" ? (
-                <div className="space-y-3">
-                  <div className="rounded-2xl bg-surface/60 p-4 ring-1 ring-border/80">
-                    <p className="text-[13px] font-semibold text-foreground">App Store packaging</p>
-                    <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-                      Run the readiness scan, then queue an iOS export. Wrapper mode opens a guided Capacitor setup form.
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      type="button"
-                      variant={iosLocked ? "secondary" : "accent"}
-                      className="w-full"
-                      disabled={iosLocked || !projectId || wrapBusy !== null}
-                      onClick={() => toast.info("iOS export queued — check Mobile App dashboard for status.")}
-                    >
-                      {iosLocked ? (
-                        <span className="flex items-center gap-1">
-                          <Lock className="size-3.5" /> iOS build — Pro required
-                        </span>
-                      ) : (
-                        "Build iOS package"
-                      )}
-                    </Button>
-                    <Button type="button" variant="secondary" className="w-full" disabled={iosLocked || !projectId}>
-                      Open wrapper setup (Capacitor)
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              {mobilePlatform === "android" ? (
-                <>
               <div className="rounded-2xl bg-surface/50 p-4 ring-1 ring-border/80">
                 <p className="text-[12px] font-semibold text-foreground">App Store Readiness Scan</p>
                 <p className="mt-1 text-[11.5px] text-muted-foreground">
@@ -710,42 +775,69 @@ export function PublishModal({
                 </ul>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2">
                 <Button
                   type="button"
-                  variant={androidLocked ? "secondary" : "accent"}
-                  className="flex-1"
-                  disabled={androidLocked || !projectId || wrapBusy !== null}
-                  onClick={() => void requestWrap("android_apk")}
+                  variant={androidLocked || mobilePlatform === "ios" ? "secondary" : "accent"}
+                  className="w-full"
+                  disabled={
+                    androidLocked ||
+                    mobilePlatform === "ios" ||
+                    !projectId ||
+                    wrapBusy !== null ||
+                    !mobileGatePassed
+                  }
+                  onClick={() => {
+                    if (mobilePlatform === "android") void requestWrap("android_aab");
+                    else toast.info("Open Mobile App in the builder for iOS wrapped exports.");
+                  }}
                 >
                   {androidLocked ? (
                     <span className="flex items-center gap-1">
-                      <Lock className="size-3.5" /> Android APK — upgrade
+                      <Lock className="size-3.5" /> Upgrade for store builds
                     </span>
-                  ) : wrapBusy === "android_apk" ? (
+                  ) : wrapBusy ? (
                     <Loader2 className="size-4 animate-spin" />
+                  ) : mobilePlatform === "android" ? (
+                    "Build Android AAB (wrapped)"
                   ) : (
-                    "Download APK (no wrapper)"
+                    "Build iOS package (wrapped)"
                   )}
                 </Button>
-                <Button
-                  type="button"
-                  variant={androidLocked ? "secondary" : "accent"}
-                  className="flex-1"
-                  disabled={androidLocked || !projectId || wrapBusy !== null}
-                  onClick={() => void requestWrap("android_aab")}
-                >
-                  {androidLocked ? (
-                    <span className="flex items-center gap-1">
-                      <Lock className="size-3.5" /> Android AAB — upgrade
-                    </span>
-                  ) : wrapBusy === "android_aab" ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    "Download AAB (no wrapper)"
-                  )}
-                </Button>
+                {projectId ? (
+                  <Button type="button" variant="secondary" className="w-full" asChild>
+                    <Link href={`/apps/${projectId}/builder?tab=mobile`}>Open Mobile App setup</Link>
+                  </Button>
+                ) : null}
               </div>
+
+              <details className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-3 py-2">
+                <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+                  Advanced: raw APK/AAB without wrapper (developer export)
+                </summary>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 text-[11px]"
+                    disabled={androidLocked || !projectId || wrapBusy !== null || !mobileGatePassed}
+                    onClick={() => void requestWrap("android_apk")}
+                  >
+                    {wrapBusy === "android_apk" ? <Loader2 className="size-3.5 animate-spin" /> : "APK (no wrapper)"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 text-[11px]"
+                    disabled={androidLocked || !projectId || wrapBusy !== null || !mobileGatePassed}
+                    onClick={() => void requestWrap("android_aab")}
+                  >
+                    {wrapBusy === "android_aab" ? <Loader2 className="size-3.5 animate-spin" /> : "AAB (no wrapper)"}
+                  </Button>
+                </div>
+              </details>
 
               {androidLocked && (
                 <Link
@@ -764,12 +856,7 @@ export function PublishModal({
                   )}
                 </div>
               )}
-
-              <p className="text-[11px] text-muted-foreground">
-                Switch to the iOS tab above for the App Store roadmap — Android jobs queue from this section.
-              </p>
-                </>
-              ) : null}
+              </div>
             </div>
           )}
 

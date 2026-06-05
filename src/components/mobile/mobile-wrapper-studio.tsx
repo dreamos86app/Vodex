@@ -27,8 +27,26 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { mobileEntitlementsForPlan } from "@/lib/mobile/entitlements";
 import type { MobileAppConfig, MobilePlatform, ReadinessItem } from "@/lib/mobile/types";
-import { validateAndroidPackageId, validateIosBundleId } from "@/lib/mobile/package-validation";
+import {
+  migrateLegacyPackageId,
+  validateAndroidPackageId,
+  validateIosBundleId,
+} from "@/lib/mobile/package-validation";
 import { MOBILE_SECRET_KEYS } from "@/lib/mobile/secrets";
+import {
+  APP_STORE_SETUP_STEPS,
+  PLAY_CONSOLE_SETUP_STEPS,
+  PLAY_SHA_HELP,
+  REVENUECAT_IMPORTANCE,
+} from "@/lib/mobile/store-setup-copy";
+import { StoreOnboardingWizard } from "@/components/mobile/store-onboarding-wizard";
+import type { StoreOnboardingProgress } from "@/lib/mobile/store-onboarding-steps";
+import {
+  exportShaRegistryJson,
+  mergeShaRegistry,
+  readShaRegistry,
+  shaRegistryToStoreDraft,
+} from "@/lib/mobile/sha-key-registry";
 
 type Props = {
   projectId: string;
@@ -133,6 +151,14 @@ export function MobileWrapperStudio({
   }>({ android: null, ios: null, store: null, items: [] });
   const [jobs, setJobs] = React.useState<BuildJob[]>([]);
   const [wrapperType, setWrapperType] = React.useState<"capacitor" | "twa">("capacitor");
+  const [gatePassed, setGatePassed] = React.useState(false);
+  const [sha256Input, setSha256Input] = React.useState("");
+  const [sha1Input, setSha1Input] = React.useState("");
+  const [storeProgress, setStoreProgress] = React.useState<StoreOnboardingProgress>({
+    google_play: {},
+    apple_app_store: {},
+  });
+  const [engineScore, setEngineScore] = React.useState<number | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -144,12 +170,51 @@ export function MobileWrapperStudio({
       const cfgJson = (await cfgRes.json()) as { config?: Partial<MobileAppConfig> };
       const jobsJson = (await jobsRes.json()) as { jobs?: BuildJob[] };
       if (cfgJson.config) {
-        setConfig(cfgJson.config);
-        setWrapperType(cfgJson.config.wrapper_type ?? "capacitor");
+        const raw = cfgJson.config;
+        const appLabel = raw.app_name ?? projectName;
+        const migrated: Partial<MobileAppConfig> = {
+          ...raw,
+          package_id: migrateLegacyPackageId(raw.package_id, appLabel),
+          bundle_id: migrateLegacyPackageId(raw.bundle_id ?? raw.package_id, appLabel),
+        };
+        if (
+          migrated.package_id !== raw.package_id ||
+          migrated.bundle_id !== raw.bundle_id
+        ) {
+          void fetch(`/api/projects/${projectId}/mobile/config`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              package_id: migrated.package_id,
+              bundle_id: migrated.bundle_id,
+            }),
+            credentials: "include",
+          });
+        }
+        setConfig(migrated);
+        setWrapperType(migrated.wrapper_type ?? "capacitor");
+        const meta =
+          migrated.meta && typeof migrated.meta === "object"
+            ? (migrated.meta as Record<string, unknown>)
+            : {};
+        setGatePassed(Boolean(meta.readiness_gate_passed_at));
+        const draft =
+          migrated.store_draft && typeof migrated.store_draft === "object"
+            ? (migrated.store_draft as Record<string, unknown>)
+            : {};
+        const sop = draft.store_onboarding_progress;
+        if (sop && typeof sop === "object") {
+          setStoreProgress(sop as StoreOnboardingProgress);
+        }
+        const registry = readShaRegistry(draft);
+        setSha256Input(
+          registry.sha256.map((e) => `${e.label}:${e.fingerprint}`).join("\n"),
+        );
+        setSha1Input(registry.sha1.map((e) => `${e.label}:${e.fingerprint}`).join("\n"));
         setReadiness({
-          android: cfgJson.config.readiness_android ?? null,
-          ios: cfgJson.config.readiness_ios ?? null,
-          store: cfgJson.config.readiness_store ?? null,
+          android: migrated.readiness_android ?? null,
+          ios: migrated.readiness_ios ?? null,
+          store: migrated.readiness_store ?? null,
           items: [],
         });
       }
@@ -194,27 +259,64 @@ export function MobileWrapperStudio({
         credentials: "include",
       });
       const json = (await res.json()) as {
-        scores?: { android: number; ios: number; store: number };
-        results?: Array<{ platform: string; score: number; items: ReadinessItem[] }>;
+        scores?: { android: number; ios: number; store: number; general?: number };
+        report?: {
+          critical: Array<{ id: string; label: string; detail: string; platform?: string }>;
+          warnings?: Array<{ id: string; label: string; detail: string; platform?: string }>;
+          recommendations?: Array<{ id: string; label: string; detail: string; platform?: string }>;
+          eligibility?: { scores?: { android: number; ios: number; store: number } };
+        };
+        critical?: Array<{ label: string; detail: string; platform?: string }>;
+        warnings?: Array<{ label: string; detail: string }>;
         actionCreditsCharged?: number;
+        gatePassed?: boolean;
+        blockers?: string[];
+        score?: number;
+        high?: Array<{ id?: string; label: string; detail: string; platform?: string }>;
+        medium?: Array<{ id?: string; label: string; detail: string; platform?: string }>;
+        low?: Array<{ id?: string; label: string; detail: string; platform?: string }>;
         error?: string;
       };
       if (!res.ok) {
         toast.error(json.error ?? "Scan failed");
         return;
       }
-      const allItems = (json.results ?? []).flatMap((r) => r.items);
+      const mapFinding = (
+        f: { id?: string; label: string; detail: string; platform?: string },
+        status: ReadinessItem["status"],
+      ) => ({
+        id: f.id ?? f.label,
+        label: f.label,
+        detail: f.detail,
+        status,
+        platform: (f.platform ?? "general") as ReadinessItem["platform"],
+      });
+      const allItems: ReadinessItem[] = [
+        ...(json.critical ?? json.report?.critical ?? []).map((f) => mapFinding(f, "missing")),
+        ...(json.high ?? []).map((f) => mapFinding(f, "warning")),
+        ...(json.medium ?? []).map((f) => mapFinding(f, "warning")),
+        ...(json.low ?? []).map((f) => mapFinding(f, "pass")),
+        ...(json.report?.warnings ?? []).map((f) => mapFinding(f, "warning")),
+        ...(json.report?.recommendations ?? []).map((f) => mapFinding(f, "pass")),
+      ];
+      const eligScores = json.report?.eligibility?.scores;
       setReadiness({
-        android: json.scores?.android ?? null,
-        ios: json.scores?.ios ?? null,
-        store: json.scores?.store ?? null,
+        android: eligScores?.android ?? json.scores?.android ?? null,
+        ios: eligScores?.ios ?? json.scores?.ios ?? null,
+        store: eligScores?.store ?? json.scores?.store ?? null,
         items: allItems,
       });
-      toast.success(
-        json.actionCreditsCharged === 0
-          ? "Readiness scan complete — no Action Credits used"
-          : "Readiness scan complete",
-      );
+      setEngineScore(typeof json.score === "number" ? json.score : null);
+      setGatePassed(Boolean(json.gatePassed));
+      if (json.gatePassed) {
+        toast.success("Eligibility check passed — mobile setup unlocked");
+      } else {
+        toast.error(
+          json.blockers?.length
+            ? `Fix ${json.blockers.length} blocker(s) before packaging`
+            : "Readiness scan found blockers — review results below",
+        );
+      }
     } finally {
       setScanning(false);
     }
@@ -309,7 +411,10 @@ export function MobileWrapperStudio({
   const bundleValid = validateIosBundleId(config.bundle_id ?? config.package_id);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gradient-to-b from-[#f4f7ff] to-background">
+    <div
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-gradient-to-b from-[#f4f7ff] to-background"
+      data-testid="mobile-wrapper-studio"
+    >
       <div className="shrink-0 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -365,13 +470,98 @@ export function MobileWrapperStudio({
           </div>
         )}
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <Section title="Step 1 · Store eligibility check (required)">
+          <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
+            We scan every script, route, and UI pattern against Play Store and App Store rules. Until this
+            passes, packaging and store fields stay locked.
+          </p>
+          {!gatePassed ? (
+            <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-950 dark:text-amber-100">
+              Complete the scan and fix all blockers to unlock Android / iPhone setup.
+            </div>
+          ) : (
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-900 dark:text-emerald-100">
+              <CheckCircle2 className="size-4 shrink-0" />
+              Eligibility check passed — you can configure packaging below.
+            </div>
+          )}
+          {readiness.items.length > 0 && (
+            <ul className="mb-3 max-h-48 space-y-1.5 overflow-y-auto">
+              {readiness.items.slice(0, 20).map((item) => (
+                <ItemRow key={`${item.platform}-${item.id}`} item={item} />
+              ))}
+            </ul>
+          )}
+          {engineScore != null ? (
+            <p className="mb-2 text-[11px] font-medium text-foreground">Readiness score: {engineScore}/100</p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`/api/projects/${projectId}/mobile/readiness?format=json`}
+              className="text-[11px] font-semibold text-accent hover:underline"
+              download
+            >
+              Download JSON
+            </a>
+            <a
+              href={`/api/projects/${projectId}/mobile/readiness?format=html`}
+              className="text-[11px] font-semibold text-accent hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Download HTML
+            </a>
+            <a
+              href={`/api/projects/${projectId}/mobile/readiness?format=pdf`}
+              className="text-[11px] font-semibold text-accent hover:underline"
+              download
+            >
+              Download PDF
+            </a>
+          </div>
+        </Section>
+
+        {gatePassed ? (
+          <div className="mb-4 grid gap-4 lg:grid-cols-2">
+            <StoreOnboardingWizard
+              platform="google_play"
+              progress={storeProgress}
+              gatePassed={gatePassed}
+              onProgressChange={(next) => {
+                setStoreProgress(next);
+                void saveConfig({
+                  store_draft: {
+                    ...(typeof config.store_draft === "object" ? config.store_draft : {}),
+                    store_onboarding_progress: next,
+                  },
+                });
+              }}
+            />
+            <StoreOnboardingWizard
+              platform="apple_app_store"
+              progress={storeProgress}
+              gatePassed={gatePassed}
+              onProgressChange={(next) => {
+                setStoreProgress(next);
+                void saveConfig({
+                  store_draft: {
+                    ...(typeof config.store_draft === "object" ? config.store_draft : {}),
+                    store_onboarding_progress: next,
+                  },
+                });
+              }}
+            />
+          </div>
+        ) : null}
+
+        <div className={cn("mb-4 grid grid-cols-3 gap-2", !gatePassed && "opacity-50")}>
           <ReadinessMeter label="Android" score={readiness.android} />
           <ReadinessMeter label="iPhone" score={readiness.ios} />
           <ReadinessMeter label="Store prep" score={readiness.store} />
         </div>
 
-        <Section title="1 · Choose platform">
+        <div className={cn(!gatePassed && "pointer-events-none select-none opacity-40")}>
+        <Section title="2 · Choose platform">
           <div className="grid gap-2 sm:grid-cols-3">
             {(
               [
@@ -420,7 +610,7 @@ export function MobileWrapperStudio({
           />
         </Section>
 
-        <Section title="2 · App identity">
+        <Section title="3 · App identity">
           <Field label="App name" value={config.app_name ?? ""} onChange={(v) => setConfig((c) => ({ ...c, app_name: v }))} onBlur={() => void saveConfig({ app_name: config.app_name })} />
           <Field label="Short name" value={config.short_name ?? ""} onChange={(v) => setConfig((c) => ({ ...c, short_name: v }))} onBlur={() => void saveConfig({ short_name: config.short_name })} hint="Home screen label (12 chars max)" />
           <Field label="Description" value={config.app_description ?? ""} onChange={(v) => setConfig((c) => ({ ...c, app_description: v }))} onBlur={() => void saveConfig({ app_description: config.app_description })} multiline />
@@ -449,7 +639,7 @@ export function MobileWrapperStudio({
           {saving ? <p className="text-[10px] text-muted-foreground">Saving…</p> : null}
         </Section>
 
-        <Section title="3 · Assets">
+        <Section title="4 · Assets & splash">
           <button
             type="button"
             className="mb-2 text-[11px] font-semibold text-accent hover:underline"
@@ -464,12 +654,37 @@ export function MobileWrapperStudio({
             Sync icon from app
           </button>
           <p className="text-[11px] text-muted-foreground">
-            Icon: {config.icon_url ? "Ready" : "Missing — sync or upload in Advanced"}
+            Icon: {config.icon_url ? "Ready" : "Missing — add a public image URL below"}
           </p>
+          <Field
+            label="Splash screen image URL"
+            value={config.splash_url ?? ""}
+            onChange={(v) => setConfig((c) => ({ ...c, splash_url: v || null }))}
+            onBlur={() => void saveConfig({ splash_url: config.splash_url ?? null })}
+            hint="PNG/JPG recommended · 2732×2732 max · used on launch"
+          />
+          <label className="mb-2 block">
+            <span className="text-[11px] font-medium text-foreground">
+              Splash duration ({config.splash_duration_ms ?? 2000} ms)
+            </span>
+            <input
+              type="range"
+              min={500}
+              max={8000}
+              step={100}
+              value={config.splash_duration_ms ?? 2000}
+              onChange={(e) =>
+                setConfig((c) => ({ ...c, splash_duration_ms: parseInt(e.target.value, 10) }))
+              }
+              onMouseUp={() => void saveConfig({ splash_duration_ms: config.splash_duration_ms ?? 2000 })}
+              onTouchEnd={() => void saveConfig({ splash_duration_ms: config.splash_duration_ms ?? 2000 })}
+              className="mt-1 w-full"
+            />
+          </label>
           <HelpButton label="Help me prepare store icons" onHelp={() => onAskForHelp("Explain what icon sizes I need for Google Play and the App Store for my app.")} />
         </Section>
 
-        <Section title="4 · Permissions">
+        <Section title="5 · Permissions">
           <div className="space-y-2">
             {PERMISSIONS.map(({ key, label, icon: Icon, why }) => (
               <label key={key} className="flex cursor-pointer items-start gap-3 rounded-lg bg-white/80 px-3 py-2 ring-1 ring-border/60">
@@ -495,8 +710,8 @@ export function MobileWrapperStudio({
           </div>
         </Section>
 
-        {readiness.items.length > 0 && (
-          <Section title="5 · Readiness results">
+        {readiness.items.length > 0 && gatePassed && (
+          <Section title="6 · Latest scan details">
             <ul className="max-h-64 space-y-1.5 overflow-y-auto">
               {readiness.items.slice(0, 24).map((item) => (
                 <ItemRow key={`${item.platform}-${item.id}`} item={item} />
@@ -506,7 +721,7 @@ export function MobileWrapperStudio({
           </Section>
         )}
 
-        <Section title="6 · Build center">
+        <Section title="7 · Build center">
           <div className="flex flex-wrap gap-2">
             <BuildBtn
               label="Store-ready project"
@@ -570,6 +785,92 @@ export function MobileWrapperStudio({
           </button>
           {advancedOpen && (
             <div className="space-y-3 border-t border-border/60 px-4 pb-4 pt-3">
+              <p className="text-[11px] leading-relaxed text-muted-foreground">{REVENUECAT_IMPORTANCE}</p>
+              <div>
+                <p className="text-[11px] font-semibold text-foreground">Google Play setup</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-[10px] text-muted-foreground">
+                  {PLAY_CONSOLE_SETUP_STEPS.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ol>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-foreground">App Store setup</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-[10px] text-muted-foreground">
+                  {APP_STORE_SETUP_STEPS.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ol>
+              </div>
+              <p className="text-[10px] text-muted-foreground">{PLAY_SHA_HELP}</p>
+              <p className="text-[10px] text-muted-foreground">
+                Prefix lines with a label: upload_key:, play_signing_key:, legacy_key:, firebase_key:, custom_key:
+              </p>
+              <label className="block">
+                <span className="text-[11px] font-medium">SHA-256 fingerprints (one per line)</span>
+                <textarea
+                  value={sha256Input}
+                  onChange={(e) => setSha256Input(e.target.value)}
+                  rows={3}
+                  placeholder="AA:BB:… or colon-separated from Play Console"
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 font-mono text-[11px]"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-medium">SHA-1 fingerprints (one per line)</span>
+                <textarea
+                  value={sha1Input}
+                  onChange={(e) => setSha1Input(e.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 font-mono text-[11px]"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white"
+                  onClick={() => {
+                    const base =
+                      typeof config.store_draft === "object" ? config.store_draft : {};
+                    const current = readShaRegistry(base);
+                    const { registry, duplicates } = mergeShaRegistry(current, {
+                      sha256Text: sha256Input,
+                      sha1Text: sha1Input,
+                    });
+                    const store_draft = {
+                      ...base,
+                      ...shaRegistryToStoreDraft(registry),
+                    };
+                    setConfig((c) => ({ ...c, store_draft }));
+                    void saveConfig({ store_draft });
+                    if (duplicates.length) {
+                      toast.success(`Saved (${duplicates.length} duplicate(s) skipped)`);
+                    } else {
+                      toast.success("Play signing fingerprints saved");
+                    }
+                  }}
+                >
+                  Save Play Store keys
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold"
+                  onClick={() => {
+                    const base =
+                      typeof config.store_draft === "object" ? config.store_draft : {};
+                    const json = exportShaRegistryJson(readShaRegistry(base));
+                    const blob = new Blob([json], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `play-sha-keys-${projectId}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  Export JSON
+                </button>
+              </div>
               <div className="flex gap-2">
                 {(["capacitor", "twa"] as const).map((t) => (
                   <button
@@ -601,6 +902,7 @@ export function MobileWrapperStudio({
               />
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

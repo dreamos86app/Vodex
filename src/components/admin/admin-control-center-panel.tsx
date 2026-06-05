@@ -7,8 +7,9 @@ import { AdminAnnouncementsPanel } from "@/components/admin/admin-announcements-
 import { AdminEmailMarketingPanel } from "@/components/admin/admin-email-marketing-panel";
 import { AdminSystemStatusPanel } from "@/components/admin/admin-system-status-panel";
 import { AdminPreviewRuntimePanel } from "@/components/admin/admin-preview-runtime-panel";
+import { AdminOperationsCenterPanel } from "@/components/admin/admin-operations-center-panel";
 
-type Tab = "inbox" | "announcements" | "email" | "status" | "preview";
+type Tab = "inbox" | "announcements" | "email" | "status" | "preview" | "operations";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "inbox", label: "User inbox" },
@@ -16,6 +17,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "email", label: "Email marketing" },
   { id: "status", label: "Status page" },
   { id: "preview", label: "Preview runtime" },
+  { id: "operations", label: "Operations" },
 ];
 
 export function AdminControlCenterPanel() {
@@ -54,6 +56,7 @@ export function AdminControlCenterPanel() {
       {tab === "email" ? <AdminEmailMarketingPanel /> : null}
       {tab === "status" ? <AdminSystemStatusPanel /> : null}
       {tab === "preview" ? <AdminPreviewRuntimePanel /> : null}
+      {tab === "operations" ? <AdminOperationsCenterPanel /> : null}
     </div>
   );
 }

@@ -403,6 +403,7 @@ export function NotificationBell() {
           open && "bg-surface text-foreground",
         )}
         aria-label="Notifications"
+        data-testid="notification-bell"
       >
         <Bell className="size-[17px]" strokeWidth={1.55} />
         <AnimatePresence>

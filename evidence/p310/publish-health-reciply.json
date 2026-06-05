@@ -1,0 +1,47 @@
+{
+  "ok": false,
+  "attempts": [
+    {
+      "attempt": 1,
+      "delayMs": 5000,
+      "ok": false,
+      "error": "fetch failed",
+      "sslOk": true,
+      "dnsOk": true
+    },
+    {
+      "attempt": 2,
+      "delayMs": 15000,
+      "ok": false,
+      "error": "fetch failed",
+      "sslOk": true,
+      "dnsOk": true
+    },
+    {
+      "attempt": 3,
+      "delayMs": 30000,
+      "ok": false,
+      "error": "fetch failed",
+      "sslOk": true,
+      "dnsOk": true
+    },
+    {
+      "attempt": 4,
+      "delayMs": 60000,
+      "ok": false,
+      "error": "fetch failed",
+      "sslOk": true,
+      "dnsOk": true
+    },
+    {
+      "attempt": 5,
+      "delayMs": 120000,
+      "ok": false,
+      "error": "fetch failed",
+      "sslOk": true,
+      "dnsOk": true
+    }
+  ],
+  "totalMs": 226030,
+  "error": "fetch failed"
+}

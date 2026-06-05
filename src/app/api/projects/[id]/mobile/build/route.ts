@@ -11,10 +11,21 @@ import {
 } from "@/lib/mobile/capacitor-generator";
 import { sanitizeMobileBuildLog } from "@/lib/mobile/secrets";
 import { validateAndroidPackageId } from "@/lib/mobile/package-validation";
+import { assertMobileReadinessGate } from "@/lib/mobile/readiness-gate";
+import {
+  resolveHonestMobileBuildStatus,
+  verifyBuildArtifact,
+  iosPackageHonestStatus,
+} from "@/lib/mobile/mobile-build-pipeline";
 import {
   buildDreamosBillingJson,
   loadMobileRevenueCatPublicConfig,
 } from "@/lib/mobile-billing/wrapper-config";
+import {
+  builderCallbackUrl,
+  dispatchAndroidBuildJob,
+  resolveBuildType,
+} from "@/lib/mobile/android-builder-dispatch";
 
 export const runtime = "nodejs";
 
@@ -77,6 +88,19 @@ export async function POST(
     return NextResponse.json(
       { error: "Upgrade your plan to build mobile apps.", locked: true, code: "plan_gate" },
       { status: 403 },
+    );
+  }
+
+  const gate = await assertMobileReadinessGate(supabase, projectId, user.id);
+  if (!gate.ok) {
+    return NextResponse.json(
+      {
+        error: gate.state.message,
+        code: gate.state.code,
+        locked: true,
+        criticalCount: gate.state.criticalCount,
+      },
+      { status: gate.status },
     );
   }
 
@@ -161,24 +185,51 @@ export async function POST(
   const { data: signed } = await supabase.storage.from("media").createSignedUrl(storagePath, 60 * 60 * 24);
   const artifactUrl = signed?.signedUrl ?? null;
 
-  const wantsBinary = artifactType === "apk" || artifactType === "aab";
-  const webhookConfigured = Boolean(process.env.WRAP_ANDROID_WEBHOOK_URL?.trim());
-  const status = wantsBinary
-    ? webhookConfigured
-      ? "queued"
-      : "requires_builder_config"
-    : "success";
+  const pipelineType =
+    artifactType === "wrapper_zip" ? "wrapper_zip" : artifactType === "aab" ? "aab" : "apk";
 
+  const artifactCheck = verifyBuildArtifact({
+    buffer,
+    storagePath,
+    downloadUrl: artifactUrl,
+    artifactType: pipelineType,
+  });
+
+  const webhookConfigured = Boolean(process.env.WRAP_ANDROID_WEBHOOK_URL?.trim());
+  const isAndroidBinary =
+    platform === "android" && (artifactType === "apk" || artifactType === "aab");
+  const honest =
+    platform === "ios" && artifactType === "wrapper_zip"
+      ? iosPackageHonestStatus({ wrapperZipVerified: artifactCheck.verified })
+      : resolveHonestMobileBuildStatus({
+          artifactType: pipelineType,
+          artifactVerified: isAndroidBinary ? false : artifactCheck.verified,
+          webhookConfigured,
+        });
+
+  const status = isAndroidBinary && webhookConfigured ? "queued" : honest.status;
   const logs = sanitizeMobileBuildLog(
-    wantsBinary
-      ? webhookConfigured
-        ? "Wrapper project generated. Remote builder queued."
-        : "Wrapper project ZIP ready. APK/AAB requires a connected build worker (WRAP_ANDROID_WEBHOOK_URL) or local Gradle build from the wrapper project."
-      : "Capacitor wrapper project generated successfully.",
+    [
+      artifactType === "wrapper_zip"
+        ? "Wrapper project generated."
+        : platform === "ios"
+          ? `iOS export: ${iosPackageHonestStatus({ wrapperZipVerified: artifactCheck.verified }).deliverables.join("; ")}`
+          : isAndroidBinary && webhookConfigured
+            ? "Android binary queued on dedicated builder."
+            : honest.errorMessage ?? "Build status recorded honestly.",
+      artifactType === "wrapper_zip" || platform === "ios"
+        ? artifactCheck.verified
+          ? `Artifact verified (${artifactCheck.byteSize} bytes).`
+          : `Artifact verification failed: ${artifactCheck.reason}`
+        : "Awaiting builder callback with verified binary artifact.",
+    ].join("\n"),
   );
 
   const actionCreditsCharged =
     artifactType === "wrapper_zip" ? 0 : buildQuote.isFree ? 0 : buildQuote.actionCredits;
+
+  const buildType = resolveBuildType(pipelineType);
+  const binaryArtifactUrl = isAndroidBinary ? null : artifactUrl;
 
   const { data: job, error: jobErr } = await supabase
     .from("mobile_build_jobs" as never)
@@ -188,19 +239,25 @@ export async function POST(
       platform,
       wrapper_type: wrapperType,
       status,
+      build_type: buildType,
       artifact_type: artifactType === "wrapper_zip" ? "wrapper_zip" : artifactType,
       version_name: (cfg.version_name as string) ?? "0.0.1",
       version_code: (cfg.android_version_code as number) ?? 1,
-      artifact_url: artifactUrl,
+      artifact_url: binaryArtifactUrl,
       logs,
-      error_message:
-        status === "requires_builder_config"
-          ? "Binary build requires a connected Android builder or build locally from the wrapper ZIP. No APK/AAB was faked."
-          : null,
+      error_message: isAndroidBinary && webhookConfigured ? null : honest.errorMessage,
       action_credits_charged: actionCreditsCharged,
       provider_cost_usd:
         artifactType === "wrapper_zip" ? 0 : actionCreditsCharged > 0 ? (actionCreditsCharged / 10) / 5 : 0,
-      meta: { storage_path: storagePath, file_count: wrapperFiles.length },
+      meta: {
+        wrapper_storage_path: storagePath,
+        wrapper_download_url: artifactUrl,
+        storage_path: isAndroidBinary ? null : storagePath,
+        file_count: wrapperFiles.length,
+        artifact_byte_size: isAndroidBinary ? 0 : artifactCheck.byteSize,
+        artifact_verified: isAndroidBinary ? false : artifactCheck.verified,
+        build_success: isAndroidBinary ? false : honest.buildSuccess,
+      },
       completed_at: status === "success" ? new Date().toISOString() : null,
     } as never)
     .select("*")
@@ -208,10 +265,60 @@ export async function POST(
 
   if (jobErr) return NextResponse.json({ error: jobErr.message }, { status: 500 });
 
+  const jobRecord = job as { id?: string; status?: string; artifact_url?: string | null };
+
+  if (isAndroidBinary && webhookConfigured && jobRecord.id) {
+    const callbackSecret = process.env.ANDROID_BUILDER_SECRET?.trim() ?? "";
+    const dispatched = await dispatchAndroidBuildJob({
+      jobId: jobRecord.id,
+      projectId,
+      ownerId: user.id,
+      buildType: artifactType as "apk" | "aab",
+      wrapperStoragePath: storagePath,
+      wrapperDownloadUrl: artifactUrl ?? "",
+      packageId: String(cfg.package_id ?? ""),
+      versionName: String(cfg.version_name ?? "0.0.1"),
+      versionCode: Number(cfg.android_version_code ?? 1),
+      callbackUrl: builderCallbackUrl(),
+      callbackSecret,
+    });
+    if (!dispatched.ok) {
+      await supabase
+        .from("mobile_build_jobs" as never)
+        .update({
+          status: "failed",
+          error_message: dispatched.error,
+          logs: sanitizeMobileBuildLog(`${logs}\nDispatch failed: ${dispatched.error}`),
+          completed_at: new Date().toISOString(),
+          meta: {
+            wrapper_storage_path: storagePath,
+            build_success: false,
+            artifact_verified: false,
+          },
+        } as never)
+        .eq("id", jobRecord.id);
+      return NextResponse.json(
+        { error: dispatched.error, code: "builder_dispatch_failed", jobId: jobRecord.id },
+        { status: 502 },
+      );
+    }
+  }
+
+  if (honest.buildSuccess && !isAndroidBinary && !artifactCheck.verified) {
+    return NextResponse.json(
+      { error: artifactCheck.reason ?? "Artifact verification failed", code: "artifact_missing" },
+      { status: 500 },
+    );
+  }
+
   return NextResponse.json({
     job,
+    jobId: jobRecord.id,
     downloadUrl: artifactUrl,
     quote: buildQuote,
     honestStatus: status,
+    buildSuccess: honest.buildSuccess,
+    artifactVerified: artifactCheck.verified,
+    artifactByteSize: artifactCheck.byteSize,
   });
 }

@@ -38,10 +38,22 @@ export function validateVersionName(value: string | null | undefined): boolean {
   return /^\d+\.\d+\.\d+([-.][\w\d]+)?$/.test(value?.trim() ?? "");
 }
 
+/** Reverse-domain app id on vodex.app — never dreamos86 / dreamos legacy domains. */
 export function suggestPackageId(appName: string): string {
   const slug = appName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "")
     .slice(0, 24);
-  return `com.dreamos.${slug || "myapp"}`;
+  return `com.vodex.${slug || "myapp"}`;
+}
+
+export function migrateLegacyPackageId(
+  value: string | null | undefined,
+  appName: string,
+): string {
+  const v = value?.trim() ?? "";
+  if (!v || /\.dreamos(\.|$)/i.test(v) || v.includes("dreamos86")) {
+    return suggestPackageId(appName);
+  }
+  return v;
 }

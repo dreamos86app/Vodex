@@ -79,7 +79,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   let diagnostics = analyzePreviewHtml("", []);
   let servedFromArtifact = false;
 
-  const metaRenderable = meta.preview_renderable === true && meta.preview_honest === true;
+  const previewRoute = url.searchParams.get("route")?.trim() || "/";
+
+  const metaRenderable =
+    runtime.previewRenderable &&
+    runtime.previewHonest &&
+    (meta.preview_renderable === true ||
+      runtime.jobStatus === "succeeded" ||
+      Boolean(artifactPath && buildId));
 
   if (artifactPath && buildId && metaRenderable) {
     const admin = createSupabaseAdmin();
@@ -101,7 +108,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       const fw = detectImportedFramework(zipFiles);
       const legacy = analyzeLegacyAdapter(zipFiles, fw);
       html = injectPreviewShims(file.data.toString("utf8"), legacy);
-      html = rewritePreviewArtifactHtml(html, projectId, buildId);
+      html = rewritePreviewArtifactHtml(html, projectId, buildId, previewRoute);
       diagnostics = analyzePreviewHtml(
         html,
         zipFiles.map((f) => ({ path: f.path, content: f.content })),

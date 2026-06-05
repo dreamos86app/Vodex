@@ -9,6 +9,7 @@ import {
   readMobileConfigFromMetadata,
   saveMobileConfigFallback,
 } from "@/lib/mobile/mobile-config-fallback";
+import { sanitizeMobileConfigPatch } from "@/lib/mobile/readiness-gate";
 
 const patchSchema = z.object({
   platforms: z.array(z.enum(["android", "ios"])).optional(),
@@ -27,6 +28,8 @@ const patchSchema = z.object({
   store_draft: z.record(z.string(), z.unknown()).optional(),
   icon_url: z.string().url().nullable().optional(),
   splash_url: z.string().url().nullable().optional(),
+  splash_duration_ms: z.number().int().min(500).max(15_000).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 async function loadProject(supabase: Awaited<ReturnType<typeof createClient>>, projectId: string, userId: string) {
@@ -97,7 +100,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid config", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const patch = parsed.data;
+  const patch = sanitizeMobileConfigPatch(parsed.data);
   const { data: existing, error: existingErr } = await supabase
     .from("mobile_app_configs" as never)
     .select("id")

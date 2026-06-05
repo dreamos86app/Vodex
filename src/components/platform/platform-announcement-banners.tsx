@@ -58,7 +58,7 @@ function defaultGradient(type: string): [string, string] {
 }
 
 function BannerIcon({ type }: { type: string }) {
-  const cls = "mt-0.5 size-4 shrink-0";
+  const cls = "size-3.5 shrink-0 opacity-95";
   if (type === "sparkles") return <Sparkles className={cls} strokeWidth={2} />;
   if (type === "wrench") return <Wrench className={cls} strokeWidth={2} />;
   if (type === "info") return <Info className={cls} strokeWidth={2} />;
@@ -68,26 +68,28 @@ function BannerIcon({ type }: { type: string }) {
 export function PlatformAnnouncementBanners() {
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
   const [dismissed, setDismissed] = React.useState<Set<string>>(() => new Set());
+  const [ready, setReady] = React.useState(false);
 
   const load = React.useCallback(() => {
-    void fetch("/api/platform/active-announcements", { cache: "no-store" })
+    return fetch("/api/platform/active-announcements", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((json: { announcements?: Announcement[] } | null) => {
         if (!json?.announcements) return;
         setAnnouncements(json.announcements.slice(0, 2));
+        setReady(true);
       })
-      .catch(() => {});
+      .catch(() => setReady(true));
   }, []);
 
   React.useEffect(() => {
     setDismissed(readDismissed());
-    load();
-    const poll = window.setInterval(load, 30_000);
+    void load();
+    const poll = window.setInterval(() => void load(), 60_000);
     return () => window.clearInterval(poll);
   }, [load]);
 
   const visible = announcements.filter((a) => !dismissed.has(a.id));
-  if (visible.length === 0) return null;
+  if (!ready || visible.length === 0) return null;
 
   return (
     <div className="relative z-[60] flex flex-col" data-testid="platform-incident-banner">
@@ -103,41 +105,47 @@ export function PlatformAnnouncementBanners() {
             a.link_url?.startsWith("http") || a.link_url?.startsWith("/")
               ? a.link_url
               : "https://status.vodex.dev";
+          const linkLabel = a.link_label?.trim() || "Status";
 
           return (
             <motion.div
               key={a.id}
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.22 }}
-              className="border-b border-black/10 px-4 py-2.5 shadow-md"
+              transition={{ duration: 0.15 }}
+              className="border-b border-black/10 px-2 py-1.5 sm:px-3"
               style={{
                 background: `linear-gradient(90deg, ${from}, ${to})`,
                 color: textColor,
               }}
               role="alert"
             >
-              <div className="mx-auto flex max-w-6xl items-start gap-3">
+              <div className="mx-auto flex max-w-6xl items-center gap-2 sm:gap-2.5">
                 <BannerIcon type={a.icon_type ?? type} />
-                <div className="min-w-0 flex-1 text-[12px] leading-relaxed sm:text-[13px]">
-                  <p className="font-semibold">{a.title}</p>
-                  <p className="mt-0.5 opacity-90">{a.message}</p>
-                  {a.link_label || a.link_url ? (
-                    <Link
-                      href={href}
-                      className="mt-2 inline-flex items-center justify-center rounded-lg bg-white px-3.5 py-1.5 text-[12px] font-semibold text-[#2563eb] shadow-md transition hover:bg-white/95"
-                      target={href.startsWith("http") ? "_blank" : undefined}
-                      rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-                    >
-                      {a.link_label?.trim() || "Visit"}
-                    </Link>
+                <p className="min-w-0 flex-1 truncate text-[11px] font-semibold leading-tight sm:text-[12px]">
+                  <span>{a.title}</span>
+                  {a.message ? (
+                    <span className="hidden font-normal opacity-90 sm:inline">
+                      {" "}
+                      · {a.message}
+                    </span>
                   ) : null}
-                </div>
+                </p>
+                {a.link_label || a.link_url ? (
+                  <Link
+                    href={href}
+                    className="hidden shrink-0 rounded-md bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-[#2563eb] shadow-sm sm:inline-flex"
+                    target={href.startsWith("http") ? "_blank" : undefined}
+                    rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  >
+                    {linkLabel}
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   aria-label="Dismiss for this session"
-                  className="shrink-0 rounded-md p-1 hover:bg-black/10"
+                  className="shrink-0 rounded p-0.5 hover:bg-black/10"
                   onClick={() => {
                     const next = new Set(dismissed);
                     next.add(a.id);
@@ -145,7 +153,7 @@ export function PlatformAnnouncementBanners() {
                     writeDismissed(next);
                   }}
                 >
-                  <X className="size-4" />
+                  <X className="size-3.5" />
                 </button>
               </div>
             </motion.div>

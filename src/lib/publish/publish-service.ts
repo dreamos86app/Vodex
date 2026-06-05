@@ -99,7 +99,17 @@ export async function resolvePublishSlug(
 }
 
 export type PublishStartResult =
-  | { ok: true; publicUrl: string; slug: string; mode: "subdomain" | "path"; version: number }
+  | {
+      ok: true;
+      publicUrl: string;
+      slug: string;
+      mode: "subdomain" | "path";
+      version: number;
+      publishedAppId?: string;
+      healthChecked?: boolean;
+      healthAttempts?: number;
+      publishedAt?: string;
+    }
   | { ok: false; error: string; code: string; details?: { blockers: string[]; warnings?: string[] } };
 
 export async function startPublish(input: {
@@ -292,6 +302,16 @@ export async function startPublish(input: {
     };
   }
 
+  const { verifyPublishedUrlHealthWithRetry } = await import("@/lib/publish/publish-health-retry");
+  const health = await verifyPublishedUrlHealthWithRetry(url);
+  if (!health.ok) {
+    return {
+      ok: false,
+      error: `Publish health check failed after retries — ${health.error}`,
+      code: "publish_health_failed",
+    };
+  }
+
   if (publishedAppId) {
     await insertVersionRow(input.writer, {
       publishedAppId,
@@ -331,7 +351,17 @@ export async function startPublish(input: {
     .eq("id", input.projectId)
     .eq("owner_id", input.userId);
 
-  return { ok: true, publicUrl: url, slug, mode, version };
+  return {
+    ok: true,
+    publicUrl: url,
+    slug,
+    mode,
+    version,
+    publishedAppId,
+    healthChecked: true,
+    healthAttempts: health.attempts.length,
+    publishedAt: now,
+  };
 }
 
 export { resolveDisplayPublicUrl } from "@/lib/publish/publish-display-url";

@@ -8,10 +8,23 @@ export function generateCapacitorWrapperProject(input: {
   appFiles: Array<{ path: string; content: string }>;
   billingConfigJson?: string | null;
 }): CapacitorProjectFiles {
-  const appId = input.config.package_id ?? input.config.bundle_id ?? "com.dreamos.app";
+  const appId = input.config.package_id ?? input.config.bundle_id ?? "com.vodex.app";
   const appName = input.config.app_name ?? "Dream App";
   const shortName = input.config.short_name ?? appName.slice(0, 12);
   const theme = input.config.theme_color ?? "#6366f1";
+  const splashMs =
+    typeof input.config.splash_duration_ms === "number" && input.config.splash_duration_ms > 0
+      ? input.config.splash_duration_ms
+      : 2000;
+  const storeDraft =
+    input.config.store_draft && typeof input.config.store_draft === "object"
+      ? (input.config.store_draft as Record<string, unknown>)
+      : {};
+  const sha256List = Array.isArray(storeDraft.play_sha256_fingerprints)
+    ? (storeDraft.play_sha256_fingerprints as string[]).filter(Boolean)
+    : [];
+  const sha256Fingerprints =
+    sha256List.length > 0 ? sha256List : ["REPLACE_WITH_YOUR_SHA256_FINGERPRINT"];
 
   const permissions = input.config.permissions ?? {};
   const androidPermissions: string[] = [];
@@ -40,8 +53,9 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
+      launchShowDuration: ${splashMs},
       backgroundColor: '${theme}',
+      launchAutoHide: true,
     },
   },
 };
@@ -132,8 +146,21 @@ export function generateTwaManifest(input: {
   config: Partial<MobileAppConfig>;
   webUrl: string;
 }): CapacitorProjectFiles {
-  const appId = input.config.package_id ?? "com.dreamos.app";
+  const appId = input.config.package_id ?? "com.vodex.app";
   const appName = input.config.app_name ?? "Dream App";
+  const splashMs =
+    typeof input.config.splash_duration_ms === "number" && input.config.splash_duration_ms > 0
+      ? input.config.splash_duration_ms
+      : 2000;
+  const storeDraft =
+    input.config.store_draft && typeof input.config.store_draft === "object"
+      ? (input.config.store_draft as Record<string, unknown>)
+      : {};
+  const sha256List = Array.isArray(storeDraft.play_sha256_fingerprints)
+    ? (storeDraft.play_sha256_fingerprints as string[]).filter(Boolean)
+    : [];
+  const sha256Fingerprints =
+    sha256List.length > 0 ? sha256List : ["REPLACE_WITH_YOUR_SHA256_FINGERPRINT"];
   const host = (() => {
     try {
       return new URL(input.webUrl).host;
@@ -154,7 +181,7 @@ export function generateTwaManifest(input: {
           themeColor: input.config.theme_color ?? "#6366f1",
           startUrl: "/",
           iconUrl: input.config.icon_url ?? "",
-          splashScreenFadeOutDuration: 300,
+          splashScreenFadeOutDuration: Math.min(1000, Math.max(200, Math.round(splashMs / 4))),
         },
         null,
         2,
@@ -169,7 +196,7 @@ export function generateTwaManifest(input: {
             target: {
               namespace: "android_app",
               package_name: appId,
-              sha256_cert_fingerprints: ["REPLACE_WITH_YOUR_SHA256_FINGERPRINT"],
+              sha256_cert_fingerprints: sha256Fingerprints,
             },
           },
         ],

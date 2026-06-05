@@ -1,22 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { loadMobileRevenueCatPublicConfig } from "@/lib/mobile-billing/wrapper-config";
+import { runAppReadinessEngine } from "@/lib/mobile/readiness-engine";
 import {
-  scanAndroidReadiness,
-  scanGeneralReadiness,
-  scanIosReadiness,
-  scanStoreReadiness,
-} from "@/lib/mobile/readiness";
+  readinessReportToHtml,
+  readinessReportToJson,
+  readinessReportToPdfBytes,
+} from "@/lib/mobile/readiness-report-export";
+import { persistMobileGateMeta } from "@/lib/mobile/readiness-gate";
 import { MOBILE_SECRET_KEYS } from "@/lib/mobile/secrets";
 import { quoteMobileAction } from "@/lib/mobile/action-pricing";
 
 const bodySchema = z.object({
-  platforms: z.array(z.enum(["general", "android", "ios", "store"])).optional(),
+  revenuecat_opt_out: z.boolean().optional(),
 });
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id: projectId } = await ctx.params;
@@ -25,6 +27,56 @@ export async function GET(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const url = new URL(req.url);
+  const format = url.searchParams.get("format");
+
+  const { data: config } = await supabase
+    .from("mobile_app_configs" as never)
+    .select("meta, app_name")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  const meta =
+    config &&
+    (config as { meta?: unknown }).meta &&
+    typeof (config as { meta?: unknown }).meta === "object"
+      ? ((config as { meta?: unknown }).meta as Record<string, unknown>)
+      : {};
+  const report = meta.last_readiness_engine_report;
+  if (!report) {
+    return NextResponse.json({ error: "No report — run POST scan first" }, { status: 404 });
+  }
+
+  const appName = String(
+    (config as { app_name?: string } | null)?.app_name ?? "App",
+  );
+
+  if (format === "json") {
+    return new NextResponse(readinessReportToJson(report as never), {
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Disposition": `attachment; filename="readiness-${projectId}.json"`,
+      },
+    });
+  }
+  if (format === "html") {
+    return new NextResponse(readinessReportToHtml(report as never, appName), {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename="readiness-${projectId}.html"`,
+      },
+    });
+  }
+  if (format === "pdf") {
+    const pdf = readinessReportToPdfBytes(report as never, appName);
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="readiness-${projectId}.pdf"`,
+      },
+    });
+  }
 
   const { data: checks } = await supabase
     .from("mobile_readiness_checks" as never)
@@ -42,6 +94,8 @@ export async function POST(
 ) {
   const { id: projectId } = await ctx.params;
   const supabase = await createClient();
+  const admin = createServiceRoleClient();
+  const writer = admin ?? supabase;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -49,7 +103,6 @@ export async function POST(
 
   const json = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(json);
-  const platforms = parsed.success ? (parsed.data.platforms ?? ["general", "android", "ios", "store"]) : ["general", "android", "ios", "store"];
 
   const { data: project } = await supabase
     .from("projects")
@@ -86,88 +139,123 @@ export async function POST(
   const rcPublic = await loadMobileRevenueCatPublicConfig(projectId);
   const revenueCatConfigured = rcPublic.enabled;
 
-  const results = [];
-  if (platforms.includes("general")) {
-    results.push(
-      scanGeneralReadiness({
-        fileCount: fileCount ?? 0,
-        hasPreview: Boolean(project.preview_url),
-        appName: (project as { app_name?: string }).app_name ?? project.name,
-        description: (project as { short_description?: string }).short_description ?? null,
-        files: files ?? [],
-      }),
-    );
-  }
-  if (platforms.includes("android")) {
-    results.push(
-      scanAndroidReadiness(cfg as never, {
-        hasSigningSecret: secretNames.has(MOBILE_SECRET_KEYS.android_upload_key),
-        hasPlayServiceAccount: secretNames.has(MOBILE_SECRET_KEYS.google_play_service_account),
-        hasFirebase: secretNames.has(MOBILE_SECRET_KEYS.firebase_google_services),
-        fileCount: fileCount ?? 0,
-        previewUrl: project.preview_url,
-        revenueCatConfigured,
-      }),
-    );
-  }
-  if (platforms.includes("ios")) {
-    results.push(
-      scanIosReadiness(cfg as never, {
-        hasAscApiKey: secretNames.has(MOBILE_SECRET_KEYS.asc_api_private_key),
-        hasApnsKey: secretNames.has(MOBILE_SECRET_KEYS.apns_key),
-        hasSigningAssets: secretNames.has(MOBILE_SECRET_KEYS.android_signing_keystore),
-        revenueCatConfigured,
-      }),
-    );
-  }
-  if (platforms.includes("store")) {
-    results.push(scanStoreReadiness(cfg as never, "android"));
-    results.push(scanStoreReadiness(cfg as never, "ios"));
+  if (parsed.success && parsed.data.revenuecat_opt_out) {
+    const store_draft = {
+      ...(typeof cfg.store_draft === "object" && cfg.store_draft ? cfg.store_draft : {}),
+      revenuecat_not_used: true,
+    };
+    await writer
+      .from("mobile_app_configs" as never)
+      .upsert({ project_id: projectId, owner_id: user.id, store_draft } as never, {
+        onConflict: "project_id",
+      });
+    cfg.store_draft = store_draft;
   }
 
-  const quote = quoteMobileAction("mobile_readiness_scan");
-  const rows: unknown[] = [];
-  for (const r of results) {
-    const { data: row, error } = await supabase
-      .from("mobile_readiness_checks" as never)
-      .insert({
-        project_id: projectId,
-        owner_id: user.id,
-        platform: r.platform,
-        score: r.score,
-        items: r.items,
-        action_credits_charged: 0,
-        meta: { deterministic: true },
-      } as never)
-      .select("*")
-      .single();
-    if (!error && row) rows.push(row);
-  }
+  const storeDraft =
+    cfg.store_draft && typeof cfg.store_draft === "object"
+      ? (cfg.store_draft as Record<string, unknown>)
+      : {};
+  const revenueCatOptedOut = storeDraft.revenuecat_not_used === true;
 
-  const androidScore = results.find((r) => r.platform === "android")?.score ?? null;
-  const iosScore = results.find((r) => r.platform === "ios")?.score ?? null;
-  const storeScore = Math.round(
-    (results.filter((r) => r.platform === "store").reduce((s, r) => s + r.score, 0) /
-      Math.max(1, results.filter((r) => r.platform === "store").length)) ||
-      0,
+  const report = await runAppReadinessEngine({
+    projectId,
+    supabase,
+    config: cfg as never,
+    fileCount: fileCount ?? 0,
+    hasPreview: Boolean(project.preview_url),
+    appName: (project as { app_name?: string }).app_name ?? project.name,
+    description: (project as { short_description?: string }).short_description ?? null,
+    files: files ?? [],
+    androidCtx: {
+      hasSigningSecret: secretNames.has(MOBILE_SECRET_KEYS.android_upload_key),
+      hasPlayServiceAccount: secretNames.has(MOBILE_SECRET_KEYS.google_play_service_account),
+      hasFirebase: secretNames.has(MOBILE_SECRET_KEYS.firebase_google_services),
+      fileCount: fileCount ?? 0,
+      previewUrl: project.preview_url,
+      revenueCatConfigured,
+    },
+    iosCtx: {
+      hasAscApiKey: secretNames.has(MOBILE_SECRET_KEYS.asc_api_private_key),
+      hasApnsKey: secretNames.has(MOBILE_SECRET_KEYS.apns_key),
+      hasSigningAssets: secretNames.has(MOBILE_SECRET_KEYS.android_signing_keystore),
+      revenueCatConfigured,
+    },
+    revenueCatConfigured,
+    revenueCatOptedOut,
+  });
+
+  await persistMobileGateMeta(writer, projectId, user.id, {
+    passed: report.gatePassed,
+    criticalCount: report.critical.length,
+    blockerCount: report.critical.length,
+  });
+
+  const prevMeta =
+    cfg.meta && typeof cfg.meta === "object" && !Array.isArray(cfg.meta)
+      ? (cfg.meta as Record<string, unknown>)
+      : {};
+
+  await writer.from("mobile_app_configs" as never).upsert(
+    {
+      project_id: projectId,
+      owner_id: user.id,
+      readiness_android: report.eligibility.scores.android,
+      readiness_ios: report.eligibility.scores.ios,
+      readiness_store: report.eligibility.scores.store,
+      readiness_state: {
+        score: report.score,
+        gatePassed: report.gatePassed,
+        critical: report.critical.length,
+        high: report.high.length,
+        scannedAt: report.generatedAt,
+      },
+      sha_keys: {
+        sha256: storeDraft.play_sha256_entries ?? storeDraft.play_sha256_fingerprints ?? [],
+        sha1: storeDraft.play_sha1_entries ?? storeDraft.play_sha1_fingerprints ?? [],
+      },
+      revenuecat: {
+        status: report.revenueCat.status,
+        optedOut: revenueCatOptedOut,
+        score: report.revenueCat.score,
+      },
+      splash: {
+        url: (cfg.splash_url as string | null) ?? null,
+      },
+      play_store: storeDraft.store_onboarding_progress
+        ? { google_play: (storeDraft.store_onboarding_progress as Record<string, unknown>).google_play }
+        : {},
+      app_store: storeDraft.store_onboarding_progress
+        ? { apple_app_store: (storeDraft.store_onboarding_progress as Record<string, unknown>).apple_app_store }
+        : {},
+      meta: {
+        ...prevMeta,
+        readiness_gate_passed_at: report.gatePassed ? new Date().toISOString() : null,
+        last_readiness_blocker_count: report.critical.length,
+        last_eligibility_critical_count: report.critical.length,
+        last_readiness_engine_report: report,
+      },
+    } as never,
+    { onConflict: "project_id" },
   );
 
-  if (config) {
-    await supabase
-      .from("mobile_app_configs" as never)
-      .update({
-        readiness_android: androidScore,
-        readiness_ios: iosScore,
-        readiness_store: storeScore,
-      } as never)
-      .eq("project_id", projectId);
-  }
-
   return NextResponse.json({
-    results,
-    checks: rows,
-    scores: { android: androidScore, ios: iosScore, store: storeScore },
+    report,
+    reportJson: readinessReportToJson(report),
+    score: report.score,
+    gatePassed: report.gatePassed,
+    critical: report.critical,
+    high: report.high,
+    medium: report.medium,
+    low: report.low,
+    revenueCat: report.revenueCat,
+    blockers: report.critical.map((b) => b.label),
     actionCreditsCharged: 0,
-    quote,
+    quote: quoteMobileAction("mobile_readiness_scan"),
+    downloads: {
+      json: `/api/projects/${projectId}/mobile/readiness?format=json`,
+      html: `/api/projects/${projectId}/mobile/readiness?format=html`,
+      pdf: `/api/projects/${projectId}/mobile/readiness?format=pdf`,
+    },
   });
 }

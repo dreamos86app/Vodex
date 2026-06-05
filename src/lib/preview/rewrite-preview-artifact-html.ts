@@ -1,3 +1,5 @@
+import { injectPreviewRouterShim } from "@/lib/preview/inject-preview-router-shim";
+
 /**
  * Rewrites built SPA index.html asset URLs to the authenticated preview-assets API.
  */
@@ -5,6 +7,7 @@ export function rewritePreviewArtifactHtml(
   html: string,
   projectId: string,
   artifactBuildId: string,
+  routePath = "/",
 ): string {
   const base = `/api/projects/${encodeURIComponent(projectId)}/preview-assets`;
   const q = `build=${encodeURIComponent(artifactBuildId)}`;
@@ -35,7 +38,7 @@ export function rewritePreviewArtifactHtml(
     return ` ${attr}="${assetUrl(p)}"`;
   });
 
-  return out;
+  return injectPreviewRouterShim(out, routePath);
 }
 
 export function previewFrameUrlWithRoute(

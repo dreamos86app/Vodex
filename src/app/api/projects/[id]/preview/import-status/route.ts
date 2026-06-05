@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { requireProjectId, jsonMissingId } from "@/lib/ids/required-ids";
+import { applyPreviewBuildToProject } from "@/lib/imports/apply-preview-build-to-project";
+import { loadLatestPreviewDiagnostics } from "@/lib/imports/runtime-build-runner";
 import { loadPreviewRuntimeStatus } from "@/lib/preview/load-preview-runtime-status";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +33,31 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       ? (project.metadata as Record<string, unknown>)
       : {};
 
-  const runtime = await loadPreviewRuntimeStatus(supabase, projectId, meta);
+  let runtime = await loadPreviewRuntimeStatus(supabase, projectId, meta);
+
+  if (
+    runtime.jobStatus === "succeeded" &&
+    runtime.previewRenderable &&
+    meta.preview_renderable !== true
+  ) {
+    const admin = createServiceRoleClient();
+    if (admin) {
+      const diagnostics = await loadLatestPreviewDiagnostics(admin, projectId);
+      if (diagnostics?.previewRenderable) {
+        await applyPreviewBuildToProject({
+          writer: admin,
+          projectId,
+          userId: user.id,
+          diagnostics,
+        });
+        runtime = await loadPreviewRuntimeStatus(supabase, projectId, {
+          ...meta,
+          preview_renderable: true,
+          preview_honest: true,
+        });
+      }
+    }
+  }
 
   return NextResponse.json({
     ...runtime,

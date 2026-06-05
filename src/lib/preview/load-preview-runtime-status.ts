@@ -30,13 +30,14 @@ export async function loadPreviewRuntimeStatus(
     locked_by: string | null;
     build_logs: string | null;
     logs: string | null;
+    preview_renderable: boolean | null;
   } | null = null;
 
   if (admin) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (admin as any)
       .from("preview_build_jobs")
-      .select("id, status, created_at, artifact_path, locked_by, build_logs, logs")
+      .select("id, status, created_at, artifact_path, locked_by, build_logs, logs, preview_renderable")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -85,8 +86,15 @@ export async function loadPreviewRuntimeStatus(
     Date.now() - queuedAt > WORKER_QUEUE_GRACE_MS;
   const workerUnavailable = queueStale || queueNoWorker;
 
-  const previewRenderable = Boolean(meta.preview_renderable ?? diag?.previewRenderable);
-  const previewHonest = Boolean(meta.preview_honest ?? previewRenderable);
+  const jobSucceededRenderable =
+    jobRow?.status === "succeeded" && jobRow.preview_renderable === true;
+  const previewRenderable = Boolean(
+    meta.preview_renderable ?? diag?.previewRenderable ?? jobSucceededRenderable,
+  );
+  const previewHonest = Boolean(
+    meta.preview_honest === true ||
+      (previewRenderable && (meta.preview_honest !== false || jobSucceededRenderable)),
+  );
 
   const diagRecord = diag as Record<string, unknown> | null;
   const diagBilling =

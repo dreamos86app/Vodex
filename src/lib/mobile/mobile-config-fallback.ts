@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MobileAppConfig } from "@/lib/mobile/types";
-import { suggestPackageId } from "@/lib/mobile/package-validation";
+import { migrateLegacyPackageId, suggestPackageId } from "@/lib/mobile/package-validation";
 
 export function isMissingMobileConfigTableError(message: string): boolean {
   return /could not find the table|schema cache|mobile_app_configs/i.test(message);
@@ -25,6 +25,7 @@ export function defaultMobileConfigFromProject(
     app_description: project.short_description ?? null,
     package_id: suggestPackageId(appName),
     bundle_id: suggestPackageId(appName),
+    meta: { splash_duration_ms: 2000 },
     theme_color: "#6366f1",
     version_name: "0.0.1",
     android_version_code: 1,
