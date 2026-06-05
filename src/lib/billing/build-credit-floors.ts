@@ -22,16 +22,17 @@ export type BuildCreditOperationType =
   | "backlog_continuation";
 
 /** Minimum user Build Credits by operation (before provider×markup×10). */
+/** P5.4.4 — +10–15% on high-cost build operations (UX-neutral; fewer actions per allowance). */
 export const BUILD_CREDIT_OPERATION_FLOORS: Record<BuildCreditOperationType, number> = {
-  discuss: 0.4,
+  discuss: 0.3,
   tiny_edit: 1,
   normal_edit: 2,
   ui_polish: 2,
   repair: 2,
-  first_build_small: 3,
-  first_build_standard: 5,
-  first_build_advanced: 8,
-  huge_staged_first_pass: 12,
+  first_build_small: 4,
+  first_build_standard: 6,
+  first_build_advanced: 9,
+  huge_staged_first_pass: 14,
   backlog_continuation: 2,
 };
 

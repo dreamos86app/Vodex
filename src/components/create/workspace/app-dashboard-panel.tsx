@@ -70,6 +70,7 @@ import {
 } from "@/lib/dashboard/section-access";
 import { isPaidPlan } from "@/lib/billing/plan-features";
 import { PublishTemplateModal } from "@/components/templates/publish-template-modal";
+import { AppVersionHistoryPanel } from "@/components/builder/app-version-history-panel";
 import { getEntitlements } from "@/lib/billing/plan-entitlements";
 import { AppAuthSettingsPanel } from "@/components/settings/app-auth-settings-panel";
 import {
@@ -503,6 +504,10 @@ export function AppDashboardPanel({
           iconSrc={iconSrc}
           onSaved={() => setSettingsRefresh((k) => k + 1)}
         />
+      </SectionCard>
+
+      <SectionCard title="Version history">
+        <AppVersionHistoryPanel projectId={projectId} />
       </SectionCard>
 
       <div className="flex flex-wrap gap-2">

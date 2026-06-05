@@ -1,7 +1,7 @@
 import { validateGeneratedApp } from "@/lib/build/generated-app-validator";
 import { findPlaceholderFindings } from "@/lib/publish/placeholder-findings";
 import { scanAppSourceForReadiness } from "@/lib/publish/readiness-scan";
-import { isZipImportProject } from "@/lib/projects/imported-project-state";
+import { isZipImportProject, readImportMeta } from "@/lib/projects/imported-project-state";
 import {
   detectCertificationSecretLeak,
   detectUnsafePublicEnvReferences,
@@ -39,24 +39,23 @@ export function runAppAuditChecks(ctx: CertificationContext): CertificationCheck
   const safeFiles = prepareCertificationFiles(files);
   const isImport = isZipImportProject(ctx.metadata);
 
+  const importMeta = isImport ? readImportMeta(ctx.metadata) : null;
   const validation = validateGeneratedApp({
     files: safeFiles,
     projectId: ctx.projectId,
     ownerId: ctx.ownerId,
+    routeMap: importMeta?.routes ?? null,
   });
 
-  if (!validation.ok) {
-    const userReasons = validation.reasons.filter((r) => !r.startsWith("placeholder_content:"));
-    checks.push({
-      id: "app_route_manifest",
-      section: "app_audit",
-      title: "Route manifest validity",
-      status: userReasons.includes("no_page_route") ? "blocker" : "warning",
-      weight: 8,
-      detail: userReasons.length ? userReasons.join("; ") : "Validation issues detected.",
-      fix: "Add a main page route (app/page or index.html).",
-    });
-  } else {
+  const routeReasons = validation.reasons.filter(
+    (r) =>
+      !r.startsWith("placeholder_content:") &&
+      r !== "todo_only_content" &&
+      r !== "todo_or_stub_page" &&
+      r !== "fake_disabled_primary_button",
+  );
+
+  if (routeReasons.length === 0) {
     checks.push({
       id: "app_route_manifest",
       section: "app_audit",
@@ -64,6 +63,27 @@ export function runAppAuditChecks(ctx: CertificationContext): CertificationCheck
       status: "passed",
       weight: 8,
       detail: "Core routes and package.json present.",
+    });
+  } else {
+    const importRouteGap =
+      isImport &&
+      routeReasons.every((r) => r === "no_page_route" || r === "unstyled_html") &&
+      (ctx.published || ctx.metadata.preview_renderable === true) &&
+      (importMeta?.routes?.length ?? 0) > 0;
+    const routeStatus =
+      importRouteGap || (isImport && routeReasons.includes("no_page_route") && ctx.published)
+        ? "warning"
+        : routeReasons.includes("no_page_route")
+          ? "blocker"
+          : "warning";
+    checks.push({
+      id: "app_route_manifest",
+      section: "app_audit",
+      title: "Route manifest validity",
+      status: routeStatus,
+      weight: 8,
+      detail: routeReasons.join("; "),
+      fix: "Add a main page route (app/page or index.html).",
     });
   }
 

@@ -4,7 +4,7 @@
 import { DISCUSS_FLAT_CREDITS } from "@/lib/billing/credit-pricing";
 
 /** Target revenue multiplier over provider cost — aligns with TARGET_REVENUE_MULTIPLIER */
-export const MARGIN_MULTIPLIER = 3;
+export const MARGIN_MULTIPLIER = 5;
 
 /** User-facing credits per $1 revenue (see src/lib/billing/pricing-config.ts) */
 export const CREDITS_PER_USD = 10;

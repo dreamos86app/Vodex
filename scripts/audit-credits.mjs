@@ -34,8 +34,8 @@ if (!url || !key) {
 
 const admin = createClient(url, key, { auth: { persistSession: false } });
 
-const PLAN_BUILD = { free: 30, starter: 200, pro: 500, business: 500, infinity: 1000, enterprise: 1000 };
-const PLAN_ACTION = { free: 25, starter: 500, pro: 1250, business: 1250, infinity: 2500, enterprise: 2500 };
+const PLAN_BUILD = { free: 20, starter: 185, pro: 475, business: 475, infinity: 975, enterprise: 975 };
+const PLAN_ACTION = { free: 20, starter: 420, pro: 1125, business: 1125, infinity: 2350, enterprise: 2350 };
 
 function bonus(available, allowance) {
   return Math.max(0, Math.round((available - allowance) * 10) / 10);
@@ -60,7 +60,7 @@ async function main() {
 
   for (const p of profiles ?? []) {
     const plan = p.plan_id ?? "free";
-    const buildAllowance = PLAN_BUILD[plan] ?? 30;
+    const buildAllowance = PLAN_BUILD[plan] ?? 20;
     const actionAllowance = PLAN_ACTION[plan] ?? 25;
     const buildAvailable = Number(p.credits_remaining ?? buildAllowance);
     const actionAvailable = actionByUser.has(p.id) ? actionByUser.get(p.id) : actionAllowance;

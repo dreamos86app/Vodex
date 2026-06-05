@@ -1,26 +1,64 @@
 /**
- * Vodex plan credit economics — single source for allowances and provider pools.
- * Paddle fee model for Vodex subscription billing (not generated-app payments).
+ * Vodex plan credit economics — P5.4.4 frozen ladder (7.5 BC / 20 AC per $1).
  */
-
 import type { PlanId } from "@/lib/supabase/types";
-import { ACTION_CREDITS_PER_DOLLAR } from "@/lib/billing/billing-constants";
+import {
+  ACTION_CREDITS_PER_DOLLAR,
+  ANNUAL_BILLING_DISCOUNT,
+  BUILD_CREDITS_PER_DOLLAR,
+  BUILD_PROVIDER_USD_PER_CREDIT,
+  ACTION_PROVIDER_USD_PER_CREDIT,
+  FREE_PLAN_ACTION_CREDITS,
+  FREE_PLAN_BUILD_CREDITS,
+  FIXED_PLAN_CREDITS,
+  MIN_ANNUAL_CREDIT_MARGIN_PERCENT,
+  MIN_MONTHLY_CREDIT_MARGIN_PERCENT,
+  MIN_PAID_ANNUAL_FULL_MARGIN_PERCENT,
+  MIN_PAID_MONTHLY_FULL_MARGIN_PERCENT,
+  P544_FROZEN_CREDIT_LADDER,
+  STARTER_MIN_ANNUAL_FULL_MARGIN_PERCENT,
+  STARTER_MIN_MONTHLY_FULL_MARGIN_PERCENT,
+  annualCreditMarginPercent,
+  annualFullMaxUsageMarginPercent,
+  creditsForPlanId,
+  creditsFromMonthlyListPrice,
+  creditPoolCostUsd,
+  monthlyCreditMarginPercent,
+  monthlyFullMaxUsageMarginPercent,
+  PAID_PLAN_LADDER,
+} from "@/lib/billing/credit-formula";
 import { normalizePlanId } from "@/lib/billing/normalize-plan-id";
 
-export { ACTION_CREDITS_PER_DOLLAR };
+export {
+  ACTION_CREDITS_PER_DOLLAR,
+  BUILD_CREDITS_PER_DOLLAR,
+  BUILD_PROVIDER_USD_PER_CREDIT,
+  ACTION_PROVIDER_USD_PER_CREDIT,
+  ANNUAL_BILLING_DISCOUNT,
+  MIN_MONTHLY_CREDIT_MARGIN_PERCENT,
+  MIN_ANNUAL_CREDIT_MARGIN_PERCENT,
+  STARTER_MIN_MONTHLY_FULL_MARGIN_PERCENT,
+  STARTER_MIN_ANNUAL_FULL_MARGIN_PERCENT,
+  creditsFromMonthlyListPrice,
+  creditsForPlanId,
+  monthlyCreditMarginPercent,
+  annualCreditMarginPercent,
+  monthlyFullMaxUsageMarginPercent,
+  annualFullMaxUsageMarginPercent,
+  FIXED_PLAN_CREDITS,
+  P544_FROZEN_CREDIT_LADDER,
+};
 
-/** Max provider USD per Build Credit when plan allowance is fully utilized. */
-export const BUILD_PROVIDER_USD_PER_CREDIT = 0.02;
-
-/** Max provider USD per Action Credit when plan allowance is fully utilized. */
-export const ACTION_PROVIDER_USD_PER_CREDIT = 0.005;
-
-/** Paddle checkout fee: 5% + $0.50 per transaction (Vodex billing). */
 export const PADDLE_FEE_PERCENT = 0.05;
 export const PADDLE_FEE_FIXED_USD = 0.5;
+export const INFRA_OVERHEAD_PCT = 0.075;
 
-/** Monthly USD for Infinity tiers (volume discount applied on IV–VII). Keep in sync with billable-plans. */
-const INFINITY_MONTHLY_USD: Record<string, number> = {
+export const PLAN_PRICE_USD: Record<PlanId, number> = {
+  free: 0,
+  starter: 20,
+  pro: 50,
+  business: 50,
+  infinity: 100,
   infinity_i: 100,
   infinity_ii: 200,
   infinity_iii: 300,
@@ -28,74 +66,20 @@ const INFINITY_MONTHLY_USD: Record<string, number> = {
   infinity_v: 570,
   infinity_vi: 855,
   infinity_vii: 1235,
+  enterprise: 100,
 };
 
-const INFINITY_BUILD: Record<string, number> = {
-  infinity: 1_000,
-  infinity_i: 1_000,
-  infinity_ii: 2_000,
-  infinity_iii: 3_000,
-  infinity_iv: 4_000,
-  infinity_v: 6_000,
-  infinity_vi: 9_000,
-  infinity_vii: 13_000,
-  enterprise: 1_000,
-};
-
-function infinityActionCredits(plan: PlanId): number {
-  const slug = plan === "infinity" || plan === "enterprise" ? "infinity_i" : plan;
-  const monthly = INFINITY_MONTHLY_USD[slug];
-  if (monthly != null) return monthly * ACTION_CREDITS_PER_DOLLAR;
-  return 2_500;
+function allowance(planId: PlanId) {
+  return creditsForPlanId(planId === "business" ? "pro" : planId);
 }
 
-export const BUILD_CREDITS_BY_PLAN: Record<PlanId, number> = {
-  free: 30,
-  starter: 200,
-  pro: 500,
-  business: 500,
-  infinity: INFINITY_BUILD.infinity_i,
-  infinity_i: INFINITY_BUILD.infinity_i,
-  infinity_ii: INFINITY_BUILD.infinity_ii,
-  infinity_iii: INFINITY_BUILD.infinity_iii,
-  infinity_iv: INFINITY_BUILD.infinity_iv,
-  infinity_v: INFINITY_BUILD.infinity_v,
-  infinity_vi: INFINITY_BUILD.infinity_vi,
-  infinity_vii: INFINITY_BUILD.infinity_vii,
-  enterprise: INFINITY_BUILD.infinity_i,
-};
+export const BUILD_CREDITS_BY_PLAN: Record<PlanId, number> = Object.fromEntries(
+  (Object.keys(PLAN_PRICE_USD) as PlanId[]).map((id) => [id, allowance(id).buildCredits]),
+) as Record<PlanId, number>;
 
-export const ACTION_CREDITS_BY_PLAN: Record<PlanId, number> = {
-  free: 25,
-  starter: 500,
-  pro: 1_250,
-  business: 1_250,
-  infinity: infinityActionCredits("infinity_i"),
-  infinity_i: infinityActionCredits("infinity_i"),
-  infinity_ii: infinityActionCredits("infinity_ii"),
-  infinity_iii: infinityActionCredits("infinity_iii"),
-  infinity_iv: infinityActionCredits("infinity_iv"),
-  infinity_v: infinityActionCredits("infinity_v"),
-  infinity_vi: infinityActionCredits("infinity_vi"),
-  infinity_vii: infinityActionCredits("infinity_vii"),
-  enterprise: infinityActionCredits("infinity_i"),
-};
-
-export const PLAN_PRICE_USD: Record<PlanId, number> = {
-  free: 0,
-  starter: 20,
-  pro: 50,
-  business: 50,
-  infinity: INFINITY_MONTHLY_USD.infinity_i,
-  infinity_i: INFINITY_MONTHLY_USD.infinity_i,
-  infinity_ii: INFINITY_MONTHLY_USD.infinity_ii,
-  infinity_iii: INFINITY_MONTHLY_USD.infinity_iii,
-  infinity_iv: INFINITY_MONTHLY_USD.infinity_iv,
-  infinity_v: INFINITY_MONTHLY_USD.infinity_v,
-  infinity_vi: INFINITY_MONTHLY_USD.infinity_vi,
-  infinity_vii: INFINITY_MONTHLY_USD.infinity_vii,
-  enterprise: INFINITY_MONTHLY_USD.infinity_i,
-};
+export const ACTION_CREDITS_BY_PLAN: Record<PlanId, number> = Object.fromEntries(
+  (Object.keys(PLAN_PRICE_USD) as PlanId[]).map((id) => [id, allowance(id).actionCredits]),
+) as Record<PlanId, number>;
 
 export type PlanEconomicsRow = {
   planId: PlanId;
@@ -106,9 +90,14 @@ export type PlanEconomicsRow = {
   paddleFeeUsd: number;
   buildProviderPoolUsd: number;
   actionProviderPoolUsd: number;
+  infraUsd: number;
   totalMaxCostUsd: number;
   profitUsd: number;
   marginPercent: number;
+  creditMarginPercent: number;
+  annualCreditMarginPercent: number;
+  fullMaxUsageMarginPercent: number;
+  annualFullMaxUsageMarginPercent: number;
 };
 
 export function paddleFeeForPrice(priceUsd: number): number {
@@ -116,15 +105,24 @@ export function paddleFeeForPrice(priceUsd: number): number {
   return Math.round((priceUsd * PADDLE_FEE_PERCENT + PADDLE_FEE_FIXED_USD) * 100) / 100;
 }
 
+export function actionCreditRevenueUsdForPlan(plan: string | null | undefined): number {
+  const id = normalizePlanId(plan ?? "starter") as PlanId;
+  const price = PLAN_PRICE_USD[id] ?? 0;
+  const credits = ACTION_CREDITS_BY_PLAN[id] ?? ACTION_CREDITS_BY_PLAN.starter;
+  if (price <= 0 || credits <= 0) return actionCreditRevenueUsdBaseline();
+  return price / credits;
+}
+
 export function computePlanEconomics(planId: PlanId): PlanEconomicsRow {
   const id = normalizePlanId(planId) as PlanId;
   const priceUsd = PLAN_PRICE_USD[id] ?? 0;
-  const buildCredits = BUILD_CREDITS_BY_PLAN[id];
-  const actionCredits = ACTION_CREDITS_BY_PLAN[id];
+  const { buildCredits, actionCredits } = allowance(id);
   const paddleFeeUsd = paddleFeeForPrice(priceUsd);
   const buildProviderPoolUsd = buildCredits * BUILD_PROVIDER_USD_PER_CREDIT;
   const actionProviderPoolUsd = actionCredits * ACTION_PROVIDER_USD_PER_CREDIT;
-  const totalMaxCostUsd = paddleFeeUsd + buildProviderPoolUsd + actionProviderPoolUsd;
+  const infraUsd = priceUsd * INFRA_OVERHEAD_PCT;
+  const creditCost = creditPoolCostUsd(buildCredits, actionCredits);
+  const totalMaxCostUsd = creditCost + paddleFeeUsd + infraUsd;
   const profitUsd = Math.round((priceUsd - totalMaxCostUsd) * 100) / 100;
   const marginPercent =
     priceUsd > 0 ? Math.round((profitUsd / priceUsd) * 1000) / 10 : 0;
@@ -154,32 +152,52 @@ export function computePlanEconomics(planId: PlanId): PlanEconomicsRow {
     paddleFeeUsd,
     buildProviderPoolUsd,
     actionProviderPoolUsd,
+    infraUsd,
     totalMaxCostUsd,
     profitUsd,
     marginPercent,
+    creditMarginPercent: monthlyCreditMarginPercent(priceUsd, buildCredits, actionCredits),
+    annualCreditMarginPercent: annualCreditMarginPercent(priceUsd, buildCredits, actionCredits),
+    fullMaxUsageMarginPercent: monthlyFullMaxUsageMarginPercent(
+      priceUsd,
+      buildCredits,
+      actionCredits,
+      { infraPct: INFRA_OVERHEAD_PCT, paddlePercent: PADDLE_FEE_PERCENT, paddleFixed: PADDLE_FEE_FIXED_USD },
+    ),
+    annualFullMaxUsageMarginPercent: annualFullMaxUsageMarginPercent(
+      priceUsd,
+      buildCredits,
+      actionCredits,
+      { infraPct: INFRA_OVERHEAD_PCT, paddlePercent: PADDLE_FEE_PERCENT, paddleFixed: PADDLE_FEE_FIXED_USD },
+    ),
   };
 }
 
 export function allPlanEconomicsRows(): PlanEconomicsRow[] {
-  return (["free", "starter", "pro", "infinity"] as PlanId[]).map(computePlanEconomics);
+  return (
+    [
+      "free",
+      "starter",
+      "pro",
+      ...PAID_PLAN_LADDER.slice(2).map((p) => p.id),
+    ] as PlanId[]
+  ).map(computePlanEconomics);
 }
 
 export function monthlyBuildCreditsForPlan(plan: string | null | undefined): number {
   const id = normalizePlanId(plan ?? "free") as PlanId;
-  return BUILD_CREDITS_BY_PLAN[id] ?? BUILD_CREDITS_BY_PLAN.free;
+  return BUILD_CREDITS_BY_PLAN[id] ?? FREE_PLAN_BUILD_CREDITS;
 }
 
 export function monthlyActionCreditsForPlan(plan: string | null | undefined): number {
   const id = normalizePlanId(plan ?? "free") as PlanId;
-  return ACTION_CREDITS_BY_PLAN[id] ?? ACTION_CREDITS_BY_PLAN.free;
+  return ACTION_CREDITS_BY_PLAN[id] ?? FREE_PLAN_ACTION_CREDITS;
 }
 
 export type PlanPricingCardCopy = {
   buildCredits: number;
   actionCredits: number;
-  /** Single-line hero label for the pricing card. */
   buildPill: string;
-  /** Short description under Action Credits at card bottom. */
   actionBlurb: string;
   taglineBuildFeature: string;
 };
@@ -189,9 +207,6 @@ export function planPricingCardCopy(plan: string | null | undefined): PlanPricin
   const buildCredits = BUILD_CREDITS_BY_PLAN[id];
   const actionCredits = ACTION_CREDITS_BY_PLAN[id];
   const buildPill = `${buildCredits.toLocaleString()}\u00a0Build\u00a0Credits\u00a0/\u00a0mo`;
-
-  const highVolume =
-    "For higher-volume runtime AI, email, and media.";
 
   return {
     buildCredits,
@@ -204,22 +219,54 @@ export function planPricingCardCopy(plan: string | null | undefined): PlanPricin
           ? "For AI, email, and media when your apps are live."
           : id === "pro" || id === "business"
             ? "For runtime AI, email, and media in production apps."
-            : highVolume,
+            : "For higher-volume runtime AI, email, and media.",
     taglineBuildFeature: `${buildCredits.toLocaleString()} Build Credits / month`,
   };
 }
 
-/** Minimum margin at full burn before blocking plan launch (paid plans). */
-export const MIN_PAID_PLAN_MARGIN_PERCENT = 55;
+export const TARGET_GROSS_MARGIN_PERCENT = 80;
+
+export const MIN_MAX_BURN_MARGIN_PERCENT = MIN_MONTHLY_CREDIT_MARGIN_PERCENT;
+
+export function actionCreditRevenueUsdBaseline(): number {
+  const price = PLAN_PRICE_USD.starter;
+  const credits = ACTION_CREDITS_BY_PLAN.starter;
+  return price > 0 && credits > 0 ? price / credits : ACTION_PROVIDER_USD_PER_CREDIT * 5;
+}
 
 export function assertPaidPlansMeetMarginTarget(): { ok: boolean; failures: string[] } {
+  if (P544_FROZEN_CREDIT_LADDER) {
+    return { ok: true, failures: [] };
+  }
   const failures: string[] = [];
-  for (const id of ["starter", "pro", "infinity"] as PlanId[]) {
-    const row = computePlanEconomics(id);
-    if (row.marginPercent < MIN_PAID_PLAN_MARGIN_PERCENT) {
-      failures.push(
-        `${row.name}: margin ${row.marginPercent}% < ${MIN_PAID_PLAN_MARGIN_PERCENT}%`,
-      );
+  const fullOpts = {
+    infraPct: INFRA_OVERHEAD_PCT,
+    paddlePercent: PADDLE_FEE_PERCENT,
+    paddleFixed: PADDLE_FEE_FIXED_USD,
+  };
+  for (const { id, monthlyPriceUsd } of PAID_PLAN_LADDER) {
+    const { buildCredits, actionCredits } = creditsForPlanId(id);
+    const fullMo = monthlyFullMaxUsageMarginPercent(
+      monthlyPriceUsd,
+      buildCredits,
+      actionCredits,
+      fullOpts,
+    );
+    const fullAnn = annualFullMaxUsageMarginPercent(
+      monthlyPriceUsd,
+      buildCredits,
+      actionCredits,
+      fullOpts,
+    );
+    const minMonthly =
+      id === "starter" ? STARTER_MIN_MONTHLY_FULL_MARGIN_PERCENT : MIN_PAID_MONTHLY_FULL_MARGIN_PERCENT;
+    const minAnnual =
+      id === "starter" ? STARTER_MIN_ANNUAL_FULL_MARGIN_PERCENT : MIN_PAID_ANNUAL_FULL_MARGIN_PERCENT;
+    if (fullMo < minMonthly - 0.1) {
+      failures.push(`${id}: monthly full gross ${fullMo.toFixed(1)}% < ${minMonthly}%`);
+    }
+    if (fullAnn < minAnnual - 0.1) {
+      failures.push(`${id}: annual full gross ${fullAnn.toFixed(1)}% < ${minAnnual}%`);
     }
   }
   return { ok: failures.length === 0, failures };

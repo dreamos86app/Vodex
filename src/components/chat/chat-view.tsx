@@ -31,7 +31,7 @@ import { isAiPreflightSuccess, preflightBlockedLabel } from "@/lib/ai/preflight-
 import { applyComposerPaste } from "@/lib/composer/textarea-handlers";
 import { composerTextareaClass } from "@/components/ui/composer-shell";
 import { VodexBrandIcon } from "@/components/brand/vodex-brand-icon";
-import { VodexBrandLockup } from "@/components/brand/vodex-brand-lockup";
+import { ChatDeleteConfirmModal } from "@/components/chat/chat-delete-confirm-modal";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { submitDebug, uiSubmitLog } from "@/lib/dev/submit-debug";
 import { useComposerClickCapture } from "@/lib/dev/composer-click-capture";
@@ -46,7 +46,8 @@ import {
   useChatConversationStore,
 } from "@/lib/stores/chat-conversation-store";
 
-const DISCUSS_MODEL_ID_FREE = "gpt-4o-mini";
+/** Server routes discuss to cheapest safe model — client sends auto only. */
+const DISCUSS_MODEL_AUTO = "auto";
 
 export type ChatAttachment = { id?: string; url?: string; mime?: string; name?: string };
 
@@ -59,12 +60,6 @@ function parseAttachments(raw: unknown): ChatAttachment[] {
       "url" in x &&
       typeof (x as ChatAttachment).url === "string",
   );
-}
-
-function planIsFree(planId: string | null | undefined): boolean {
-  if (!planId) return true;
-  const p = planId.toLowerCase();
-  return p === "free" || p === "starter";
 }
 
 // ─── Data hooks ───────────────────────────────────────────────────────────────
@@ -455,9 +450,10 @@ export function ChatView() {
     searchParams,
     profile?.email ?? user?.email ?? null,
   );
-  const freePlan = planIsFree(profile?.plan_id);
-  const [paidDiscussModel, setPaidDiscussModel] = React.useState("claude-sonnet-4-6");
-  const effectiveDiscussModel = freePlan ? DISCUSS_MODEL_ID_FREE : paidDiscussModel;
+  const effectiveDiscussModel = DISCUSS_MODEL_AUTO;
+  const [deleteTarget, setDeleteTarget] = React.useState<Conversation | null>(null);
+  const [renamingId, setRenamingId] = React.useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = React.useState("");
   const discussTokens = DISCUSS_FLAT_CREDITS;
   /** Block sends only after server confirmed balance; avoids false zero before /api/credits hydrates. */
   const tokenBlocked = isConfirmed && remaining < discussTokens;
@@ -692,6 +688,48 @@ export function ChatView() {
   const filteredConvs = conversations.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase()),
   );
+  const activeConvTitle =
+    conversations.find((c) => c.id === activeConvId)?.title ?? "New conversation";
+
+  async function confirmDeleteConversation() {
+    if (!deleteTarget) return;
+    const conv = deleteTarget;
+    const res = await fetch(`/api/conversations/${conv.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      toast.error("Could not delete this chat.");
+      return;
+    }
+    setConversations((list) => list.filter((c) => c.id !== conv.id));
+    if (activeConvId === conv.id) {
+      setActiveConvId(null);
+      setMessages([]);
+      updateChatUrl(null);
+    }
+    toast.success("Chat deleted");
+  }
+
+  async function saveRenameConversation(convId: string) {
+    const title = renameDraft.trim();
+    if (!title) return;
+    const res = await fetch(`/api/conversations/${convId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    if (!res.ok) {
+      toast.error("Could not rename chat.");
+      return;
+    }
+    setConversations((list) =>
+      list.map((c) => (c.id === convId ? { ...c, title, updated_at: new Date().toISOString() } : c)),
+    );
+    setRenamingId(null);
+    setRenameDraft("");
+  }
 
   function failSend(blocked: string, message: string, hint?: string) {
     const full = hint ? `${message} — ${hint}` : message;
@@ -1036,25 +1074,72 @@ export function ChatView() {
             </div>
           ) : (
             filteredConvs.map((conv) => (
-              <button
+              <div
                 key={conv.id}
-                type="button"
-                onClick={() => switchConversation(conv.id)}
                 className={cn(
-                  "group w-full cursor-pointer px-3 py-2.5 text-left transition hover:bg-surface",
+                  "group flex items-start gap-1 px-2 py-1.5 transition hover:bg-surface",
                   activeConvId === conv.id && "bg-surface",
                 )}
               >
-                <p className={cn(
-                  "truncate text-[12.5px] font-medium leading-snug",
-                  activeConvId === conv.id ? "text-foreground" : "text-foreground/80",
-                )}>
-                  {conv.title}
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {new Date(conv.updated_at).toLocaleDateString()}
-                </p>
-              </button>
+                {renamingId === conv.id ? (
+                  <form
+                    className="flex min-w-0 flex-1 gap-1"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void saveRenameConversation(conv.id);
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={renameDraft}
+                      onChange={(e) => setRenameDraft(e.target.value)}
+                      className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[12px]"
+                    />
+                    <button type="submit" className="text-[11px] font-medium text-accent">
+                      Save
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => switchConversation(conv.id)}
+                      className="min-w-0 flex-1 cursor-pointer px-1 py-1 text-left"
+                    >
+                      <p
+                        className={cn(
+                          "truncate text-[12.5px] font-medium leading-snug",
+                          activeConvId === conv.id ? "text-foreground" : "text-foreground/80",
+                        )}
+                      >
+                        {conv.title}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {new Date(conv.updated_at).toLocaleDateString()}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      title="Rename"
+                      onClick={() => {
+                        setRenamingId(conv.id);
+                        setRenameDraft(conv.title);
+                      }}
+                      className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-background hover:text-foreground"
+                    >
+                      <MoreHorizontal className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Delete"
+                      onClick={() => setDeleteTarget(conv)}
+                      className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-600"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
             ))
           )}
         </div>
@@ -1092,7 +1177,7 @@ export function ChatView() {
               className="fixed inset-y-0 left-0 z-[61] flex w-[min(100%,280px)] flex-col border-r border-border bg-background shadow-xl lg:hidden"
             >
               <div className="flex items-center justify-between border-b border-border px-3 py-3">
-                <VodexBrandLockup variant="drawer" href="/" onClick={() => setMobileConvOpen(false)} />
+                <p className="text-[13px] font-semibold text-foreground">Conversations</p>
                 <button
                   type="button"
                   onClick={() => setMobileConvOpen(false)}
@@ -1153,7 +1238,8 @@ export function ChatView() {
             <PanelLeft className="size-4" strokeWidth={1.75} />
           </button>
           <div className="min-w-0 flex-1">
-            <VodexBrandLockup variant="drawer" href="/chat" showText />
+            <p className="truncate text-[13px] font-semibold text-foreground">{activeConvTitle}</p>
+            <p className="truncate text-[10px] text-muted-foreground">Discuss</p>
           </div>
           <button
             type="button"
@@ -1165,26 +1251,11 @@ export function ChatView() {
           </button>
         </div>
         {/* Chat label bar */}
-        <div className="flex h-10 shrink-0 flex-wrap items-center gap-2 border-b border-border px-4">
-          <div className="flex items-center gap-1.5 rounded-full bg-muted/50 px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground ring-1 ring-border/60">
-            <VodexBrandIcon variant="assistant" alt="" />
-            {freePlan ? "Discuss · automatic model" : "Discuss · choose model"}
-          </div>
-          {!freePlan && (
-            <select
-              value={paidDiscussModel}
-              onChange={(e) => setPaidDiscussModel(e.target.value)}
-              aria-label="Model"
-              className="rounded-lg border border-border/80 bg-background px-2 py-1 text-[11px] text-foreground outline-none"
-            >
-              <option value="claude-sonnet-4-6">Claude Sonnet</option>
-              <option value="claude-haiku-4-5">Claude Haiku</option>
-              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="gpt-4o-mini">GPT-4o mini</option>
-            </select>
-          )}
-          <span className="ml-auto hidden text-[11px] text-muted-foreground/60 sm:inline">
+        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-4">
+          <span className="rounded-full bg-muted/50 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground ring-1 ring-border/60">
+            Discuss
+          </span>
+          <span className="ml-auto hidden text-[10.5px] text-muted-foreground/70 sm:inline">
             {discussInputHintLabel()}
           </span>
         </div>
@@ -1199,13 +1270,13 @@ export function ChatView() {
                 animate="show"
                 className="flex flex-col items-center py-8 text-center sm:py-10"
               >
-                <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/25 via-accent/15 to-violet-500/20 ring-1 ring-accent/25 shadow-[0_8px_28px_-12px_rgba(37,99,235,0.22)]">
-                  <VodexBrandIcon variant="lg" alt="Vodex" />
+                <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-accent/10 ring-1 ring-accent/20">
+                  <MessageSquare className="size-5 text-accent" strokeWidth={1.75} />
                 </div>
-                <h2 className="text-[20px] font-semibold tracking-tight text-foreground">
+                <h2 className="text-[17px] font-semibold tracking-tight text-foreground sm:text-[18px]">
                   How can I help?
                 </h2>
-                <p className="mt-2 max-w-md text-[13px] leading-relaxed text-muted-foreground">
+                <p className="mt-1.5 max-w-md text-[12.5px] leading-relaxed text-muted-foreground">
                   Ask how Vodex works, what to build first, or where to find pricing and settings. Short, plain-language answers.
                 </p>
                 <div className="mt-6 flex w-full max-w-xl flex-col gap-2">
@@ -1327,7 +1398,7 @@ export function ChatView() {
         {/* Input area */}
         <div
           ref={composerRootRef}
-          className="relative z-30 shrink-0 border-t border-border/60 bg-background/90 px-3 pt-2.5 backdrop-blur-xl pb-[max(0.875rem,calc(4rem+env(safe-area-inset-bottom,0px)))] lg:pb-3"
+          className="relative z-30 shrink-0 border-t border-border/60 bg-background/90 px-2.5 pt-2 backdrop-blur-xl pb-[max(0.75rem,calc(var(--mobile-bottom-nav-height,76px)+env(safe-area-inset-bottom,0px)+0.5rem))] sm:px-3 lg:pb-3"
         >
           {attachments.length > 0 && (
             <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-2">
@@ -1499,6 +1570,13 @@ export function ChatView() {
           />
         )}
       </AnimatePresence>
+
+      <ChatDeleteConfirmModal
+        open={Boolean(deleteTarget)}
+        title={deleteTarget?.title ?? "Chat"}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDeleteConversation}
+      />
       </div>
     </div>
   );

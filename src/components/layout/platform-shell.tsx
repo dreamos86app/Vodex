@@ -157,7 +157,9 @@ function MobileBottomNav() {
             ? pathname === "/"
             : item.href === "/settings"
               ? pathname === "/settings" || pathname.startsWith("/settings/")
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              : item.href === "/chat"
+                ? pathname === "/chat" || pathname === "/ai-chat"
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = item.icon;
         return (
           <Link
@@ -210,6 +212,7 @@ export function PlatformShell({
   const isFullBleed =
     isOnboarding ||
     pathname === "/chat" ||
+    pathname === "/ai-chat" ||
     pathname.startsWith("/create") ||
     pathname.includes("/builder");
   /** Home scrolls on `main` so the scrollbar sits at the right edge of the content column. */
@@ -274,7 +277,7 @@ export function PlatformShell({
               ? "relative flex min-h-0 flex-1 min-w-0 flex-col overflow-y-auto overflow-x-hidden pb-[calc(var(--mobile-bottom-nav-height,76px)+env(safe-area-inset-bottom,0px)+12px)] lg:pb-0"
               : isFullBleed
                 ? "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                : "relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-atmosphere px-[var(--page-padding-x)] pt-[var(--page-padding-y)] pb-[calc(var(--mobile-bottom-nav-height,76px)+env(safe-area-inset-bottom,0px)+12px)] lg:pb-0"
+                : "vodex-shell-main relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-atmosphere px-[var(--page-padding-x)] pt-[var(--page-padding-y)] pb-[calc(var(--mobile-bottom-nav-height,76px)+env(safe-area-inset-bottom,0px)+12px)] lg:pb-0"
           }
           style={
             isHomeShellScroll || !isFullBleed ? { scrollBehavior: "smooth" } : undefined

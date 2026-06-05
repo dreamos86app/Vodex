@@ -34,7 +34,7 @@ mustInclude("src/components/os-home/os-home.tsx", "DreamOsStatsSection");
 mustInclude("src/components/os-home/os-home.tsx", "WhyDreamOsSection");
 mustInclude("src/components/os-home/dreamos-stats-section.tsx", "/api/public/stats");
 mustInclude("src/components/os-home/dreamos-stats-section.tsx", "StatSkeleton");
-mustInclude("src/lib/billing/plans.ts", "free: 30");
+mustInclude("src/lib/billing/plan-credit-economics.ts", "free: 20");
 mustInclude("src/components/marketing/public-landing.tsx", 'data-testid="public-landing"');
 mustInclude("src/components/marketing/public-conversion-cards.tsx", 'data-testid="public-conversion-cards"');
 mustInclude("src/components/marketing/how-it-works-demo.tsx", 'data-testid="how-it-works-demo"');

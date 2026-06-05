@@ -33,18 +33,17 @@ export function computeUpgradeCycleCredits(input: {
   const oldActionCap = monthlyActionCreditsForPlan(oldPlan) + input.explicitActionBonus;
   const newActionCap = monthlyActionCreditsForPlan(newPlan) + input.explicitActionBonus;
 
-  const buildUsed = midCyclePreserveUsage
-    ? Math.max(0, oldBuildCap - Math.max(0, input.buildRemainingBefore))
-    : 0;
-  const actionUsed = midCyclePreserveUsage
-    ? Math.max(0, oldActionCap - Math.max(0, input.actionRemainingBefore))
-    : 0;
+  const buildRemaining = Math.max(0, input.buildRemainingBefore);
+  const actionRemaining = Math.max(0, input.actionRemainingBefore);
+
+  const buildUsed = midCyclePreserveUsage ? Math.max(0, oldBuildCap - buildRemaining) : 0;
+  const actionUsed = midCyclePreserveUsage ? Math.max(0, oldActionCap - actionRemaining) : 0;
 
   const buildCredits = midCyclePreserveUsage
-    ? Math.max(0, newBuildCap - buildUsed)
+    ? Math.max(0, Math.round((buildRemaining + (newBuildCap - oldBuildCap)) * 10) / 10)
     : newBuildCap;
   const actionCredits = midCyclePreserveUsage
-    ? Math.max(0, newActionCap - actionUsed)
+    ? Math.max(0, Math.round((actionRemaining + (newActionCap - oldActionCap)) * 10) / 10)
     : newActionCap;
 
   return {

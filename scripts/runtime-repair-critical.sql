@@ -25,7 +25,7 @@ begin
   if p_user_id is null then return jsonb_build_object('ok', false, 'error', 'user_id_required'); end if;
   v_email := coalesce(nullif(trim(p_email), ''), '');
   insert into public.profiles (id, email, plan_id, credits_remaining, credits_limit, credits_used)
-  values (p_user_id, v_email, 'free', 30, 30, 0) on conflict (id) do nothing;
+  values (p_user_id, v_email, 'free', 20, 20, 0) on conflict (id) do nothing;
   update public.profiles set
     email = case when (email is null or email = '') and v_email <> '' then v_email else email end,
     plan_id = coalesce(plan_id, 'free'),

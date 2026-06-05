@@ -1,11 +1,9 @@
 import "server-only";
 
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { loadCertificationProjectFiles } from "@/lib/certification/load-project-files";
 import type { CertificationContext } from "@/lib/certification/types";
 import { isZipImportProject } from "@/lib/projects/imported-project-state";
-
-const MAX_FILES = 250;
-const MAX_BYTES = 4_000_000;
 
 export async function loadCertificationContext(
   projectId: string,
@@ -27,28 +25,17 @@ export async function loadCertificationContext(
       ? (project.metadata as Record<string, unknown>)
       : {};
 
-  const { data: fileRows } = await admin
-    .from("app_files")
-    .select("path, content")
-    .eq("project_id", projectId)
-    .order("path")
-    .limit(MAX_FILES);
-
-  const files: Array<{ path: string; content: string }> = [];
-  let bytes = 0;
-  for (const row of fileRows ?? []) {
-    const content = String(row.content ?? "");
-    bytes += content.length;
-    if (bytes > MAX_BYTES) break;
-    files.push({ path: String(row.path), content });
-  }
-
   const { data: pub } = await admin
     .from("published_apps" as never)
-    .select("slug, public_url, canonical_url, status")
+    .select("slug, public_url, canonical_url, status, snapshot_files")
     .eq("project_id", projectId)
     .eq("status", "published")
     .maybeSingle();
+
+  const pubRowEarly = pub as { snapshot_files?: unknown } | null;
+  const files = await loadCertificationProjectFiles(admin, projectId, {
+    publishedSnapshot: pubRowEarly?.snapshot_files,
+  });
 
   const published = Boolean(pub);
   const pubRow = pub as { slug?: string; public_url?: string; canonical_url?: string } | null;

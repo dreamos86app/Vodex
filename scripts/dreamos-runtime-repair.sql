@@ -40,8 +40,8 @@ create table if not exists public.profiles (
   workspace_name text default 'My Workspace',
   plan_id text default 'free',
   plan_interval text default 'monthly',
-  credits_remaining integer default 30,
-  credits_limit integer default 30,
+  credits_remaining integer default 20,
+  credits_limit integer default 20,
   credits_used integer default 0,
   onboarding_completed boolean default false,
   created_at timestamptz not null default now(),
@@ -102,8 +102,8 @@ alter table public.profiles add column if not exists email text default '';
 alter table public.profiles add column if not exists workspace_name text default 'My Workspace';
 alter table public.profiles add column if not exists plan_id text default 'free';
 alter table public.profiles add column if not exists plan_interval text default 'monthly';
-alter table public.profiles add column if not exists credits_remaining integer default 30;
-alter table public.profiles add column if not exists credits_limit integer default 30;
+alter table public.profiles add column if not exists credits_remaining integer default 20;
+alter table public.profiles add column if not exists credits_limit integer default 20;
 alter table public.profiles add column if not exists credits_used integer default 0;
 alter table public.profiles add column if not exists onboarding_completed boolean default false;
 alter table public.profiles add column if not exists created_at timestamptz default now();
@@ -828,11 +828,11 @@ update public.app_files
 set source = coalesce(nullif(trim(source), ''), 'generated')
 where source is null;
 
-alter table public.profiles alter column credits_remaining set default 30;
-alter table public.profiles alter column credits_limit set default 30;
+alter table public.profiles alter column credits_remaining set default 20;
+alter table public.profiles alter column credits_limit set default 20;
 
 update public.profiles p
-set credits_remaining = 30, credits_limit = 30, monthly_token_limit = coalesce(p.monthly_token_limit, 30), updated_at = now()
+set credits_remaining = 20, credits_limit = 20, monthly_token_limit = coalesce(p.monthly_token_limit, 20), updated_at = now()
 where coalesce(p.plan_id, 'free') = 'free'
   and p.credits_remaining = 100
   and coalesce(p.credits_limit, 100) = 100

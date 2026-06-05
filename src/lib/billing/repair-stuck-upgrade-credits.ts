@@ -1,9 +1,7 @@
-import "server-only";
-
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
 import { monthlyTokensForPlan, normalizePlanId } from "@/lib/billing/plans";
-import { sumExplicitActionGrants, sumExplicitBuildGrants } from "@/lib/credits/canonical-credits";
+import { sumExplicitActionGrants, sumExplicitBuildGrants } from "@/lib/credits/explicit-grant-sums";
 import { computeUpgradeCycleCredits } from "@/lib/billing/mid-cycle-upgrade-credits";
 import type { PlanId } from "@/lib/supabase/types";
 

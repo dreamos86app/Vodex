@@ -1841,6 +1841,33 @@ body {
   min-height: var(--mobile-bottom-nav-height);
 }
 
+/* P5.2 — compact mobile typography and spacing (320–430px) */
+@media (max-width: 430px) {
+  .vodex-shell-main {
+    font-size: 0.8125rem;
+  }
+
+  .vodex-mobile-bottom-nav a {
+    font-size: 9px;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .vodex-mobile-bottom-nav svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  [data-testid="chat-composer-form"] textarea {
+    font-size: 13px;
+    min-height: 34px;
+  }
+
+  [data-testid="chat-composer-form"] {
+    padding: 0.35rem 0.4rem;
+  }
+}
+
 .vodex-footer-glass .vodex-footer-columns {
   padding-top: clamp(1.75rem, 3.5vw, 2.75rem);
 }

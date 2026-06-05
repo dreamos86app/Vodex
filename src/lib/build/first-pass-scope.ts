@@ -126,10 +126,10 @@ export function planFirstPassScope(intake: BuildIntakeSummary): FirstPassScope {
 export function firstPassTierCredits(tier: FirstPassTier): { min: number; max: number } {
   switch (tier) {
     case "simple":
-      return { min: 3, max: 5 };
+      return { min: 4, max: 6 };
     case "standard":
-      return { min: 5, max: 8 };
+      return { min: 6, max: 9 };
     case "advanced":
-      return { min: 8, max: 12 };
+      return { min: 9, max: 14 };
   }
 }

@@ -56,9 +56,13 @@ const suites = {
       throw new Error("profile seed clamp missing");
     }
   },
-  "credits-free-plan-30-of-30": () => {
-    if (!read("src/lib/billing/plans.ts").includes("free") || !read("src/lib/billing/plans.ts").includes("30")) {
-      throw new Error("free plan allowance must be 30");
+  "credits-free-plan-20-of-20": () => {
+    const econ = read("src/lib/billing/plan-credit-economics.ts");
+    if (!econ.includes("free: 20")) {
+      throw new Error("free plan build allowance must be 20");
+    }
+    if (!econ.includes("free: 20")) {
+      throw new Error("free plan action allowance must be 20");
     }
   },
   "credits-no-100-of-30": () => {

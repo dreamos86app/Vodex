@@ -31,7 +31,7 @@ function mustNotInclude(rel, needles, label) {
 
 // Part 0 economics constants
 const econ = read("src/lib/billing/plan-credit-economics.ts");
-const allowances = { free: 25, starter: 500, pro: 1250, infinity: 2500 };
+const allowances = { free: 20, starter: 420, pro: 1125, infinity: 2350 };
 for (const [plan, ac] of Object.entries(allowances)) {
   const underscored = ac >= 1000 ? `${Math.floor(ac / 1000)}_${String(ac % 1000).padStart(3, "0")}` : String(ac);
   if (!new RegExp(`${plan}:\\s*(${ac}|${underscored})`).test(econ)) {
@@ -95,7 +95,7 @@ mustInclude("src/lib/contact/save-contact-request.ts", "meterRuntimeActionForOwn
 
 // Pricing page copy
 mustInclude("src/components/pricing/pricing-view.tsx", "planPricingCardCopy", "pricing card copy");
-mustInclude("src/lib/billing/plan-credit-economics.ts", "pro: 1_250", "pro action credits allowance");
+mustInclude("src/lib/billing/plan-credit-economics.ts", "pro: 1_125", "pro action credits allowance");
 mustInclude("src/components/pricing/pricing-view.tsx", "planPricingCardCopy(\"pro\")", "pro pricing card");
 
 // Help docs

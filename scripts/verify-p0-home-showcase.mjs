@@ -42,7 +42,7 @@ const CHECKS = {
   },
   "plan-credit-truth": () => {
     mustExist("src/lib/billing/plan-entitlements.ts");
-    mustInclude("src/lib/billing/plans.ts", "free: 30", "free 30");
+    mustInclude("src/lib/billing/plan-credit-economics.ts", "free: 20", "free 20");
     mustInclude("src/lib/billing/plans.ts", "pro: 500", "pro 500");
     mustInclude("src/lib/credits/canonical-credits.ts", "explicitBonus", "explicit bonus param");
     mustInclude("src/lib/credits/canonical-credits.ts", "sumExplicitBuildGrants", "grant lookup");

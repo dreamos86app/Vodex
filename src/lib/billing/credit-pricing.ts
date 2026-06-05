@@ -1,9 +1,17 @@
 /**
  * User-facing credit pricing constants — visible labels only; no provider costs.
  */
+import {
+  DISCUSS_BC_TIER_PROTECTED,
+  DISCUSS_BC_TIER_STANDARD,
+  discussCreditsToCharge,
+  resolveDiscussBuildCredits,
+} from "@/lib/billing/discuss-credit-pricing";
 
-/** @deprecated Use floor + markup pricing — kept for legacy UI fallbacks. */
-export const DISCUSS_FLAT_CREDITS = 0.4;
+/** Default discuss charge when provider cost unknown (medium turn, cheapest model). */
+export const DISCUSS_FLAT_CREDITS = DISCUSS_BC_TIER_STANDARD;
+
+export { DISCUSS_BC_TIER_STANDARD, DISCUSS_BC_TIER_PROTECTED, discussCreditsToCharge, resolveDiscussBuildCredits };
 
 /** @deprecated Use floor + markup pricing — kept for legacy UI fallbacks. */
 export const CREATE_QUESTION_FLAT_CREDITS = 0.8;
@@ -26,7 +34,7 @@ export function createQuestionFlatCreditsUsedLabel(credits = CREATE_QUESTION_FLA
 }
 
 export function discussInputHintLabel(): string {
-  return "Uses Build Credits when successful.";
+  return "Uses 0.3–0.4 Build Credits when successful.";
 }
 
 export function createQuestionInputHintLabel(): string {

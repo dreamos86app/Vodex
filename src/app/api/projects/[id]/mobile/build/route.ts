@@ -26,6 +26,8 @@ import {
   dispatchAndroidBuildJob,
   resolveBuildType,
 } from "@/lib/mobile/android-builder-dispatch";
+import { chargeActionCredit } from "@/lib/action-credits/charge-action-credit";
+import { MOBILE_PROVIDER_COST_USD } from "@/lib/mobile/action-pricing";
 
 export const runtime = "nodejs";
 
@@ -227,6 +229,28 @@ export async function POST(
 
   const actionCreditsCharged =
     artifactType === "wrapper_zip" ? 0 : buildQuote.isFree ? 0 : buildQuote.actionCredits;
+
+  if (actionCreditsCharged > 0) {
+    const charge = await chargeActionCredit({
+      ownerUserId: user.id,
+      projectId,
+      actionType: actionKey,
+      operationId: `mobile-build-${projectId}-${Date.now()}`,
+      providerCostUsd: MOBILE_PROVIDER_COST_USD[actionKey] ?? 0,
+      dynamicFloor: actionCreditsCharged,
+      metadata: {
+        platform,
+        artifactType,
+        charge_from_user_pool: true,
+      },
+    });
+    if (!charge.ok) {
+      return NextResponse.json(
+        { error: charge.error, code: charge.code, quote: buildQuote },
+        { status: charge.code === "insufficient" ? 402 : 500 },
+      );
+    }
+  }
 
   const buildType = resolveBuildType(pipelineType);
   const binaryArtifactUrl = isAndroidBinary ? null : artifactUrl;

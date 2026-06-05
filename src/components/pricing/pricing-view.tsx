@@ -41,7 +41,7 @@ import { normalizePlanId } from "@/lib/billing/plans";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const FREE_CREDITS = 30;
+const FREE_CREDITS = 20;
 const ANNUAL_DISCOUNT = 0.20;
 const INFINITY_DISCOUNT = 0.05;
 
@@ -56,13 +56,13 @@ interface InfinityTier {
 }
 
 const INFINITY_TIERS: InfinityTier[] = [
-  { id: "inf-1", label: "Infinity I",   credits: 1_000,  baseMonthly: 100 },
-  { id: "inf-2", label: "Infinity II",  credits: 2_000,  baseMonthly: 200 },
-  { id: "inf-3", label: "Infinity III", credits: 3_000,  baseMonthly: 300 },
-  { id: "inf-4", label: "Infinity IV",  credits: 4_000,  baseMonthly: 400, discount: INFINITY_DISCOUNT },
-  { id: "inf-5", label: "Infinity V",   credits: 6_000,  baseMonthly: 600, discount: INFINITY_DISCOUNT },
-  { id: "inf-6", label: "Infinity VI",  credits: 9_000,  baseMonthly: 900, discount: INFINITY_DISCOUNT },
-  { id: "inf-7", label: "Infinity VII", credits: 13_000, baseMonthly: 1300, discount: INFINITY_DISCOUNT },
+  { id: "inf-1", label: "Infinity I",   credits: 750,   baseMonthly: 100 },
+  { id: "inf-2", label: "Infinity II",  credits: 1_500, baseMonthly: 200 },
+  { id: "inf-3", label: "Infinity III", credits: 2_250, baseMonthly: 300 },
+  { id: "inf-4", label: "Infinity IV",  credits: 2_850, baseMonthly: 400, discount: INFINITY_DISCOUNT },
+  { id: "inf-5", label: "Infinity V",   credits: 4_250, baseMonthly: 600, discount: INFINITY_DISCOUNT },
+  { id: "inf-6", label: "Infinity VI",  credits: 6_500, baseMonthly: 900, discount: INFINITY_DISCOUNT },
+  { id: "inf-7", label: "Infinity VII", credits: 9_300, baseMonthly: 1300, discount: INFINITY_DISCOUNT },
 ];
 
 function tierPrice(tier: InfinityTier, annual: boolean): number {
@@ -78,7 +78,8 @@ function tierOriginalPrice(tier: InfinityTier): number {
 // ─── Comparison table data ────────────────────────────────────────────────────
 
 const COMPARISON_ROWS: { label: string; free: string | boolean; starter: string | boolean; pro: string | boolean; infinity: string | boolean }[] = [
-  { label: "Monthly credits",      free: "30",        starter: "200",      pro: "500",           infinity: "1,000–13,000" },
+  { label: "Monthly Build Credits", free: "20",        starter: "150",      pro: "375",           infinity: "750–9,300" },
+  { label: "Monthly Action Credits", free: "20",       starter: "400",      pro: "1,000",         infinity: "2,000–25,000" },
   { label: "Active projects",      free: "3",         starter: "Unlimited", pro: "Unlimited",    infinity: "Unlimited" },
   { label: "Discuss mode",         free: true,        starter: true,        pro: true,           infinity: true },
   { label: "Edit mode",            free: true,        starter: true,        pro: true,           infinity: true },

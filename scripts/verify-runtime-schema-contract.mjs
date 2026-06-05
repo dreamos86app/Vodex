@@ -28,7 +28,7 @@ mustInclude("supabase/migrations/20260624120000_runtime_contract_repair.sql", "c
 const repair = fs.readFileSync(path.join(root, "scripts/dreamos-runtime-repair.sql"), "utf8");
 if (/credits_remaining integer default 100/.test(repair)) {
   errors.push("dreamos-runtime-repair.sql still defaults credits to 100");
-} else ok.push("repair SQL free plan default 30");
+} else ok.push("repair SQL free plan default 20");
 
 function loadEnvLocal() {
   const p = path.join(root, ".env.local");

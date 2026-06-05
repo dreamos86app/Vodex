@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const writer = createServiceRoleClient() ?? supabase;
   const { data: owned } = await writer
     .from("projects")
-    .select("id")
+    .select("id, owner_id, workspace_id")
     .eq("id", projectId)
     .eq("owner_id", authUser.id)
     .maybeSingle();
@@ -59,6 +59,23 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  try {
+    const { saveAppVersionSnapshot } = await import("@/lib/projects/app-version-history");
+    await saveAppVersionSnapshot({
+      admin: writer,
+      projectId,
+      ownerId: owned.owner_id,
+      workspaceId: owned.workspace_id,
+      createdBy: authUser.id,
+      mode: "manual_edit",
+      summary: `Manual edit — ${patches.length} file(s)`,
+      files: patches.map((p) => ({ path: p.path, content: p.content })),
+      changedPaths: patches.map((p) => p.path),
+    });
+  } catch {
+    /* version history is best-effort */
   }
 
   const { data: allFiles } = await writer

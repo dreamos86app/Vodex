@@ -18,8 +18,8 @@ must("src/lib/credits/canonical-credits.ts", "computeActiveBonus", "explicit bon
 must("src/lib/credits/normalize-credit-balance.ts", "normalizeAvailableCredits", "inflate clamp");
 must("src/lib/credits/normalize-credit-balance.ts", "repairProfileCreditsIfInflated", "auto repair");
 must("src/lib/credits/format-credit-reset.ts", "formatCreditResetLocal", "local reset label");
-must("src/lib/billing/plans.ts", "30", "free plan 30 build allowance");
-must("src/lib/action-credits/action-credit-allowances.ts", "free: 25", "free plan 25 action allowance");
+must("src/lib/billing/plan-credit-economics.ts", "free: 20", "free plan 20 build allowance");
+must("src/lib/billing/plan-credit-economics.ts", "free: 20", "free plan 20 action allowance");
 must("src/lib/admin/list-users.ts", "buildCanonicalBucket", "admin canonical");
 
 console.log("\n=== verify:credit-truth ===\n");

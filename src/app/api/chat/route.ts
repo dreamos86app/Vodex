@@ -35,6 +35,7 @@ import { completeBuildWithValidation } from "@/lib/build/complete-build-with-val
 import { guardDiscussProviderCall } from "@/lib/ai/discuss-profit-guard";
 import { resolveFastDiscussStreamSpec } from "@/lib/ai/fast-discuss-pipeline";
 import { pickFreeDiscussModelId } from "@/lib/ai/discuss-model";
+import { resolveDiscussModeModel } from "@/lib/ai/discuss-mode-policy";
 import {
   classifyFirstCreatePrompt,
   classifyCreateIntent,
@@ -525,7 +526,11 @@ export async function POST(request: Request) {
   const freePlan = planIsFree(profileRow.plan_id as string | undefined);
   const requestedModel =
     typeof raw.modelId === "string" && raw.modelId.length > 0 ? raw.modelId : undefined;
-  const manualModelSelection = Boolean(requestedModel && !isAutomaticModelId(requestedModel));
+  const discussOnly =
+    modeAtSubmit === "discuss" || chargeMode === "discuss" || chargeMode === "create_question";
+  const manualModelSelection = discussOnly
+    ? false
+    : Boolean(requestedModel && !isAutomaticModelId(requestedModel));
   const taskMode = mapChatModeToTask(mode);
   const createIntent =
     firstCreateIntent?.intent ??
@@ -556,8 +561,8 @@ export async function POST(request: Request) {
   });
   const routed = costRuntime.route;
   const modelId =
-    freePlan && taskMode === "discuss"
-      ? pickFreeDiscussModelId()
+    discussOnly || (freePlan && taskMode === "discuss")
+      ? resolveDiscussModeModel({ planId: profileRow.plan_id as string }).modelId
       : routed.modelId;
   const billedModelId = modelId;
 
@@ -1123,8 +1128,7 @@ export async function POST(request: Request) {
   if (modeAtSubmit === "discuss" || chargeMode === "discuss" || chargeMode === "create_question") {
     streamSpec = resolveFastDiscussStreamSpec({
       ownerEmail: userEmail,
-      manualModelSelection,
-      requestedModelId: requestedModel,
+      planId: profileRow.plan_id as string,
     });
     const estIn = Math.min(2000, userText.length * 2 + 400);
     const discussGuard = guardDiscussProviderCall({

@@ -14,15 +14,18 @@ import {
   USER_CREDITS_PER_USD,
   type GenerationMode,
 } from "@/lib/billing/pricing-config";
-import { DISCUSS_FLAT_CREDITS } from "@/lib/billing/credit-pricing";
+import {
+  discussCreditsToCharge,
+  DISCUSS_BC_TIER_PROTECTED,
+} from "@/lib/billing/discuss-credit-pricing";
 import { estimateProviderCostUsd } from "@/lib/credits/usage-cost";
 import { estimateTokenProviderCostUsd } from "@/lib/credits/token-cost";
 
-/** Pricing policy id — discuss_flat_0.4: charge 0.4 Build Credits only after successful discuss. */
-export const DISCUSS_CREDIT_POLICY_ID = "discuss_flat_0.4";
+/** Pricing policy id — discuss tiered 0.3/0.4 BC after successful discuss. */
+export const DISCUSS_CREDIT_POLICY_ID = "discuss_tiered_0.3_0.4";
 
-export function discussFlatCreditsOnSuccess(): number {
-  return DISCUSS_FLAT_CREDITS;
+export function discussFlatCreditsOnSuccess(providerCostUsd?: number): number {
+  return discussCreditsToCharge({ providerCostUsd });
 }
 
 export type QuoteGenerationCostInput = {
@@ -180,22 +183,57 @@ function quoteWithFloors(
   };
 }
 
-/** Discuss / create-question — same floor + markup rules. */
+/** Discuss / create-question — tiered 0.3/0.4 BC with 5x margin guard. */
 export function quoteDiscussCost(input: {
   selectedModel: string;
   estimatedProviderCostUsd?: number;
   inputTokens?: number | null;
   outputTokens?: number | null;
 }): GenerationCostQuote {
-  return quoteWithFloors({
+  const providerUsd = resolveProviderCostUsd({
     mode: "discuss",
     selectedModel: input.selectedModel,
     estimatedProviderCostUsd: input.estimatedProviderCostUsd,
     estimatedInputTokens: input.inputTokens,
     estimatedOutputTokens: input.outputTokens,
-    operationType: "discuss",
     complexity: 1,
   });
+  const userCreditsRequired = discussCreditsToCharge({
+    providerCostUsd: providerUsd,
+    inputTokens: input.inputTokens ?? undefined,
+    outputTokens: input.outputTokens ?? undefined,
+  });
+  const revenueMultiplier = revenueMultiplierFromCharge(userCreditsRequired, providerUsd);
+  const grossMargin = grossMarginFromCharge(userCreditsRequired, providerUsd);
+
+  return {
+    userCreditsRequired,
+    userCreditsReserved: userCreditsRequired,
+    internalCostCredits: providerUsdToInternalCredits(providerUsd),
+    revenueMultiplier,
+    estimatedGrossMargin: grossMargin,
+    providerHardCapUsd: providerHardCapForMode("discuss"),
+    estimatedProviderCostUsd: providerUsd,
+    floorReason: userCreditsRequired <= DISCUSS_BC_TIER_PROTECTED ? "discuss_tier_standard" : "discuss_tier_protected",
+    safeToRun: revenueMultiplier >= TARGET_REVENUE_MULTIPLIER - 0.001,
+    userFacingLabel: formatBuildCreditsWhenSuccessful(userCreditsRequired),
+    operationType: "discuss",
+    adminBreakdown: {
+      operationType: "discuss",
+      productFloorCredits: userCreditsRequired,
+      minimumProfitableCredits: userCreditsRequired,
+      minimum_floor_applied: true,
+      markup_multiplier: TARGET_REVENUE_MULTIPLIER,
+      promptBump: 0,
+      fileBump: 0,
+      bufferApplied: 1,
+      revenueUsd: userCreditsRequired / USER_CREDITS_PER_USD,
+      costUsd: providerUsd,
+      modelId: input.selectedModel,
+      mode: "discuss",
+      complexity: 1,
+    },
+  };
 }
 
 export function quoteCreateQuestionCost(input: {

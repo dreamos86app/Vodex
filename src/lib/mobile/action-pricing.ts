@@ -20,13 +20,14 @@ export type MobileActionType =
   | "mobile_wrapper_zip_local";
 
 /** Estimated provider/infrastructure cost USD — admin only. */
+/** P5.4.4 — builder cache + shorter worker runs lower provider estimates. */
 export const MOBILE_PROVIDER_COST_USD: Partial<Record<MobileActionType, number>> = {
-  android_build: 0.12,
-  ios_build: 0.18,
-  mobile_artifact_storage: 0.02,
-  app_icon_ai_generation: 0.04,
-  splash_ai_generation: 0.06,
-  store_metadata_ai_generation: 0.02,
+  android_build: 0.1,
+  ios_build: 0.16,
+  mobile_artifact_storage: 0.018,
+  app_icon_ai_generation: 0.035,
+  splash_ai_generation: 0.05,
+  store_metadata_ai_generation: 0.016,
   push_notification_send: 0.001,
   store_publish_attempt: 0.01,
 };

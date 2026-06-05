@@ -14,8 +14,8 @@ export const INTERNAL_CREDITS_PER_USD = 30;
 /** User-facing revenue ledger */
 export const USER_CREDITS_PER_USD = 10;
 
-/** Required revenue dollars per $1 provider cost (3 = triple revenue vs cost) */
-export const TARGET_REVENUE_MULTIPLIER = 3;
+/** Required revenue dollars per $1 provider cost (5 = 5× provider cost → 80% gross margin). */
+export const TARGET_REVENUE_MULTIPLIER = 5;
 
 /** @deprecated Use TARGET_REVENUE_MULTIPLIER — old name implied internal×3 user credits (9× revenue) */
 export const MIN_GROSS_MARKUP_MULTIPLIER = TARGET_REVENUE_MULTIPLIER;
@@ -40,7 +40,7 @@ export type ComplexityFloorKey =
 
 /** Product pricing floors — aligned with build-credit-floors.ts (UI hints only). */
 export const USER_CREDIT_FLOORS: Record<ComplexityFloorKey, number> = {
-  discuss: 0.4,
+  discuss: 0.3,
   edit: 2,
   polish: 2,
   build_simple: 3,

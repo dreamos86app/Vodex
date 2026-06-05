@@ -22,10 +22,10 @@ function walk(dir, acc = []) {
 }
 
 const EXPECTED = {
-  free: { build: 30, action: 25 },
-  starter: { build: 200, action: 500 },
-  pro: { build: 500, action: 1250 },
-  infinity: { build: 1000, action: 2500 },
+  free: { build: 20, action: 20 },
+  starter: { build: 185, action: 420 },
+  pro: { build: 475, action: 1125 },
+  infinity: { build: 975, action: 2350 },
 };
 
 const econ = read("src/lib/billing/plan-credit-economics.ts");

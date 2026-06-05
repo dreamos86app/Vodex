@@ -130,7 +130,7 @@ function logCreditSync(reason: CreditSyncReason | undefined, detail: string) {
 export const useCreditsStore = create<CreditsState>()((set, get) => ({
   ...withLegacyFields({
     build: { ...EMPTY_BUCKET, planAllowance: 30 },
-    action: { ...EMPTY_BUCKET, planAllowance: 25 },
+    action: { ...EMPTY_BUCKET, planAllowance: 20 },
     planId: "free",
     loading: false,
     syncing: false,
@@ -333,7 +333,7 @@ export const useCreditsStore = create<CreditsState>()((set, get) => ({
     set(
       withLegacyFields({
         build: { ...EMPTY_BUCKET, planAllowance: 30 },
-        action: { ...EMPTY_BUCKET, planAllowance: 25 },
+        action: { ...EMPTY_BUCKET, planAllowance: 20 },
         planId: "free",
         loading: false,
         syncing: false,

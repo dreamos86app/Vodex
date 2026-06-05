@@ -141,7 +141,7 @@ export function PublicPricingSection() {
             Simple plans. Build Credits that scale with you.
           </h2>
           <p className="mx-auto mt-2 max-w-2xl text-[14px] leading-relaxed text-muted-foreground">
-            Start free with 30 Build Credits every month. Upgrade when you need more generation power,
+            Start free with 20 Build Credits and 20 Action Credits every month. Upgrade when you need more generation power,
             runtime AI, and production features — no surprise bills.
           </p>
         </div>

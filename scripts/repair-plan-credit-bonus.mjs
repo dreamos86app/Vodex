@@ -17,16 +17,16 @@ if (!url || !key) {
 }
 
 const PLAN_ALLOWANCE = {
-  free: 30,
-  starter: 200,
-  pro: 500,
+  free: 20,
+  starter: 185,
+  pro: 475,
   business: 500,
   infinity: 1000,
   enterprise: 1000,
 };
 
 function allowance(plan) {
-  return PLAN_ALLOWANCE[plan] ?? 30;
+  return PLAN_ALLOWANCE[plan] ?? 20;
 }
 
 const admin = createClient(url, key, { auth: { persistSession: false } });

@@ -19,6 +19,7 @@ import { loadProjectFileContent } from "@/lib/projects/load-project-files";
 import { preferredEntryFile } from "@/lib/projects/imported-project-state";
 import { fileMeetsMeaningfulThreshold } from "@/lib/build/source-integrity-validator";
 import { canManualCodeEdit } from "@/lib/billing/plan-features";
+import { AppVersionHistoryPanel } from "@/components/builder/app-version-history-panel";
 
 export type BuilderFile = { path: string; content: string };
 
@@ -650,18 +651,27 @@ export function AppBuilderWorkspace({
       </div>
 
       <div className="grid min-h-0 flex-1 overflow-hidden grid-cols-1 lg:grid-cols-[minmax(180px,220px)_1fr]">
-        <EditorFileTree
-          files={treeNodes}
-          selectedPath={activePath}
-          onSelect={(p) => {
-            openFile(p);
-            setMobilePanel("code");
-          }}
+        <div
           className={cn(
-            "min-h-0 overflow-hidden border-r border-border",
+            "flex min-h-0 flex-col overflow-hidden border-r border-border",
             mobilePanel !== "files" && "hidden lg:flex",
           )}
-        />
+        >
+          <EditorFileTree
+            files={treeNodes}
+            selectedPath={activePath}
+            onSelect={(p) => {
+              openFile(p);
+              setMobilePanel("code");
+            }}
+            className="min-h-0 flex-1 overflow-hidden"
+          />
+          {projectId ? (
+            <div className="hidden max-h-[220px] shrink-0 overflow-y-auto border-t border-border p-2 lg:block">
+              <AppVersionHistoryPanel projectId={projectId} />
+            </div>
+          ) : null}
+        </div>
 
         <div
           className={cn(

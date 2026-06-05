@@ -1,27 +1,27 @@
-import { pickFreeDiscussModelId } from "@/lib/ai/discuss-model";
+import { DISCUSS_MAX_OUTPUT_TOKENS, resolveDiscussModeModel } from "@/lib/ai/discuss-mode-policy";
 import { routeOperation } from "@/lib/ai/model-router";
 
-/** Ultra-fast discuss — no build worker, no preview, cheapest model. */
+/** Ultra-fast discuss — no build worker, no preview, cheapest safe model only. */
 export function resolveFastDiscussStreamSpec(input: {
   ownerEmail?: string | null;
-  manualModelSelection: boolean;
+  manualModelSelection?: boolean;
   requestedModelId?: string | null;
+  planId?: string | null;
 }) {
-  const cheapId = pickFreeDiscussModelId();
-  const modelId =
-    input.manualModelSelection && input.requestedModelId
-      ? input.requestedModelId
-      : cheapId;
+  const { modelId: cheapId } = resolveDiscussModeModel({
+    planId: input.planId,
+    requestedModelId: null,
+  });
   const spec = routeOperation({
     operationType: "discuss_stream",
     ownerEmail: input.ownerEmail,
-    requestedModelId: modelId,
+    requestedModelId: cheapId,
     complexity: 1,
   });
   return {
     ...spec,
-    modelId: input.manualModelSelection ? spec.modelId : cheapId,
-    maxOutputTokens: Math.min(spec.maxOutputTokens, 1200),
+    modelId: cheapId,
+    maxOutputTokens: Math.min(spec.maxOutputTokens, DISCUSS_MAX_OUTPUT_TOKENS),
   };
 }
 

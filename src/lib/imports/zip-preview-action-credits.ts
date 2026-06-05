@@ -34,11 +34,12 @@ export function dependencySurchargeCredits(dependencyCount: number): number {
   return 0;
 }
 
+/** P5.4.4 — +12% tier bases (large ZIP preview still gated by catalog floor 140 AC). */
 const TIER_BASE: Record<ZipPreviewCreditTier, number> = {
-  1: 10,
-  2: 25,
-  3: 50,
-  4: 100,
+  1: 11,
+  2: 28,
+  3: 56,
+  4: 112,
 };
 
 export function tierForSizeMb(sizeMb: number): ZipPreviewCreditTier {

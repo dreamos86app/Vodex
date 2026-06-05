@@ -3,7 +3,7 @@
  */
 import { pickCheapDiscussModel } from "@/lib/ai/cheap-planner";
 import { estimateTokenProviderCostUsd } from "@/lib/credits/token-cost";
-import { DISCUSS_FLAT_CREDITS } from "@/lib/billing/credit-pricing";
+import { discussCreditsToCharge } from "@/lib/billing/discuss-credit-pricing";
 import { USER_CREDITS_PER_USD } from "@/lib/billing/pricing-config";
 
 /** Max projected provider USD for a single Discuss turn before re-route/block. */
@@ -101,7 +101,7 @@ export function guardDiscussProviderCall(input: DiscussGuardInput): DiscussGuard
   }
 
   if (!manual) {
-    const discussRevenueUsd = DISCUSS_FLAT_CREDITS / USER_CREDITS_PER_USD;
+    const discussRevenueUsd = discussCreditsToCharge() / USER_CREDITS_PER_USD;
     if (projected > discussRevenueUsd * 0.5) {
       return {
         allowed: true,

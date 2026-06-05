@@ -16,7 +16,7 @@ function buildPlanDisplay(): Record<
     PlanId,
     { name: string; priceMonthlyUsd: number | null; description: string }
   > = {
-    free: { name: "Free", priceMonthlyUsd: 0, description: "30 credits / month" },
+    free: { name: "Free", priceMonthlyUsd: 0, description: "20 Build Credits / month" },
     starter: { name: "Starter", priceMonthlyUsd: 20, description: "200 credits / month" },
     pro: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month" },
     business: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month (legacy id)" },

@@ -2,7 +2,6 @@ import "server-only";
 
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizePlanId } from "@/lib/billing/plans";
-import { isPlanUpgrade } from "@/lib/billing/upgrade-policy";
 import { computeUpgradeCycleCredits } from "@/lib/billing/mid-cycle-upgrade-credits";
 import { sumExplicitActionGrants, sumExplicitBuildGrants } from "@/lib/credits/canonical-credits";
 import { monthlyActionCreditsForPlan } from "@/lib/action-credits/action-credit-allowances";
@@ -54,18 +53,18 @@ export async function applyAdminPlanChange(input: {
       ? (actionRow as { balance: number }).balance
       : monthlyActionCreditsForPlan(oldPlan) + explicitActionBonus;
 
-  const isUpgrade = isPlanUpgrade(oldPlan, newPlan);
+  const buildRemainingBefore = Math.max(0, profile.credits_remaining ?? 0);
   const cycle = computeUpgradeCycleCredits({
     oldPlan,
     newPlan,
-    buildRemainingBefore: profile.credits_remaining ?? monthlyTokensForPlan(oldPlan),
+    buildRemainingBefore,
     actionRemainingBefore: actionBalance,
     explicitBuildBonus,
     explicitActionBonus,
   });
 
-  const buildCredits = isUpgrade || oldPlan === "free" ? cycle.buildCredits : cycle.buildCredits;
-  const actionCredits = isUpgrade || oldPlan === "free" ? cycle.actionCredits : cycle.actionCredits;
+  const buildCredits = cycle.buildCredits;
+  const actionCredits = cycle.actionCredits;
 
   const { error: profileErr } = await admin
     .from("profiles")

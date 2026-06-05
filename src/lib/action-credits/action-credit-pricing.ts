@@ -3,6 +3,7 @@
 import {
   ACTION_PROVIDER_USD_PER_CREDIT,
   ACTION_CREDITS_PER_DOLLAR,
+  actionCreditRevenueUsdBaseline,
 } from "@/lib/billing/plan-credit-economics";
 import {
   floorForRuntimeAction,
@@ -12,8 +13,8 @@ import {
 
 export { ACTION_PROVIDER_USD_PER_CREDIT, ACTION_CREDITS_PER_DOLLAR };
 
-/** @deprecated legacy admin helpers — use ACTION_PROVIDER_USD_PER_CREDIT */
-export const ACTION_CREDIT_REVENUE_MULTIPLIER = 5;
+/** Minimum provider-cost multiple for Action Credit quotes (P5.3). */
+export const MIN_ACTION_MARGIN_MULTIPLIER = 5;
 /** @deprecated */
 export const ACTION_CREDITS_PER_USD = 1 / ACTION_PROVIDER_USD_PER_CREDIT;
 
@@ -59,11 +60,16 @@ export function quoteActionCredits(input: ActionCreditQuoteInput): ActionCreditQ
   }
 
   const providerCostUsd = Math.max(0, Number(input.providerCostUsd ?? 0) || 0);
-  const protectedMinimum = creditsFromProviderCostUsd(providerCostUsd);
-  const finalActionCredits = Math.max(floor, protectedMinimum);
-  const impliedRevenueUsd = finalActionCredits * ACTION_PROVIDER_USD_PER_CREDIT;
+  const revenuePerCredit = actionCreditRevenueUsdBaseline();
+  const protectedMinimum =
+    providerCostUsd > 0
+      ? Math.ceil((providerCostUsd * MIN_ACTION_MARGIN_MULTIPLIER) / revenuePerCredit)
+      : 0;
+  const poolMinimum = creditsFromProviderCostUsd(providerCostUsd);
+  const finalActionCredits = Math.max(floor, protectedMinimum, poolMinimum);
+  const impliedRevenueUsd = finalActionCredits * revenuePerCredit;
   const multiplierAchieved =
-    providerCostUsd > 0 ? impliedRevenueUsd / providerCostUsd : 1 / ACTION_PROVIDER_USD_PER_CREDIT;
+    providerCostUsd > 0 ? impliedRevenueUsd / providerCostUsd : MIN_ACTION_MARGIN_MULTIPLIER;
 
   return {
     actionType: input.actionType,

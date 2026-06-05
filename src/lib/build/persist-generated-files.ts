@@ -165,6 +165,31 @@ export async function persistGeneratedBuildFiles(input: {
     });
   }
 
+  if (persistOk && renderable.length > 0) {
+    try {
+      const { saveAppVersionSnapshot } = await import("@/lib/projects/app-version-history");
+      const { data: projectRow } = await writer
+        .from("projects")
+        .select("owner_id, workspace_id")
+        .eq("id", input.projectId)
+        .maybeSingle();
+      if (projectRow?.owner_id) {
+        await saveAppVersionSnapshot({
+          admin: writer,
+          projectId: input.projectId,
+          ownerId: projectRow.owner_id,
+          workspaceId: projectRow.workspace_id,
+          createdBy: projectRow.owner_id,
+          mode: "build",
+          summary: `Build persist — ${renderable.length} files`,
+          files: renderable.map((f) => ({ path: f.path, content: f.content })),
+        });
+      }
+    } catch {
+      /* version history is best-effort */
+    }
+  }
+
   if (input.workflowEmit && persistOk) {
     const sorted = [...renderable].sort((a, b) => a.path.localeCompare(b.path));
     const total = sorted.length;
