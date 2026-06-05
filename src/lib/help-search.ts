@@ -1,7 +1,10 @@
-import { DOCS, type DocArticle } from "@/lib/docs";
+import { HELP_ARTICLES } from "@/lib/help/cms/registry";
+import { helpArticlePath } from "@/lib/help/cms/paths";
+import type { HelpArticle } from "@/lib/help/cms/types";
 
 export type HelpSearchHit = {
   slug: string;
+  href: string;
   title: string;
   description: string;
   category: string;
@@ -13,7 +16,7 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-function articleSearchBlob(doc: DocArticle): string {
+function articleSearchBlob(doc: HelpArticle): string {
   return normalize(
     [doc.title, doc.description, doc.category, ...(doc.keywords ?? []), doc.content].join(" "),
   );
@@ -26,7 +29,7 @@ export function searchHelpArticles(query: string, limit = 12): HelpSearchHit[] {
   const terms = q.split(" ").filter(Boolean);
   const hits: HelpSearchHit[] = [];
 
-  for (const doc of DOCS) {
+  for (const doc of HELP_ARTICLES) {
     const blob = articleSearchBlob(doc);
     let score = 0;
     for (const term of terms) {
@@ -37,7 +40,8 @@ export function searchHelpArticles(query: string, limit = 12): HelpSearchHit[] {
     }
     if (score <= 0) continue;
     hits.push({
-      slug: doc.slug,
+      slug: `${doc.categorySlug}/${doc.slug}`,
+      href: helpArticlePath(doc),
       title: doc.title,
       description: doc.description,
       category: doc.category,
@@ -48,10 +52,4 @@ export function searchHelpArticles(query: string, limit = 12): HelpSearchHit[] {
   return hits.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
-export function getAllHelpArticleLinks(): Array<{ title: string; href: string; category: string }> {
-  return DOCS.map((d) => ({
-    title: d.title,
-    href: `/help/docs/${d.slug}`,
-    category: d.category,
-  }));
-}
+export { getAllHelpArticleLinks } from "@/lib/help/cms/registry";

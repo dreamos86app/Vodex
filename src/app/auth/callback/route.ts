@@ -23,9 +23,13 @@ import {
   type PendingAuthCookie,
 } from "@/lib/supabase/route-handler";
 import { SESSION_INTRO_PENDING_COOKIE } from "@/lib/session/session-intro-cookie";
+import {
+  handlePublishedOAuthCallback,
+  readPublishedOAuthState,
+} from "@/lib/publish/published-oauth-callback-handler";
 
 /**
- * Supabase PKCE auth callback — handles ALL auth redirect cases.
+ * Supabase PKCE auth callback — platform login + central published-app OAuth.
  * Session cookies from exchangeCodeForSession must be applied to the final redirect Response.
  */
 export async function GET(request: NextRequest) {
@@ -37,6 +41,7 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type");
   const providerError = searchParams.get("error");
   const providerErrorDesc = searchParams.get("error_description");
+  const publishedState = readPublishedOAuthState(request);
 
   const cookieDiag = diagnoseOAuthCallbackCookies(request.cookies.getAll());
 
@@ -77,12 +82,30 @@ export async function GET(request: NextRequest) {
     if (safeDesc && !/token|secret|code/i.test(safeDesc)) {
       params.set("error_description", safeDesc);
     }
+    if (publishedState) {
+      return NextResponse.redirect(`${origin}/p/${publishedState.slug}/login?${params}`);
+    }
     return NextResponse.redirect(`${origin}/auth/login?${params}`);
   }
 
   if (!code) {
     logAuthEvent("oauth_callback_failed", { reason: "missing_code" }, "warn", "server");
+    if (publishedState) {
+      return NextResponse.redirect(`${origin}/p/${publishedState.slug}/login?error=missing_code`);
+    }
     return NextResponse.redirect(`${origin}/auth/login?error=missing_code`);
+  }
+
+  if (publishedState) {
+    const pendingPublished: PendingAuthCookie[] = [];
+    const jar = NextResponse.next({ request });
+    return handlePublishedOAuthCallback({
+      request,
+      response: jar,
+      pending: pendingPublished,
+      state: publishedState,
+      code,
+    });
   }
 
   if (cookieDiag.pkceProjectMismatch) {

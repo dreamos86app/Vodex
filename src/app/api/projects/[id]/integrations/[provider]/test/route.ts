@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
-import { unsealSecret } from "@/lib/secrets/seal";
-import { getIntegrationProvider } from "@/lib/generated-apps/integration-registry";
+import { runIntegrationProviderTest } from "@/lib/integrations/integration-test-harness";
 import { logSecurityAudit } from "@/lib/security/audit-events";
 
 export const dynamic = "force-dynamic";
 
+const ALIASES: Record<string, string> = {
+  lemonsqueezy: "lemon_squeezy",
+};
+
 export async function POST(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string; provider: string }> },
 ) {
-  const { id: projectId, provider: providerId } = await ctx.params;
-  const def = getIntegrationProvider(providerId);
-  if (!def) {
-    return NextResponse.json({ error: "Unknown provider" }, { status: 400 });
-  }
+  const { id: projectId, provider: rawProvider } = await ctx.params;
+  const provider = ALIASES[rawProvider] ?? rawProvider;
 
   const supabase = await createClient();
   const {
@@ -31,52 +30,35 @@ export async function POST(
     .maybeSingle();
   if (!proj) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const admin = createServiceRoleClient();
-  if (!admin) {
-    return NextResponse.json({ error: "Server configuration error" }, { status: 503 });
+  let forceMock = false;
+  try {
+    const body = (await req.json()) as { forceMock?: boolean; mode?: string };
+    forceMock = body.forceMock === true || body.mode === "mock";
+  } catch {
+    forceMock = false;
   }
 
-  const { data: rows } = await admin
-    .from("project_secrets")
-    .select("key_name, ciphertext, encrypted_value")
-    .eq("project_id", projectId);
-
-  const required = def.fields.filter((f) => f.required).map((f) => f.key);
-  const missing = required.filter((k) => !(rows ?? []).some((r) => r.key_name === k));
-  if (missing.length > 0) {
-    return NextResponse.json(
-      { ok: false, error: `Missing keys: ${missing.join(", ")}`, status: "incomplete" },
-      { status: 400 },
-    );
-  }
-
-  for (const row of rows ?? []) {
-    const sealed = (row.ciphertext ?? row.encrypted_value) as string | null;
-    if (!sealed) continue;
-    try {
-      unsealSecret(sealed);
-    } catch {
-      await admin
-        .from("project_secrets")
-        .update({ status: "invalid", last_tested_at: new Date().toISOString() } as never)
-        .eq("project_id", projectId)
-        .eq("key_name", row.key_name as string);
-      return NextResponse.json({ ok: false, error: "Secret decryption failed" }, { status: 500 });
-    }
-  }
-
-  await admin
-    .from("project_secrets")
-    .update({ status: "configured", last_tested_at: new Date().toISOString() } as never)
-    .eq("project_id", projectId)
-    .eq("provider", providerId);
+  const result = await runIntegrationProviderTest({
+    projectId,
+    ownerId: user.id,
+    provider,
+    forceMock,
+  });
 
   void logSecurityAudit({
     action: "integration_test",
     userId: user.id,
     projectId,
-    metadata: { provider: providerId },
+    metadata: { provider, mode: result.mode, label: result.label, ok: result.ok },
   });
 
-  return NextResponse.json({ ok: true, status: "configured" });
+  return NextResponse.json({
+    ok: result.ok,
+    mode: result.mode,
+    label: result.label,
+    testStatus: result.testStatus,
+    message: result.message,
+    connectionHealth: result.connectionHealth,
+    webhookStatus: result.webhookStatus,
+  });
 }

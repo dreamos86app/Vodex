@@ -7,10 +7,24 @@ import { stripSecretsFromFiles } from "@/lib/preview/preview-sandbox";
 import { planPublishedRender } from "@/lib/publish/published-renderer";
 import { rewritePublishedArtifactHtml } from "@/lib/publish/rewrite-published-artifact-html";
 import { buildPublishedErrorPage } from "@/lib/publish/published-error-page";
+import { buildPublishedRecoveryPage } from "@/lib/publish/published-recovery-page";
+import { stripLegacyPlatformBadges } from "@/lib/publish/strip-legacy-platform-badges";
 import {
   injectPublishedWatermark,
   type WatermarkEntitlement,
 } from "@/lib/publish/watermark-runtime";
+import { injectPublishedAnalytics } from "@/lib/publish/published-analytics-runtime";
+import {
+  authEnabled,
+  isAuthSystemRoute,
+  type AppAuthSettings,
+} from "@/lib/publish/default-auth-pages";
+import { resolvePublishedAuthClientConfig } from "@/lib/publish/published-auth-config";
+import {
+  buildAuthNotConfiguredPage,
+  buildPublishedAuthPageHtml,
+} from "@/lib/publish/published-auth-pages";
+import { isPublishedAuthRuntimeReady } from "@/lib/publish/published-auth-diagnostics";
 import type { PublishedSnapshotFile } from "@/lib/publish/published-snapshot";
 import { getEntitlements } from "@/lib/billing/plan-entitlements";
 import { normalizePlanId } from "@/lib/billing/plans";
@@ -136,6 +150,65 @@ async function resolveOwnerWatermarkEntitlement(
   return { planTier: tier, watermarkDisabled };
 }
 
+function finalizePublishedHtml(html: string, slug: string, watermarkEnt: WatermarkEntitlement): string {
+  let out = injectPublishedWatermark(html, watermarkEnt);
+  out = injectPublishedAnalytics(out, slug);
+  return out;
+}
+
+async function resolveAuthPageHtml(
+  admin: SupabaseClient,
+  published: PublishedAppRecord,
+  route: string,
+): Promise<string | null> {
+  if (!isAuthSystemRoute(route)) return null;
+
+  const { data: authRow } = await admin
+    .from("app_auth_provider_settings" as never)
+    .select("*")
+    .eq("project_id", published.project_id)
+    .maybeSingle();
+
+  const settings = (authRow ?? {
+    email_password_enabled: true,
+    google_enabled: false,
+    github_enabled: false,
+    apple_enabled: false,
+    oauth_mode: "vodex_managed",
+  }) as AppAuthSettings & { oauth_mode?: string };
+
+  if (!authEnabled(settings)) return null;
+
+  const appName = published.title ?? published.slug;
+
+  if (!isPublishedAuthRuntimeReady(settings)) {
+    return buildAuthNotConfiguredPage(appName);
+  }
+
+  const authConfig = resolvePublishedAuthClientConfig(published.slug, published.public_url);
+  if (!authConfig) return buildAuthNotConfiguredPage(appName);
+
+  const { data: project } = await admin
+    .from("projects")
+    .select("name, metadata")
+    .eq("id", published.project_id)
+    .maybeSingle();
+
+  const meta =
+    project?.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
+      ? (project.metadata as Record<string, unknown>)
+      : {};
+  const iconPath = typeof meta.icon_path === "string" ? meta.icon_path : null;
+
+  return buildPublishedAuthPageHtml({
+    appName: published.title ?? project?.name ?? published.slug,
+    iconUrl: iconPath,
+    route,
+    settings,
+    auth: authConfig,
+  });
+}
+
 export async function resolvePublishedAppHtml(input: {
   published: PublishedAppRecord;
   routePath?: string;
@@ -165,6 +238,17 @@ export async function resolvePublishedAppHtml(input: {
     input.published.watermark_disabled,
   );
 
+  const authHtml = await resolveAuthPageHtml(admin, input.published, route);
+  if (authHtml) {
+    return {
+      html: finalizePublishedHtml(authHtml, input.published.slug, watermarkEnt),
+      source: "artifact",
+      statusCode: 200,
+      diagnostics: [...diagnostics, "auth_page_served", `route=${route}`],
+      renderVerified: true,
+    };
+  }
+
   let artifactPath = input.published.artifact_path?.trim() || null;
   if (!artifactPath) {
     const { data: projectRow } = await admin
@@ -193,8 +277,9 @@ export async function resolvePublishedAppHtml(input: {
     if (file?.data) {
       const raw = file.data.toString("utf8");
       if (raw.trim().length > 0) {
-        let html = rewritePublishedArtifactHtml(raw, input.published.slug, route);
-        html = injectPublishedWatermark(html, watermarkEnt);
+        let html = stripLegacyPlatformBadges(raw);
+        html = rewritePublishedArtifactHtml(html, input.published.slug, route);
+        html = finalizePublishedHtml(html, input.published.slug, watermarkEnt);
         diagnostics.push("artifact_served", `route=${route}`);
         return {
           html,
@@ -208,14 +293,27 @@ export async function resolvePublishedAppHtml(input: {
     diagnostics.push("artifact_index_missing");
   }
 
+  if (!artifactPath) {
+    return {
+      html: buildPublishedRecoveryPage({
+        slug: input.published.slug,
+        title: input.published.title ?? undefined,
+        reason: "no_artifact",
+      }),
+      source: "error",
+      statusCode: 503,
+      diagnostics: [...diagnostics, "no_artifact"],
+      renderVerified: false,
+    };
+  }
+
   const files = input.published.snapshot_files;
   if (files.length === 0) {
     return {
-      html: buildPublishedErrorPage({
-        title: "App not ready",
-        message: "This published app has no content yet. Republish from Vodex to fix.",
+      html: buildPublishedRecoveryPage({
         slug: input.published.slug,
-        diagnostics,
+        title: input.published.title ?? undefined,
+        reason: "empty_snapshot",
       }),
       source: "error",
       statusCode: 503,
@@ -234,25 +332,23 @@ export async function resolvePublishedAppHtml(input: {
 
   if (!plan.html?.trim()) {
     return {
-      html: buildPublishedErrorPage({
-        title: "App not renderable",
-        message:
-          "We could not render this app. Try republishing after a successful preview build.",
+      html: buildPublishedRecoveryPage({
         slug: input.published.slug,
-        diagnostics: [...diagnostics, "no_renderable_entry"],
+        title: input.published.title ?? undefined,
+        reason: "empty_snapshot",
       }),
       source: "error",
       statusCode: 503,
-      diagnostics,
+      diagnostics: [...diagnostics, "no_renderable_entry"],
       renderVerified: false,
     };
   }
 
-  let html = plan.html;
+  let html = stripLegacyPlatformBadges(plan.html);
   if (route !== "/") {
     html = rewritePublishedArtifactHtml(html, input.published.slug, route);
   }
-  html = injectPublishedWatermark(html, watermarkEnt);
+  html = finalizePublishedHtml(html, input.published.slug, watermarkEnt);
 
   return {
     html,

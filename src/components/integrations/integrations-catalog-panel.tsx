@@ -18,6 +18,9 @@ import {
 import { canUseIntegrations } from "@/lib/billing/plan-features";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { SupabaseConnectModal } from "@/components/integrations/supabase-connect-modal";
+import { IntegrationConnectModal } from "@/components/integrations/integration-connect-modal";
+import { ContextualHelp } from "@/components/help/contextual-help";
 
 type RowStatus = { provider: string; status: string; display_name: string | null };
 
@@ -124,6 +127,8 @@ export function IntegrationsCatalogPanel({
     Array<{ ref: string; name: string }>
   >([]);
   const [showSupabasePicker, setShowSupabasePicker] = React.useState(false);
+  const [showSupabaseModal, setShowSupabaseModal] = React.useState(false);
+  const [connectModalProvider, setConnectModalProvider] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -177,32 +182,8 @@ export function IntegrationsCatalogPanel({
     }
   }
 
-  async function linkSupabaseAccount() {
-    const token = window.prompt(
-      "Paste your Supabase Management API access token.\n\nCreate one at: https://supabase.com/dashboard/account/tokens",
-    );
-    if (!token?.trim()) return;
-    setBusyId("supabase-link");
-    try {
-      const res = await fetch("/api/integrations/supabase/user/link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ accessToken: token.trim() }),
-      });
-      const json = (await res.json()) as { error?: string; projects?: Array<{ ref: string; name: string }> };
-      if (!res.ok) throw new Error(json.error ?? "Could not link Supabase");
-      toast.success("Supabase account linked");
-      setUserLinks((m) => ({ ...m, supabase: true }));
-      if (json.projects?.length) {
-        setSupabaseProjects(json.projects);
-        setShowSupabasePicker(true);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Supabase link failed");
-    } finally {
-      setBusyId(null);
-    }
+  function linkSupabaseAccount() {
+    setShowSupabaseModal(true);
   }
 
   async function openSupabasePicker() {
@@ -270,12 +251,13 @@ export function IntegrationsCatalogPanel({
       return;
     }
     if (item.connectMode === "secrets_form") {
-      window.location.href = `/apps/${projectId}/builder?tab=dashboard&section=secrets&focus=${item.id}`;
+      setConnectModalProvider(item.id);
     }
   }
 
   return (
     <div className="space-y-6" data-testid="integrations-catalog-panel">
+      <ContextualHelp guideHref="/help/integrations/supabase" />
       <div className="rounded-xl bg-sky-500/5 px-4 py-3 ring-1 ring-sky-500/15">
         <p className="text-[12px] leading-relaxed text-muted-foreground">
           Connect services for <strong className="text-foreground">this app only</strong>. Secrets are
@@ -360,6 +342,18 @@ export function IntegrationsCatalogPanel({
         })
       )}
 
+      <SupabaseConnectModal
+        open={showSupabaseModal}
+        onClose={() => setShowSupabaseModal(false)}
+        onLinked={(projects) => {
+          setUserLinks((m) => ({ ...m, supabase: true }));
+          if (projects.length) {
+            setSupabaseProjects(projects);
+            setShowSupabasePicker(true);
+          }
+        }}
+      />
+
       {showSupabasePicker ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-foreground/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-background p-5 shadow-2xl ring-1 ring-border">
@@ -390,6 +384,16 @@ export function IntegrationsCatalogPanel({
             </button>
           </div>
         </div>
+      ) : null}
+
+      {connectModalProvider ? (
+        <IntegrationConnectModal
+          open
+          projectId={projectId}
+          providerId={connectModalProvider}
+          onClose={() => setConnectModalProvider(null)}
+          onSaved={() => void load()}
+        />
       ) : null}
     </div>
   );

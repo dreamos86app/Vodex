@@ -70,18 +70,21 @@ import {
 import { isPaidPlan } from "@/lib/billing/plan-features";
 import { PublishTemplateModal } from "@/components/templates/publish-template-modal";
 import { getEntitlements } from "@/lib/billing/plan-entitlements";
+import { AppAuthSettingsPanel } from "@/components/settings/app-auth-settings-panel";
 import {
-  DashboardAnalyticsSection,
   DashboardApiSection,
   DashboardAutomationsSection,
-  DashboardDataSection,
   DashboardDomainsSection,
   DashboardLogsSection,
-  DashboardMarketingSection,
   DashboardSecuritySection,
   DashboardSettingsWatermark,
-  DashboardUsersSection,
 } from "@/components/create/workspace/app-dashboard-live-sections";
+import {
+  InsightsDashboardPanel,
+  GrowthDashboardPanel,
+  DataDashboardPanel,
+  UsersDashboardPanel,
+} from "@/components/dashboard/dashboard-panels-p44";
 
 type ProjectRow = Pick<
   Tables<"projects">,
@@ -703,25 +706,25 @@ export function AppDashboardPanel({
       case "users":
         return (
           <SectionCard title="App users">
-            <DashboardUsersSection publicUrl={dashProject.preview_url} />
+            <UsersDashboardPanel projectId={projectId} publicUrl={dashProject.preview_url} />
           </SectionCard>
         );
       case "data":
         return (
           <SectionCard title="App data">
-            <DashboardDataSection />
+            <DataDashboardPanel projectId={projectId} />
           </SectionCard>
         );
       case "analytics":
         return (
           <SectionCard title="Analytics">
-            <DashboardAnalyticsSection publicUrl={dashProject.preview_url} />
+            <InsightsDashboardPanel publicUrl={dashProject.preview_url} projectId={projectId} />
           </SectionCard>
         );
       case "marketing":
         return (
           <SectionCard title="Marketing">
-            <DashboardMarketingSection publicUrl={dashProject.preview_url} appName={displayName} />
+            <GrowthDashboardPanel projectId={projectId} publicUrl={dashProject.preview_url} appName={displayName} />
           </SectionCard>
         );
       case "domains":
@@ -751,12 +754,8 @@ export function AppDashboardPanel({
         return <ProjectPaymentsPanel projectId={projectId} planId={planId} published={published} />;
       case "security":
         return (
-          <SectionCard title="Authentication & security">
-            <DashboardSecuritySection
-              projectId={projectId}
-              planId={planId ?? "free"}
-              publicAppUrl={dashProject.preview_url}
-            />
+          <SectionCard title="Security">
+            <DashboardSecuritySection projectId={projectId} />
           </SectionCard>
         );
       case "automations":
@@ -768,7 +767,7 @@ export function AppDashboardPanel({
       case "logs":
         return (
           <SectionCard title="Activity">
-            <DashboardLogsSection />
+            <DashboardLogsSection projectId={projectId} />
           </SectionCard>
         );
       case "api":
@@ -788,6 +787,13 @@ export function AppDashboardPanel({
                 initialPublic={Boolean(dashProject.is_public)}
                 iconSrc={iconSrc}
                 onSaved={() => setSettingsRefresh((k) => k + 1)}
+              />
+            </SectionCard>
+            <SectionCard title="Authentication">
+              <AppAuthSettingsPanel
+                projectId={projectId}
+                planTier={getEntitlements(planId).tier}
+                publicAppUrl={dashProject.preview_url}
               />
             </SectionCard>
             <DashboardSettingsWatermark

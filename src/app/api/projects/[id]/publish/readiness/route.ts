@@ -8,6 +8,8 @@ import { checkPublishReadiness } from "@/lib/publish/publish-readiness";
 import {
   collectPublishSetupGaps,
   gapsToBlockers,
+  gapsRecommended,
+  gapsOptional,
 } from "@/lib/publish/integration-secret-readiness";
 import {
   isBuildCompleteForProject,
@@ -190,6 +192,8 @@ export async function GET(
     issues,
     scannedAt: new Date().toISOString(),
     blockers: [...new Set(blockers)],
+    recommended: gapsRecommended(setupGaps),
+    optionalIntegrations: gapsOptional(setupGaps),
     setupGaps,
     reconciled: buildReconcile.reconciled,
     lifecycleStatus: typeof meta.lifecycle === "string" ? meta.lifecycle : null,

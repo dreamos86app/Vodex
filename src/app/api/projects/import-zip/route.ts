@@ -39,6 +39,10 @@ import {
 } from "@/lib/imports/zip-preview-action-credits";
 import { frameworkNeedsWorkerBuild } from "@/lib/imports/preview-build-queue";
 import type { DetectedFrameworkId } from "@/lib/imports/framework-detector";
+import {
+  buildImportedRouteManifest,
+  mergeRouteManifestIntoMetadata,
+} from "@/lib/preview/imported-app-route-manifest";
 
 export const runtime = "nodejs";
 
@@ -188,6 +192,8 @@ export async function POST(req: Request) {
   const icon = detectAppIconFromImport(files, displayName ?? defaultTitle);
   const displayTitle = displayName ?? defaultTitle;
   const iconSvg = ensureProjectIconSvg(displayTitle, icon.svg);
+  const routeManifest = buildImportedRouteManifest(files, "zip_import");
+  const discoveredRoutes = routeManifest.paths.length ? routeManifest.paths : validation.routes;
   const bannerSvg = buildProjectBannerSvg({
     title: displayTitle,
     framework: frameworkId === "unknown" ? "nextjs" : frameworkId,
@@ -206,7 +212,8 @@ export async function POST(req: Request) {
       build_status: "imported",
       framework: frameworkId === "unknown" ? "nextjs" : frameworkId,
       icon_svg: iconSvg,
-      metadata: {
+      metadata: mergeRouteManifestIntoMetadata(
+        {
         source: "zip_import",
         lifecycle_status: lifecycleStatus,
         icon_source: icon.source,
@@ -216,7 +223,7 @@ export async function POST(req: Request) {
           original_name: file.name,
           file_count: files.length,
           framework: validation.framework,
-          routes: validation.routes,
+          routes: discoveredRoutes,
           scripts: validation.scripts,
           package_manager: validation.packageManager,
           dependencies: {
@@ -242,7 +249,9 @@ export async function POST(req: Request) {
         preview_ready: false,
         preview_honest: false,
         ...lifecyclePatch(lifecycleStatus),
-      } as Json,
+      },
+        routeManifest,
+      ) as Json,
     } as never)
     .select("id")
     .single();

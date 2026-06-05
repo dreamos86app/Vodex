@@ -1,9 +1,11 @@
 import "server-only";
 
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import { assertActionCreditsAffordable } from "@/lib/action-credits/assert-action-credits-affordable";
-import { chargeActionCredit } from "@/lib/action-credits/charge-action-credit";
-import { refundActionCredit } from "@/lib/action-credits/refund-action-credit";
+import {
+  commitActionCreditHold,
+  releaseActionCreditHold,
+  reserveActionCreditHold,
+} from "@/lib/credits/action-credit-holds";
 import { getPreviewCostMultiplier } from "@/lib/platform/platform-settings";
 import { patchLatestPreviewJobBilling, previewZipBillingDiagnostics } from "@/lib/imports/zip-preview-billing";
 
@@ -104,44 +106,48 @@ export async function reserveZipPreviewActionCredits(input: {
   | { ok: true; operationId: string; credits: number }
   | { ok: false; error: string; code: "insufficient" | "db_error" }
 > {
-  const affordable = await assertActionCreditsAffordable({
-    ownerUserId: input.userId,
+  const operationId = zipPreviewOperationId(input.projectId);
+  const reserved = await reserveActionCreditHold({
+    userId: input.userId,
     projectId: input.projectId,
     actionType: "zip_preview_build",
-    dynamicFloor: input.estimate.estimatedActionCredits,
-  });
-  if (!affordable.ok) {
-    return { ok: false, error: "Not enough Action Credits for this ZIP preview build.", code: "insufficient" };
-  }
-
-  const admin = createSupabaseAdmin();
-  if (!admin) return { ok: false, error: "Service unavailable", code: "db_error" };
-
-  const operationId = zipPreviewOperationId(input.projectId);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (admin as any).from("zip_preview_action_holds").upsert(
-    {
-      user_id: input.userId,
-      project_id: input.projectId,
-      operation_id: operationId,
-      credits: input.estimate.estimatedActionCredits,
-      status: "reserved",
+    amount: input.estimate.estimatedActionCredits,
+    operationId,
+    meta: {
       tier: input.estimate.tier,
       size_mb: input.estimate.estimatedSizeMb,
       framework: input.estimate.framework,
-      metadata: {
-        base_credits: input.estimate.baseCredits,
-        multiplier: input.estimate.multiplier,
-        size_base_credits: input.estimate.sizeBaseCredits,
-        dependency_count: input.estimate.dependencyCount,
-        dependency_surcharge_credits: input.estimate.dependencySurchargeCredits,
-      },
-      updated_at: new Date().toISOString(),
     },
-    { onConflict: "operation_id" },
-  );
+  });
+  if (!reserved.ok) {
+    return {
+      ok: false,
+      error: reserved.code === "insufficient" ? "Not enough Action Credits for this ZIP preview build." : reserved.error,
+      code: reserved.code === "insufficient" ? "insufficient" : "db_error",
+    };
+  }
 
-  if (error) return { ok: false, error: error.message, code: "db_error" };
+  const admin = createSupabaseAdmin();
+  if (admin) {
+    await (admin as never as { from: (t: string) => { upsert: (v: unknown) => Promise<unknown> } })
+      .from("zip_preview_action_holds")
+      .upsert({
+        user_id: input.userId,
+        project_id: input.projectId,
+        operation_id: operationId,
+        credits: input.estimate.estimatedActionCredits,
+        status: "reserved",
+        tier: input.estimate.tier,
+        size_mb: input.estimate.estimatedSizeMb,
+        framework: input.estimate.framework,
+        metadata: {
+          base_credits: input.estimate.baseCredits,
+          multiplier: input.estimate.multiplier,
+        },
+        updated_at: new Date().toISOString(),
+      });
+  }
+
   return { ok: true, operationId, credits: input.estimate.estimatedActionCredits };
 }
 
@@ -164,33 +170,24 @@ export async function captureZipPreviewActionCredits(input: {
   if (hold.status === "refunded" || hold.status === "cancelled") return { ok: false, charged: 0 };
 
   const credits = Number(hold.credits) || 0;
-  const charge = await chargeActionCredit({
-    ownerUserId: input.userId,
+  const charge = await commitActionCreditHold({
+    userId: input.userId,
     projectId: input.projectId,
     actionType: "zip_preview_build",
+    amount: credits,
     operationId,
-    dynamicFloor: credits,
-    metadata: {
-      zip_preview: true,
-      capture: true,
-      tier_credits: credits,
-    },
+    reason: "zip_preview_success",
   });
 
   if (!charge.ok) return { ok: false, charged: 0 };
 
-  await (admin as any)
-    .from("zip_preview_action_holds")
-    .update({ status: "charged", updated_at: new Date().toISOString() })
-    .eq("operation_id", operationId);
-
   await patchLatestPreviewJobBilling(
     admin,
     input.projectId,
-    previewZipBillingDiagnostics({ estimatedActionCredits: credits }, "charged", charge.charged),
+    previewZipBillingDiagnostics({ estimatedActionCredits: credits }, "charged", charge.charged ?? credits),
   );
 
-  return { ok: true, charged: charge.charged };
+  return { ok: true, charged: charge.charged ?? credits };
 }
 
 export async function refundZipPreviewActionCredits(input: {
@@ -211,37 +208,27 @@ export async function refundZipPreviewActionCredits(input: {
 
   if (!hold) return { ok: true, refunded: 0 };
   const holdCredits = Number(hold.credits) || 0;
+  await releaseActionCreditHold({
+    userId: input.userId,
+    projectId: input.projectId,
+    operationId,
+    reason: input.reason ?? "zip_preview_failed",
+  });
+
   if (hold.status === "charged") {
-    const refund = await refundActionCredit({
-      ownerUserId: input.userId,
-      projectId: input.projectId,
-      operationId,
-      reason: input.reason ?? "zip_preview_failed",
-    });
-    await (admin as any)
-      .from("zip_preview_action_holds")
-      .update({ status: "refunded", updated_at: new Date().toISOString() })
-      .eq("operation_id", operationId);
     await patchLatestPreviewJobBilling(
       admin,
       input.projectId,
       previewZipBillingDiagnostics({ estimatedActionCredits: holdCredits }, "refunded"),
     );
-    return { ok: refund.ok, refunded: refund.refunded };
+    return { ok: true, refunded: holdCredits };
   }
 
   if (hold.status === "reserved") {
-    await (admin as any)
-      .from("zip_preview_action_holds")
-      .update({ status: "cancelled", updated_at: new Date().toISOString() })
-      .eq("operation_id", operationId);
     await patchLatestPreviewJobBilling(
       admin,
       input.projectId,
-      previewZipBillingDiagnostics(
-        { estimatedActionCredits: holdCredits },
-        "cancelled",
-      ),
+      previewZipBillingDiagnostics({ estimatedActionCredits: holdCredits }, "cancelled"),
     );
     return { ok: true, refunded: 0 };
   }

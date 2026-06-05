@@ -1,4 +1,5 @@
 import type { ZipImportFile } from "@/lib/import/zip-file-validator";
+import { routePathsFromDiscovery } from "@/lib/preview/route-discovery";
 
 export type DetectedFramework = {
   id: "nextjs" | "vite" | "react" | "vue" | "svelte" | "static" | "express" | "unknown";
@@ -43,14 +44,5 @@ export function detectFramework(files: ZipImportFile[]): DetectedFramework {
 }
 
 export function detectRoutes(files: ZipImportFile[]): string[] {
-  const routes: string[] = [];
-  for (const f of files) {
-    if (/^app\/page\.(tsx|jsx|js|ts)$/i.test(f.path)) routes.push("/");
-    const m = f.path.match(/(?:^|\/)app\/(.+?)\/page\.(tsx|jsx|js|ts)$/i);
-    if (m) routes.push("/" + m[1].replace(/\[(\w+)\]/g, ":$1"));
-    const p = f.path.match(/(?:^|\/)pages\/(.+?)\.(tsx|jsx|js|ts)$/i);
-    if (p && !p[1].startsWith("_")) routes.push("/" + p[1].replace(/index$/i, "").replace(/\/index$/i, ""));
-    if (/^index\.html$/i.test(f.path)) routes.push("/");
-  }
-  return [...new Set(routes)].slice(0, 50);
+  return routePathsFromDiscovery(files);
 }

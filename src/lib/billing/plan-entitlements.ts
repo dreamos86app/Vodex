@@ -20,6 +20,7 @@ export type PlanEntitlements = {
   canUseIntegrations: boolean;
   canUseMobileWrapping: boolean;
   canUseCustomDomain: boolean;
+  canUseCustomOAuth: boolean;
   canPublishWeb: boolean;
 };
 
@@ -73,6 +74,7 @@ export function getEntitlements(planId: string | null | undefined): PlanEntitlem
     canUseIntegrations: tierAtLeast(id, "starter"),
     canUseMobileWrapping: tierAtLeast(id, "pro"),
     canUseCustomDomain: tierAtLeast(id, "starter"),
+    canUseCustomOAuth: tierAtLeast(id, "pro"),
     canPublishWeb: true,
   };
 }

@@ -182,6 +182,9 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/auth/callback" || pathname.startsWith("/auth/callback/")) {
     return NextResponse.next({ request });
   }
+  if (/^\/p\/[^/]+\/auth\/callback\/?$/.test(pathname)) {
+    return NextResponse.next({ request });
+  }
 
   // OAuth mis-config: Supabase sometimes lands PKCE code on Site URL (/) instead of /auth/callback
   const oauthRedirect = buildAuthCallbackRedirectFromSearchParams(

@@ -40,6 +40,7 @@ import {
   REVENUECAT_IMPORTANCE,
 } from "@/lib/mobile/store-setup-copy";
 import { StoreOnboardingWizard } from "@/components/mobile/store-onboarding-wizard";
+import { MobileReadinessScanModal } from "@/components/mobile/mobile-readiness-scan-modal";
 import type { StoreOnboardingProgress } from "@/lib/mobile/store-onboarding-steps";
 import {
   exportShaRegistryJson,
@@ -152,6 +153,7 @@ export function MobileWrapperStudio({
   const [jobs, setJobs] = React.useState<BuildJob[]>([]);
   const [wrapperType, setWrapperType] = React.useState<"capacitor" | "twa">("capacitor");
   const [gatePassed, setGatePassed] = React.useState(false);
+  const [scanModalOpen, setScanModalOpen] = React.useState(false);
   const [sha256Input, setSha256Input] = React.useState("");
   const [sha1Input, setSha1Input] = React.useState("");
   const [storeProgress, setStoreProgress] = React.useState<StoreOnboardingProgress>({
@@ -437,7 +439,7 @@ export function MobileWrapperStudio({
           {!locked ? (
             <button
               type="button"
-              onClick={() => void runReadinessScan()}
+              onClick={() => setScanModalOpen(true)}
               disabled={scanning}
               className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-accent/90 disabled:opacity-60"
             >
@@ -905,6 +907,11 @@ export function MobileWrapperStudio({
         </div>
         </div>
       </div>
+      <MobileReadinessScanModal
+        open={scanModalOpen}
+        onClose={() => setScanModalOpen(false)}
+        projectId={projectId}
+      />
     </div>
   );
 }

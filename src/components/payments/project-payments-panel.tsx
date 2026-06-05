@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { parseJsonResponse } from "@/lib/api/safe-json";
 import { MobileBillingWizard } from "@/components/payments/mobile-billing-wizard";
+import { ContextualHelp } from "@/components/help/contextual-help";
 
 type ProviderCard = {
   provider: string;
@@ -49,6 +50,9 @@ export function ProjectPaymentsPanel({
   const [testPriceId, setTestPriceId] = React.useState("");
   const [setupWarning, setSetupWarning] = React.useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = React.useState(false);
+  const [readiness, setReadiness] = React.useState<
+    Record<string, { mode: string; checkoutStatus: string; message: string; canTestPayment: boolean }>
+  >({});
 
   const load = React.useCallback(async () => {
     if (!published) {
@@ -73,6 +77,30 @@ export function ProjectPaymentsPanel({
       setProviders((data.providers ?? []) as ProviderCard[]);
       setNotice(data.responsibility_notice ?? "");
       setSetupWarning(data.setup_warning ?? data.warning ?? null);
+      const readyRes = await fetch(`/api/projects/${projectId}/payments/readiness`, {
+        credentials: "include",
+      });
+      if (readyRes.ok) {
+        const readyJson = (await readyRes.json()) as {
+          providers?: Array<{
+            provider: string;
+            mode: string;
+            checkoutStatus: string;
+            message: string;
+            canTestPayment: boolean;
+          }>;
+        };
+        const map: typeof readiness = {};
+        for (const r of readyJson.providers ?? []) {
+          map[r.provider] = {
+            mode: r.mode,
+            checkoutStatus: r.checkoutStatus,
+            message: r.message,
+            canTestPayment: r.canTestPayment,
+          };
+        }
+        setReadiness(map);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not load payments");
     } finally {
@@ -167,6 +195,7 @@ export function ProjectPaymentsPanel({
 
   return (
     <div className="space-y-6 p-4">
+      <ContextualHelp guideHref="/help/payments/stripe" />
       <div>
         <h2 className="text-lg font-semibold text-foreground">Payments & Billing</h2>
         <p className="mt-1 text-[13px] text-muted-foreground">
@@ -211,7 +240,17 @@ export function ProjectPaymentsPanel({
                     <CreditCard className="size-4 text-muted-foreground" />
                   )}
                 </div>
-                <StatusPill status={p.status} />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatusPill status={p.status} />
+                  {readiness[p.provider] ? (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
+                      {readiness[p.provider].mode}
+                    </span>
+                  ) : null}
+                </div>
+                {readiness[p.provider]?.message ? (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">{readiness[p.provider].message}</p>
+                ) : null}
                 {p.provider === "revenuecat" && (
                   <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
                     Mobile app subscriptions — Google Play and Apple process in-app purchases.
