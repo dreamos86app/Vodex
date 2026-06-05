@@ -2504,7 +2504,7 @@ export function ImmersiveWorkspace({
     ? projectPreviewFrameUrl(
         effectiveProjectId,
         projectDataRefresh,
-        previewRoute,
+        "/",
         previewRuntime?.jobId ?? null,
       )
     : null;
@@ -3312,11 +3312,7 @@ export function ImmersiveWorkspace({
                 previewRoutes={previewRoutes}
                 previewRoute={previewRoute}
                 onPreviewRouteChange={(path) => {
-                  setPreviewRoute((prev) => {
-                    if (prev === path) return prev;
-                    queueMicrotask(() => setProjectDataRefresh((n) => n + 1));
-                    return path;
-                  });
+                  setPreviewRoute((prev) => (prev === path ? prev : path));
                 }}
                 onRebuildPreview={
                   effectiveProjectId ? () => void rebuildPreview() : undefined

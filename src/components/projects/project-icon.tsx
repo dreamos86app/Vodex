@@ -23,7 +23,7 @@ export function ProjectIcon({
   cacheKey,
   size = 40,
   className,
-  circular = true,
+  circular = false,
 }: Props) {
   const primarySrc = projectIconSrc(projectId, iconSvg, iconUrl, cacheKey);
   const fallbackSrc = projectIconSrc(projectId, null, null, cacheKey);

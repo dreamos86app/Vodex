@@ -22,6 +22,9 @@ import { REFERRAL_NOTICE_QUERY } from "@/lib/referrals/referral-messages";
 import { classifyUrlHostname } from "@/lib/network/safe-fetch";
 import { applyAuthCookieOptions } from "@/lib/auth/auth-cookie-options";
 import { isOnboardingExemptPath } from "@/lib/onboarding/exempt-paths";
+import { PLATFORM_BASE_DOMAIN } from "@/lib/publish/publish-config";
+import { slugFromSubdomainHost } from "@/lib/publish/published-app-runtime";
+import { resolveCustomDomainSlug } from "@/lib/publish/custom-domain-routing";
 
 const PROXY_AUTH_WARN_MS = 30_000;
 const PROXY_AUTH_TIMEOUT_MS = 2_500;
@@ -142,6 +145,37 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = rewritePath;
     return NextResponse.rewrite(url);
+  }
+
+  const rootDomain = PLATFORM_BASE_DOMAIN.toLowerCase();
+  const publishSlug = slugFromSubdomainHost(host, rootDomain);
+  if (publishSlug && !pathname.startsWith("/api/") && !pathname.startsWith("/_next")) {
+    const subPath = pathname === "/" ? "" : pathname;
+    const url = request.nextUrl.clone();
+    url.pathname = `/p/${publishSlug}${subPath}`;
+    return NextResponse.rewrite(url);
+  }
+
+  if (
+    host &&
+    !host.endsWith(".vodex.dev") &&
+    !host.endsWith(".vodex.app") &&
+    host !== "vodex.dev" &&
+    host !== "vodex.app" &&
+    host !== "localhost" &&
+    !host.endsWith(".localhost") &&
+    !pathname.startsWith("/api/") &&
+    !pathname.startsWith("/_next") &&
+    !pathname.startsWith("/auth") &&
+    !pathname.startsWith("/p/")
+  ) {
+    const customSlug = await resolveCustomDomainSlug(host);
+    if (customSlug) {
+      const subPath = pathname === "/" ? "" : pathname;
+      const url = request.nextUrl.clone();
+      url.pathname = `/p/${customSlug}${subPath}`;
+      return NextResponse.rewrite(url);
+    }
   }
 
   // Never run session refresh on OAuth callback — PKCE verifier cookies must reach the route handler intact.

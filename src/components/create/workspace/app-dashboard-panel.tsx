@@ -69,6 +69,9 @@ import {
 } from "@/lib/dashboard/section-access";
 import { isPaidPlan } from "@/lib/billing/plan-features";
 import { PublishTemplateModal } from "@/components/templates/publish-template-modal";
+import { CustomDomainsPanel } from "@/components/publish/custom-domains-panel";
+import { AppAuthSettingsPanel } from "@/components/settings/app-auth-settings-panel";
+import { getEntitlements } from "@/lib/billing/plan-entitlements";
 
 type ProjectRow = Pick<
   Tables<"projects">,
@@ -714,13 +717,11 @@ export function AppDashboardPanel({
       case "domains":
         return (
           <SectionCard title="Domains">
-            {dashProject.published_subdomain ? (
-              <p className="text-[12px] text-foreground">
-                Live address: <span className="font-medium">{dashProject.published_subdomain}</span>
-              </p>
-            ) : (
-              <EmptyHint text="Connect a custom web address after you publish." />
-            )}
+            <CustomDomainsPanel
+              projectId={projectId}
+              canUseCustomDomain={getEntitlements(planId).canUseCustomDomain}
+              publishedSubdomain={dashProject.published_subdomain}
+            />
           </SectionCard>
         );
       case "integrations":
@@ -740,8 +741,12 @@ export function AppDashboardPanel({
         return <ProjectPaymentsPanel projectId={projectId} planId={planId} published={published} />;
       case "security":
         return (
-          <SectionCard title="Security">
-            <EmptyHint text="Sign-in, access rules, and privacy settings for your live app." />
+          <SectionCard title="Authentication">
+            <AppAuthSettingsPanel
+              projectId={projectId}
+              planTier={getEntitlements(planId).tier}
+              publicAppUrl={dashProject.preview_url}
+            />
           </SectionCard>
         );
       case "automations":

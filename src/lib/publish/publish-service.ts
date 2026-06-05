@@ -229,18 +229,33 @@ export async function startPublish(input: {
     .eq("project_id", input.projectId)
     .maybeSingle();
 
+  const artifactPath =
+    typeof prevMeta.preview_artifact_path === "string" ? prevMeta.preview_artifact_path.trim() : "";
+  const artifactBuildId =
+    typeof prevMeta.preview_artifact_build_id === "string"
+      ? prevMeta.preview_artifact_build_id.trim()
+      : artifactPath
+        ? artifactPath.split("/").pop() ?? null
+        : null;
+
+  const { probePublishedAppHealth } = await import("@/lib/publish/published-app-runtime");
+
   const pubPayload = {
     project_id: input.projectId,
     owner_id: input.userId,
     slug,
     subdomain: wildcardSubdomainEnabled() ? slug : null,
     public_url: url,
+    canonical_url: url,
+    artifact_path: artifactPath || null,
+    artifact_build_id: artifactBuildId,
     status: "published",
     version,
     build_snapshot_id: buildSnapshotId,
     title: snapshot.title,
     description: snapshot.description,
     snapshot_files: safeFiles,
+    render_verified: false,
     published_at: now,
     updated_at: now,
   } as never;
@@ -302,14 +317,19 @@ export async function startPublish(input: {
     };
   }
 
-  const { verifyPublishedUrlHealthWithRetry } = await import("@/lib/publish/publish-health-retry");
-  const health = await verifyPublishedUrlHealthWithRetry(url);
-  if (!health.ok) {
-    return {
-      ok: false,
-      error: `Publish health check failed after retries — ${health.error}`,
-      code: "publish_health_failed",
-    };
+  const healthProbe = await probePublishedAppHealth(slug);
+  let healthAttempts = healthProbe.diagnostics.length || 1;
+  if (!healthProbe.ok) {
+    const { verifyPublishedUrlHealthWithRetry } = await import("@/lib/publish/publish-health-retry");
+    const health = await verifyPublishedUrlHealthWithRetry(url);
+    healthAttempts = health.attempts.length;
+    if (!health.ok) {
+      return {
+        ok: false,
+        error: `Publish health check failed after retries — ${health.error}`,
+        code: "publish_health_failed",
+      };
+    }
   }
 
   if (publishedAppId) {
@@ -359,7 +379,7 @@ export async function startPublish(input: {
     version,
     publishedAppId,
     healthChecked: true,
-    healthAttempts: health.attempts.length,
+    healthAttempts,
     publishedAt: now,
   };
 }

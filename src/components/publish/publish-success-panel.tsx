@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Copy, ExternalLink, PartyPopper, X } from "lucide-react";
+import { Copy, ExternalLink, PartyPopper, QrCode, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { PlatformShareButton, type SharePlatform } from "@/components/publish/platform-share-icons";
 
 type ShareNetwork = "facebook" | "linkedin" | "x" | "whatsapp" | "reddit";
 
@@ -131,17 +132,41 @@ export function PublishSuccessPanel({
       <p className="mt-4 text-[11px] font-semibold text-foreground">Sharing options</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {SHARE.map((s) => (
-          <a
+          <PlatformShareButton
             key={s.id}
+            platform={s.id as SharePlatform}
             href={s.href(publicUrl, title)}
-            target="_blank"
-            rel="noopener noreferrer"
             title={s.label}
-            className="flex size-9 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-foreground ring-1 ring-border transition hover:bg-background"
-          >
-            {s.label.slice(0, 1)}
-          </a>
+          />
         ))}
+        <PlatformShareButton
+          platform="email"
+          href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(publicUrl)}`}
+          title="Email"
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <a
+          href={publicUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-xl bg-accent px-4 py-2 text-[12px] font-semibold text-white"
+        >
+          Open live app
+        </a>
+        {customDomainHint ? (
+          <a href="/billing" className="rounded-xl px-4 py-2 text-[12px] font-medium ring-1 ring-border">
+            Add custom domain
+          </a>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-xl px-4 py-2 text-[12px] ring-1 ring-border"
+          onClick={() => toast.info("QR — scan from mobile to open app")}
+        >
+          <QrCode className="size-3.5" /> QR code
+        </button>
       </div>
     </div>
   );

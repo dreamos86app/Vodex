@@ -63,7 +63,7 @@ const AUTOMATIC_MODEL = {
   contextK: 200,
   credits: 0,
   specialization: "fullstack" as const,
-  orchestrationRole: "DreamOS picks the right model per task",
+  orchestrationRole: "Vodex picks the right model per task",
   idealFor: ["Most builds", "Balanced cost & quality", "Hands-off creation"],
   weaknesses: ["You don't control which model runs each sub-step"],
   accent: "#f59e0b",

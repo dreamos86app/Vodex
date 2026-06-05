@@ -8,25 +8,29 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const FRAME_HEADERS = {
+const HTML_HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
   "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
   "X-Frame-Options": "SAMEORIGIN",
-  "Content-Security-Policy": "frame-ancestors 'self' https://vodex.dev https://*.vodex.dev https://vodex.app https://*.vodex.app",
 };
 
-/** Serves published app HTML — frame-safe for builder preview embeds. */
-export async function GET(req: Request, ctx: { params: Promise<{ slug: string }> }) {
-  const { slug } = await ctx.params;
+/** Serves published app HTML directly — no iframe shell. */
+export async function GET(
+  req: Request,
+  ctx: { params: Promise<{ slug: string; path?: string[] }> },
+) {
+  const { slug, path: pathSegments } = await ctx.params;
   const safe = slug?.trim().toLowerCase();
   if (!safe) return new NextResponse("Not found", { status: 404 });
 
-  const url = new URL(req.url);
-  const routeParam = url.searchParams.get("route")?.trim();
-  const routePath = routeParam ? normalizePublishedRoute(routeParam.split("/").filter(Boolean)) : "/";
-
   const published = await loadPublishedAppBySlug(safe);
   if (!published) return new NextResponse("Not found", { status: 404 });
+
+  const url = new URL(req.url);
+  const routeFromQuery = url.searchParams.get("route")?.trim();
+  const routePath = routeFromQuery
+    ? normalizePublishedRoute(routeFromQuery.split("/").filter(Boolean))
+    : normalizePublishedRoute(pathSegments);
 
   const result = await resolvePublishedAppHtml({ published, routePath });
 
@@ -36,6 +40,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ slug: string }>
 
   return new NextResponse(result.html, {
     status: result.statusCode,
-    headers: FRAME_HEADERS,
+    headers: HTML_HEADERS,
   });
 }

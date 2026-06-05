@@ -21,6 +21,7 @@ import { PreviewRuntimeStatusPanel } from "@/components/create/workspace/preview
 import { PreviewPageSwitcher } from "@/components/create/workspace/preview-page-switcher";
 import type { PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
 import type { PreviewRouteEntry } from "@/lib/preview/detect-preview-routes";
+import { navigatePreviewIframe } from "@/lib/preview/preview-route-navigation";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 
@@ -89,6 +90,11 @@ export function PreviewPanel({
   const [iframeLoading, setIframeLoading] = React.useState(false);
   const [iframeLoaded, setIframeLoaded] = React.useState(false);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  React.useEffect(() => {
+    if (!iframeLoaded || !onPreviewRouteChange) return;
+    navigatePreviewIframe(iframeRef.current, previewRoute);
+  }, [previewRoute, iframeLoaded, onPreviewRouteChange]);
 
   React.useEffect(() => {
     setIframeError(false);
@@ -271,7 +277,7 @@ export function PreviewPanel({
           >
             <AnimatePresence mode="wait">
               <motion.div
-                key={`${viewport}-${reloadKey}`}
+                key={reloadKey}
                 initial={{ opacity: 0, scale: 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97 }}

@@ -72,7 +72,7 @@ export function getEntitlements(planId: string | null | undefined): PlanEntitlem
     canEditCode: tierAtLeast(id, "pro"),
     canUseIntegrations: tierAtLeast(id, "starter"),
     canUseMobileWrapping: tierAtLeast(id, "pro"),
-    canUseCustomDomain: tierAtLeast(id, "pro"),
+    canUseCustomDomain: tierAtLeast(id, "starter"),
     canPublishWeb: true,
   };
 }

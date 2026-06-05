@@ -11,9 +11,16 @@ export const PLATFORM_BASE_DOMAIN = getPublicAppRootDomain();
 
 /** Wildcard only when DNS is verified — path mode is default. */
 export function wildcardSubdomainEnabled(): boolean {
-  return (
-    process.env.DREAMOS_WILDCARD_SUBDOMAIN === "1" && process.env.DREAMOS_DNS_VERIFIED === "1"
-  );
+  const wildcard =
+    process.env.VODEX_WILDCARD_SUBDOMAIN === "1" || process.env.DREAMOS_WILDCARD_SUBDOMAIN === "1";
+  const dnsVerified =
+    process.env.VODEX_DNS_VERIFIED === "1" || process.env.DREAMOS_DNS_VERIFIED === "1";
+  return wildcard && dnsVerified;
+}
+
+/** Supabase custom auth domain ready flag for UI warnings. */
+export function vodexSupabaseAuthDomainReady(): boolean {
+  return process.env.VODEX_SUPABASE_AUTH_DOMAIN_READY === "true";
 }
 
 /** Show "Built with Vodex" badge on public apps (default on). */

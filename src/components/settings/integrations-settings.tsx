@@ -66,9 +66,9 @@ export function IntegrationsSettings() {
         <div className="flex items-start gap-3">
           <ExternalLink className="mt-0.5 size-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
           <div>
-            <p className="text-[13px] font-medium text-foreground">DreamOS Platform API Keys</p>
+            <p className="text-[13px] font-medium text-foreground">Vodex Platform API Keys</p>
             <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-              If you are looking for API keys to access DreamOS programmatically, those are
+              If you are looking for API keys to access Vodex programmatically, those are
               in{" "}
               <Link href="/settings/api-keys" className="text-accent hover:underline underline-offset-2">
                 Settings → API Keys

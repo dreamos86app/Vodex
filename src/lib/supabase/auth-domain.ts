@@ -30,3 +30,15 @@ export function getSupabaseAuthCallbackUrl(): string | null {
   if (!base) return null;
   return `${base.replace(/\/$/, "")}/auth/v1/callback`;
 }
+
+/** True when platform operator marked Vodex custom Supabase auth domain as live. */
+export function isVodexSupabaseAuthDomainReady(): boolean {
+  return process.env.VODEX_SUPABASE_AUTH_DOMAIN_READY === "true";
+}
+
+export function supabaseAuthDomainStatusMessage(): string {
+  if (isVodexSupabaseAuthDomainReady() && !usesDefaultSupabaseProjectHost()) {
+    return "Vodex Auth domain is active.";
+  }
+  return "Vodex Auth domain not configured yet — using Supabase project domain.";
+}

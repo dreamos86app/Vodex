@@ -108,14 +108,6 @@ export function buildSlugCandidates(input: {
       const suffixed = `${b}-${n}`;
       if (!out.includes(suffixed)) out.push(suffixed);
     }
-    const withId = `${b}-${shortId}`;
-    if (!out.includes(withId)) out.push(withId);
-  }
-
-  for (let r = 0; r < 20; r++) {
-    const rand = Math.random().toString(36).slice(2, 8);
-    const c = `${bases[0] || "app"}-${rand}`;
-    if (!out.includes(c)) out.push(c);
   }
 
   return out.filter((s) => s.length >= 2 && !isReservedPublishSlugStrict(s));
