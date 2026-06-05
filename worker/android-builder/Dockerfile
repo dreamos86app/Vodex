@@ -1,6 +1,16 @@
 FROM eclipse-temurin:17-jdk-jammy
 
-RUN apt-get update && apt-get install -y --no-install-recommends unzip curl && rm -rf /var/lib/apt/lists/*
+# Java 17 (base image) + Node.js 22 for the builder service
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg \
+    unzip \
+  && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+  && apt-get install -y nodejs \
+  && rm -rf /var/lib/apt/lists/* \
+  && node --version \
+  && npm --version
 
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV ANDROID_HOME=/opt/android-sdk
@@ -14,10 +24,14 @@ RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
     sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev || npm install --omit=dev
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
-CMD ["node", "dist/index.js"]
+ENV NODE_ENV=production
+
+CMD ["npm", "start"]

@@ -10,6 +10,11 @@ const must = (rel, needle, label) => {
   if (!fs.existsSync(p) || !fs.readFileSync(p, "utf8").includes(needle)) errors.push(label);
 };
 
+must("worker/android-builder/Dockerfile", "setup_22.x", "Node.js 22 via NodeSource");
+must("worker/android-builder/Dockerfile", "npm --version", "npm verified in image build");
+must("worker/android-builder/Dockerfile", "npm ci", "npm ci in Dockerfile");
+must("worker/android-builder/Dockerfile", 'CMD ["npm", "start"]', "npm start CMD");
+must("worker/android-builder/package-lock.json", "lockfileVersion", "package-lock for npm ci");
 must("worker/android-builder/src/index.ts", "/v1/build", "builder HTTP webhook");
 must("worker/android-builder/src/gradle-build.ts", "assembleRelease", "APK gradle task");
 must("worker/android-builder/src/gradle-build.ts", "bundleRelease", "AAB gradle task");
