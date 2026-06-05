@@ -8,6 +8,7 @@ import {
   sealCustomOAuthInput,
   validateCustomOAuthEnable,
 } from "@/lib/publish/custom-oauth-store";
+import { clearPublishedAuthError } from "@/lib/publish/published-auth-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const body = (await req.json()) as Record<string, unknown>;
   const admin = createServiceRoleClient();
   if (!admin) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+
+  if (body.clear_last_auth_error === true) {
+    await clearPublishedAuthError(projectId);
+    return NextResponse.json({ ok: true, cleared: true });
+  }
 
   const { data: prof } = await supabase.from("profiles").select("plan_id").eq("id", user.id).maybeSingle();
   const entitlements = getEntitlements(prof?.plan_id ?? "free");

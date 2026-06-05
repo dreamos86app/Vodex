@@ -312,3 +312,15 @@ export async function recordPublishedAuthError(
     } as never)
     .eq("project_id", projectId);
 }
+
+export async function clearPublishedAuthError(projectId: string): Promise<void> {
+  const admin = (await import("@/lib/supabase/admin")).createServiceRoleClient();
+  if (!admin) return;
+  await admin
+    .from("app_auth_provider_settings" as never)
+    .update({
+      last_auth_error: null,
+      last_auth_error_at: null,
+    } as never)
+    .eq("project_id", projectId);
+}

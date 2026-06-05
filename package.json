@@ -878,6 +878,8 @@
     "verify:p46-auth-production": "node scripts/verify-p46-auth-production.mjs",
     "verify:p47-production": "node scripts/verify-p47-production.mjs",
     "verify:p48-help-center": "node scripts/verify-p48-help-center.mjs",
+    "verify:p49-certification": "node scripts/verify-p49-certification.mjs",
+    "verify:p50-certification-blockers": "node scripts/verify-p50-certification-blockers.mjs",
     "verify:p47-integration-test-harness": "node -e \"import('./scripts/lib/p47-verify-checks.mjs').then(m=>{const e=m.P47_CHECKS['p47-integration-test-harness'](process.cwd());if(e.length){console.error(e[0]);process.exit(1)}console.log('ok')})\"",
     "verify:p47-payment-readiness": "node -e \"import('./scripts/lib/p47-verify-checks.mjs').then(m=>{const e=m.P47_CHECKS['p47-payment-readiness'](process.cwd());if(e.length){console.error(e[0]);process.exit(1)}console.log('ok')})\"",
     "verify:p47-central-oauth-callback": "node -e \"import('./scripts/lib/p47-verify-checks.mjs').then(m=>{const e=m.P47_CHECKS['p47-central-oauth-callback'](process.cwd());if(e.length){console.error(e[0]);process.exit(1)}console.log('ok')})\"",

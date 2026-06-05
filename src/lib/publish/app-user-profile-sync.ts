@@ -19,6 +19,9 @@ export async function syncAppUserProfile(
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = createServiceRoleClient();
   if (!admin) return { ok: false, error: "service_role_unavailable" };
+  if (!input.ownerId?.trim()) {
+    return { ok: false, error: "profile_sync_failed: missing project owner_id" };
+  }
 
   const now = new Date().toISOString();
   const email = input.user.email ?? null;

@@ -3,7 +3,10 @@ import { loadPublishedAppBySlug } from "@/lib/publish/published-app-runtime";
 import { publishedAuthBasePath } from "@/lib/publish/published-auth-config";
 import { syncAppUserProfile } from "@/lib/publish/app-user-profile-sync";
 import { recordPublishedAnalyticsEvents } from "@/lib/publish/published-analytics-server";
-import { recordPublishedAuthError } from "@/lib/publish/published-auth-diagnostics";
+import {
+  clearPublishedAuthError,
+  recordPublishedAuthError,
+} from "@/lib/publish/published-auth-diagnostics";
 import {
   applyPendingAuthCookies,
   createRouteHandlerClient,
@@ -92,6 +95,8 @@ export async function GET(
     });
     if (!sync.ok) {
       await recordPublishedAuthError(published.project_id, sync.error ?? "profile_sync_failed");
+    } else {
+      await clearPublishedAuthError(published.project_id);
     }
 
     applyPendingAuthCookies(response, pending);

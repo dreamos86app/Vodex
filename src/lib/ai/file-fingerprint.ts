@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 
-const BANNED_REFS = ["xycqutvqxtkbszytaxbe"];
+/** Legacy Supabase project — must not appear in generated/imported app source. */
+const BANNED_REFS = ["wciioegiczwqlmlroley"];
 
 export function sha256Short(input: string): string {
   return createHash("sha256").update(input).digest("hex").slice(0, 16);

@@ -44,6 +44,7 @@ import { RepairCenter } from "@/components/repair/repair-center";
 import { AppSettingsInlineForm } from "@/components/create/workspace/app-settings-inline-form";
 import { PublishStatusPanel } from "@/components/publish/publish-status-panel";
 import { PublishSetupChecklist } from "@/components/publish/publish-setup-checklist";
+import { ProductionCertificationCenter } from "@/components/certification/production-certification-center";
 import type { PublishSetupGap } from "@/lib/publish/integration-secret-readiness";
 import { ImportedSecretsSetupPanel } from "@/components/import/imported-secrets-setup-panel";
 import { loadProjectFilePaths } from "@/lib/projects/load-project-files";
@@ -866,6 +867,7 @@ export function AppDashboardPanel({
       case "publish":
         return (
           <div className="space-y-3">
+            <ProductionCertificationCenter projectId={projectId} />
             {publishSetupGaps.length > 0 ? (
               <PublishSetupChecklist projectId={projectId} gaps={publishSetupGaps} />
             ) : null}

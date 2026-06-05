@@ -3,7 +3,10 @@ import "server-only";
 import { type NextRequest, NextResponse } from "next/server";
 import { syncAppUserProfile } from "@/lib/publish/app-user-profile-sync";
 import { recordPublishedAnalyticsEvents } from "@/lib/publish/published-analytics-server";
-import { recordPublishedAuthError } from "@/lib/publish/published-auth-diagnostics";
+import {
+  clearPublishedAuthError,
+  recordPublishedAuthError,
+} from "@/lib/publish/published-auth-diagnostics";
 import {
   parsePublishedOAuthState,
   type PublishedOAuthState,
@@ -78,15 +81,25 @@ export async function handlePublishedOAuthCallback(input: {
     null;
 
   const admin = createServiceRoleClient();
-  const { data: published } = admin
-    ? await admin
-        .from("published_apps" as never)
-        .select("owner_id")
-        .eq("id", state.publishedAppId)
-        .maybeSingle()
-    : { data: null };
+  const [{ data: published }, { data: projectRow }] = admin
+    ? await Promise.all([
+        admin
+          .from("published_apps" as never)
+          .select("owner_id")
+          .eq("id", state.publishedAppId)
+          .maybeSingle(),
+        admin
+          .from("projects")
+          .select("owner_id")
+          .eq("id", state.projectId)
+          .maybeSingle(),
+      ])
+    : [{ data: null }, { data: null }];
 
-  const ownerId = (published as { owner_id?: string } | null)?.owner_id ?? "";
+  const ownerId =
+    (published as { owner_id?: string } | null)?.owner_id ??
+    (projectRow as { owner_id?: string } | null)?.owner_id ??
+    "";
 
   const sync = await syncAppUserProfile({
     projectId: state.projectId,
@@ -100,6 +113,8 @@ export async function handlePublishedOAuthCallback(input: {
 
   if (!sync.ok) {
     await recordPublishedAuthError(state.projectId, sync.error ?? "profile_sync_failed");
+  } else {
+    await clearPublishedAuthError(state.projectId);
   }
 
   const dest = state.returnUrl.startsWith("/") ? state.returnUrl : `/p/${state.slug}`;
