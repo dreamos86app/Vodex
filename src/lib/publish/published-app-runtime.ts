@@ -165,7 +165,25 @@ export async function resolvePublishedAppHtml(input: {
     input.published.watermark_disabled,
   );
 
-  const artifactPath = input.published.artifact_path?.trim();
+  let artifactPath = input.published.artifact_path?.trim() || null;
+  if (!artifactPath) {
+    const { data: projectRow } = await admin
+      .from("projects")
+      .select("metadata")
+      .eq("id", input.published.project_id)
+      .maybeSingle();
+    const meta =
+      projectRow?.metadata && typeof projectRow.metadata === "object" && !Array.isArray(projectRow.metadata)
+        ? (projectRow.metadata as Record<string, unknown>)
+        : {};
+    const fromMeta =
+      typeof meta.preview_artifact_path === "string" ? meta.preview_artifact_path.trim() : "";
+    if (fromMeta) {
+      artifactPath = fromMeta;
+      diagnostics.push("artifact_from_project_metadata");
+    }
+  }
+
   if (artifactPath) {
     const file = await downloadPreviewArtifactFile({
       admin,

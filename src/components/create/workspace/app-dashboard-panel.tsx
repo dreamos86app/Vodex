@@ -69,9 +69,19 @@ import {
 } from "@/lib/dashboard/section-access";
 import { isPaidPlan } from "@/lib/billing/plan-features";
 import { PublishTemplateModal } from "@/components/templates/publish-template-modal";
-import { CustomDomainsPanel } from "@/components/publish/custom-domains-panel";
-import { AppAuthSettingsPanel } from "@/components/settings/app-auth-settings-panel";
 import { getEntitlements } from "@/lib/billing/plan-entitlements";
+import {
+  DashboardAnalyticsSection,
+  DashboardApiSection,
+  DashboardAutomationsSection,
+  DashboardDataSection,
+  DashboardDomainsSection,
+  DashboardLogsSection,
+  DashboardMarketingSection,
+  DashboardSecuritySection,
+  DashboardSettingsWatermark,
+  DashboardUsersSection,
+} from "@/components/create/workspace/app-dashboard-live-sections";
 
 type ProjectRow = Pick<
   Tables<"projects">,
@@ -693,33 +703,33 @@ export function AppDashboardPanel({
       case "users":
         return (
           <SectionCard title="App users">
-            <EmptyHint text="Manage signups, invites, and access from here once people start using your app." />
+            <DashboardUsersSection publicUrl={dashProject.preview_url} />
           </SectionCard>
         );
       case "data":
         return (
           <SectionCard title="App data">
-            <EmptyHint text="Your app collections and saved information will show up here in plain language." />
+            <DashboardDataSection />
           </SectionCard>
         );
       case "analytics":
         return (
           <SectionCard title="Analytics">
-            <EmptyHint text="Visits, signups, and engagement metrics appear here after your app goes live." />
+            <DashboardAnalyticsSection publicUrl={dashProject.preview_url} />
           </SectionCard>
         );
       case "marketing":
         return (
           <SectionCard title="Marketing">
-            <EmptyHint text="Share links, social previews, and referral tools live here." />
+            <DashboardMarketingSection publicUrl={dashProject.preview_url} appName={displayName} />
           </SectionCard>
         );
       case "domains":
         return (
           <SectionCard title="Domains">
-            <CustomDomainsPanel
+            <DashboardDomainsSection
               projectId={projectId}
-              canUseCustomDomain={getEntitlements(planId).canUseCustomDomain}
+              planId={planId ?? "free"}
               publishedSubdomain={dashProject.published_subdomain}
             />
           </SectionCard>
@@ -741,10 +751,10 @@ export function AppDashboardPanel({
         return <ProjectPaymentsPanel projectId={projectId} planId={planId} published={published} />;
       case "security":
         return (
-          <SectionCard title="Authentication">
-            <AppAuthSettingsPanel
+          <SectionCard title="Authentication & security">
+            <DashboardSecuritySection
               projectId={projectId}
-              planTier={getEntitlements(planId).tier}
+              planId={planId ?? "free"}
               publicAppUrl={dashProject.preview_url}
             />
           </SectionCard>
@@ -752,19 +762,19 @@ export function AppDashboardPanel({
       case "automations":
         return (
           <SectionCard title="Automations">
-            <EmptyHint text="Automate follow-ups, notifications, and workflows for your app." />
+            <DashboardAutomationsSection />
           </SectionCard>
         );
       case "logs":
         return (
           <SectionCard title="Activity">
-            <EmptyHint text="Recent activity and errors from your live app — friendly summaries only." />
+            <DashboardLogsSection />
           </SectionCard>
         );
       case "api":
         return (
           <SectionCard title="API access">
-            <EmptyHint text="Programmatic access for developers. Keys are never shown in plain text here." />
+            <DashboardApiSection projectId={projectId} />
           </SectionCard>
         );
       case "settings":
@@ -780,6 +790,13 @@ export function AppDashboardPanel({
                 onSaved={() => setSettingsRefresh((k) => k + 1)}
               />
             </SectionCard>
+            <DashboardSettingsWatermark
+              planId={planId ?? "free"}
+              disabled={false}
+              onToggle={() => {
+                /* wired via watermark API in follow-up save */
+              }}
+            />
             <div className="rounded-2xl border border-border/70 bg-white/80 ring-1 ring-border/50 dark:bg-background/80">
               <button
                 type="button"

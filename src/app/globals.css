@@ -2233,6 +2233,21 @@ body {
   animation: vodex-shimmer 2.5s ease-in-out infinite;
 }
 
+@keyframes publish-confetti-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.publish-confetti-piece {
+  animation: publish-confetti-fall 2.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 .vodex-effect-confetti::before {
   content: "";
   position: absolute;

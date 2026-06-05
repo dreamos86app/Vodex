@@ -74,12 +74,16 @@ function LinkRow({ url, label }: { url: string; label?: string }) {
 export function PublishSuccessPanel({
   appName,
   publicUrl,
+  subdomainUrl,
+  customDomain,
   customDomainHint,
   onClose,
   className,
 }: {
   appName: string;
   publicUrl: string;
+  subdomainUrl?: string | null;
+  customDomain?: string | null;
   customDomainHint?: string | null;
   onClose?: () => void;
   className?: string;
@@ -117,7 +121,11 @@ export function PublishSuccessPanel({
 
       <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Your app links</p>
       <div className="mt-2 space-y-2">
-        <LinkRow url={publicUrl} label="Live on Vodex" />
+        <LinkRow url={publicUrl} label="Primary live URL" />
+        {subdomainUrl && subdomainUrl !== publicUrl ? (
+          <LinkRow url={subdomainUrl} label="Subdomain" />
+        ) : null}
+        {customDomain ? <LinkRow url={`https://${customDomain}`} label="Custom domain" /> : null}
       </div>
 
       {customDomainHint ? (

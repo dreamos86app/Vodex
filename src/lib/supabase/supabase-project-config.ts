@@ -33,6 +33,37 @@ export function extractSupabaseProjectRefFromUrl(url: string | null | undefined)
   }
 }
 
+/** Resolve project ref from URL or anon/service JWT when using a Supabase custom domain. */
+export function resolveSupabaseProjectRef(input?: {
+  url?: string | null;
+  anonKey?: string | null;
+  serviceKey?: string | null;
+}): string | null {
+  const fromUrl = extractSupabaseProjectRefFromUrl(input?.url ?? process.env.NEXT_PUBLIC_SUPABASE_URL);
+  if (fromUrl) return fromUrl;
+  const anonKey = input?.anonKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceKey =
+    input?.serviceKey ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SECRET_KEY;
+  return extractProjectRefFromSupabaseJwt(anonKey) ?? extractProjectRefFromSupabaseJwt(serviceKey);
+}
+
+export function isVodexSupabaseCustomDomainUrl(url: string | null | undefined): boolean {
+  if (!url?.trim()) return false;
+  try {
+    const host = new URL(url.trim()).hostname.toLowerCase();
+    return (
+      host === "api.vodex.dev" ||
+      host === "auth.vodex.dev" ||
+      host.endsWith(".vodex.dev") ||
+      process.env.VODEX_SUPABASE_AUTH_DOMAIN_READY === "true"
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Decode Supabase JWT `ref` claim without verifying signature (config check only). */
 export function extractProjectRefFromSupabaseJwt(jwt: string | null | undefined): string | null {
   if (!jwt?.trim()) return null;

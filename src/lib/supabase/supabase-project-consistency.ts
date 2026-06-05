@@ -37,29 +37,41 @@ export function validateSupabaseProjectConsistency(): SupabaseProjectConsistency
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  if (!urlProjectRef) {
+  const resolvedRef = urlProjectRef ?? anonKeyProjectRef ?? serviceRoleProjectRef;
+
+  if (!urlProjectRef && url) {
+  } else if (!urlProjectRef && !resolvedRef) {
     errors.push("NEXT_PUBLIC_SUPABASE_URL is missing or not a *.supabase.co URL");
-  } else if (!isAllowedSupabaseProjectRef(urlProjectRef)) {
-    errors.push(`Supabase URL project ref "${urlProjectRef}" is not in allowed project refs list`);
+  } else if (resolvedRef && !isAllowedSupabaseProjectRef(resolvedRef)) {
+    errors.push(`Supabase project ref "${resolvedRef}" is not in allowed project refs list`);
   }
 
-  if (anonKey && urlProjectRef && anonKeyProjectRef && anonKeyProjectRef !== urlProjectRef) {
+  const refForKeyCheck = urlProjectRef ?? resolvedRef;
+  if (anonKey && refForKeyCheck && anonKeyProjectRef && anonKeyProjectRef !== refForKeyCheck) {
     errors.push(
       `NEXT_PUBLIC_SUPABASE_ANON_KEY belongs to project "${anonKeyProjectRef}" but URL points to "${urlProjectRef}"`,
     );
   }
 
-  if (serviceKey && urlProjectRef && serviceRoleProjectRef && serviceRoleProjectRef !== urlProjectRef) {
+  if (serviceKey && refForKeyCheck && serviceRoleProjectRef && serviceRoleProjectRef !== refForKeyCheck) {
     errors.push(
       `SUPABASE_SERVICE_ROLE_KEY belongs to project "${serviceRoleProjectRef}" but URL points to "${urlProjectRef}"`,
     );
   }
 
-  if (process.env.NODE_ENV === "production" && urlProjectRef && urlProjectRef !== PRODUCTION_CANONICAL_PROJECT_REF) {
+  const effectiveRef = urlProjectRef ?? resolvedRef;
+  const customAuthDomain =
+    url.includes("vodex.dev") || process.env.VODEX_SUPABASE_AUTH_DOMAIN_READY === "true";
+  if (
+    process.env.NODE_ENV === "production" &&
+    effectiveRef &&
+    effectiveRef !== PRODUCTION_CANONICAL_PROJECT_REF &&
+    !(customAuthDomain && effectiveRef === PRODUCTION_CANONICAL_PROJECT_REF)
+  ) {
     errors.push(
-      `Production is using Supabase project "${urlProjectRef}" but canonical is "${PRODUCTION_CANONICAL_PROJECT_REF}". ` +
+      `Production is using Supabase project "${effectiveRef}" but canonical is "${PRODUCTION_CANONICAL_PROJECT_REF}". ` +
         `Update Vercel env NEXT_PUBLIC_SUPABASE_URL and matching keys, or register Google OAuth callback for: ` +
-        expectedGoogleOAuthRedirectUri(urlProjectRef),
+        expectedGoogleOAuthRedirectUri(effectiveRef),
     );
   }
 

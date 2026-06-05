@@ -21,7 +21,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PlaceholderRepairCard, type PlaceholderFindingUi } from "@/components/publish/placeholder-repair-card";
-import { PublishSuccessPanel } from "@/components/publish/publish-success-panel";
+import { PublishSuccessOverlay } from "@/components/publish/publish-success-overlay";
 import { fetchDedupe, getCached, invalidateCache } from "@/lib/cache/fetch-dedupe";
 import { toast } from "@/lib/toast";
 
@@ -114,6 +114,7 @@ export function PublishModal({
   localRef.current = local;
   const [mobilePlatform, setMobilePlatform] = React.useState<"ios" | "android">("android");
   const [publishSuccessUrl, setPublishSuccessUrl] = React.useState<string | null>(null);
+  const [successOverlayOpen, setSuccessOverlayOpen] = React.useState(false);
   const [mobileGatePassed, setMobileGatePassed] = React.useState(false);
   const [mobileScanning, setMobileScanning] = React.useState(false);
 
@@ -235,9 +236,10 @@ export function PublishModal({
       setPhase("published", { url: liveUrl ?? undefined });
       if (liveUrl) {
         setPublishSuccessUrl(liveUrl);
-        setTab("web");
+        setSuccessOverlayOpen(true);
+        onClose();
       }
-      toast.success("Your app is live — share the link below.");
+      toast.success("Your app is live!");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Publish failed";
       setPublishError(msg);
@@ -361,9 +363,25 @@ export function PublishModal({
       .finally(() => setLoading(false));
   }
 
-  if (!open || typeof document === "undefined") return null;
+  const subdomainLiveUrl =
+    publishInfo?.subdomain && publishInfo?.platformBaseDomain
+      ? `https://${publishInfo.subdomain}.${publishInfo.platformBaseDomain}`
+      : null;
 
-  return createPortal(
+  return (
+    <>
+      <PublishSuccessOverlay
+        open={successOverlayOpen && Boolean(publishSuccessUrl)}
+        appName={readiness?.appName ?? "Your app"}
+        publicUrl={publishSuccessUrl ?? ""}
+        subdomainUrl={subdomainLiveUrl}
+        customDomainHint={customAllowed ? undefined : "Upgrade to connect a custom domain."}
+        onDone={() => {
+          setSuccessOverlayOpen(false);
+          setPublishSuccessUrl(null);
+        }}
+      />
+      {!open || typeof document === "undefined" ? null : createPortal(
     <div
       className="fixed inset-0 z-[10050] flex items-end justify-center bg-foreground/25 p-4 backdrop-blur-sm sm:items-center"
       role="dialog"
@@ -523,16 +541,6 @@ export function PublishModal({
 
           {tab === "web" && (
             <div className="space-y-3">
-              {publishSuccessUrl ? (
-                <PublishSuccessPanel
-                  appName={readiness?.appName ?? "Your app"}
-                  publicUrl={publishSuccessUrl}
-                  customDomainHint={
-                    customAllowed ? undefined : "Upgrade to connect a custom domain."
-                  }
-                  onClose={() => setPublishSuccessUrl(null)}
-                />
-              ) : null}
               <div className="rounded-2xl bg-surface/60 p-4 ring-1 ring-border/80">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Live app URL</p>
                 <p className="mt-2 text-[13px] text-muted-foreground">
@@ -870,5 +878,7 @@ export function PublishModal({
       </motion.div>
     </div>,
     document.body,
+      )}
+    </>
   );
 }

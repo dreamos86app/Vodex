@@ -134,26 +134,30 @@ export const CHECKS = {
   "watermark-runtime": (root) => {
     const { errors, must } = createChecker(root);
     must("src/lib/publish/watermark-runtime.ts", "injectPublishedWatermark", "watermark injector");
-    must("src/lib/publish/watermark-runtime.ts", "Built with Vodex", "badge copy");
+    must("src/lib/publish/watermark-runtime.ts", "Made with Vodex", "page footer copy");
+    must("src/lib/publish/watermark-runtime.ts", "vodex-page-watermark", "document flow footer");
     must("src/lib/publish/published-app-runtime.ts", "injectPublishedWatermark", "runtime watermark");
     return errors;
   },
   "watermark-entitlements": (root) => {
-    const { errors, must } = createChecker(root);
+    const { errors, must, mustNot } = createChecker(root);
     must("src/lib/publish/watermark-runtime.ts", "shouldInjectPublishedWatermark", "entitlement gate");
     must("src/lib/publish/watermark-runtime.ts", 'planTier === "free"', "free always watermarked");
+    mustNot("src/lib/publish/watermark-runtime.ts", "position:fixed;bottom:0", "no fixed screen footer");
     return errors;
   },
   "publish-success-ux": (root) => {
-    const { errors, must } = createChecker(root);
+    const { errors, must, mustExist } = createChecker(root);
     must("src/components/publish/publish-success-panel.tsx", "publish-success-panel", "success panel");
     must("src/components/publish/publish-success-panel.tsx", "Open live app", "open CTA");
     must("src/components/publish/publish-success-panel.tsx", "QrCode", "QR CTA");
+    mustExist("src/components/publish/publish-success-overlay.tsx", "success overlay");
+    mustExist("src/components/publish/publish-confetti.tsx", "confetti");
     return errors;
   },
   "app-dashboard-settings": (root) => {
     const { errors, must } = createChecker(root);
-    must("src/components/create/workspace/app-dashboard-panel.tsx", "CustomDomainsPanel", "domains section");
+    must("src/components/create/workspace/app-dashboard-panel.tsx", "DashboardDomainsSection", "domains section");
     must("src/components/create/workspace/app-dashboard-panel.tsx", "AppAuthSettingsPanel", "auth section");
     must("src/components/create/workspace/app-dashboard-panel.tsx", "IntegrationsCatalogPanel", "integrations");
     return errors;

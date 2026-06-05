@@ -88,16 +88,20 @@ export function getDashboardSectionAccess(
     return "locked_publish_required";
   }
 
+  /** Once live, all dashboard sections unlock — plan gates only affect feature depth inside panels. */
+  if (isProjectPublished(project)) {
+    if (section === "integrations" && !canUseIntegrations(userPlan)) {
+      return "locked_plan_required";
+    }
+    return "unlocked";
+  }
+
   if (PLAN_GATED.includes(section) && !isPaidPlan(userPlan)) {
     return "locked_plan_required";
   }
 
   if (INTEGRATIONS_GATED.includes(section) && !canUseIntegrations(userPlan)) {
     return "locked_plan_required";
-  }
-
-  if (section === "domains" && !project?.published_subdomain && !project?.custom_domain) {
-    return "locked_setup_required";
   }
 
   return "unlocked";
