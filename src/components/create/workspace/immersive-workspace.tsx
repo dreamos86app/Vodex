@@ -1999,7 +1999,8 @@ export function ImmersiveWorkspace({
             mode: submitMode,
             mode_at_submit: submitMode,
             strategy: buildStrategyRef.current,
-            forceBuildPipeline: options?.forceBuild === true,
+            forceBuildPipeline:
+              options?.forceBuild === true || buildStrategyRef.current === "build_now",
             planFirstOnly: false,
             projectId: asyncProjectId,
             conversationId: conversationIdRef.current ?? undefined,
@@ -2442,6 +2443,30 @@ export function ImmersiveWorkspace({
       return next;
     });
   }, [codeFiles]);
+
+  const [previewStarting, setPreviewStarting] = React.useState(false);
+
+  const startPreviewSession = React.useCallback(async () => {
+    if (!effectiveProjectId) return;
+    setPreviewStarting(true);
+    try {
+      const res = await fetch(`/api/projects/${effectiveProjectId}/preview/start`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const body = (await res.json()) as { ok?: boolean; error?: string; previewUrl?: string };
+      if (body.ok) {
+        toast.success("Preview session started");
+      } else {
+        toast.error(body.error ?? "Could not start preview");
+      }
+      setProjectDataRefresh((n) => n + 1);
+    } catch {
+      toast.error("Could not start preview");
+    } finally {
+      setPreviewStarting(false);
+    }
+  }, [effectiveProjectId]);
 
   const rebuildPreview = React.useCallback(async () => {
     if (!effectiveProjectId) return;
@@ -3333,7 +3358,11 @@ export function ImmersiveWorkspace({
                 onRebuildPreview={
                   effectiveProjectId ? () => void rebuildPreview() : undefined
                 }
+                onStartPreview={
+                  effectiveProjectId ? () => void startPreviewSession() : undefined
+                }
                 previewRebuilding={previewRebuilding}
+                previewStarting={previewStarting}
                 onEditTarget={(info) => {
                   setEditTarget(info.section);
                   setScope(info.section.toLowerCase().replace(/\s+/g, "_") as EditScope);

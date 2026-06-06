@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-06-06T18:50:49.235Z",
+  "playwrightReportPresent": true,
+  "liveBenchmarkPresent": true,
+  "verifySuites": {
+    "p13": {
+      "ok": true,
+      "status": 0
+    },
+    "p12": {
+      "ok": true,
+      "status": 0
+    },
+    "p121": {
+      "ok": true,
+      "status": 0
+    },
+    "security": {
+      "ok": true,
+      "status": 0
+    },
+    "mobile": {
+      "ok": true,
+      "status": 0
+    },
+    "preview": {
+      "ok": true,
+      "status": 0
+    },
+    "publish": {
+      "ok": true,
+      "status": 0
+    },
+    "zip": {
+      "ok": true,
+      "status": 0
+    },
+    "publicRendering": {
+      "ok": false,
+      "status": 1
+    },
+    "mutation": {
+      "ok": true,
+      "status": 0
+    }
+  }
+}

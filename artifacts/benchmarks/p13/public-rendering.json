@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-06-06T18:50:48.533Z",
+  "pass": false,
+  "mode": "failed",
+  "structuralChecks": true,
+  "fixtureTests": true,
+  "live": {
+    "attempted": true,
+    "pass": false,
+    "skipped": false,
+    "reason": "Set PUBLISHED_TEST_SLUG (+ running server at E2E_BASE_URL) for live /p/[slug] proof",
+    "slug": "reciplyy-mq01rwer",
+    "routes_tested": [
+      {
+        "route": "/p/reciplyy-mq01rwer",
+        "error": "TypeError: fetch failed"
+      },
+      {
+        "route": "/p/reciplyy-mq01rwer/",
+        "error": "TypeError: fetch failed"
+      }
+    ]
+  },
+  "errors": [
+    "live /p/[slug] fetch failed or returned stub/empty body"
+  ]
+}

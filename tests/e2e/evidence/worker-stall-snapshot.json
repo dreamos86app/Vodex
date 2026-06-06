@@ -1,0 +1,101 @@
+{
+  "capturedAt": "2026-06-06T18:21:16.788Z",
+  "project_id": "e00a8f80-adaf-447f-85f4-22f66817279d",
+  "build_job_id": "b77218e2-e7c7-4e7c-95a9-69756d941db8",
+  "operation_id": "7d4786f5-a6f4-4b49-944e-79268c974846",
+  "last_persisted_event": "scaffold_fallback_applied",
+  "in_memory_trace": {
+    "buildJobId": "b77218e2-e7c7-4e7c-95a9-69756d941db8",
+    "operationId": "7d4786f5-a6f4-4b49-944e-79268c974846",
+    "executionInstanceId": "7d4786f5-a6f4-4b49-944e-79268c974846:c27f5f49-ddc3-42bf-bd67-781592f894f4",
+    "projectId": "e00a8f80-adaf-447f-85f4-22f66817279d",
+    "startedAt": "2026-06-06T18:20:52.694Z",
+    "lastStage": "scaffold_fallback_applied",
+    "lastAt": "2026-06-06T18:21:16.784Z",
+    "rows": [
+      {
+        "stage": "worker_claim_attempt",
+        "at": "2026-06-06T18:20:52.695Z"
+      },
+      {
+        "stage": "worker_claimed",
+        "at": "2026-06-06T18:20:53.541Z"
+      },
+      {
+        "stage": "build_pipeline_entered",
+        "at": "2026-06-06T18:20:53.809Z"
+      },
+      {
+        "stage": "planning_app_started",
+        "at": "2026-06-06T18:20:53.809Z",
+        "detail": "Organizing screens and features"
+      },
+      {
+        "stage": "preflight_started",
+        "at": "2026-06-06T18:20:55.071Z"
+      },
+      {
+        "stage": "preflight_completed",
+        "at": "2026-06-06T18:20:55.653Z"
+      },
+      {
+        "stage": "deterministic_plan_fallback_used",
+        "at": "2026-06-06T18:20:55.679Z",
+        "detail": "restaurant_inventory"
+      },
+      {
+        "stage": "identity_started",
+        "at": "2026-06-06T18:20:56.197Z"
+      },
+      {
+        "stage": "identity_failed",
+        "at": "2026-06-06T18:21:16.212Z"
+      },
+      {
+        "stage": "file_generation_started",
+        "at": "2026-06-06T18:21:16.774Z"
+      },
+      {
+        "stage": "scaffold_fallback_applied",
+        "at": "2026-06-06T18:21:16.780Z",
+        "detail": "16"
+      },
+      {
+        "stage": "scaffold_fallback_applied",
+        "at": "2026-06-06T18:21:16.781Z",
+        "detail": "16"
+      },
+      {
+        "stage": "scaffold_fallback_applied",
+        "at": "2026-06-06T18:21:16.784Z",
+        "detail": "root_page:true"
+      }
+    ],
+    "modelCall": {
+      "state": "idle",
+      "operationType": null,
+      "provider": null,
+      "model": null,
+      "timeoutMs": null,
+      "startedAt": null
+    },
+    "heartbeatRunning": true
+  },
+  "model_call": {
+    "state": "idle",
+    "operationType": null,
+    "provider": null,
+    "model": null,
+    "timeoutMs": null,
+    "startedAt": null
+  },
+  "provider_model": {
+    "provider": null,
+    "model": null
+  },
+  "request_timeout_ms": null,
+  "abort_controller_used": true,
+  "deterministic_fallback_available": true,
+  "heartbeat_running": true,
+  "root_cause_hint": "scaffold_fallback_applied"
+}

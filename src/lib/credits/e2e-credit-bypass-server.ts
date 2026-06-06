@@ -5,7 +5,8 @@ import type { CanonicalCreditsPayload } from "@/lib/credits/canonical-credits";
 import { isE2eCreditTestAccount } from "@/lib/credits/e2e-credit-account";
 
 const E2E_MIN_BUILD = 200;
-const E2E_MIN_ACTION = 50;
+/** ZIP preview floor is 140 AC — live E2E harness must exceed it when marker is present. */
+const E2E_MIN_ACTION = 500;
 
 type Marker = {
   userId?: string;
@@ -44,8 +45,9 @@ export function applyE2eCreditBypassDisplay(
   rawBuild: number,
   rawAction: number,
 ): CanonicalCreditsPayload {
-  const build = Math.max(rawBuild, E2E_MIN_BUILD);
-  const action = Math.max(rawAction, E2E_MIN_ACTION);
+  const marker = readE2eCreditBypassMarker();
+  const build = Math.max(rawBuild, marker?.buildCredits ?? E2E_MIN_BUILD);
+  const action = Math.max(rawAction, marker?.actionCredits ?? E2E_MIN_ACTION);
   return {
     ...payload,
     build: {

@@ -134,7 +134,7 @@ export async function fetchPublicStatusPayload(options?: { fullView?: boolean })
   const { data: announcements, error: annErr } = await db
     .from("platform_announcements")
     .select(
-      "id,title,message,severity,link_label,link_url,priority,banner_type,gradient_from,gradient_to,text_color,icon_type",
+      "id,title,message,severity,link_label,link_url,priority,banner_type,gradient_from,gradient_to,text_color,icon_type,background_preset,effect_preset,effect_key,icon_preset,animated_icon_enabled,accent_color,outline_color,button_color",
     )
     .eq("is_active", true)
     .or(`starts_at.is.null,starts_at.lte.${nowIso}`)

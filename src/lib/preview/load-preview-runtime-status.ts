@@ -10,9 +10,20 @@ import {
 import { isServerlessHost } from "@/lib/imports/preview-build-queue";
 import { WORKER_CONNECTED_THRESHOLD_MS } from "@/lib/preview/preview-worker-status";
 import { loadZipPreviewBillingForProject } from "@/lib/imports/zip-preview-billing";
+import { derivePreviewFailure } from "@/lib/preview/derive-preview-failure";
 
 const WORKER_STALE_MS = 5 * 60 * 1000;
 const WORKER_QUEUE_GRACE_MS = 8_000;
+
+function previewNotStartedFromMeta(meta: Record<string, unknown>): boolean {
+  return (
+    meta.preview_ready !== true &&
+    meta.preview_renderable !== true &&
+    (meta.preview_status == null ||
+      meta.preview_status === "not_started" ||
+      meta.preview_status === "unknown")
+  );
+}
 
 export async function loadPreviewRuntimeStatus(
   supabase: SupabaseClient,
@@ -43,6 +54,45 @@ export async function loadPreviewRuntimeStatus(
       .limit(1)
       .maybeSingle();
     jobRow = data ?? null;
+  }
+
+  const sessionId =
+    typeof meta.last_preview_session_id === "string"
+      ? meta.last_preview_session_id
+      : typeof meta.preview_session_id === "string"
+        ? meta.preview_session_id
+        : null;
+
+  let sessionRow: {
+    id: string;
+    status: string;
+    snapshot_id: string | null;
+    provider_level: string | null;
+    error: string | null;
+    created_at: string;
+  } | null = null;
+
+  if (admin && sessionId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (admin as any)
+      .from("preview_sessions")
+      .select("id, status, snapshot_id, provider_level, error, created_at")
+      .eq("id", sessionId)
+      .eq("project_id", projectId)
+      .maybeSingle();
+    sessionRow = data ?? null;
+  }
+
+  if (admin && !sessionRow) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (admin as any)
+      .from("preview_sessions")
+      .select("id, status, snapshot_id, provider_level, error, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    sessionRow = data ?? null;
   }
 
   const diag =
@@ -88,13 +138,71 @@ export async function loadPreviewRuntimeStatus(
 
   const jobSucceededRenderable =
     jobRow?.status === "succeeded" && jobRow.preview_renderable === true;
+  const sessionReady = sessionRow?.status === "ready";
+  const sessionRenderable =
+    sessionReady &&
+    (meta.preview_ready === true || meta.preview_honest === true || meta.preview_renderable === true);
   const previewRenderable = Boolean(
-    meta.preview_renderable ?? diag?.previewRenderable ?? jobSucceededRenderable,
+    meta.preview_renderable === true ||
+      diag?.previewRenderable === true ||
+      jobSucceededRenderable ||
+      sessionRenderable ||
+      (meta.preview_ready === true && meta.preview_honest === true && Boolean(sessionId)),
   );
   const previewHonest = Boolean(
     meta.preview_honest === true ||
-      (previewRenderable && (meta.preview_honest !== false || jobSucceededRenderable)),
+      (previewRenderable &&
+        meta.preview_honest !== false &&
+        (jobSucceededRenderable || sessionReady || meta.preview_ready === true)),
   );
+
+  const previewSource: PreviewRuntimeStatusPayload["previewSource"] = jobRow
+    ? "worker_job"
+    : sessionRow
+      ? "preview_session"
+      : meta.preview_renderable === true &&
+          (meta.preview_status === "ready" || meta.preview_honest === true)
+        ? "metadata"
+        : "none";
+
+  const resolvedJobId = jobRow?.id ?? sessionRow?.id ?? null;
+  const resolvedJobStatus =
+    jobRow?.status ??
+    (sessionRow?.status === "ready"
+      ? "succeeded"
+      : sessionRow?.status === "building"
+        ? "running"
+        : sessionRow?.status ?? null);
+  const resolvedPreviewStatus = String(
+    diag?.previewStatus ??
+      meta.preview_status ??
+      (sessionRow?.status === "ready"
+        ? "ready"
+        : sessionRow?.status === "building"
+          ? "running"
+          : sessionRow?.status === "failed"
+            ? "failed"
+            : jobRow?.status === "succeeded"
+              ? "ready"
+              : jobRow?.status ??
+                (sessionRow
+                  ? sessionRow.status
+                  : meta.preview_status === "not_started"
+                    ? "not_started"
+                    : previewNotStartedFromMeta(meta)
+                      ? "not_started"
+                      : "unknown")),
+  );
+  const resolvedFramework =
+    (meta.imported_framework as string) ??
+    (typeof meta.preview_framework === "string" ? meta.preview_framework : null) ??
+    (diag?.framework as string) ??
+    (sessionRow?.provider_level ? `session:${sessionRow.provider_level}` : null);
+  const resolvedArtifactPath =
+    jobRow?.artifact_path ??
+    (typeof meta.preview_artifact_path === "string" ? meta.preview_artifact_path : null) ??
+    (diag?.artifactPath as string | null) ??
+    (sessionRow?.snapshot_id ? `session:${sessionRow.snapshot_id}` : null);
 
   const diagRecord = diag as Record<string, unknown> | null;
   const diagBilling =
@@ -130,21 +238,26 @@ export async function loadPreviewRuntimeStatus(
       ? billing.charge_status
       : null;
 
-  return {
+  const payload: PreviewRuntimeStatusPayload = {
     previewRenderable,
     previewHonest,
-    previewStatus: String(diag?.previewStatus ?? meta.preview_status ?? "unknown"),
-    jobStatus,
-    jobId: jobRow?.id ?? (diag?.jobId as string | null) ?? null,
-    framework: (meta.imported_framework as string) ?? (diag?.framework as string) ?? null,
+    previewStatus: resolvedPreviewStatus,
+    jobStatus: resolvedJobStatus,
+    jobId: resolvedJobId,
+    framework: resolvedFramework,
     frameworkLabel:
       (diag?.frameworkLabel as string | undefined) ??
       (importMeta?.framework &&
       typeof importMeta.framework === "object" &&
       typeof (importMeta.framework as { label?: string }).label === "string"
         ? (importMeta.framework as { label: string }).label
-        : null),
-    artifactPath: jobRow?.artifact_path ?? (diag?.artifactPath as string | null) ?? null,
+        : sessionRow?.provider_level === "in_app_sandbox"
+          ? "Vodex in-app preview"
+          : sessionRow?.provider_level
+            ? String(sessionRow.provider_level)
+            : null),
+    artifactPath: resolvedArtifactPath,
+    previewSource,
     blockedReason:
       (diag?.blockedReason as string | null) ?? (meta.preview_blocked_reason as string | null) ?? null,
     errorCode: (() => {
@@ -223,5 +336,17 @@ export async function loadPreviewRuntimeStatus(
     chargedActionCredits: billing?.charged_action_credits ?? null,
     creditsCharged: billing?.charge_status === "charged",
     chargeStatus,
+    previewFailureKind: null,
+    previewFailureDetail: null,
   };
+
+  const failure = derivePreviewFailure(payload, meta);
+  payload.previewFailureKind = failure.kind;
+  payload.previewFailureDetail = failure.detail;
+
+  if (sessionRow?.error && !payload.userMessage) {
+    payload.userMessage = sessionRow.error;
+  }
+
+  return payload;
 }

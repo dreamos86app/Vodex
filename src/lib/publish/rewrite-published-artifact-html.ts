@@ -7,6 +7,7 @@ export function rewritePublishedArtifactHtml(
   html: string,
   slug: string,
   routePath = "/",
+  pageTitle?: string | null,
 ): string {
   const base = `/api/public/${encodeURIComponent(slug)}/assets`;
   const assetUrl = (rel: string) => {
@@ -15,6 +16,18 @@ export function rewritePublishedArtifactHtml(
   };
 
   let out = html;
+
+  const titleText = pageTitle?.trim() || slug;
+  if (!/<title[^>]*>[\s\S]*?<\/title>/i.test(out)) {
+    const titleTag = `<title>${escapeHtml(titleText)}</title>`;
+    if (/<head[^>]*>/i.test(out)) {
+      out = out.replace(/<head[^>]*>/i, (m) => `${m}${titleTag}`);
+    } else {
+      out = `<head>${titleTag}</head>` + out;
+    }
+  } else if (/<title>\s*<\/title>/i.test(out) || /<title><\/title>/i.test(out)) {
+    out = out.replace(/<title[^>]*>[\s\S]*?<\/title>/i, `<title>${escapeHtml(titleText)}</title>`);
+  }
 
   const runtimeStyle =
     '<style id="vodex-published-runtime">html,body{min-height:100%;margin:0}#root,#app,.app-root{min-height:100vh}</style>';
@@ -44,4 +57,12 @@ export function rewritePublishedArtifactHtml(
   });
 
   return injectPreviewRouterShim(out, routePath);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

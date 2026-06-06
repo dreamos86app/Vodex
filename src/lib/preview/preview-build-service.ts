@@ -114,6 +114,8 @@ async function updateProjectPreviewState(input: {
   deploymentId?: string | null;
 }) {
   const lifecycleStatus = input.status === "ready" ? "preview_ready" : "needs_attention";
+  const previewStatus =
+    input.status === "ready" ? "ready" : input.status === "failed" ? "failed" : "running";
   await input.writer
     .from("projects")
     .update({
@@ -122,12 +124,19 @@ async function updateProjectPreviewState(input: {
         ...input.prevMeta,
         ...lifecyclePatch(lifecycleStatus, {
           last_preview_session_id: input.sessionId,
+          preview_session_id: input.sessionId,
+          preview_job_id: input.sessionId,
           preview_honest: input.status === "ready",
+          preview_renderable: input.status === "ready",
           preview_provider_level: input.providerLevel,
           preview_external_url: input.externalUrl,
           preview_deployment_id: input.deploymentId ?? null,
           preview_ready: input.status === "ready",
+          preview_status: previewStatus,
+          preview_framework: input.providerLevel,
           preview_failed_at: input.status === "failed" ? input.now : null,
+          preview_failure_kind: input.status === "failed" ? "runtime_error" : null,
+          preview_failure_detail: input.status === "failed" ? "Preview session validation failed" : null,
         }),
       },
     } as never)

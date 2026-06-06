@@ -35,22 +35,6 @@ export async function reserveActionCreditHold(input: {
     return { ok: false, error: "Not enough Action Credits.", code: "insufficient" };
   }
 
-  const admin = createSupabaseAdmin();
-  if (!admin) return { ok: false, error: "Service unavailable", code: "unavailable" };
-
-  const { error } = await (admin as never as { from: (t: string) => { upsert: (v: unknown) => Promise<{ error: { message: string } | null }> } })
-    .from("zip_preview_action_holds")
-    .upsert({
-      operation_id: input.operationId,
-      user_id: input.userId,
-      project_id: input.projectId,
-      status: "reserved",
-      estimated_credits: input.amount,
-      meta: input.meta ?? {},
-      updated_at: new Date().toISOString(),
-    });
-
-  if (error) return { ok: false, error: error.message, code: "db_error" };
   return { ok: true };
 }
 
@@ -88,18 +72,31 @@ export async function releaseActionCreditHold(input: {
   operationId: string;
   reason: string;
 }): Promise<void> {
-  await refundActionCredit({
-    ownerUserId: input.userId,
-    projectId: input.projectId,
-    operationId: input.operationId,
-    reason: input.reason,
-  });
-
   const admin = createSupabaseAdmin();
+  let holdStatus: string | null = null;
   if (admin) {
+    const { data: hold } = await admin
+      .from("zip_preview_action_holds" as never)
+      .select("status" as never)
+      .eq("operation_id" as never, input.operationId)
+      .maybeSingle();
+    holdStatus = (hold as { status?: string } | null)?.status ?? null;
+  }
+
+  if (holdStatus === "charged") {
+    await refundActionCredit({
+      ownerUserId: input.userId,
+      projectId: input.projectId,
+      operationId: input.operationId,
+      reason: input.reason,
+    });
+  }
+
+  if (admin) {
+    const nextStatus = holdStatus === "charged" ? "refunded" : "cancelled";
     await admin
       .from("zip_preview_action_holds" as never)
-      .update({ status: "released", updated_at: new Date().toISOString() } as never)
-      .eq("operation_id", input.operationId);
+      .update({ status: nextStatus, updated_at: new Date().toISOString() } as never)
+      .eq("operation_id" as never, input.operationId);
   }
 }

@@ -1,0 +1,18 @@
+{
+  "status": "EXECUTED",
+  "pass": false,
+  "generatedAt": "2026-06-06T17:40:00.000Z",
+  "viewports": [320, 360, 375, 390, 414, 430, 768],
+  "executed": [],
+  "notExecuted": [320, 360, 375, 390, 414, 430, 768],
+  "liveJourneyTests": {
+    "@live 09 mobile create no overflow": "NOT_RUN",
+    "@live 10 mobile dashboard no overflow": "NOT_RUN",
+    "reason": "live-journeys.spec.ts serial suite aborted after test 01 failure"
+  },
+  "structuralVerify": {
+    "command": "npm run verify:p13-mobile",
+    "pass": true,
+    "evidence": "artifacts/benchmarks/p13/mobile-viewports.json"
+  }
+}

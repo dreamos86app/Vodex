@@ -278,7 +278,12 @@ export async function resolvePublishedAppHtml(input: {
       const raw = file.data.toString("utf8");
       if (raw.trim().length > 0) {
         let html = stripLegacyPlatformBadges(raw);
-        html = rewritePublishedArtifactHtml(html, input.published.slug, route);
+        html = rewritePublishedArtifactHtml(
+          html,
+          input.published.slug,
+          route,
+          input.published.title ?? input.published.slug,
+        );
         html = finalizePublishedHtml(html, input.published.slug, watermarkEnt);
         diagnostics.push("artifact_served", `route=${route}`);
         return {
@@ -346,7 +351,12 @@ export async function resolvePublishedAppHtml(input: {
 
   let html = stripLegacyPlatformBadges(plan.html);
   if (route !== "/") {
-    html = rewritePublishedArtifactHtml(html, input.published.slug, route);
+    html = rewritePublishedArtifactHtml(
+      html,
+      input.published.slug,
+      route,
+      input.published.title ?? input.published.slug,
+    );
   }
   html = finalizePublishedHtml(html, input.published.slug, watermarkEnt);
 

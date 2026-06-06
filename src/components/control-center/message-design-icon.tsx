@@ -18,6 +18,14 @@ import {
   Wand2,
   AppWindow,
   Orbit,
+  Bell,
+  Star,
+  Flame,
+  Globe,
+  Code,
+  CircleDollarSign,
+  Calendar,
+  ThumbsUp,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -42,6 +50,14 @@ const ICON_MAP: Record<IconPresetId, LucideIcon> = {
   discord_community: MessagesSquare,
   ai_wand: Wand2,
   app_window: AppWindow,
+  bell_alert: Bell,
+  star_feature: Star,
+  flame_hot: Flame,
+  globe_world: Globe,
+  code_brackets: Code,
+  coin_dollar: CircleDollarSign,
+  calendar_event: Calendar,
+  thumbs_up: ThumbsUp,
 };
 
 export function MessageDesignIcon({

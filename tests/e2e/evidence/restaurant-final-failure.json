@@ -1,42 +1,13 @@
 {
-  "capturedAt": "2026-05-29T08:43:58.892Z",
-  "stage": "queue",
-  "message": "queue\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m0\u001b[39m\nReceived length: \u001b[31m3\u001b[39m\nReceived array:  \u001b[31m[\"queue:queue:8plus1_or_empty_or_dup\", \"queue:8plus1_or_empty_or_dup\", \"console_errors:15\"]\u001b[39m",
-  "url": "http://localhost:3000/apps/a876813c-e165-4171-bcb1-6c193e36c785/dashboard",
-  "projectId": "a876813c-e165-4171-bcb1-6c193e36c785",
-  "fileCount": 16,
-  "consoleErrors": [
-    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
-    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
-    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
-    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
-    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
-    "Failed to load resource: net::ERR_CONNECTION_REFUSED",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "WebSocket is already in CLOSING or CLOSED state.",
-    "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.\n- Date formatting in a user's locale which doesn't match the server.\n- External changing data without sending a snapshot of it along with the HTML.\n- Invalid HTML tag nesting.\n\nIt can also happen if the client has a browser extension installed which messes with the HTML before React loaded.\n\n%s%s https://react.dev/link/hydration-mismatch \n\n  ...\n    <RedirectErrorBoundary router={{...}}>\n      <InnerLayoutRouter url=\"/apps/a876...\" tree={[...]} params={{appId:\"a87...\"}} cacheNode={{rsc:{...}, ...}} ...>\n        <SegmentViewNode type=\"page\" pagePath=\"(workspace...\">\n          <SegmentTrieNode>\n          <AppBuilderPage>\n            <Suspense fallback={<div>}>\n              <BuilderProjectGate appId=\"a876813c-e...\" userId=\"3c08502e-9...\" initialProject={{id:\"a87681...\", ...}} ...>\n                <ImmersiveWorkspace initialPrompt=\"\" initialMode=\"build\" initialAutoStart={false} ...>\n                  <DropZone onFiles={function ImmersiveWorkspace.useCallback[onFiles]} disabled={false} ...>\n                    <div onDragEnter={function DropZone.useCallback[onDragEnter]} ...>\n                      <span>\n                      <WorkspaceLauncher>\n                      <div className=\"flex min-h...\">\n                        <div>\n                        <div className=\"flex min-h...\">\n                          <div>\n                          <div>\n                          <div ref={{current:null}} className=\"relative z...\">\n                            <AttachmentRail>\n                            <div>\n                            <ComposerPromptQueue>\n                            <form\n                              ref={{current:null}}\n                              data-testid=\"create-composer-form\"\n                              data-build-strategy=\"plan_first\"\n                              data-mode=\"build\"\n                              data-plan-first-enabled=\"true\"\n                              data-can-enqueue-build=\"false\"\n                              data-queue-ready=\"false\"\n                              data-queue-count=\"0\"\n+                             data-queue-disabled-reason=\"none\"\n-                             data-queue-disabled-reason=\"empty\"\n                              data-active-project-id=\"a876813c-e165-4171-bcb1-6c193e36c785\"\n                              className=\"relative z-10 rounded-xl composer-shell border border-violet-500/25 bg-surfac...\"\n                              onInputCapture={function ImmersiveWorkspace.useCallback[handleComposerInputCapture]}\n                              onSubmitCapture={function ImmersiveWorkspace.useCallback[handleFormSubmitCapture]}\n                              onSubmit={function ImmersiveWorkspace.useCallback[handleFormSubmit]}\n                            >\n                        ...\n                      ...\n                      ...\n        ...\n      ...\n"
-  ],
+  "capturedAt": "2026-06-06T18:36:04.686Z",
+  "stage": "auth",
+  "message": "apiRequestContext.get: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/dev/auth-session-check\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n",
+  "url": "about:blank",
+  "consoleErrors": [],
   "networkErrors": [],
   "page": {
     "_type": "Page",
-    "_guid": "page@d79caedbf2e53a062d9fe7ab6bf6f234"
+    "_guid": "page@b34a7b5d57cd15c602e89c58a2e128a1"
   },
-  "localStorageKeys": [
-    "dreamos-auth",
-    "dreamos-recent-pages",
-    "dreamos86.submittedOp:0b2389d1-4bd6-4795-af7c-6d3449c7fc90",
-    "dreamos86.submittedOp:714002cd-83ee-43d1-a46a-3194d0f1079c",
-    "dreamos86.consumedPrompt:0b2389d1-4bd6-4795-af7c-6d3449c7fc90",
-    "dreamos86.consumedPrompt:70fce0d7-ac77-4ce4-b8c4-9f849e2db3c0",
-    "dreamos-editor-session:a876813c-e165-4171-bcb1-6c193e36c785",
-    "dreamos86.consumedPrompt:714002cd-83ee-43d1-a46a-3194d0f1079c",
-    "dreamos86.consumedPrompt:f0b5aa40-5ca9-4ba9-bbac-7a4baae6fcd2"
-  ]
+  "localStorageKeys": []
 }

@@ -47,7 +47,7 @@ async function readAuthSession(request: APIRequestContext) {
 }
 
 async function readCredits(request: APIRequestContext) {
-  const res = await request.get("/api/credits", { timeout: 30_000 });
+  const res = await request.get("/api/credits?lite=1", { timeout: AUTH_API_TIMEOUT_MS });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   return { status: res.status(), body };
 }
@@ -122,12 +122,12 @@ export async function probeE2eAuthInBrowserContext(input: {
   page: Page;
   request: APIRequestContext;
 }): Promise<E2eAuthProbeResult | E2eAuthProbeFailure> {
-  await input.page.goto("/", { waitUntil: "domcontentloaded", timeout: 120_000 }).catch(() => undefined);
-  await input.page.waitForTimeout(500);
-
   const cookieNames = cookieNamesFromStorage();
   const auth = await readAuthSession(input.request);
   const credits = await readCredits(input.request);
+
+  await input.page.goto("/create", { waitUntil: "domcontentloaded", timeout: 120_000 }).catch(() => undefined);
+  await input.page.waitForTimeout(300);
   const onboarding = await readOnboarding(input.request);
 
   const userResolved = auth.body.userResolved === true;

@@ -251,7 +251,16 @@ export function classifyCreateIntent(prompt: string, hasProjectId: boolean): Cre
     };
   }
 
-  if (buildSignals || buildIntent.intent === "build_app") {
+  if (questionSignals && !buildSignals) {
+    return baseQuestionResult(
+      "This looks like a question — we will answer without creating an app or using build credits.",
+    );
+  }
+
+  if (
+    buildSignals ||
+    (buildIntent.intent === "build_app" && buildIntent.confidence >= 0.85)
+  ) {
     return {
       intent: "app_build_request",
       confidence: buildIntent.confidence >= 0.8 ? 0.92 : 0.82,
@@ -274,12 +283,6 @@ export function classifyCreateIntent(prompt: string, hasProjectId: boolean): Cre
       needsClarification: false,
       userMessage: "We will capture this as an app idea and prepare a blueprint first.",
     };
-  }
-
-  if (questionSignals && !buildSignals) {
-    return baseQuestionResult(
-      "This looks like a question — we will answer without creating an app or using build credits.",
-    );
   }
 
   if (text.length > 40 && !text.includes("?") && !IDEA_REQUEST.test(text)) {

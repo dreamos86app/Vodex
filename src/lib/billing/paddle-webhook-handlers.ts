@@ -126,7 +126,7 @@ export async function handlePaddleTransactionCompleted(input: {
   const newPlan = resolveEntitlementPlan(custom, priceId);
   if (!newPlan) return;
 
-  await syncPaddleMarketingConsent(userId, input.data);
+  await syncPaddleMarketingConsent(userId, input.data, { purchaseDefaultOptIn: true });
 
   const interval: BillingInterval = custom.billingInterval ?? "monthly";
   const subscriptionId = String(

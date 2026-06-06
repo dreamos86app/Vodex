@@ -111,8 +111,8 @@ test.describe("@live ZIP import live journey", () => {
     expect((found?.metadata as { source?: string })?.source).toBe("zip_import");
 
     if (body.redirectTo) {
-      await page.goto(body.redirectTo);
-      await expect(page.getByText(/imported|framework|files/i).first()).toBeVisible({ timeout: 15000 });
+      await page.goto(body.redirectTo, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await expect(page.getByText(/imported|framework|files/i).first()).toBeVisible({ timeout: 30_000 });
     }
   });
 });

@@ -9,6 +9,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { chromium } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
 import {
   ROOT,
   AUTH_PATH,
@@ -40,6 +41,10 @@ function loadEnvLocal() {
     out[t.slice(0, i).trim()] = t.slice(i + 1).trim();
   }
   return out;
+}
+
+if (!process.env.NODE_USE_SYSTEM_CA) {
+  process.env.NODE_USE_SYSTEM_CA = "1";
 }
 
 const env = { ...process.env, ...loadEnvLocal() };
@@ -166,6 +171,50 @@ if (authFileExists() && !force) {
   process.exit(v.status ?? 0);
 }
 
+async function writeApiAuthFallback() {
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl?.startsWith("http") || !anonKey || !email || !password) return false;
+
+  const client = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error || !data.session) return false;
+
+  let cookieRef = "auth";
+  try {
+    const host = new URL(supabaseUrl).hostname.split(".")[0];
+    if (host) cookieRef = host;
+  } catch {
+    /* */
+  }
+  const cookieName = `sb-${cookieRef}-auth-token`;
+  const value = `base64-${Buffer.from(JSON.stringify(data.session)).toString("base64")}`;
+  fs.writeFileSync(
+    AUTH_PATH,
+    JSON.stringify(
+      {
+        cookies: [
+          {
+            name: cookieName,
+            value,
+            domain: "localhost",
+            path: "/",
+            expires: -1,
+            httpOnly: false,
+            secure: false,
+            sameSite: "Lax",
+          },
+        ],
+        origins: [],
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(`✓ API auth fallback wrote ${cookieName}`);
+  return true;
+}
+
 console.log(`Signing in at ${baseUrl}/auth/login (headless)…\n`);
 
 const browser = await chromium.launch({ headless: true });
@@ -176,22 +225,43 @@ try {
   await page.goto(`${baseUrl}/auth/login`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.fill("#email", email);
   await page.fill("#password", password);
-  await Promise.all([
-    page.waitForURL(
-      (url) => !url.pathname.includes("/auth/login") || url.searchParams.has("error"),
-      { timeout: 60_000 },
-    ),
-    page.click('button[type="submit"]:not([disabled])'),
-  ]);
+  await page.click('button[type="submit"]:not([disabled])');
 
-  const url = page.url();
-  if (url.includes("/auth/login")) {
-    const errText = await page.locator('[role="alert"], .text-destructive, [class*="destructive"]').first().textContent().catch(() => "");
-    if (url.includes("error") || errText?.trim()) {
+  // Next.js client router.replace does not always emit a navigation event Playwright can wait on.
+  const loginDeadline = Date.now() + 60_000;
+  let leftLogin = false;
+  while (Date.now() < loginDeadline) {
+    const pathname = new URL(page.url()).pathname;
+    if (!pathname.includes("/auth/login")) {
+      leftLogin = true;
+      break;
+    }
+    const errText = await page
+      .locator('[role="alert"], .text-destructive, [class*="destructive"]')
+      .first()
+      .textContent()
+      .catch(() => "");
+    if (errText?.trim()) {
       console.error("✗ Login failed — check E2E credentials or Supabase auth.");
-      if (errText?.trim()) console.error(`  UI: ${errText.trim().slice(0, 200)}`);
+      console.error(`  UI: ${errText.trim().slice(0, 200)}`);
       process.exit(1);
     }
+    await page.waitForTimeout(500);
+  }
+
+  if (!leftLogin) {
+    console.warn("⚠ Headless UI login timed out — trying API auth fallback…");
+    await browser.close();
+    if (!(await writeApiAuthFallback())) {
+      console.error("✗ Headless login timed out and API auth fallback failed.");
+      process.exit(1);
+    }
+    const verifyFallback = spawnSync("node", [join(scriptDir, "verify-e2e-auth.mjs")], {
+      cwd: ROOT,
+      shell: true,
+      stdio: "inherit",
+    });
+    process.exit(verifyFallback.status ?? 1);
   }
 
   await page.goto(`${baseUrl}/create`, { waitUntil: "domcontentloaded", timeout: 60_000 });

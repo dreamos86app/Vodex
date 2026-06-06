@@ -15,13 +15,17 @@ export function PreviewRuntimeStatusPanel({
   compact,
   className,
   onRebuild,
+  onStartPreview,
   rebuilding,
+  startingPreview,
 }: {
   status: PreviewRuntimeStatusPayload;
   compact?: boolean;
   className?: string;
   onRebuild?: () => void;
+  onStartPreview?: () => void;
   rebuilding?: boolean;
+  startingPreview?: boolean;
 }) {
   const [logsOpen, setLogsOpen] = React.useState(false);
   const label = previewRuntimeStateLabel(status);
@@ -44,7 +48,14 @@ export function PreviewRuntimeStatusPanel({
           (status.requiresDeployedWorker
             ? "Deploy the preview worker for production builds."
             : "Start the preview worker locally."))
-        : status.blockedReason ?? "Waiting for a renderable preview build.";
+        : status.previewFailureKind === "no_preview_job"
+          ? (status.previewFailureDetail ??
+            "No preview session was created after source files were saved.")
+          : status.previewFailureDetail ??
+            status.blockedReason ??
+            (status.previewStatus === "not_started"
+              ? "Start preview to render your generated app."
+              : "Waiting for a renderable preview build.");
 
   return (
     <div
@@ -77,28 +88,65 @@ export function PreviewRuntimeStatusPanel({
             </p>
           )}
         </div>
-        {onRebuild && !compact && (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="h-7 shrink-0 gap-1 px-2 text-[10px]"
-            disabled={rebuilding || (pending && status.workerConnected && !status.workerUnavailable)}
-            onClick={onRebuild}
-          >
-            {rebuilding ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <RefreshCw className="size-3" />
-            )}
-            Rebuild
-          </Button>
-        )}
+        {!compact && (onStartPreview || onRebuild) ? (
+          <div className="flex shrink-0 flex-col gap-1">
+            {onStartPreview &&
+            status.previewSource !== "worker_job" &&
+            !status.previewRenderable ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="h-7 gap-1 px-2 text-[10px]"
+                disabled={startingPreview || rebuilding || pending}
+                onClick={onStartPreview}
+                data-testid="preview-start-button"
+              >
+                {startingPreview ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3" />
+                )}
+                {status.previewFailureKind === "no_preview_job" ? "Start preview" : "Retry preview"}
+              </Button>
+            ) : null}
+            {onRebuild && status.previewSource === "worker_job" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-7 gap-1 px-2 text-[10px]"
+                disabled={rebuilding || (pending && status.workerConnected && !status.workerUnavailable)}
+                onClick={onRebuild}
+              >
+                {rebuilding ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3" />
+                )}
+                Rebuild
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <dl className={cn("mt-2 grid gap-1", compact ? "grid-cols-2" : "sm:grid-cols-2")}>
-        <Item label="Job" value={status.jobId ?? "—"} />
-        <Item label="Job status" value={status.jobStatus ?? status.previewStatus} />
+        <Item
+          label={status.previewSource === "preview_session" ? "Session" : "Job"}
+          value={status.jobId ?? (status.previewFailureKind === "no_preview_job" ? "none" : "—")}
+        />
+        <Item
+          label="Job status"
+          value={
+            status.jobStatus ??
+            (status.previewStatus === "not_started" ? "not_started" : status.previewStatus)
+          }
+        />
+        <Item label="Source" value={status.previewSource ?? "—"} />
+        {status.previewFailureKind ? (
+          <Item label="Failure kind" value={status.previewFailureKind} />
+        ) : null}
         {status.jobAgeLabel ? <Item label="Queue age" value={status.jobAgeLabel} /> : null}
         <Item label="Framework" value={status.frameworkLabel ?? status.framework ?? "—"} />
         <Item label="Artifact" value={status.artifactPath ?? "—"} mono />

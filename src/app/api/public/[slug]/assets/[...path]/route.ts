@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { downloadPreviewArtifactFile } from "@/lib/imports/preview-artifact-writer";
 import { loadPublishedAppBySlug } from "@/lib/publish/published-app-runtime";
+import { resolvePublishedArtifactPath } from "@/lib/publish/resolve-published-artifact-path";
 
 export const dynamic = "force-dynamic";
 
@@ -29,15 +30,18 @@ export async function GET(
   if (!safe || !segments?.length) return new NextResponse("Not found", { status: 404 });
 
   const published = await loadPublishedAppBySlug(safe);
-  if (!published?.artifact_path) return new NextResponse("Not found", { status: 404 });
+  if (!published) return new NextResponse("Not found", { status: 404 });
 
   const admin = createServiceRoleClient();
   if (!admin) return new NextResponse("Unavailable", { status: 503 });
 
+  const artifactPath = await resolvePublishedArtifactPath(published, admin);
+  if (!artifactPath) return new NextResponse("Not found", { status: 404 });
+
   const relativePath = segments.join("/");
   const file = await downloadPreviewArtifactFile({
     admin,
-    artifactPath: published.artifact_path,
+    artifactPath,
     relativePath,
   });
 

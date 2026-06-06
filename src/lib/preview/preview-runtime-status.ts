@@ -31,6 +31,9 @@ export type PreviewRuntimeStatusPayload = {
   chargedActionCredits: number | null;
   creditsCharged: boolean;
   chargeStatus: "pending" | "charged" | "refunded" | "cancelled" | "none" | null;
+  previewFailureKind: string | null;
+  previewFailureDetail: string | null;
+  previewSource: "worker_job" | "preview_session" | "metadata" | "none";
 };
 
 export type PackageRepairDiagnosticsPayload = {
@@ -96,5 +99,11 @@ export function previewRuntimeStateLabel(status: PreviewRuntimeStatusPayload): s
   }
   if (status.jobStatus === "failed" || status.previewStatus === "failed") return "Preview failed";
   if (status.workerUnavailable) return "Worker unavailable";
+  if (status.previewFailureKind === "no_preview_job" || status.previewStatus === "not_started") {
+    return "Preview not started";
+  }
+  if (status.previewFailureKind && status.previewFailureKind !== "unknown") {
+    return "Preview blocked";
+  }
   return "Preview not ready";
 }

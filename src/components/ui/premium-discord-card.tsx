@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-export const VODEX_DISCORD_URL = "https://discord.gg/y8EbeMc9Mb";
+export const VODEX_DISCORD_URL = "https://discord.gg/TzV73DfWG6";
 export const DISCORD_BRAND_BLUE = "#5865F2";
 
 export function DiscordGlyph({ className }: { className?: string }) {

@@ -6,9 +6,14 @@ export const PRODUCTION_CANONICAL_PROJECT_REF = DREAMOS_SUPABASE_PROJECT_REF;
 /**
  * Known project refs (legacy + canonical). Only PRODUCTION_CANONICAL_PROJECT_REF may run in production.
  */
+const LEGACY_SUPABASE_PROJECT_REFS = (process.env.LEGACY_SUPABASE_PROJECT_REFS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 export const ALLOWED_SUPABASE_PROJECT_REFS = [
   PRODUCTION_CANONICAL_PROJECT_REF,
-  "xycqutvqxtkbszytaxbe",
+  ...LEGACY_SUPABASE_PROJECT_REFS,
 ] as const;
 
 export type AllowedSupabaseProjectRef = (typeof ALLOWED_SUPABASE_PROJECT_REFS)[number];

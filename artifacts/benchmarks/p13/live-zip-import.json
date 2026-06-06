@@ -1,0 +1,17 @@
+{
+  "executed": true,
+  "status": "EXECUTED",
+  "pass": true,
+  "timestamp": "2026-06-06T18:13:45.000Z",
+  "environment": {
+    "baseUrl": "http://localhost:3000",
+    "e2eRunLive": true,
+    "userEmail": "e2e-live@dreamos86.test"
+  },
+  "route": "/api/projects/import-zip",
+  "projectId": "141ecb9b-b730-442e-9c5e-648dba314e0c",
+  "actionCreditsBefore": 500,
+  "httpStatus": 200,
+  "failureReason": null,
+  "note": "verify:zip-import-live-route passed after E2E credit provisioning + hold schema fix"
+}

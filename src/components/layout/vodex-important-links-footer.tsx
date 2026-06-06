@@ -25,7 +25,7 @@ const LINK_COLUMNS = [
       { href: "/help", label: "Help" },
       { href: "/changelog", label: "Changelog" },
       { href: STATUS_URL, label: "Status", external: true },
-      { href: "https://discord.gg/y8EbeMc9Mb", label: "Discord Community", external: true },
+      { href: "https://discord.gg/TzV73DfWG6", label: "Discord Community", external: true },
     ],
   },
   {

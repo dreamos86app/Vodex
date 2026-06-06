@@ -1,0 +1,120 @@
+{
+  "environment": {
+    "generatedAt": "2026-06-06T17:31:14.600Z",
+    "baseUrl": "http://localhost:3000",
+    "serverUp": true,
+    "authPresent": true,
+    "supabaseConfigured": true
+  },
+  "phases": {
+    "previewAudit": {
+      "status": "EXECUTED",
+      "pass": true,
+      "previewSessions": 116,
+      "previewBuildJobs": 10,
+      "projectsWithPreviewUrl": 5,
+      "readyWithoutRenderable": 0,
+      "staleRenderable": 0,
+      "repairDryRun": true,
+      "repairCandidates": 0,
+      "forbiddenStates": {
+        "jobUnknownWithoutSession": null
+      }
+    },
+    "generatedAppLive": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "Full recipe build journey not run in this pass (requires manual or E2E_RUN_LIVE=1 npm run test:e2e:live:ready)"
+    },
+    "publicRenderingLive": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "Set PUBLISHED_TEST_SLUG with running server for live /p/[slug] fetch",
+      "partialProbe": true,
+      "probe": {
+        "route": "/p/e2e-not-published-slug-xyz",
+        "status": 404,
+        "honestNotFound": true
+      }
+    },
+    "zipImportLive": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "ZIP import E2E not executed — run tests/e2e/zip-import.spec.ts @live with server"
+    },
+    "publishLive": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "Publish/unpublish/republish journey not executed in this pass"
+    },
+    "auth": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "Auth browser flows not executed in this pass"
+    },
+    "mobile": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "Playwright mobile viewport E2E not executed — run test:e2e:live:ready"
+    },
+    "community": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "Community live interactions not executed"
+    },
+    "notifications": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "Notification live delivery not executed"
+    },
+    "creditAudit": {
+      "status": "EXECUTED",
+      "pass": true
+    },
+    "security": {
+      "status": "EXECUTED",
+      "pass": true
+    },
+    "sessionStability": {
+      "status": "NOT_EXECUTED",
+      "pass": false,
+      "reason": "Browser session stability requires live E2E — structural auth code verified via verify:p13-production"
+    },
+    "dashboard": {
+      "status": "EXECUTED",
+      "pass": true
+    },
+    "verifyE2eStructure": {
+      "status": "EXECUTED",
+      "pass": true
+    },
+    "liveE2e": {
+      "status": "EXECUTED",
+      "pass": false,
+      "command": "npm run test:e2e:live:ready",
+      "reportPresent": true
+    },
+    "liveApiProbes": {
+      "status": "EXECUTED",
+      "pass": true,
+      "probes": [
+        {
+          "route": "/api/status/public",
+          "status": 200
+        },
+        {
+          "route": "/p/e2e-not-published-slug-xyz",
+          "status": 404,
+          "honestNotFound": true
+        }
+      ],
+      "note": "Unauthenticated public probes only"
+    }
+  },
+  "productionReadiness": {
+    "structuralVerificationGreen": true,
+    "liveJourneysExecuted": false,
+    "livePublicRenderingExecuted": false,
+    "liveGeneratedAppExecuted": false
+  }
+}

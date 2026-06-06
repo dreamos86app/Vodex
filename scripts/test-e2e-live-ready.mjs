@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const authPath = path.join(root, ".playwright-auth.json");
 const evidencePath = path.join(root, ".dreamos-evidence.json");
+const e2eResultsPath = path.join(root, "artifacts", "benchmarks", "p13", "e2e-live-results.json");
 const baseUrl = process.env.E2E_BASE_URL ?? process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 console.log("\n=== test:e2e:live:ready ===\n");
@@ -110,6 +111,22 @@ if (fs.existsSync(reportPath)) {
 }
 
 const passed = r.status === 0;
+fs.mkdirSync(path.dirname(e2eResultsPath), { recursive: true });
+fs.writeFileSync(
+  e2eResultsPath,
+  JSON.stringify(
+    {
+      executed: true,
+      pass: passed,
+      generatedAt: new Date().toISOString(),
+      environment: { baseUrl, e2eRunLive: process.env.E2E_RUN_LIVE === "1" },
+      tests,
+      exitCode: r.status ?? 1,
+    },
+    null,
+    2,
+  ),
+);
 writeEvidence({
   e2eMode: passed ? "live-passed" : "live-failed",
   e2ePassed: passed,

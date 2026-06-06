@@ -116,6 +116,10 @@ export function discoverImportedAppRoutes(files: BuildFile[]): PreviewRouteEntry
 
   for (const file of files) {
     const p = norm(file.path);
+    if (/^(?:src\/)?app\/page\.(tsx|jsx|ts|js)$/i.test(p)) {
+      add([{ path: "/", label: "Home", source: p }]);
+      continue;
+    }
     const appPage = p.match(/^(?:src\/)?app\/(.+)\/page\.(tsx|jsx|ts|js)$/i);
     if (appPage) {
       const segments = appPage[1]!

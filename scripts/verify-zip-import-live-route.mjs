@@ -186,6 +186,28 @@ async function main() {
   }
   console.log("✓ redirectTo returned");
 
+  const outDir = path.join(root, "artifacts", "benchmarks", "p13");
+  fs.mkdirSync(outDir, { recursive: true });
+  const writeLiveArtifact = (pass, failureReason = null) => {
+    fs.writeFileSync(
+      path.join(outDir, "live-zip-import.json"),
+      JSON.stringify(
+        {
+          executed: true,
+          status: "EXECUTED",
+          pass,
+          timestamp: new Date().toISOString(),
+          environment: { baseUrl: base, e2eRunLive: process.env.E2E_RUN_LIVE === "1" },
+          projectId,
+          route: "/api/projects/import-zip",
+          failureReason,
+        },
+        null,
+        2,
+      ),
+    );
+  };
+
   const readyRes = await fetch(`${base}/api/projects/${projectId}/publish/readiness`, {
     headers: { Cookie: cookieHeader },
   });
@@ -211,6 +233,8 @@ async function main() {
   await admin.storage.from("zip-imports").remove([storagePath]).catch(() => {});
   await admin.from("projects").delete().eq("id", projectId);
   console.log("✓ Cleaned up test project");
+
+  writeLiveArtifact(true);
 
   console.log("\nverify:zip-import-live-route passed.\n");
 }

@@ -43,7 +43,12 @@ const suites = {
     const errors = [];
     if (!exists("src/components/publish/publish-readiness-cards.tsx")) errors.push("publish-readiness-cards missing");
     const modal = read("src/components/create/workspace/publish-modal.tsx");
-    if (!modal.includes("PublishReadinessCards")) errors.push("publish modal missing readiness cards");
+    if (
+      !modal.includes("PublishReadinessCards") &&
+      !modal.includes("PublishReadinessCompact")
+    ) {
+      errors.push("publish modal missing readiness UI");
+    }
     if (!modal.includes("publish-modal-body")) errors.push("publish modal scroll body missing");
     return errors;
   },

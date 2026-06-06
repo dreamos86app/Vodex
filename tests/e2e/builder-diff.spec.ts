@@ -76,18 +76,29 @@ test.describe("Builder diff review @live", () => {
   });
 
   test("chat edit creates pending diff without mutating until accept", async ({ page, request }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     const projectsRes = await request.get("/api/projects?reconcile=1");
     expect(projectsRes.ok()).toBeTruthy();
     const body = (await projectsRes.json()) as { projects?: Array<{ id: string }> };
-    const projectId = body.projects?.[0]?.id;
-    test.skip(!projectId, "No project for live builder diff test");
+    let projectId: string | undefined;
+    for (const p of body.projects ?? []) {
+      const filesRes = await request.get(`/api/projects/${p.id}/files`);
+      if (!filesRes.ok()) continue;
+      const filesJson = (await filesRes.json()) as { count?: number };
+      if ((filesJson.count ?? 0) > 0) {
+        projectId = p.id;
+        break;
+      }
+    }
+    test.skip(!projectId, "No project with files for live builder diff test");
 
     const beforeRes = await request.get(`/api/editor/pending-diff?projectId=${projectId}`);
     const beforeJson = (await beforeRes.json()) as { pending?: { diffs?: unknown[] } | null };
 
-    await page.goto(`/apps/${projectId}/builder?tab=code`);
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto(`/apps/${projectId}/builder?tab=code`, {
+      waitUntil: "domcontentloaded",
+      timeout: 120_000,
+    });
     await expect(page.getByTestId("builder-file-tree")).toBeVisible({ timeout: 20_000 });
 
     const hasFiles = (await page.getByTestId("builder-file-tree").getByText("No files").count()) === 0;

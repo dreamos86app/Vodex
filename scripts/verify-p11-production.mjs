@@ -325,7 +325,7 @@ const suites = {
     const errors = [];
     must(read("src/components/layout/vodex-important-links-footer.tsx"), "vodex-important-links-footer", "footer", errors);
     must(read("src/components/layout/platform-shell.tsx"), "DeferredFooter", "footer wired", errors);
-    must(read("src/components/layout/vodex-important-links-footer.tsx"), "discord.gg/y8EbeMc9Mb", "discord link", errors);
+    must(read("src/components/layout/vodex-important-links-footer.tsx"), "discord.gg/TzV73DfWG6", "discord link", errors);
     return errors;
   },
   "discord-community-card": () => {

@@ -1,0 +1,63 @@
+{
+  "generatedAt": "2026-06-06T18:06:26.012Z",
+  "mode": "apply",
+  "scannedProjects": 360,
+  "repairCandidates": 3,
+  "candidates": [
+    {
+      "projectId": "068e3905-1819-4a94-be36-61b747def97c",
+      "ownerId": "82681c97-83d4-4c2b-9b54-060e2ef70c79",
+      "sessionId": null,
+      "before": {
+        "preview_ready": true,
+        "preview_renderable": null,
+        "preview_status": null
+      },
+      "after": {
+        "preview_ready": false,
+        "preview_honest": false,
+        "preview_renderable": false,
+        "preview_status": "not_started",
+        "preview_failure_kind": "no_preview_job",
+        "preview_failure_detail": "No preview session was created after source files were saved."
+      }
+    },
+    {
+      "projectId": "4d27080e-d2a9-4cd5-b24f-f22966e0534d",
+      "ownerId": "82681c97-83d4-4c2b-9b54-060e2ef70c79",
+      "sessionId": null,
+      "before": {
+        "preview_ready": true,
+        "preview_renderable": null,
+        "preview_status": null
+      },
+      "after": {
+        "preview_ready": false,
+        "preview_honest": false,
+        "preview_renderable": false,
+        "preview_status": "not_started",
+        "preview_failure_kind": "no_preview_job",
+        "preview_failure_detail": "No preview session was created after source files were saved."
+      }
+    },
+    {
+      "projectId": "8c591e78-16df-471a-b557-ec7492026901",
+      "ownerId": "d026ba49-4de5-489d-ace7-12ec78d98e70",
+      "sessionId": null,
+      "before": {
+        "preview_ready": true,
+        "preview_renderable": null,
+        "preview_status": null
+      },
+      "after": {
+        "preview_ready": false,
+        "preview_honest": false,
+        "preview_renderable": false,
+        "preview_status": "not_started",
+        "preview_failure_kind": "no_preview_job",
+        "preview_failure_detail": "No preview session was created after source files were saved."
+      }
+    }
+  ],
+  "applied": 3
+}

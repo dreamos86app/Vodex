@@ -72,6 +72,11 @@ if (profErr || !profile?.id) {
 
 const userId = profile.id;
 
+const prevMeta =
+  profile.metadata && typeof profile.metadata === "object" && !Array.isArray(profile.metadata)
+    ? profile.metadata
+    : {};
+
 const { error: onboardErr } = await admin
   .from("profiles")
   .update({ onboarding_completed: true, onboarding_step: 4 })
@@ -132,21 +137,21 @@ if (rpcErr) {
   console.warn(`[e2e:credits] ensure_action_credit_balance: ${rpcErr.message}`);
 }
 
-const { data: actionRow } = await admin
+const { data: actionRows } = await admin
   .from("action_credit_balances")
   .select("id, balance")
   .eq("owner_user_id", userId)
-  .is("project_id", null)
-  .maybeSingle();
+  .is("project_id", null);
 
-const prevAction = Number(actionRow?.balance ?? 0);
+const prevAction = Math.max(0, ...(actionRows ?? []).map((r) => Number(r.balance ?? 0)));
 const targetAction = Math.max(prevAction, E2E_MIN_ACTION_CREDITS);
 
-if (actionRow?.id) {
+if ((actionRows ?? []).length > 0) {
   const { error: actErr } = await admin
     .from("action_credit_balances")
     .update({ balance: targetAction, updated_at: new Date().toISOString() })
-    .eq("id", actionRow.id);
+    .eq("owner_user_id", userId)
+    .is("project_id", null);
   if (actErr) {
     console.error(`E2E_CREDITS_INSUFFICIENT: action credits update failed — ${actErr.message}`);
     process.exit(1);
@@ -162,6 +167,18 @@ if (actionRow?.id) {
     process.exit(1);
   }
 }
+
+await admin
+  .from("profiles")
+  .update({
+    metadata: {
+      ...prevMeta,
+      e2e_test_credit_grant: new Date().toISOString(),
+      e2e_credit_prepare_action: targetAction,
+      e2e_credit_prepare_build: targetBuild,
+    },
+  })
+  .eq("id", userId);
 
 console.log("\n=== e2e:credits:prepare ===\n");
 console.log(`✓ user: ${email}`);

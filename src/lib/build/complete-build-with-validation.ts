@@ -11,6 +11,10 @@ import {
 } from "@/lib/projects/project-lifecycle";
 import { filterRenderableBuildFiles } from "@/lib/build/generated-file-utils";
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
+import {
+  canonicalPreviewNotStartedMetadata,
+  canonicalPreviewReadyMetadata,
+} from "@/lib/preview/preview-metadata";
 
 type Writer = SupabaseClient<Database>;
 
@@ -171,8 +175,41 @@ export async function completeBuildWithValidation(input: {
           ...(previewFailedPersisted ? { files_ready_preview_failed: true } : {}),
           file_count: fileCount,
           ...(previewWasReady
-            ? { preview_ready: true, preview_honest: true }
-            : { preview_ready: false, preview_honest: false }),
+            ? canonicalPreviewReadyMetadata({
+                sessionId:
+                  typeof prevMeta.preview_session_id === "string"
+                    ? prevMeta.preview_session_id
+                    : typeof prevMeta.last_preview_session_id === "string"
+                      ? prevMeta.last_preview_session_id
+                      : null,
+                jobId:
+                  typeof prevMeta.preview_job_id === "string" ? prevMeta.preview_job_id : null,
+                framework:
+                  typeof prevMeta.preview_framework === "string"
+                    ? prevMeta.preview_framework
+                    : null,
+                artifactPath:
+                  typeof prevMeta.preview_artifact_path === "string"
+                    ? prevMeta.preview_artifact_path
+                    : null,
+              })
+            : previewFailedPersisted
+              ? {
+                  preview_ready: false,
+                  preview_honest: false,
+                  preview_renderable: false,
+                  preview_status: "failed",
+                  preview_failure_kind: "build_failed",
+                  preview_failure_detail: "Preview failed during a prior build attempt.",
+                }
+              : fileCount >= MIN_RENDERABLE_FILES && validationOk
+                ? canonicalPreviewNotStartedMetadata()
+                : {
+                    preview_ready: false,
+                    preview_honest: false,
+                    preview_renderable: false,
+                    preview_status: "not_started",
+                  }),
         }),
       },
     } as never)

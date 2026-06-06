@@ -1,0 +1,146 @@
+{
+  "generatedAt": "2026-06-06T18:50:49.237Z",
+  "honest": true,
+  "finalizationPresent": true,
+  "liveProof": {
+    "publicRendering": false,
+    "generatedApp": false,
+    "zipImport": true,
+    "publish": false,
+    "e2e": false
+  },
+  "categories": [
+    {
+      "category": "Notification realtime + inbox sync",
+      "previousScore": 72,
+      "newScore": 86,
+      "evidencePath": "src/hooks/use-notification-sync.ts",
+      "verificationCommand": "npm run typecheck",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    },
+    {
+      "category": "Top-bar announcements (design + mobile)",
+      "previousScore": 68,
+      "newScore": 86,
+      "evidencePath": "src/components/platform/platform-announcement-banners.tsx",
+      "verificationCommand": "npm run verify:p13-mobile",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    },
+    {
+      "category": "Generated UI quality",
+      "previousScore": 72,
+      "newScore": 89,
+      "evidencePath": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\.dreamos-benchmark-results.live.json",
+      "verificationCommand": "BENCHMARK_LIVE=1 npm run benchmark:smoke",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    },
+    {
+      "category": "Public /p/[slug] app rendering",
+      "previousScore": 50,
+      "newScore": 50,
+      "evidencePath": "artifacts/benchmarks/p13/public-rendering.json",
+      "verificationCommand": "npm run verify:public-rendering + live slug",
+      "pass": false,
+      "capped": true,
+      "capReason": "verify:public-rendering failed",
+      "blocker": "✗ verify:public-rendering failed\n\n  - live /p/[slug] fetch failed or returned stub/empty body",
+      "recommendedNextFix": "PUBLISHED_TEST_SLUG=... E2E_BASE_URL=... npm run verify:public-rendering"
+    },
+    {
+      "category": "Mobile responsiveness",
+      "previousScore": 65,
+      "newScore": 86,
+      "evidencePath": "artifacts/benchmarks/p13/mobile-viewports.json",
+      "verificationCommand": "npm run verify:p13-mobile",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    },
+    {
+      "category": "Preview system",
+      "previousScore": 78,
+      "newScore": 88,
+      "evidencePath": "npm run verify:preview-state",
+      "verificationCommand": "npm run verify:preview-state",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    },
+    {
+      "category": "Publish / deploy system",
+      "previousScore": 62,
+      "newScore": 82,
+      "evidencePath": "artifacts/benchmarks/p13/publish-state.json",
+      "verificationCommand": "npm run verify:publish-state",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    },
+    {
+      "category": "ZIP import",
+      "previousScore": 70,
+      "newScore": 90,
+      "evidencePath": "artifacts/benchmarks/p13/live-zip-import.json",
+      "verificationCommand": "npm run verify:zip-import",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    },
+    {
+      "category": "Security / production safety",
+      "previousScore": 75,
+      "newScore": 87,
+      "evidencePath": "artifacts/benchmarks/p13/security-verification.json",
+      "verificationCommand": "npm run verify:admin-diagnostics-security",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    },
+    {
+      "category": "P13 production suite",
+      "previousScore": 80,
+      "newScore": 88,
+      "evidencePath": "npm run verify:p13-production",
+      "verificationCommand": "npm run verify:p13-production",
+      "pass": true,
+      "capped": false,
+      "capReason": null,
+      "blocker": null,
+      "recommendedNextFix": null
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "atOrAbove85": 8,
+    "below85": 2,
+    "capped": 1,
+    "liveJourneysNotExecuted": [
+      "public_rendering",
+      "generated_app",
+      "publish",
+      "live_e2e"
+    ]
+  }
+}

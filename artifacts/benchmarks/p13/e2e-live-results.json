@@ -1,0 +1,36 @@
+{
+  "executed": true,
+  "pass": false,
+  "generatedAt": "2026-06-06T18:23:20.196Z",
+  "environment": {
+    "baseUrl": "http://localhost:3000",
+    "e2eRunLive": true
+  },
+  "summary": {
+    "total": 33,
+    "passed": 15,
+    "failed": 6,
+    "skipped": 12,
+    "note": "Clean run before dev-server port conflict on rerun. Rerun at 18:40 failed 21/21 due to ECONNRESET (server killed by parallel verify:zip-import-live-route)."
+  },
+  "passedTests": [
+    "deploy-vercel @live deploy history",
+    "e2e-auth-probe @live credits API",
+    "editor-checkpoints-live reject pending diff",
+    "editor-checkpoints-live checkpoints guarded",
+    "failure-repair reconcile",
+    "preview-publish-deploy-live (6 tests)",
+    "p40 Flow A create workspace",
+    "p40 Flow B published Reciply live",
+    "p40 Flow E billing settings"
+  ],
+  "failedTests": [
+    "builder-diff file tree visible",
+    "live-journeys 01 question UI (intent API passed)",
+    "p40 Flow C mobile studio",
+    "p40 Flow D notification bell hidden",
+    "restaurant-inventory chat_enqueue assertion",
+    "zip-import page.goto redirectTo"
+  ],
+  "exitCode": 1
+}

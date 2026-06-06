@@ -16,6 +16,15 @@ export type BackgroundPresetId =
   | "animated_radial_glow"
   | "animated_constellation"
   | "animated_gradient_shimmer"
+  | "ocean_teal"
+  | "midnight_indigo"
+  | "golden_hour"
+  | "rose_blush"
+  | "mint_fresh"
+  | "charcoal_slate"
+  | "animated_ocean_flow"
+  | "animated_sunset_wave"
+  | "animated_neon_pulse"
   /** @deprecated legacy ids — mapped in backgroundClass */
   | "animated_stars"
   | "animated_aurora"
@@ -38,7 +47,13 @@ export type EffectPresetId =
   | "border_shine"
   | "radial_spotlight"
   | "success_sparkle"
-  | "warning_pulse";
+  | "warning_pulse"
+  | "wave_ripple"
+  | "soft_vignette"
+  | "heartbeat"
+  | "scan_line"
+  | "particle_burst"
+  | "color_shift";
 
 export type IconPresetId =
   | "vodex_welcome"
@@ -57,7 +72,15 @@ export type IconPresetId =
   | "check_success"
   | "discord_community"
   | "ai_wand"
-  | "app_window";
+  | "app_window"
+  | "bell_alert"
+  | "star_feature"
+  | "flame_hot"
+  | "globe_world"
+  | "code_brackets"
+  | "coin_dollar"
+  | "calendar_event"
+  | "thumbs_up";
 
 export type MessageDesign = {
   backgroundPreset: BackgroundPresetId;
@@ -108,6 +131,15 @@ export const BACKGROUND_PRESETS: Array<{ id: BackgroundPresetId; label: string; 
   { id: "animated_icy_drift", label: "Icy particle drift", animated: true },
   { id: "animated_radial_glow", label: "Radial glow motion", animated: true },
   { id: "animated_constellation", label: "Soft constellation", animated: true },
+  { id: "ocean_teal", label: "Ocean teal" },
+  { id: "midnight_indigo", label: "Midnight indigo" },
+  { id: "golden_hour", label: "Golden hour" },
+  { id: "rose_blush", label: "Rose blush" },
+  { id: "mint_fresh", label: "Mint fresh" },
+  { id: "charcoal_slate", label: "Charcoal slate" },
+  { id: "animated_ocean_flow", label: "Ocean flow", animated: true },
+  { id: "animated_sunset_wave", label: "Sunset wave", animated: true },
+  { id: "animated_neon_pulse", label: "Neon pulse", animated: true },
 ];
 
 export const EFFECT_PRESETS: Array<{ id: EffectPresetId; label: string }> = [
@@ -127,6 +159,12 @@ export const EFFECT_PRESETS: Array<{ id: EffectPresetId; label: string }> = [
   { id: "animated_shine", label: "Animated shine" },
   { id: "status_pulse", label: "Status pulse" },
   { id: "frost_particles", label: "Frost particles" },
+  { id: "wave_ripple", label: "Wave ripple" },
+  { id: "soft_vignette", label: "Soft vignette" },
+  { id: "heartbeat", label: "Heartbeat glow" },
+  { id: "scan_line", label: "Scan line" },
+  { id: "particle_burst", label: "Particle burst" },
+  { id: "color_shift", label: "Color shift" },
 ];
 
 export const ICON_PRESETS: Array<{ id: IconPresetId; label: string; color: string }> = [
@@ -147,6 +185,14 @@ export const ICON_PRESETS: Array<{ id: IconPresetId; label: string; color: strin
   { id: "app_window", label: "App window", color: "#2563eb" },
   { id: "megaphone", label: "Megaphone", color: "#2563eb" },
   { id: "welcome_sparkle", label: "Welcome sparkle (legacy)", color: "#7c3aed" },
+  { id: "bell_alert", label: "Bell alert", color: "#f97316" },
+  { id: "star_feature", label: "Featured star", color: "#eab308" },
+  { id: "flame_hot", label: "Hot / trending", color: "#ef4444" },
+  { id: "globe_world", label: "Globe / global", color: "#0ea5e9" },
+  { id: "code_brackets", label: "Code / dev", color: "#64748b" },
+  { id: "coin_dollar", label: "Billing / credits", color: "#16a34a" },
+  { id: "calendar_event", label: "Event / schedule", color: "#8b5cf6" },
+  { id: "thumbs_up", label: "Thumbs up", color: "#22c55e" },
 ];
 
 export function backgroundClass(id: BackgroundPresetId): string {
@@ -173,6 +219,15 @@ export function backgroundClass(id: BackgroundPresetId): string {
     animated_stars: "vodex-bg-animated-shimmer",
     animated_aurora: "vodex-bg-aurora-wave",
     animated_floating_particles: "vodex-bg-icy-drift",
+    ocean_teal: "vodex-bg-ocean-teal",
+    midnight_indigo: "vodex-bg-midnight-indigo",
+    golden_hour: "vodex-bg-golden-hour",
+    rose_blush: "vodex-bg-rose-blush",
+    mint_fresh: "vodex-bg-mint-fresh",
+    charcoal_slate: "vodex-bg-charcoal-slate",
+    animated_ocean_flow: "vodex-bg-ocean-flow",
+    animated_sunset_wave: "vodex-bg-sunset-wave",
+    animated_neon_pulse: "vodex-bg-neon-pulse",
   };
   return map[id] ?? map.soft_blue_white;
 }
@@ -195,6 +250,12 @@ export function effectOverlayClass(id: EffectPresetId): string | null {
     frost_particles: "vodex-effect-frost",
     aurora_dust: "vodex-effect-aurora-dust",
     border_shine: "vodex-effect-border-shine",
+    wave_ripple: "vodex-effect-wave-ripple",
+    soft_vignette: "vodex-effect-soft-vignette",
+    heartbeat: "vodex-effect-heartbeat",
+    scan_line: "vodex-effect-scan-line",
+    particle_burst: "vodex-effect-particle-burst",
+    color_shift: "vodex-effect-color-shift",
   };
   return map[id] ?? null;
 }

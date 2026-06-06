@@ -1,13 +1,25 @@
 {
-  "capturedAt": "2026-05-29T08:32:20.107Z",
+  "capturedAt": "2026-06-06T18:20:52.724Z",
   "stage": "chat_enqueue",
-  "url": "http://localhost:3000/create?mode=build&strategy=build_now",
-  "http_status": 0,
-  "response_body": {},
+  "url": "http://localhost:3000/create?mode=build&strategy=build_now&projectId=e00a8f80-adaf-447f-85f4-22f66817279d",
+  "http_status": 202,
+  "response_body": {
+    "ok": true,
+    "asyncBuild": true,
+    "buildJobId": "b77218e2-e7c7-4e7c-95a9-69756d941db8",
+    "operationId": "7d4786f5-a6f4-4b49-944e-79268c974846",
+    "projectId": "e00a8f80-adaf-447f-85f4-22f66817279d",
+    "conversationId": "25698914-92f7-43bf-b543-c12cd7cfb40b",
+    "eventsUrl": "/api/projects/e00a8f80-adaf-447f-85f4-22f66817279d/build-jobs/b77218e2-e7c7-4e7c-95a9-69756d941db8/events",
+    "message": "Build started — track progress via events.",
+    "partialBuild": false,
+    "creditsReserved": 5,
+    "billingSource": "Your personal credits"
+  },
   "request_payload": {
     "messages": [
       {
-        "id": "pending-user-69c907b1-4f84-4f34-af6e-3b459e237f16",
+        "id": "pending-user-7d4786f5-a6f4-4b49-944e-79268c974846",
         "role": "user",
         "parts": [
           {
@@ -19,13 +31,14 @@
     ],
     "modelId": "automatic",
     "mode": "build",
+    "mode_at_submit": "build",
     "strategy": "build_now",
-    "forceBuildPipeline": true,
+    "forceBuildPipeline": false,
     "planFirstOnly": false,
-    "projectId": "1ded2635-805d-44d4-8920-0a5923a1a853",
-    "conversationId": "cb426df8-5a87-42d2-913f-44a8c131cf2f",
-    "operationId": "69c907b1-4f84-4f34-af6e-3b459e237f16",
-    "idempotencyKey": "69c907b1-4f84-4f34-af6e-3b459e237f16"
+    "projectId": "e00a8f80-adaf-447f-85f4-22f66817279d",
+    "conversationId": "25698914-92f7-43bf-b543-c12cd7cfb40b",
+    "operationId": "7d4786f5-a6f4-4b49-944e-79268c974846",
+    "idempotencyKey": "7d4786f5-a6f4-4b49-944e-79268c974846"
   },
-  "error": "Error: chat_enqueue_timeout"
+  "error": "Error: chat_payload_invalid: mode=build strategy=build_now forceBuildPipeline=false"
 }

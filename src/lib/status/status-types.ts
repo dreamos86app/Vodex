@@ -58,5 +58,13 @@ export type PlatformAnnouncementRow = {
   gradient_to?: string | null;
   text_color?: string | null;
   icon_type?: string | null;
+  background_preset?: string | null;
+  effect_preset?: string | null;
+  effect_key?: string | null;
+  icon_preset?: string | null;
+  animated_icon_enabled?: boolean | null;
+  accent_color?: string | null;
+  outline_color?: string | null;
+  button_color?: string | null;
   is_active?: boolean;
 };

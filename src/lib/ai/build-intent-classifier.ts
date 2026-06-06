@@ -53,6 +53,14 @@ export function classifyBuildIntent(prompt: string): BuildIntentResult {
     return { intent: "edit_app", confidence: 0.85, reason: "edit_request" };
   }
 
+  if (
+    QUESTION_START.test(lower) &&
+    !BUILD_VERBS.test(lower) &&
+    !/\b(build|create|make|generate)\s+(me\s+)?(a|an|my)\b/i.test(lower)
+  ) {
+    return { intent: "discuss_question", confidence: 0.88, reason: "question_without_build_verb" };
+  }
+
   if (BUILD_VERBS.test(lower) || (APP_NOUNS.test(lower) && text.split(/\s+/).length >= 4)) {
     const confidence =
       BUILD_VERBS.test(lower) && APP_NOUNS.test(lower)

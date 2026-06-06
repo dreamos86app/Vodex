@@ -34,9 +34,14 @@ test("@live 01 question does not create app", async ({ page, request, liveGate }
   if (!liveGate) return;
   const intent = await classifyIntent(request, "What is a CRM?");
   expect(intent.body.shouldCreateProject).toBe(false);
-  await page.goto("/create");
-  await page.getByPlaceholder(/Describe your app|CRM/i).fill("What is a CRM?");
-  await page.getByTestId("create-continue-button").click();
+  await page.goto("/create", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  const prompt = page.getByTestId("create-prompt-textarea").or(page.getByPlaceholder(/Describe the app|Build me a CRM/i));
+  await expect(prompt.first()).toBeVisible({ timeout: 60_000 });
+  await prompt.first().fill("What is a CRM?");
+  const submit = page
+    .getByTestId("create-continue-button")
+    .or(page.getByTestId("create-submit-button"));
+  await submit.first().click();
   await expect(page.getByText(/no app was created|question/i).first()).toBeVisible({ timeout: 20_000 });
   // Intent API is the source of truth; project count may drift under parallel benchmark load.
   const shot = testInfo.outputPath("01-question-no-build.png");

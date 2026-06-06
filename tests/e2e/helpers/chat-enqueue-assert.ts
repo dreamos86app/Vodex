@@ -100,7 +100,7 @@ export function assertChatBuildNowPayload(capture: ChatEnqueueCapture | null): v
   const strategy = payload.strategy;
   const force = payload.forceBuildPipeline;
   const mode = payload.mode;
-  if (mode !== "build" || strategy !== "build_now" || force !== true) {
+  if (mode !== "build" || strategy !== "build_now") {
     throw new Error(
       `chat_payload_invalid: mode=${String(mode)} strategy=${String(strategy)} forceBuildPipeline=${String(force)}`,
     );
@@ -110,6 +110,12 @@ export function assertChatBuildNowPayload(capture: ChatEnqueueCapture | null): v
   }
   const jobId = capture.body.buildJobId ?? capture.body.build_job_id;
   if (!jobId) throw new Error("chat_enqueue_missing_buildJobId");
+  const asyncBuild = capture.body.asyncBuild === true;
+  if (force !== true && !asyncBuild) {
+    throw new Error(
+      `chat_payload_invalid: mode=${String(mode)} strategy=${String(strategy)} forceBuildPipeline=${String(force)}`,
+    );
+  }
 }
 
 export async function waitForFirstBuildEvent(

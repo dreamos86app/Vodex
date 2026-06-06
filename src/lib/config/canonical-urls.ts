@@ -11,7 +11,7 @@ export function getDiscordInviteUrl(): string {
   return (
     process.env.NEXT_PUBLIC_DISCORD_INVITE_URL?.trim() ||
     process.env.DISCORD_INVITE_URL?.trim() ||
-    "https://discord.gg/y8EbeMc9Mb"
+    "https://discord.gg/TzV73DfWG6"
   );
 }
 

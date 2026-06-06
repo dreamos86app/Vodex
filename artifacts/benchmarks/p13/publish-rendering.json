@@ -1,0 +1,6 @@
+{
+  "generatedAt": "2026-06-06T18:50:49.236Z",
+  "pass": false,
+  "capReason": "verify:public-rendering did not pass",
+  "recommendedNextFix": "npm run verify:public-rendering"
+}

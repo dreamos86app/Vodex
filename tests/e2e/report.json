@@ -59,27 +59,27 @@
   },
   "suites": [
     {
-      "title": "workflow-agent-stream.spec.ts",
-      "file": "workflow-agent-stream.spec.ts",
+      "title": "builder-diff.spec.ts",
+      "file": "builder-diff.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "Agent workflow stream @workflow-qa",
-          "file": "workflow-agent-stream.spec.ts",
-          "line": 22,
+          "title": "Builder diff review @live",
+          "file": "builder-diff.spec.ts",
+          "line": 67,
           "column": 6,
           "specs": [
             {
-              "title": "desktop — stream visible with assistant + file events",
-              "ok": true,
+              "title": "chat edit creates pending diff without mutating until accept",
+              "ok": false,
               "tags": [
-                "workflow-qa"
+                "live"
               ],
               "tests": [
                 {
-                  "timeout": 360000,
+                  "timeout": 120000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "chromium",
@@ -88,70 +88,1882 @@
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 52147,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [
-                        {
-                          "text": "[e2e] create-composer-ready marker false but DOM fallback passed { reason: \u001b[32m'shell_missing'\u001b[39m }\n"
+                      "status": "failed",
+                      "duration": 63199,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('builder-file-tree')\nExpected: visible\nTimeout: 20000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 20000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('builder-file-tree')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('builder-file-tree')\nExpected: visible\nTimeout: 20000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 20000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('builder-file-tree')\u001b[22m\n\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\builder-diff.spec.ts:102:57",
+                        "location": {
+                          "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\builder-diff.spec.ts",
+                          "column": 57,
+                          "line": 102
                         },
+                        "snippet": "  100 |       timeout: 120_000,\n  101 |     });\n> 102 |     await expect(page.getByTestId(\"builder-file-tree\")).toBeVisible({ timeout: 20_000 });\n      |                                                         ^\n  103 |\n  104 |     const hasFiles = (await page.getByTestId(\"builder-file-tree\").getByText(\"No files\").count()) === 0;\n  105 |     if (hasFiles) {"
+                      },
+                      "errors": [
                         {
-                          "text": "[e2e] create-composer-ready marker false but DOM fallback passed { reason: \u001b[32m'shell_missing'\u001b[39m }\n"
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\builder-diff.spec.ts",
+                            "column": 57,
+                            "line": 102
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('builder-file-tree')\nExpected: visible\nTimeout: 20000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 20000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('builder-file-tree')\u001b[22m\n\n\n  100 |       timeout: 120_000,\n  101 |     });\n> 102 |     await expect(page.getByTestId(\"builder-file-tree\")).toBeVisible({ timeout: 20_000 });\n      |                                                         ^\n  103 |\n  104 |     const hasFiles = (await page.getByTestId(\"builder-file-tree\").getByText(\"No files\").count()) === 0;\n  105 |     if (hasFiles) {\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\builder-diff.spec.ts:102:57"
                         }
                       ],
+                      "stdout": [],
+                      "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-05-29T17:16:57.458Z",
+                      "startTime": "2026-06-06T18:24:48.386Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\builder-diff-Builder-diff--2fd2c-thout-mutating-until-accept-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\builder-diff.spec.ts",
+                        "column": 57,
+                        "line": 102
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
-              "id": "d470186025717df18998-bb57e44037445ec19005",
-              "file": "workflow-agent-stream.spec.ts",
-              "line": 29,
+              "id": "80bc7a68ea9a4b2aef3a-06addefdea1f3c8ecbf2",
+              "file": "builder-diff.spec.ts",
+              "line": 78,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "deploy-vercel.spec.ts",
+      "file": "deploy-vercel.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "@live Deploy API",
+          "file": "deploy-vercel.spec.ts",
+          "line": 30,
+          "column": 6,
+          "specs": [
+            {
+              "title": "authenticated deploy history loads",
+              "ok": false,
+              "tags": [
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30014,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\deploy-vercel.spec.ts",
+                            "column": 31,
+                            "line": 34
+                          },
+                          "message": "Error: apiRequestContext.get: Request context disposed.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/deploy/history\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  32 |\n  33 |   test(\"authenticated deploy history loads\", async ({ request }) => {\n> 34 |     const res = await request.get(\"/api/deploy/history\");\n     |                               ^\n  35 |     expect(res.status()).toBe(200);\n  36 |     const body = await res.json();\n  37 |     expect(Array.isArray(body.deployments)).toBe(true);\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\deploy-vercel.spec.ts:34:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:25:53.015Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\deploy-vercel--live-Deploy-51f79-icated-deploy-history-loads-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "44faa02ec57c31ad2f56-87d2b764adda2d68331e",
+              "file": "deploy-vercel.spec.ts",
+              "line": 33,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "e2e-auth-probe.spec.ts",
+      "file": "e2e-auth-probe.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "E2E auth probe — @live",
+          "file": "e2e-auth-probe.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "@live browser context auth is resolved",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 60334,
+                      "error": {
+                        "message": "TimeoutError: apiRequestContext.get: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/dev/auth-session-check\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n",
+                        "stack": "TimeoutError: apiRequestContext.get: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/dev/auth-session-check\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n    at readAuthSession (C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts:42:29)\n    at probeE2eAuthInBrowserContext (C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts:126:22)\n    at assertE2eAuthInBrowserContext (C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts:218:24)\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\e2e-auth-probe.spec.ts:8:55",
+                        "location": {
+                          "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts",
+                          "column": 29,
+                          "line": 42
+                        },
+                        "snippet": "   at helpers\\e2e-auth-probe.ts:42\n\n  40 |\n  41 | async function readAuthSession(request: APIRequestContext) {\n> 42 |   const res = await request.get(\"/api/dev/auth-session-check\", {\n     |                             ^\n  43 |     timeout: AUTH_API_TIMEOUT_MS,\n  44 |   });\n  45 |   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts",
+                            "column": 29,
+                            "line": 42
+                          },
+                          "message": "TimeoutError: apiRequestContext.get: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/dev/auth-session-check\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n   at helpers\\e2e-auth-probe.ts:42\n\n  40 |\n  41 | async function readAuthSession(request: APIRequestContext) {\n> 42 |   const res = await request.get(\"/api/dev/auth-session-check\", {\n     |                             ^\n  43 |     timeout: AUTH_API_TIMEOUT_MS,\n  44 |   });\n  45 |   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;\n    at readAuthSession (C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts:42:29)\n    at probeE2eAuthInBrowserContext (C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts:126:22)\n    at assertE2eAuthInBrowserContext (C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts:218:24)\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\e2e-auth-probe.spec.ts:8:55"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:26:23.829Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\e2e-auth-probe-E2E-auth-pr-e9473-er-context-auth-is-resolved-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\helpers\\e2e-auth-probe.ts",
+                        "column": 29,
+                        "line": 42
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "49b1d180463d6c936234-45e70a7f7a1512845f0f",
+              "file": "e2e-auth-probe.spec.ts",
+              "line": 5,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "editor-checkpoints-live.spec.ts",
+      "file": "editor-checkpoints-live.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Editor checkpoints — @live",
+          "file": "editor-checkpoints-live.spec.ts",
+          "line": 61,
+          "column": 6,
+          "specs": [
+            {
+              "title": "@live reject pending diff clears pending store",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 90022,
+                      "error": {
+                        "message": "TimeoutError: apiRequestContext.get: Timeout 90000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/projects?reconcile=1\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n",
+                        "stack": "TimeoutError: apiRequestContext.get: Timeout 90000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/projects?reconcile=1\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\editor-checkpoints-live.spec.ts:73:32",
+                        "location": {
+                          "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\editor-checkpoints-live.spec.ts",
+                          "column": 32,
+                          "line": 73
+                        },
+                        "snippet": "  71 |   test(\"@live reject pending diff clears pending store\", async ({ request }) => {\n  72 |     test.setTimeout(120_000);\n> 73 |     const list = await request.get(\"/api/projects?reconcile=1\", { timeout: 90_000 });\n     |                                ^\n  74 |     expect(list.status()).toBe(200);\n  75 |     const body = (await list.json()) as { projects?: Array<{ id: string }> };\n  76 |     const projectId = body.projects?.[0]?.id;"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\editor-checkpoints-live.spec.ts",
+                            "column": 32,
+                            "line": 73
+                          },
+                          "message": "TimeoutError: apiRequestContext.get: Timeout 90000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/projects?reconcile=1\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  71 |   test(\"@live reject pending diff clears pending store\", async ({ request }) => {\n  72 |     test.setTimeout(120_000);\n> 73 |     const list = await request.get(\"/api/projects?reconcile=1\", { timeout: 90_000 });\n     |                                ^\n  74 |     expect(list.status()).toBe(200);\n  75 |     const body = (await list.json()) as { projects?: Array<{ id: string }> };\n  76 |     const projectId = body.projects?.[0]?.id;\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\editor-checkpoints-live.spec.ts:73:32"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:27:25.165Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\editor-checkpoints-live-Ed-95edb-g-diff-clears-pending-store-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\editor-checkpoints-live.spec.ts",
+                        "column": 32,
+                        "line": 73
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "0a835b99de430d83320d-6970a10c5d6f4273dfe5",
+              "file": "editor-checkpoints-live.spec.ts",
+              "line": 71,
               "column": 7
             },
             {
-              "title": "mobile — stream visible on builder",
-              "ok": true,
+              "title": "@live checkpoints list requires owned project",
+              "ok": false,
               "tags": [
-                "workflow-qa"
+                "live",
+                "live"
               ],
               "tests": [
                 {
-                  "timeout": 180000,
+                  "timeout": 30000,
                   "annotations": [],
                   "expectedStatus": "passed",
                   "projectId": "chromium",
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
+                      "workerIndex": 4,
                       "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 21471,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [
+                      "status": "timedOut",
+                      "duration": 30011,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
                         {
-                          "text": "[e2e] create-composer-ready marker false but DOM fallback passed { reason: \u001b[32m'shell_missing'\u001b[39m }\n"
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\editor-checkpoints-live.spec.ts",
+                            "column": 31,
+                            "line": 98
+                          },
+                          "message": "Error: apiRequestContext.get: Request context disposed.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/editor/checkpoints?projectId=00000000-0000-0000-0000-000000000001\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n   96 |\n   97 |   test(\"@live checkpoints list requires owned project\", async ({ request }) => {\n>  98 |     const res = await request.get(\"/api/editor/checkpoints?projectId=00000000-0000-0000-0000-000000000001\");\n      |                               ^\n   99 |     expect([200, 400, 401, 404]).toContain(res.status());\n  100 |     if (res.status() === 200) {\n  101 |       const body = (await res.json()) as { checkpoints?: unknown[] };\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\editor-checkpoints-live.spec.ts:98:31"
                         }
                       ],
+                      "stdout": [],
+                      "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-05-29T17:17:49.780Z",
+                      "startTime": "2026-06-06T18:28:55.990Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\editor-checkpoints-live-Ed-1f392-list-requires-owned-project-chromium\\error-context.md"
+                        }
+                      ]
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
-              "id": "d470186025717df18998-cd02dd59773e55356cb5",
-              "file": "workflow-agent-stream.spec.ts",
-              "line": 162,
+              "id": "0a835b99de430d83320d-7e0d35fef254c6ab58c9",
+              "file": "editor-checkpoints-live.spec.ts",
+              "line": 97,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "failure-repair.spec.ts",
+      "file": "failure-repair.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@live repair reconcile on real project",
+          "ok": false,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 90033,
+                  "error": {
+                    "message": "TimeoutError: apiRequestContext.get: Timeout 90000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/projects?reconcile=1\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n",
+                    "stack": "TimeoutError: apiRequestContext.get: Timeout 90000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/projects?reconcile=1\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\failure-repair.spec.ts:69:30",
+                    "location": {
+                      "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\failure-repair.spec.ts",
+                      "column": 30,
+                      "line": 69
+                    },
+                    "snippet": "  67 |   test.setTimeout(120_000);\n  68 |   test.skip(process.env.E2E_RUN_LIVE !== \"1\", \"Live E2E only\");\n> 69 |   const list = await request.get(\"/api/projects?reconcile=1\", { timeout: 90_000 });\n     |                              ^\n  70 |   expect(list.status()).toBe(200);\n  71 |   const body = await list.json();\n  72 |   const id = body.projects?.[0]?.id;"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\failure-repair.spec.ts",
+                        "column": 30,
+                        "line": 69
+                      },
+                      "message": "TimeoutError: apiRequestContext.get: Timeout 90000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/projects?reconcile=1\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  67 |   test.setTimeout(120_000);\n  68 |   test.skip(process.env.E2E_RUN_LIVE !== \"1\", \"Live E2E only\");\n> 69 |   const list = await request.get(\"/api/projects?reconcile=1\", { timeout: 90_000 });\n     |                              ^\n  70 |   expect(list.status()).toBe(200);\n  71 |   const body = await list.json();\n  72 |   const id = body.projects?.[0]?.id;\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\failure-repair.spec.ts:69:30"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:29:26.764Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\failure-repair--live-repair-reconcile-on-real-project-chromium\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\failure-repair.spec.ts",
+                    "column": 30,
+                    "line": 69
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "c9e9c487e0eb9f992f3b-aaa8e506f382aaae5d1b",
+          "file": "failure-repair.spec.ts",
+          "line": 66,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "live-journeys.spec.ts",
+      "file": "live-journeys.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "@live 01 question does not create app",
+          "ok": false,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 0,
+                  "error": {
+                    "message": "\u001b[31m\"beforeAll\" hook timeout of 30000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31m\"beforeAll\" hook timeout of 30000ms exceeded.\u001b[39m\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\live-journeys.spec.ts:7:6",
+                    "location": {
+                      "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\live-journeys.spec.ts",
+                      "column": 6,
+                      "line": 7
+                    },
+                    "snippet": "   5 | test.describe.configure({ mode: \"serial\", timeout: 120_000 });\n   6 |\n>  7 | test.beforeAll(async ({ request }) => {\n     |      ^\n   8 |   if (process.env.E2E_RUN_LIVE !== \"1\") return;\n   9 |   for (let attempt = 0; attempt < 8; attempt++) {\n  10 |     try {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\live-journeys.spec.ts",
+                        "column": 6,
+                        "line": 7
+                      },
+                      "message": "\u001b[31m\"beforeAll\" hook timeout of 30000ms exceeded.\u001b[39m\n\n   5 | test.describe.configure({ mode: \"serial\", timeout: 120_000 });\n   6 |\n>  7 | test.beforeAll(async ({ request }) => {\n     |      ^\n   8 |   if (process.env.E2E_RUN_LIVE !== \"1\") return;\n   9 |   for (let attempt = 0; attempt < 8; attempt++) {\n  10 |     try {\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\live-journeys.spec.ts:7:6"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:30:57.567Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\live-journeys--live-01-question-does-not-create-app-chromium\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\live-journeys.spec.ts",
+                    "column": 6,
+                    "line": 7
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-b8591704e433e7a1a976",
+          "file": "live-journeys.spec.ts",
+          "line": 32,
+          "column": 5
+        },
+        {
+          "title": "@live 02 single prompt creates one project",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-59be3e25fa0e1de0d858",
+          "file": "live-journeys.spec.ts",
+          "line": 52,
+          "column": 5
+        },
+        {
+          "title": "@live 03 template style tier wiring",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-1a74783cdc4499a6cb6b",
+          "file": "live-journeys.spec.ts",
+          "line": 84,
+          "column": 5
+        },
+        {
+          "title": "@live 04 blueprint approval gate API",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-c921fa5e81c00a3306f2",
+          "file": "live-journeys.spec.ts",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "@live 05 dashboard reconcile",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-3d61d5190f0e69b4340c",
+          "file": "live-journeys.spec.ts",
+          "line": 108,
+          "column": 5
+        },
+        {
+          "title": "@live 06 preview blocked without project",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-3d8bacf6ee753fb3f878",
+          "file": "live-journeys.spec.ts",
+          "line": 120,
+          "column": 5
+        },
+        {
+          "title": "@live 07 publish unknown slug 404",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-089f451fce5acd83c5bb",
+          "file": "live-journeys.spec.ts",
+          "line": 127,
+          "column": 5
+        },
+        {
+          "title": "@live 08 insufficient credits surfaces",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-816ea19087176db41c5c",
+          "file": "live-journeys.spec.ts",
+          "line": 135,
+          "column": 5
+        },
+        {
+          "title": "@live 09 mobile create no overflow",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-fa93a7d52836c52dbc2e",
+          "file": "live-journeys.spec.ts",
+          "line": 150,
+          "column": 5
+        },
+        {
+          "title": "@live 10 mobile dashboard no overflow",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-d0bc44eceacc68e6f158",
+          "file": "live-journeys.spec.ts",
+          "line": 162,
+          "column": 5
+        },
+        {
+          "title": "@live 11 repair API shape",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.649Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-343288c7e44d868f86ca",
+          "file": "live-journeys.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "@live 12 builder diff API guarded",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.649Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-3ce514f60ea47b0acbf7",
+          "file": "live-journeys.spec.ts",
+          "line": 181,
+          "column": 5
+        },
+        {
+          "title": "@live 13 builder handoff from create",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-06T18:31:27.649Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-7e1a14cf0d24185bcc9d",
+          "file": "live-journeys.spec.ts",
+          "line": 188,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "p40-production-flows.spec.ts",
+      "file": "p40-production-flows.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P4.0 production browser flows — @live",
+          "file": "p40-production-flows.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Flow A — create workspace loads",
+              "ok": false,
+              "tags": [
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 43035,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts",
+                            "column": 16,
+                            "line": 15
+                          },
+                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/create\", waiting until \"load\"\u001b[22m\n\n\n  13 |   test(\"Flow A — create workspace loads\", async ({ page, liveGate }) => {\n  14 |     if (!liveGate) return;\n> 15 |     await page.goto(\"/create\");\n     |                ^\n  16 |     await expect(page.getByRole(\"heading\", { name: /create/i }).or(page.locator(\"body\"))).toBeVisible({\n  17 |       timeout: 20_000,\n  18 |     });\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts:15:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:36:36.800Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--02be6--A-—-create-workspace-loads-chromium\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--02be6--A-—-create-workspace-loads-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--02be6--A-—-create-workspace-loads-chromium\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc9ef1004a9db6995867-c5a1ff8a836d68766fed",
+              "file": "p40-production-flows.spec.ts",
+              "line": 13,
+              "column": 7
+            },
+            {
+              "title": "Flow B — published Reciply ZIP app is live",
+              "ok": false,
+              "tags": [
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 17,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 43087,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts",
+                            "column": 16,
+                            "line": 24
+                          },
+                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/p/reciplyy-mq01rwer\", waiting until \"load\"\u001b[22m\n\n\n  22 |   test(\"Flow B — published Reciply ZIP app is live\", async ({ page, liveGate }) => {\n  23 |     if (!liveGate) return;\n> 24 |     await page.goto(`/p/${RECIPLY_PUBLISH_SLUG}`);\n     |                ^\n  25 |     await expect(page.locator(\"body\")).toBeVisible({ timeout: 30_000 });\n  26 |     const title = await page.title();\n  27 |     expect(title.length).toBeGreaterThan(0);\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts:24:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:37:20.698Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--870b3-hed-Reciply-ZIP-app-is-live-chromium\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--870b3-hed-Reciply-ZIP-app-is-live-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--870b3-hed-Reciply-ZIP-app-is-live-chromium\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc9ef1004a9db6995867-82f81b4d878296205c1b",
+              "file": "p40-production-flows.spec.ts",
+              "line": 22,
+              "column": 7
+            },
+            {
+              "title": "Flow C — mobile studio reachable for Reciply project",
+              "ok": false,
+              "tags": [
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 18,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 42957,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts",
+                            "column": 16,
+                            "line": 32
+                          },
+                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/apps/59bf67fb-2203-4f3a-82e7-07f31a7dc4ad/builder?tab=mobile\", waiting until \"load\"\u001b[22m\n\n\n  30 |   test(\"Flow C — mobile studio reachable for Reciply project\", async ({ page, liveGate }) => {\n  31 |     if (!liveGate) return;\n> 32 |     await page.goto(`/apps/${RECIPLY_PROJECT_ID}/builder?tab=mobile`);\n     |                ^\n  33 |     await page.waitForTimeout(2000);\n  34 |     const studio = page.getByTestId(\"mobile-wrapper-studio\");\n  35 |     const gate = page.getByText(/mobile wrapping needs|Loading mobile setup|Mobile/i);\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts:32:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:38:04.651Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--79e5c-achable-for-Reciply-project-chromium\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--79e5c-achable-for-Reciply-project-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--79e5c-achable-for-Reciply-project-chromium\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc9ef1004a9db6995867-167dfd1a179a34a4b9b6",
+              "file": "p40-production-flows.spec.ts",
+              "line": 30,
+              "column": 7
+            },
+            {
+              "title": "Flow D — notification bell opens panel",
+              "ok": false,
+              "tags": [
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 19,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 42946,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts",
+                            "column": 16,
+                            "line": 41
+                          },
+                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/dashboard\", waiting until \"load\"\u001b[22m\n\n\n  39 |   test(\"Flow D — notification bell opens panel\", async ({ page, liveGate }) => {\n  40 |     if (!liveGate) return;\n> 41 |     await page.goto(\"/dashboard\");\n     |                ^\n  42 |     const bell = page.getByTestId(\"notification-bell\");\n  43 |     await expect(bell).toBeVisible({ timeout: 20_000 });\n  44 |     await bell.click();\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts:41:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:38:48.515Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--5e52a-tification-bell-opens-panel-chromium\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--5e52a-tification-bell-opens-panel-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--5e52a-tification-bell-opens-panel-chromium\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc9ef1004a9db6995867-b9676c848acc19cd7dfa",
+              "file": "p40-production-flows.spec.ts",
+              "line": 39,
+              "column": 7
+            },
+            {
+              "title": "Flow E — billing settings page loads",
+              "ok": false,
+              "tags": [
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 20,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 43008,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts",
+                            "column": 16,
+                            "line": 50
+                          },
+                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/settings/billing\", waiting until \"load\"\u001b[22m\n\n\n  48 |   test(\"Flow E — billing settings page loads\", async ({ page, liveGate }) => {\n  49 |     if (!liveGate) return;\n> 50 |     await page.goto(\"/settings/billing\");\n     |                ^\n  51 |     await expect(page.locator(\"body\")).toContainText(/billing|plan|subscription/i, { timeout: 20_000 });\n  52 |   });\n  53 | });\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\p40-production-flows.spec.ts:50:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:39:32.320Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--a48c9-billing-settings-page-loads-chromium\\video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--a48c9-billing-settings-page-loads-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\p40-production-flows-P4-0--a48c9-billing-settings-page-loads-chromium\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc9ef1004a9db6995867-0a3f5efd0fd77e56d4fa",
+              "file": "p40-production-flows.spec.ts",
+              "line": 48,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "preview-publish-deploy-live.spec.ts",
+      "file": "preview-publish-deploy-live.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Preview / publish / deploy — @live",
+          "file": "preview-publish-deploy-live.spec.ts",
+          "line": 83,
+          "column": 6,
+          "specs": [
+            {
+              "title": "@live preview blocked before generated project",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30029,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts",
+                            "column": 31,
+                            "line": 86
+                          },
+                          "message": "Error: apiRequestContext.post: Request context disposed.\nCall log:\n\u001b[2m  - → POST http://localhost:3000/api/projects/00000000-0000-0000-0000-000000000001/preview/start\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  84 |   test(\"@live preview blocked before generated project\", async ({ request, liveGate }) => {\n  85 |     if (!liveGate) return;\n> 86 |     const res = await request.post(\"/api/projects/00000000-0000-0000-0000-000000000001/preview/start\");\n     |                               ^\n  87 |     expect([400, 401, 404]).toContain(res.status());\n  88 |     appendTestEvidence({ name: \"preview blocked invalid project\", passed: true, timestamp: new Date().toISOString() });\n  89 |   });\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts:86:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:31:28.374Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\preview-publish-deploy-liv-aeb70-ed-before-generated-project-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "16b7e573ad00f8fc2fb1-3a0c1ac93212d7a9c982",
+              "file": "preview-publish-deploy-live.spec.ts",
+              "line": 84,
+              "column": 7
+            },
+            {
+              "title": "@live publish blocked invalid project",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30015,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts",
+                            "column": 31,
+                            "line": 93
+                          },
+                          "message": "Error: apiRequestContext.post: Request context disposed.\nCall log:\n\u001b[2m  - → POST http://localhost:3000/api/projects/00000000-0000-0000-0000-000000000001/publish\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 2\u001b[22m\n\n\n  91 |   test(\"@live publish blocked invalid project\", async ({ request, liveGate }) => {\n  92 |     if (!liveGate) return;\n> 93 |     const res = await request.post(\"/api/projects/00000000-0000-0000-0000-000000000001/publish\", {\n     |                               ^\n  94 |       data: {},\n  95 |     });\n  96 |     expect([400, 401, 404, 403]).toContain(res.status());\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts:93:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:31:59.151Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\preview-publish-deploy-liv-8f852-ish-blocked-invalid-project-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "16b7e573ad00f8fc2fb1-49b368ca844a7f07f4b4",
+              "file": "preview-publish-deploy-live.spec.ts",
+              "line": 91,
+              "column": 7
+            },
+            {
+              "title": "@live unpublished slug returns not found",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30009,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts",
+                            "column": 31,
+                            "line": 102
+                          },
+                          "message": "Error: apiRequestContext.get: Request context disposed.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/p/e2e-not-published-slug-xyz\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  100 |   test(\"@live unpublished slug returns not found\", async ({ request, liveGate }) => {\n  101 |     if (!liveGate) return;\n> 102 |     const res = await request.get(\"/p/e2e-not-published-slug-xyz\");\n      |                               ^\n  103 |     expect([200, 404]).toContain(res.status());\n  104 |     if (res.status() === 200) {\n  105 |       const html = await res.text();\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts:102:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:32:30.011Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\preview-publish-deploy-liv-8b887-shed-slug-returns-not-found-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "16b7e573ad00f8fc2fb1-f85e7ad5b87371604b9e",
+              "file": "preview-publish-deploy-live.spec.ts",
+              "line": 100,
+              "column": 7
+            },
+            {
+              "title": "@live Vercel connect-status honest when no token",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 10,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30016,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts",
+                            "column": 31,
+                            "line": 113
+                          },
+                          "message": "Error: apiRequestContext.get: Request context disposed.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/deploy/vercel/connect-status\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  111 |   test(\"@live Vercel connect-status honest when no token\", async ({ request, liveGate }) => {\n  112 |     if (!liveGate) return;\n> 113 |     const res = await request.get(\"/api/deploy/vercel/connect-status\");\n      |                               ^\n  114 |     expect(res.status()).toBe(200);\n  115 |     const data = (await res.json()) as { state?: string; hasToken?: boolean };\n  116 |     if (!data.hasToken) {\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts:113:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:33:00.833Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\preview-publish-deploy-liv-9a06d-status-honest-when-no-token-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "16b7e573ad00f8fc2fb1-14e57be2b97dd682a09f",
+              "file": "preview-publish-deploy-live.spec.ts",
+              "line": 111,
+              "column": 7
+            },
+            {
+              "title": "@live deploy blocked without valid connection",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 11,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30015,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts",
+                            "column": 32,
+                            "line": 128
+                          },
+                          "message": "Error: apiRequestContext.get: Request context disposed.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/deploy/vercel/connect-status\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  126 |   test(\"@live deploy blocked without valid connection\", async ({ request, liveGate }) => {\n  127 |     if (!liveGate) return;\n> 128 |     const conn = await request.get(\"/api/deploy/vercel/connect-status\");\n      |                                ^\n  129 |     const connData = (await conn.json()) as { state?: string };\n  130 |     if (connData.state !== \"ready\") {\n  131 |       const res = await request.post(\"/api/deploy/vercel/start\", {\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts:128:32"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:33:31.628Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\preview-publish-deploy-liv-0a1e2-ed-without-valid-connection-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "16b7e573ad00f8fc2fb1-6b5176c2e1c5fcacfc2c",
+              "file": "preview-publish-deploy-live.spec.ts",
+              "line": 126,
+              "column": 7
+            },
+            {
+              "title": "@live preview logs require sessionId",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 12,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30026,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts",
+                            "column": 31,
+                            "line": 141
+                          },
+                          "message": "Error: apiRequestContext.get: Request context disposed.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/projects/00000000-0000-0000-0000-000000000001/preview/logs\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  139 |   test(\"@live preview logs require sessionId\", async ({ request, liveGate }) => {\n  140 |     if (!liveGate) return;\n> 141 |     const res = await request.get(\"/api/projects/00000000-0000-0000-0000-000000000001/preview/logs\");\n      |                               ^\n  142 |     expect([400, 401, 404]).toContain(res.status());\n  143 |     appendTestEvidence({ name: \"preview logs guarded\", passed: true, timestamp: new Date().toISOString() });\n  144 |   });\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts:141:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:34:02.497Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\preview-publish-deploy-liv-f2ae7-view-logs-require-sessionId-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "16b7e573ad00f8fc2fb1-e6636df053b42039eee2",
+              "file": "preview-publish-deploy-live.spec.ts",
+              "line": 139,
+              "column": 7
+            },
+            {
+              "title": "@live publish readiness API guarded",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 13,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30024,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts",
+                            "column": 31,
+                            "line": 148
+                          },
+                          "message": "Error: apiRequestContext.get: Request context disposed.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/projects/00000000-0000-0000-0000-000000000001/publish/readiness\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  146 |   test(\"@live publish readiness API guarded\", async ({ request, liveGate }) => {\n  147 |     if (!liveGate) return;\n> 148 |     const res = await request.get(\"/api/projects/00000000-0000-0000-0000-000000000001/publish/readiness\");\n      |                               ^\n  149 |     expect([401, 404]).toContain(res.status());\n  150 |     appendTestEvidence({ name: \"publish readiness guarded\", passed: true, timestamp: new Date().toISOString() });\n  151 |   });\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\preview-publish-deploy-live.spec.ts:148:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:34:33.346Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\preview-publish-deploy-liv-25249-blish-readiness-API-guarded-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "16b7e573ad00f8fc2fb1-51191c5c067898248250",
+              "file": "preview-publish-deploy-live.spec.ts",
+              "line": 146,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "restaurant-inventory-workflow.spec.ts",
+      "file": "restaurant-inventory-workflow.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Restaurant inventory — @live workflow",
+          "file": "restaurant-inventory-workflow.spec.ts",
+          "line": 110,
+          "column": 6,
+          "specs": [
+            {
+              "title": "@live full restaurant inventory journey",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 600000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 14,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 60293,
+                      "error": {
+                        "message": "Error: apiRequestContext.get: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/dev/auth-session-check\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n",
+                        "stack": "Error: apiRequestContext.get: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/dev/auth-session-check\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\restaurant-inventory-workflow.spec.ts:161:15",
+                        "location": {
+                          "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\restaurant-inventory-workflow.spec.ts",
+                          "column": 15,
+                          "line": 161
+                        },
+                        "snippet": "  159 |         report.timings.authMs = Date.now() - authStart;\n  160 |         failStage(report, \"auth\", code);\n> 161 |         throw new Error(code);\n      |               ^\n  162 |       }\n  163 |\n  164 |       const beforeProjects = await countProjects(request, 30_000);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\restaurant-inventory-workflow.spec.ts",
+                            "column": 15,
+                            "line": 161
+                          },
+                          "message": "Error: apiRequestContext.get: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/api/dev/auth-session-check\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\n\n  159 |         report.timings.authMs = Date.now() - authStart;\n  160 |         failStage(report, \"auth\", code);\n> 161 |         throw new Error(code);\n      |               ^\n  162 |       }\n  163 |\n  164 |       const beforeProjects = await countProjects(request, 30_000);\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\restaurant-inventory-workflow.spec.ts:161:15"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:35:04.344Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\restaurant-inventory-workf-d7555-estaurant-inventory-journey-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\restaurant-inventory-workflow.spec.ts",
+                        "column": 15,
+                        "line": 161
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "18b4ed5cfae3644aab3f-baecfa6d1e08f7f50891",
+              "file": "restaurant-inventory-workflow.spec.ts",
+              "line": 113,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "zip-import.spec.ts",
+      "file": "zip-import.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "@live ZIP import live journey",
+          "file": "zip-import.spec.ts",
+          "line": 60,
+          "column": 6,
+          "specs": [
+            {
+              "title": "@live upload ZIP creates project in Your Apps",
+              "ok": false,
+              "tags": [
+                "live",
+                "live"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 15,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30063,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\zip-import.spec.ts",
+                            "column": 31,
+                            "line": 83
+                          },
+                          "message": "Error: apiRequestContext.post: Request context disposed.\nCall log:\n\u001b[2m  - → POST http://localhost:3000/api/projects/import-zip\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - cookie: sb-auth-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeU4yUXhaRFZqTFRZek5Ea3RORGcyTnkxaE0yVXhMVGcwTVRCbU1tUTRNalEwTnlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM2RqYVdsdlpXZHBZM3AzY1d4dGJISnZiR1Y1TG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJell6QTROVEF5WlMwNU56Y3hMVFF4TTJVdFlqbGlaQzAwTkRRMllqRTNPV001TmpJaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemd3Tnpjek1UUTNMQ0pwWVhRaU9qRTNPREEzTmprMU5EY3NJbVZ0WVdsc0lqb2laVEpsTFd4cGRtVkFaSEpsWVcxdmN6ZzJMblJsYzNRaUxDSndhRzl1WlNJNklpSXNJbUZ3Y0Y5dFpYUmhaR0YwWVNJNmV5SndjbTkyYVdSbGNpSTZJbVZ0WVdsc0lpd2ljSEp2ZG1sa1pYSnpJanBiSW1WdFlXbHNJbDE5TENKMWMyVnlYMjFsZEdGa1lYUmhJanA3SW1WdFlXbHNYM1psY21sbWFXVmtJanAwY25WbGZTd2ljbTlzWlNJNkltRjFkR2hsYm5ScFkyRjBaV1FpTENKaFlXd2lPaUpoWVd3eElpd2lZVzF5SWpwYmV5SnRaWFJvYjJRaU9pSndZWE56ZDI5eVpDSXNJblJwYldWemRHRnRjQ0k2TVRjNE1EYzJPVFUwTjMxZExDSnpaWE56YVc5dVgybGtJam9pTW1WbU5UbGpOR0l0WlROaFpDMDBaamM1TFdFeFpUY3RORGs0TkRWaVpUVXpOVFUwSWl3aWFYTmZZVzV2Ym5sdGIzVnpJanBtWVd4elpYMC5yZlZwYUNLMGZsc19BMVRQckdlVmo3QXZmRjI3ZVZPdmc1Y19VSzVIdzh1WG9SdlFWT1o3cnU4ckZPdG9SZEx4ZWkxb2xodW1wWDd2dlZxaVNONFlDQSIsInRva2VuX3R5cGUiOiJiZWFyZXIiLCJleHBpcmVzX2luIjozNjAwLCJleHBpcmVzX2F0IjoxNzgwNzczMTQ3LCJyZWZyZXNoX3Rva2VuIjoiZ2RibXIyeGRycGszIiwidXNlciI6eyJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA2LTA2VDE4OjEyOjIyLjI5Mjk4OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjIuMjkyOTg4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTg6MTI6MjcuOTEzNDA0NTI4WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiJiOTFlMjA5MC1kYjc5LTQ3ZDAtYjVmMi05M2FlMWM2MGM2NzgiLCJpZCI6IjNjMDg1MDJlLTk3NzEtNDEzZS1iOWJkLTQ0NDZiMTc5Yzk2MiIsInVzZXJfaWQiOiIzYzA4NTAyZS05NzcxLTQxM2UtYjliZC00NDQ2YjE3OWM5NjIiLCJpZGVudGl0eV9kYXRhIjp7ImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiM2MwODUwMmUtOTc3MS00MTNlLWI5YmQtNDQ0NmIxNzljOTYyIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjc1ODQ2M1oiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yMlQyMTozMjozMi43NTg1MTZaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMjJUMjE6MzI6MzIuNzU4NTE2WiIsImVtYWlsIjoiZTJlLWxpdmVAZHJlYW1vczg2LnRlc3QifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA1LTIyVDIxOjMyOjMyLjcyODY4OFoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNi0wNlQxODoxMjoyNy45MzQ4NTNaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0sIndlYWtfcGFzc3dvcmQiOm51bGx9; __next_hmr_refresh_hash__=09ba2de4c9b0969f61b47442924f357230d9d55f47c398d4\u001b[22m\n\u001b[2m    - content-type: multipart/form-data; boundary=----WebKitFormBoundarymA7DMusLbBoOdoll\u001b[22m\n\u001b[2m    - content-length: 914\u001b[22m\n\n\n  81 |     const cookieHeader = cookies.map((c: { name: string; value: string }) => `${c.name}=${c.value}`).join(\"; \");\n  82 |\n> 83 |     const res = await request.post(\"/api/projects/import-zip\", {\n     |                               ^\n  84 |       headers: cookieHeader ? { cookie: cookieHeader } : {},\n  85 |       multipart: {\n  86 |         file: {\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\zip-import.spec.ts:83:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-06-06T18:36:05.801Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\zip-import--live-ZIP-impor-5e744-reates-project-in-Your-Apps-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "8f57e09ad0f72f807f7c-e5f322757acabc0c36e6",
+              "file": "zip-import.spec.ts",
+              "line": 63,
               "column": 7
             }
           ]
@@ -161,11 +1973,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-05-29T17:16:49.068Z",
-    "duration": 82293.28600000001,
-    "expected": 2,
-    "skipped": 0,
-    "unexpected": 0,
+    "startTime": "2026-06-06T18:24:45.304Z",
+    "duration": 930233.108,
+    "expected": 0,
+    "skipped": 12,
+    "unexpected": 21,
     "flaky": 0
   }
 }

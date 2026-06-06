@@ -3,13 +3,13 @@ import { test, expect } from "./helpers/live-gate";
 const RECIPLY_PROJECT_ID = process.env.E2E_RECIPLY_PROJECT_ID ?? "59bf67fb-2203-4f3a-82e7-07f31a7dc4ad";
 const RECIPLY_PUBLISH_SLUG = process.env.E2E_RECIPLY_PUBLISH_SLUG ?? "reciplyy-mq01rwer";
 
-test.describe("P4.0 production browser flows — @live", () => {
-  test.use({
-    video: "on",
-    screenshot: "on",
-    trace: "on",
-  });
+test.use({
+  video: "on",
+  screenshot: "on",
+  trace: "on",
+});
 
+test.describe("P4.0 production browser flows — @live", () => {
   test("Flow A — create workspace loads", async ({ page, liveGate }) => {
     if (!liveGate) return;
     await page.goto("/create");

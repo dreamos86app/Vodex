@@ -263,17 +263,21 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                               ? "soft_blue_white"
                               : null;
                         const effectPreset =
-                          typeof md?.effect_key === "string"
-                            ? (md.effect_key as EffectPresetId)
-                            : isWelcome
-                              ? "glow_pulse"
-                              : null;
+                          typeof md?.effect_preset === "string"
+                            ? (md.effect_preset as EffectPresetId)
+                            : typeof md?.effect_key === "string"
+                              ? (md.effect_key as EffectPresetId)
+                              : isWelcome
+                                ? "glow_pulse"
+                                : null;
                         const iconPreset =
-                          typeof md?.icon_key === "string"
-                            ? (md.icon_key as IconPresetId)
-                            : isWelcome
-                              ? "vodex_welcome"
-                              : null;
+                          typeof md?.icon_preset === "string"
+                            ? (md.icon_preset as IconPresetId)
+                            : typeof md?.icon_key === "string"
+                              ? (md.icon_key as IconPresetId)
+                              : isWelcome
+                                ? "vodex_welcome"
+                                : null;
                         const effectCls = effectPreset ? effectOverlayClass(effectPreset) : null;
                         const actionUrl =
                           typeof n.action_url === "string" && n.action_url.trim()

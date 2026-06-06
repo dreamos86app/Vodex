@@ -56,6 +56,7 @@ import {
 import { resolveInWebSoundKey } from "@/lib/notifications/in-web-sound-keys";
 import { playNotificationChime } from "@/lib/notifications/notification-sound";
 import { usePresenceHeartbeat } from "@/hooks/use-presence-heartbeat";
+import { useNotificationSync } from "@/hooks/use-notification-sync";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -74,6 +75,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const creditsSyncEnabled = Boolean(user?.id ?? profile?.id) && !lightweightPublic;
   useCreditsSync(creditsSyncEnabled);
   usePresenceHeartbeat(creditsSyncEnabled);
+  useNotificationSync(creditsSyncEnabled);
 
   const profileId = profile?.id;
   const profilePlanId = profile?.plan_id;
@@ -221,20 +223,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         )
         .subscribe();
 
-      const pollNotifications = () => {
-        void refreshUserNotificationsFromApi();
-      };
-      pollNotifications();
-      const onVisible = () => {
-        if (document.visibilityState === "visible") void refreshUserNotificationsFromApi();
-      };
-      document.addEventListener("visibilitychange", onVisible);
-
-      const pollTimer = window.setInterval(pollNotifications, 40_000);
-
       realtimeDispose = () => {
-        window.clearInterval(pollTimer);
-        document.removeEventListener("visibilitychange", onVisible);
         supabase.removeChannel(notificationsChannel);
         supabase.removeChannel(profileChannel);
       };

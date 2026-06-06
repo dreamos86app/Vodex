@@ -41,11 +41,14 @@ test.describe("Preview / publish / deploy — structure", () => {
     expect(src).toContain("snapshot_files");
   });
 
-  test("public page uses snapshot not live app_files", async () => {
-    const src = fs.readFileSync(path.join(process.cwd(), "src/app/p/[slug]/page.tsx"), "utf8");
-    expect(src).toContain("PublicAppNotFound");
+  test("public route resolves published HTML not live app_files", async () => {
+    const src = fs.readFileSync(
+      path.join(process.cwd(), "src/app/p/[slug]/[[...path]]/route.ts"),
+      "utf8",
+    );
+    expect(src).toContain("resolvePublishedAppHtml");
+    expect(src).not.toMatch(/from\s+["']@\/lib\/supabase\/client["']/);
     expect(src).not.toContain("app_files");
-    expect(src).toContain("stripSecretsFromFiles");
   });
 
   test("no fake subdomain without DNS verify", async () => {

@@ -502,7 +502,7 @@ export function AppBuilderWorkspace({
     }
   };
 
-  if (loading) {
+  if (loading && files.length === 0) {
     return (
       <div className={cn("flex h-full flex-col gap-3 p-6", className)} data-testid="code-tab-skeleton">
         <div className="h-8 w-48 animate-pulse rounded-lg bg-muted/50" />
@@ -570,7 +570,10 @@ export function AppBuilderWorkspace({
   }
 
   return (
-    <div className={cn("builder-shell flex h-full min-h-0 flex-col overflow-hidden", className)}>
+    <div
+      className={cn("builder-shell flex h-full min-h-0 flex-col overflow-hidden", className)}
+      data-testid="builder-shell-ready"
+    >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
         <div className="min-w-0">
           <p className="truncate text-[12px] font-semibold text-foreground">{projectName}</p>
