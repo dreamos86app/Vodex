@@ -60,7 +60,6 @@ export function isUserVisibleProject(row: UserVisibleProjectRow): boolean {
 
   const meta = (row.metadata ?? {}) as Record<string, unknown>;
   if (meta.hide_from_list === true || meta.hide_from_home === true) return false;
-  if (meta.hide_from_home_main === true) return false;
   if (meta.visibility_status === "archived") return false;
 
   const uiInput: ProjectCardUiInput = {
@@ -100,7 +99,9 @@ export function isUserVisibleProject(row: UserVisibleProjectRow): boolean {
   if (row.preview_url?.trim()) return true;
 
   if (lifecycle_status && PLANNED_LIFECYCLES.has(lifecycle_status)) {
-    if (lifecycle_status === "draft" || lifecycle_status === "intent_review") return false;
+    if (lifecycle_status === "draft" || lifecycle_status === "intent_review") {
+      return Boolean(meta.initial_prompt || meta.create_flow_state || meta.workflow_step);
+    }
     if (
       fileCount === 0 &&
       !row.preview_url &&
@@ -108,7 +109,7 @@ export function isUserVisibleProject(row: UserVisibleProjectRow): boolean {
       lifecycle_status !== "build_queued" &&
       lifecycle_status !== "building"
     ) {
-      return false;
+      return lifecycle_status === "needs_attention" || lifecycle_status === "failed";
     }
     return true;
   }

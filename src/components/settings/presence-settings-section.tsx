@@ -16,17 +16,12 @@ const OPTIONS: Array<{
   {
     mode: "auto",
     title: "Automatic",
-    description: "Vodex shows you online while you're active.",
+    description: "Online while active, away when idle.",
   },
   {
     mode: "online",
     title: "Online",
     description: "Always show as online while signed in.",
-  },
-  {
-    mode: "invisible",
-    title: "Appear offline",
-    description: "Use Vodex normally while others see you offline.",
   },
   {
     mode: "offline",

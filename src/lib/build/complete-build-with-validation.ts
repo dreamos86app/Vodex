@@ -110,10 +110,16 @@ export async function completeBuildWithValidation(input: {
 
   if (fileCount < MIN_RENDERABLE_FILES) {
     lifecycle = "needs_attention";
+  } else if (prevMeta.preview_ready === true && prevMeta.preview_honest === true) {
+    lifecycle = "preview_ready";
   } else {
-    // Enough files on disk — treat as generated even if polish checks are soft-failing.
     lifecycle = "generated";
   }
+
+  const previewWasReady =
+    prevMeta.preview_ready === true &&
+    prevMeta.preview_honest === true &&
+    Boolean(cur?.preview_url?.trim() || input.previewUrl?.trim());
 
   const repairAction = validationOk
     ? null
@@ -123,12 +129,16 @@ export async function completeBuildWithValidation(input: {
         : "ui_polish_quote"
       : "open_builder_retry";
 
+  const nextPreviewUrl = previewWasReady
+    ? (cur?.preview_url ?? input.previewUrl ?? null)
+    : null;
+
   await input.writer
     .from("projects")
     .update({
       status: legacyProjectStatus(lifecycle),
       build_status: fileCount >= MIN_RENDERABLE_FILES ? "completed" : "failed",
-      preview_url: null,
+      ...(previewWasReady && nextPreviewUrl ? { preview_url: nextPreviewUrl } : {}),
       metadata: {
         ...prevMeta,
         ...lifecyclePatch(lifecycle, {
@@ -143,8 +153,10 @@ export async function completeBuildWithValidation(input: {
           ui_polish_included: polishPlan.includedInReservation && uiReview.needsPolish,
           repair_action: repairAction,
           build_status: fileCount >= MIN_RENDERABLE_FILES ? "completed" : "needs_repair",
-          preview_ready: false,
-          preview_honest: false,
+          file_count: fileCount,
+          ...(previewWasReady
+            ? { preview_ready: true, preview_honest: true }
+            : { preview_ready: false, preview_honest: false }),
         }),
       },
     } as never)
@@ -157,7 +169,7 @@ export async function completeBuildWithValidation(input: {
     validationReasons,
     fileCount,
     canPreview: fileCount >= MIN_RENDERABLE_FILES && validation.ok,
-    canPublish: Boolean(prevMeta.preview_ready) && validationOk && fileCount > 0,
+    canPublish: (previewWasReady || Boolean(prevMeta.preview_ready)) && validationOk && fileCount > 0,
     uiQualityScore: uiReview.overall,
     needsUiPolish: uiReview.needsPolish,
     uiPolishQuotedCredits: polishPlan.quoted ? polishPlan.estimatedCredits : undefined,

@@ -27,6 +27,7 @@ export type BuildWorkerTraceStage =
   | "contract_completed"
   | "persist_started"
   | "persist_completed"
+  | "source_integrity_passed"
   | "preview_started"
   | "preview_completed"
   | "job_completed"
@@ -84,7 +85,8 @@ const FRIENDLY_EVENT_TITLE: Partial<Record<BuildWorkerTraceStage, string>> = {
   contract_started: "Checking the interface",
   contract_completed: "Quality checks complete",
   persist_started: "Saving files",
-  persist_completed: "Files saved",
+  persist_completed: "Writing files",
+  source_integrity_passed: "Files saved",
   preview_started: "Preparing preview",
   preview_completed: "Preview ready",
   job_completed: "Preview ready",
@@ -109,7 +111,8 @@ function progressForStage(stage: BuildWorkerTraceStage): number {
     contract_started: 60,
     contract_completed: 70,
     persist_started: 82,
-    persist_completed: 88,
+    persist_completed: 84,
+    source_integrity_passed: 88,
     preview_started: 92,
     preview_completed: 98,
     job_completed: 100,

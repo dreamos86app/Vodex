@@ -62,7 +62,8 @@ function initialsGlyph(appName: string): string {
   } else if (compact.length === 1) {
     glyph = compact.toUpperCase();
   }
-  return `<text x="64" y="74" text-anchor="middle" font-family="system-ui,Segoe UI,sans-serif" font-size="44" font-weight="700" fill="#ffffff">${glyph}</text>`;
+  const fontSize = glyph.length > 1 ? 38 : 48;
+  return `<text x="64" y="64" dominant-baseline="central" text-anchor="middle" font-family="system-ui,Segoe UI,sans-serif" font-size="${fontSize}" font-weight="700" fill="#ffffff">${glyph}</text>`;
 }
 
 export function generateAppIconSvg(appName: string, category?: string): string {

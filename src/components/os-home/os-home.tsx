@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { YourAppsSection, type YourAppsProject } from "@/components/os-home/your-apps-section";
 import { DraftsSection } from "@/components/os-home/drafts-section";
+import { BuildingSection } from "@/components/os-home/building-section";
 import { useHomeRecentProjects } from "@/components/os-home/use-home-recent-projects";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { storeAutostartHandoff } from "@/lib/create/autostart-handoff";
@@ -477,10 +478,22 @@ const heroItem = {
 export function OsHome() {
   const searchParams = useSearchParams();
   const { projects: recentProjects } = useHomeRecentProjects();
-  const { readyApps, draftApps } = React.useMemo(() => {
+  const { readyApps, draftApps, buildingApps, publishedApps } = React.useMemo(() => {
     const ready: YourAppsProject[] = [];
     const drafts: YourAppsProject[] = [];
+    const building: YourAppsProject[] = [];
+    const published: YourAppsProject[] = [];
     for (const p of recentProjects) {
+      const bs = String(p.build_status ?? "").toLowerCase();
+      const isPublished = Boolean(p.published_subdomain?.trim());
+      if (isPublished) {
+        published.push(p);
+        continue;
+      }
+      if (bs === "running" || bs === "building" || bs === "queued" || bs === "starting") {
+        building.push(p);
+        continue;
+      }
       const section = (p as YourAppsProject & { visibility_section?: string }).visibility_section;
       if (section === "drafts" || section === "failed_attempts") {
         drafts.push(p);
@@ -488,7 +501,6 @@ export function OsHome() {
         ready.push(p);
       } else if (
         p.card_status === "ready" ||
-        Boolean(p.published_subdomain) ||
         Boolean((p.metadata as Record<string, unknown> | undefined)?.published_subdomain)
       ) {
         ready.push(p);
@@ -496,7 +508,12 @@ export function OsHome() {
         drafts.push(p);
       }
     }
-    return { readyApps: ready, draftApps: drafts };
+    return {
+      readyApps: [...published, ...ready],
+      draftApps: drafts,
+      buildingApps: building,
+      publishedApps: published,
+    };
   }, [recentProjects]);
   const { profile, user } = useAuthStore();
   const display = resolveDisplayName(profile, user);
@@ -579,8 +596,12 @@ export function OsHome() {
         </div>
 
         <div className="mx-auto w-full max-w-5xl space-y-10">
-          <YourAppsSection projects={readyApps} />
           <DraftsSection projects={draftApps} />
+          <BuildingSection projects={buildingApps} />
+          <YourAppsSection
+            projects={readyApps}
+            title={publishedApps.length > 0 ? "Published apps" : "Ready apps"}
+          />
         </div>
 
         {/* App inspiration feed */}

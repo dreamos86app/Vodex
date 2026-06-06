@@ -1,6 +1,6 @@
 /**
  * Vodex Paddle billable plans — Starter, Pro, Infinity I–VII.
- * Credits from FIXED_PLAN_CREDITS via credit-formula (P5.4.3).
+ * Credits from FIXED_PLAN_CREDITS via credit-formula (P5.4.4 frozen ladder).
  */
 import {
   ANNUAL_BILLING_DISCOUNT,

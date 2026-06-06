@@ -18,6 +18,7 @@ import { logSecurityAudit } from "@/lib/security/audit-events";
 import { findMissingRelativeImports } from "@/lib/build/import-graph";
 import { filterRenderableBuildFiles } from "@/lib/build/generated-file-utils";
 import { evaluatePostBuildContract } from "@/lib/build/post-build-contract";
+import { computeCanonicalBuildState } from "@/lib/build/canonical-build-state";
 import { isBuildJobEventsTableMissing, buildJobEventsSetupWarning } from "@/lib/build/build-events-schema-health";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ async function buildStatusPayload(projectId: string, ownerId: string) {
 
   const { data: project } = await reader
     .from("projects")
-    .select("id, metadata, app_name, icon_url, status")
+    .select("id, metadata, app_name, icon_url, status, build_status, preview_url, published_subdomain")
     .eq("id", projectId)
     .eq("owner_id", ownerId)
     .maybeSingle();
@@ -104,10 +105,22 @@ async function buildStatusPayload(projectId: string, ownerId: string) {
   const buildStatus = job?.status ?? (meta.build_status as string | undefined) ?? null;
   const status = mapLifecycleToStatus(lifecycle, buildStatus);
 
+  const canonical = computeCanonicalBuildState({
+    metadata: meta,
+    buildStatus: project.build_status ?? buildStatus,
+    publishedSubdomain: project.published_subdomain,
+    previewUrl: project.preview_url,
+    files: renderable,
+    projectId,
+    ownerId,
+    buildJobStatus: job?.status ?? null,
+  });
+
   return NextResponse.json({
     ok: true,
     projectId,
     status,
+    canonical,
     buildJobId: job?.id ?? null,
     progressPercent: progress,
     buildJob: job

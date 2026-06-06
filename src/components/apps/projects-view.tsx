@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Plus, Search, LayoutGrid, List,
@@ -279,8 +279,17 @@ export function ProjectsView() {
   });
   const [loading, setLoading] = React.useState(true);
   const [hasFetchedOnce, setHasFetchedOnce] = React.useState(false);
+  const searchParams = useSearchParams();
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [search, setSearch] = React.useState("");
+
+  React.useEffect(() => {
+    const section = searchParams.get("section");
+    if (section === "drafts") setStatusFilter("draft");
+    else if (section === "building") setStatusFilter("building");
+    else if (section === "published") setStatusFilter("published");
+    else if (section === "archived") setStatusFilter("archived");
+  }, [searchParams]);
   const [sort, setSort] = React.useState<"updated" | "name">("updated");
   const [view, setView] = React.useState<"grid" | "list">("grid");
   const [showImport, setShowImport] = React.useState(false);
@@ -398,7 +407,27 @@ export function ProjectsView() {
       const appName = ((p as ProjectRow).app_name ?? "").toLowerCase();
       const matchSearch = !q || name.includes(q) || appName.includes(q);
       const ls = p.lifecycle_status ?? readLifecycleFromMetadata(p.metadata).lifecycle_status;
-      const matchStatus = statusFilter === "all" || ls === statusFilter || p.status === statusFilter;
+      const bs = String(p.build_status ?? "").toLowerCase();
+      const meta = (p.metadata ?? {}) as Record<string, unknown>;
+      let matchStatus = statusFilter === "all";
+      if (!matchStatus) {
+        if (statusFilter === "building") {
+          matchStatus =
+            bs === "running" || bs === "building" || bs === "queued" || ls === "building" || ls === "build_queued";
+        } else if (statusFilter === "published") {
+          matchStatus = Boolean(p.published_subdomain?.trim()) || ls === "published" || p.status === "live";
+        } else if (statusFilter === "archived") {
+          matchStatus = meta.visibility_status === "archived" || ls === "archived";
+        } else if (statusFilter === "draft") {
+          matchStatus =
+            ls === "draft" ||
+            ls === "intent_review" ||
+            meta.visibility_status === "draft" ||
+            meta.visibility_status === "draft_pending";
+        } else {
+          matchStatus = ls === statusFilter || p.status === statusFilter;
+        }
+      }
       return matchSearch && matchStatus;
     })
     .sort((a, b) => {
@@ -459,11 +488,12 @@ export function ProjectsView() {
           className="h-9 rounded-[var(--radius-lg)] bg-surface px-2 text-[12px] text-foreground ring-1 ring-border outline-none"
           aria-label="Filter by status"
         >
-          <option value="all">All statuses</option>
-          <option value="draft">Draft</option>
+          <option value="all">All apps</option>
+          <option value="draft">Drafts</option>
           <option value="building">Building</option>
           <option value="generated">Generated</option>
           <option value="published">Published</option>
+          <option value="archived">Archived</option>
           <option value="needs_attention">Needs attention</option>
           <option value="failed">Failed</option>
         </select>

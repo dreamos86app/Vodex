@@ -355,7 +355,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         executionInstanceId: workerCtx.executionInstanceId,
       });
 
-      await persistStage("persist_completed", `${persist.savedCount} files saved`);
+      await persistStage("persist_completed", `${persist.savedCount} files written`);
 
       if (!alreadyCharged && input.reservedCredits && input.reservedCredits > 0) {
         const chargeCalc = calculateCreditsForStagedBuild({
@@ -381,6 +381,10 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
             projectId: input.projectId,
           });
         }
+      }
+
+      if (persist.savedCount > 0) {
+        await persistStage("source_integrity_passed", `${persist.savedCount} files saved`);
       }
 
       await finalizeBuildPartial({
@@ -563,14 +567,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       },
     });
 
-    await persistStage("persist_completed", `${persist.savedCount} files saved`);
-    await persistBuildJobEvent(input.writer, {
-      ...eventCtx,
-      type: "saving_files",
-      title: "Saving files",
-      detail: `${persist.savedCount} files saved`,
-      progressPercent: 88,
-    });
+    await persistStage("persist_completed", `${persist.savedCount} files written`);
 
     const validationWatch = startValidationWatchdog({
       writer: input.writer,
@@ -733,6 +730,22 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       buildFinishedSuccess = true;
       return;
     }
+
+    await persistStage(
+      "source_integrity_passed",
+      `${postPersist.visibleFileCount} files saved — source integrity passed`,
+    );
+    await persistBuildJobEvent(input.writer, {
+      ...eventCtx,
+      type: "saving_files",
+      title: "Files saved",
+      detail: `${postPersist.visibleFileCount} files verified`,
+      progressPercent: 88,
+      metadata: {
+        source_integrity_ok: true,
+        file_count: postPersist.visibleFileCount,
+      },
+    });
 
     if (postPersist.persistenceFailure) {
       const failDetail = "technical_persistence_failure:files_without_readable_content";

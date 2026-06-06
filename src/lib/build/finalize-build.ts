@@ -6,6 +6,7 @@ import { completeBuildWithValidation } from "@/lib/build/complete-build-with-val
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { lifecyclePatch, legacyProjectStatus } from "@/lib/projects/project-lifecycle";
 import { hasMeaningfulProjectFiles } from "@/lib/projects/project-visibility-status";
+import { sanitizeUserFacingDescription } from "@/lib/projects/user-facing-description";
 
 type Writer = SupabaseClient<Database>;
 
@@ -62,6 +63,19 @@ export async function finalizeBuildSuccess(input: FinalizeBuildInput): Promise<v
       ? (curProj.metadata as Record<string, unknown>)
       : {};
 
+  const userDescription =
+    sanitizeUserFacingDescription({
+      raw: input.appDescription,
+      prompt: typeof prevMeta.initial_prompt === "string" ? prevMeta.initial_prompt : null,
+      blueprintSummary:
+        typeof prevMeta.blueprint_summary === "string" ? prevMeta.blueprint_summary : null,
+      category:
+        meta?.app?.category ??
+        (typeof prevMeta.blueprint_app_type === "string" ? prevMeta.blueprint_app_type : null),
+      purpose: meta?.app?.description ?? null,
+      appName,
+    }) ?? input.appDescription;
+
   const completion = await completeBuildWithValidation({
     writer,
     userId,
@@ -80,6 +94,7 @@ export async function finalizeBuildSuccess(input: FinalizeBuildInput): Promise<v
             : "needs_repair",
     }),
     app_name: appName,
+    short_description: userDescription?.slice(0, 240) ?? null,
     shell_only: false,
     hide_from_list: false,
     hide_from_home: false,
@@ -107,10 +122,10 @@ export async function finalizeBuildSuccess(input: FinalizeBuildInput): Promise<v
   const fullPatch: Record<string, unknown> = {
     name: shouldRename ? appName.slice(0, 80) : curName || appName.slice(0, 80),
     ...(input.appSlug && shouldRename ? { slug: input.appSlug.slice(0, 48) } : {}),
-    ...(input.appDescription ? { description: input.appDescription.slice(0, 500) } : {}),
+    ...(userDescription ? { description: userDescription.slice(0, 500) } : {}),
     app_name: appName.slice(0, 80),
     icon_svg: input.iconSvg,
-    short_description: input.appDescription?.slice(0, 240) ?? null,
+    short_description: userDescription?.slice(0, 240) ?? null,
     category: meta?.app?.category?.slice(0, 64) ?? null,
     build_status: "completed",
     last_build_id: buildJobId,

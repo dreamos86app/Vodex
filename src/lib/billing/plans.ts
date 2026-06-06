@@ -17,18 +17,18 @@ function buildPlanDisplay(): Record<
     { name: string; priceMonthlyUsd: number | null; description: string }
   > = {
     free: { name: "Free", priceMonthlyUsd: 0, description: "20 Build Credits / month" },
-    starter: { name: "Starter", priceMonthlyUsd: 20, description: "200 credits / month" },
-    pro: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month" },
-    business: { name: "Pro", priceMonthlyUsd: 50, description: "500 credits / month (legacy id)" },
-    infinity: { name: "Infinity I", priceMonthlyUsd: 100, description: "1,000 credits / month" },
-    enterprise: { name: "Infinity I", priceMonthlyUsd: 100, description: "Enterprise tier" },
-    infinity_i: { name: "Infinity I", priceMonthlyUsd: 100, description: "1,000 credits / month" },
-    infinity_ii: { name: "Infinity II", priceMonthlyUsd: 200, description: "2,000 credits / month" },
-    infinity_iii: { name: "Infinity III", priceMonthlyUsd: 300, description: "3,000 credits / month" },
-    infinity_iv: { name: "Infinity IV", priceMonthlyUsd: 380, description: "4,000 credits / month" },
-    infinity_v: { name: "Infinity V", priceMonthlyUsd: 570, description: "6,000 credits / month" },
-    infinity_vi: { name: "Infinity VI", priceMonthlyUsd: 855, description: "9,000 credits / month" },
-    infinity_vii: { name: "Infinity VII", priceMonthlyUsd: 1235, description: "13,000 credits / month" },
+    starter: { name: "Starter", priceMonthlyUsd: 20, description: "150 Build Credits / month" },
+    pro: { name: "Pro", priceMonthlyUsd: 50, description: "375 Build Credits / month" },
+    business: { name: "Pro", priceMonthlyUsd: 50, description: "375 Build Credits / month (legacy id)" },
+    infinity: { name: "Infinity I", priceMonthlyUsd: 100, description: "750 Build Credits / month" },
+    enterprise: { name: "Infinity VII", priceMonthlyUsd: 1235, description: "9,300 Build Credits / month" },
+    infinity_i: { name: "Infinity I", priceMonthlyUsd: 100, description: "750 Build Credits / month" },
+    infinity_ii: { name: "Infinity II", priceMonthlyUsd: 200, description: "1,500 Build Credits / month" },
+    infinity_iii: { name: "Infinity III", priceMonthlyUsd: 300, description: "2,250 Build Credits / month" },
+    infinity_iv: { name: "Infinity IV", priceMonthlyUsd: 380, description: "2,850 Build Credits / month" },
+    infinity_v: { name: "Infinity V", priceMonthlyUsd: 570, description: "4,250 Build Credits / month" },
+    infinity_vi: { name: "Infinity VI", priceMonthlyUsd: 855, description: "6,500 Build Credits / month" },
+    infinity_vii: { name: "Infinity VII", priceMonthlyUsd: 1235, description: "9,300 Build Credits / month" },
   };
 
   for (const p of BILLABLE_PLAN_DEFINITIONS.filter((d) => d.id.startsWith("infinity_"))) {

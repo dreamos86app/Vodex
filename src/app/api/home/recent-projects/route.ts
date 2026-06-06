@@ -31,7 +31,7 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const projects = (data ?? [])
+  const mapped = (data ?? [])
     .map((row) => {
       const meta =
         row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
@@ -78,11 +78,38 @@ export async function GET() {
       const favDiff = Number(Boolean(b.is_favorite)) - Number(Boolean(a.is_favorite));
       if (favDiff !== 0) return favDiff;
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-    })
-    .slice(0, 12);
+    });
+
+  const building: typeof mapped = [];
+  const drafts: typeof mapped = [];
+  const published: typeof mapped = [];
+  const ready: typeof mapped = [];
+
+  for (const p of mapped) {
+    const bs = String(p.build_status ?? "").toLowerCase();
+    if (p.published_subdomain?.trim()) {
+      published.push(p);
+    } else if (bs === "running" || bs === "building" || bs === "queued" || bs === "starting") {
+      building.push(p);
+    } else if (p.visibility_section === "drafts" || p.visibility_section === "failed_attempts") {
+      drafts.push(p);
+    } else {
+      ready.push(p);
+    }
+  }
+
+  const projects = [...published, ...ready, ...building, ...drafts].slice(0, 24);
 
   return NextResponse.json(
-    { projects },
+    {
+      projects,
+      sections: {
+        drafts: drafts.slice(0, 12),
+        building: building.slice(0, 12),
+        published: published.slice(0, 12),
+        ready: ready.slice(0, 12),
+      },
+    },
     {
       headers: {
         "Cache-Control": "private, max-age=0, must-revalidate",

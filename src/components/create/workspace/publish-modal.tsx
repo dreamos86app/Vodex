@@ -21,6 +21,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PlaceholderRepairCard, type PlaceholderFindingUi } from "@/components/publish/placeholder-repair-card";
+import {
+  PublishReadinessCards,
+  type PublishReadinessCard,
+} from "@/components/publish/publish-readiness-cards";
 import { PublishSuccessOverlay } from "@/components/publish/publish-success-overlay";
 import { fetchDedupe, getCached, invalidateCache } from "@/lib/cache/fetch-dedupe";
 import { toast } from "@/lib/toast";
@@ -368,6 +372,43 @@ export function PublishModal({
       ? `https://${publishInfo.subdomain}.${publishInfo.platformBaseDomain}`
       : null;
 
+  const readinessCards = React.useMemo((): PublishReadinessCard[] => {
+    if (loading && !readiness) {
+      return [
+        { id: "files", label: "Files", status: "loading" },
+        { id: "routes", label: "Routes", status: "loading" },
+        { id: "preview", label: "Preview", status: "loading" },
+        { id: "auth", label: "Auth", status: "loading" },
+      ];
+    }
+    const blockers = readiness?.blockers ?? [];
+    const hasBlocker = (re: RegExp) => blockers.some((b) => re.test(b));
+    const fileOk = (readiness?.fileCount ?? 0) > 0 && !hasBlocker(/no generated|no app files/i);
+    const routeOk = !hasBlocker(/main page|route|package\.json/i);
+    const previewOk = readiness?.artifactsReady !== false && !hasBlocker(/preview/i);
+    const authOk = !hasBlocker(/auth|oauth/i);
+    const dbOk = !hasBlocker(/database|supabase/i);
+    const domainOk = !hasBlocker(/domain/i);
+    const integrationsOk = !hasBlocker(/integration|secret/i);
+    const paymentsOk = !hasBlocker(/payment|stripe/i);
+    const card = (id: string, label: string, ok: boolean, warn?: boolean): PublishReadinessCard => ({
+      id,
+      label,
+      status: ok ? "pass" : warn ? "warn" : "fail",
+      detail: blockers.find((b) => b.toLowerCase().includes(label.toLowerCase().split(" ")[0] ?? "")),
+    });
+    return [
+      card("files", "Files", fileOk),
+      card("routes", "Routes", routeOk),
+      card("preview", "Preview", previewOk),
+      card("auth", "Auth", authOk, !authOk),
+      card("database", "Database", dbOk, !dbOk),
+      card("domains", "Domains", domainOk, !domainOk),
+      card("integrations", "Integrations", integrationsOk, !integrationsOk),
+      card("payments", "Payments", paymentsOk, true),
+    ];
+  }, [loading, readiness]);
+
   return (
     <>
       <PublishSuccessOverlay
@@ -394,7 +435,7 @@ export function PublishModal({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 16 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative flex max-h-[min(92dvh,820px)] w-full max-w-xl flex-col overflow-hidden rounded-[var(--radius-xl)] bg-background shadow-2xl ring-1 ring-border"
+        className="relative flex max-h-[min(92dvh,860px)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-xl)] bg-background shadow-2xl ring-1 ring-border"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -488,7 +529,18 @@ export function PublishModal({
           </div>
         </div>
 
-        <motion.div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 pb-12">
+        <motion.div
+          className="relative min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4"
+          data-testid="publish-modal-body"
+        >
+          {projectId ? (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Publish readiness
+              </p>
+              <PublishReadinessCards cards={readinessCards} />
+            </div>
+          ) : null}
           {posting && (
             <div
               className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/92 px-6 backdrop-blur-sm"

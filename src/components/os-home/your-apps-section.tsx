@@ -35,7 +35,13 @@ export type YourAppsProject = ProjectCardInput & {
   is_favorite?: boolean | null;
 };
 
-export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
+export function YourAppsSection({
+  projects,
+  title = "Published & ready",
+}: {
+  projects: YourAppsProject[];
+  title?: string;
+}) {
   const { user, profile } = useAuthStore();
   const isAdmin = isDreamosOwnerEmail(user?.email ?? profile?.email);
   const hasApps = projects.length > 0;
@@ -46,7 +52,7 @@ export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
         <div className="flex items-center gap-2">
           <LayoutGrid className="size-3.5 text-accent" strokeWidth={1.75} />
           <span className="text-[11.5px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-            Your apps
+            {title}
           </span>
         </div>
         {hasApps ? (
@@ -177,9 +183,9 @@ export function YourAppsSection({ projects }: { projects: YourAppsProject[] }) {
           viewport={{ once: true }}
           className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-surface/40 px-6 py-10 text-center"
         >
-          <p className="text-[14px] font-semibold text-foreground">No apps yet</p>
+          <p className="text-[14px] font-semibold text-foreground">No published apps yet</p>
           <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">
-            Describe what you want above — your first app will show up here.
+            Drafts and builds in progress appear below. Describe what you want above to start.
           </p>
           <Link
             href="/create"

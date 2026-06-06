@@ -37,8 +37,14 @@ export function buildLogoPrompt(input: {
   appName: string;
   shortDescription: string;
   category?: string;
+  keywords?: string[];
+  audience?: string;
+  brandStyle?: string;
 }): string {
   const purpose = input.shortDescription.trim() || input.category || "modern SaaS app";
+  const keywords = (input.keywords ?? []).filter(Boolean).slice(0, 6).join(", ");
+  const audience = input.audience?.trim();
+  const brandStyle = input.brandStyle?.trim() || "premium minimal SaaS";
   const cat = (input.category ?? "").toLowerCase();
   if (
     cat.includes("subscription") ||
@@ -60,6 +66,9 @@ export function buildLogoPrompt(input: {
   }
   return [
     `Premium app icon symbol for ${input.appName} (${purpose}).`,
+    audience ? `Target audience: ${audience}.` : "",
+    keywords ? `Visual keywords: ${keywords}.` : "",
+    `Brand style: ${brandStyle}.`,
     "1024x1024, bold abstract glyph or object — symbolic mark only, no logotype.",
     "NO text, NO letters, NO words, NO initials.",
     "Symbol fills 92% of canvas edge-to-edge; full-bleed saturated gradient background.",

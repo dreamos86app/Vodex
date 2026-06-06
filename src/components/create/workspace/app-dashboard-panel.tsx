@@ -1031,19 +1031,33 @@ export function AppDashboardPanel({
       </nav>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="shrink-0 border-b border-border/60 bg-background/80 px-4 py-2.5 backdrop-blur-sm lg:hidden">
-          <select
-            value={section}
-            onChange={(e) => setSection(e.target.value as DashSection)}
-            className="h-9 w-full rounded-lg bg-surface px-2 text-[12px] ring-1 ring-border"
-            aria-label="Dashboard section"
-          >
-            {MAIN_NAV.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+        <div
+          className="shrink-0 border-b border-border/60 bg-background/95 backdrop-blur-sm lg:hidden"
+          data-testid="dashboard-mobile-tabs"
+        >
+          <div className="flex gap-1 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {MAIN_NAV.map((s) => {
+              const Icon = s.icon;
+              const active = section === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  data-dashboard-section={s.id}
+                  onClick={() => setSection(s.id)}
+                  className={cn(
+                    "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold transition",
+                    active
+                      ? "bg-accent/10 text-accent ring-1 ring-accent/25"
+                      : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-3.5" strokeWidth={1.65} />
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">{renderSectionBody()}</div>

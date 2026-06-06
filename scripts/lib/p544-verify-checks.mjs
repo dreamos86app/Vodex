@@ -57,8 +57,24 @@ export function P544_MARGIN_OPTIMIZATION(root) {
     errors.push("optimized economy margin uplift < 0.5 pts at 5k users");
   }
 
-  const mig = path.join(root, "supabase/migrations/20260832120000_p544_margin_optimization_frozen_ladder.sql");
+  const mig = path.join(root, "supabase/migrations/20260901120000_p544_margin_optimization_frozen_ladder.sql");
   if (!fs.existsSync(mig)) errors.push("P5.4.4 migration missing");
+
+  const invalidMig = path.join(
+    root,
+    "supabase/migrations/20260832120000_p544_margin_optimization_frozen_ladder.sql",
+  );
+  if (fs.existsSync(invalidMig)) errors.push("invalid migration date 20260832 still present");
+
+  const migSql = fs.readFileSync(mig, "utf8");
+  if (migSql.includes("platform_credit_defaults")) {
+    errors.push("P5.4.4 migration must not reference platform_credit_defaults");
+  }
+  if (!migSql.includes("plan_monthly_credits") || !migSql.includes("plan_monthly_action_credits")) {
+    errors.push("P5.4.4 migration missing plan_monthly_* functions");
+  }
+
+  mustExist("scripts/sql/list-credit-schema.sql", "credit schema SQL helper");
 
   return errors;
 }
