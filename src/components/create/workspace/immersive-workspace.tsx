@@ -444,7 +444,6 @@ export function ImmersiveWorkspace({
     if (!section) return;
     const allowed: DashSection[] = [
       "overview",
-      "mobile",
       "publish",
       "integrations",
       "secrets",
@@ -454,9 +453,10 @@ export function ImmersiveWorkspace({
       "payments",
       "domains",
       "security",
-      "automations",
-      "logs",
-      "marketing",
+      "auth",
+      "code",
+      "template",
+      "settings",
     ];
     if (!allowed.includes(section as DashSection)) return;
     setDashboardSection(section as DashSection);
@@ -2699,18 +2699,21 @@ export function ImmersiveWorkspace({
           const map: Record<string, DashSection> = {
             overview: "overview",
             dashboard: "overview",
+            deploy: "publish",
+            publish: "publish",
             settings: "settings",
             domains: "domains",
             integrations: "integrations",
             secrets: "secrets",
-            logs: "logs",
             users: "users",
             data: "data",
             analytics: "analytics",
-            marketing: "marketing",
             security: "security",
-            automations: "automations",
-            api: "api",
+            auth: "auth",
+            authentication: "auth",
+            code: "code",
+            template: "template",
+            payments: "payments",
           };
           setDashboardSection(map[section] ?? "overview");
           setRightTab("dashboard");
@@ -3349,6 +3352,7 @@ export function ImmersiveWorkspace({
               </div>
             )}
             {rightTab === "dashboard" && effectiveProject?.id && (
+              <div className="h-full min-h-0">
               <AppDashboardPanel
                 project={effectiveProject}
                 isBusy={isBusy}
@@ -3363,6 +3367,7 @@ export function ImmersiveWorkspace({
                   toast.info("Prompt added to chat — review and press Submit");
                 }}
               />
+              </div>
             )}
             {rightTab === "code" && (
               <AppBuilderWorkspace

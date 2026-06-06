@@ -72,7 +72,10 @@ import { isPaidPlan } from "@/lib/billing/plan-features";
 import { PublishTemplateModal } from "@/components/templates/publish-template-modal";
 import { AppVersionHistoryPanel } from "@/components/builder/app-version-history-panel";
 import { getEntitlements } from "@/lib/billing/plan-entitlements";
-import { AppAuthSettingsPanel } from "@/components/settings/app-auth-settings-panel";
+import { AppAuthCenter } from "@/components/settings/app-auth-center";
+import { PublishVisibilitySettings } from "@/components/settings/publish-visibility-settings";
+import { DashboardSectionNav, type DashboardPanelSection } from "@/components/dashboard/dashboard-section-nav";
+import { AppTemplateSettingsPanel } from "@/components/templates/app-template-settings-panel";
 import {
   DashboardApiSection,
   DashboardAutomationsSection,
@@ -109,26 +112,12 @@ type ProjectRow = Pick<
   published_subdomain?: string | null;
 };
 
-export type DashSection = DashboardSectionId;
+export type DashSection = DashboardPanelSection;
 
-const MAIN_NAV: Array<{ id: DashSection; label: string; icon: React.ElementType }> = [
-  { id: "overview", label: "Overview", icon: LayoutGrid },
-  { id: "mobile", label: "Mobile App", icon: Smartphone },
-  { id: "publish", label: "Publish", icon: Rocket },
-  { id: "integrations", label: "Integrations", icon: Plug },
-  { id: "secrets", label: "Secrets", icon: KeyRound },
-  { id: "users", label: "Users", icon: Users },
-  { id: "data", label: "Data", icon: Database },
-  { id: "analytics", label: "Insights", icon: BarChart3 },
-  { id: "marketing", label: "Growth", icon: Megaphone },
-  { id: "domains", label: "Domains", icon: Globe },
-  { id: "payments", label: "Payments", icon: CreditCard },
-  { id: "security", label: "Security", icon: Shield },
-  { id: "automations", label: "Automations", icon: Workflow },
-  { id: "logs", label: "Activity", icon: ScrollText },
-  { id: "api", label: "API", icon: Code2 },
-  { id: "settings", label: "Settings", icon: Settings },
-];
+function dashboardAccessSection(section: DashSection): DashboardSectionId {
+  if (section === "auth" || section === "template") return "settings";
+  return section;
+}
 
 const ADVANCED_TECH: Array<{ id: string; label: string; icon: React.ElementType }> = [
   { id: "tech_routes", label: "Routes", icon: Monitor },
@@ -491,7 +480,7 @@ export function AppDashboardPanel({
     { label: "Publish ready", done: publishReady },
   ];
 
-  const sectionAccess = getDashboardSectionAccess(dashProject, section, planId);
+  const sectionAccess = getDashboardSectionAccess(dashProject, dashboardAccessSection(section), planId);
 
   const overviewContent = (
     <div className="space-y-4" data-testid="overview-app-editing">
@@ -500,7 +489,6 @@ export function AppDashboardPanel({
           projectId={projectId}
           initialName={displayName}
           initialDescription={displayDesc ?? ""}
-          initialPublic={Boolean(dashProject.is_public)}
           iconSrc={iconSrc}
           onSaved={() => setSettingsRefresh((k) => k + 1)}
         />
@@ -695,6 +683,10 @@ export function AppDashboardPanel({
     </div>
   );
 
+  const pageRoutes = filePaths.filter(
+    (p) => /\/(page|pages)\//i.test(p) || /page\.(tsx|jsx|html)$/i.test(p),
+  );
+
   function renderSectionBody() {
     if (section !== "overview" && sectionAccess !== "unlocked") {
       return (
@@ -790,16 +782,8 @@ export function AppDashboardPanel({
                 projectId={projectId}
                 initialName={displayName}
                 initialDescription={displayDesc ?? ""}
-                initialPublic={Boolean(dashProject.is_public)}
                 iconSrc={iconSrc}
                 onSaved={() => setSettingsRefresh((k) => k + 1)}
-              />
-            </SectionCard>
-            <SectionCard title="Authentication">
-              <AppAuthSettingsPanel
-                projectId={projectId}
-                planTier={getEntitlements(planId).tier}
-                publicAppUrl={dashProject.preview_url}
               />
             </SectionCard>
             <DashboardSettingsWatermark
@@ -869,9 +853,53 @@ export function AppDashboardPanel({
             />
           </SectionCard>
         );
+      case "auth":
+        return (
+          <AppAuthCenter projectId={projectId} planTier={getEntitlements(planId).tier} />
+        );
+      case "template":
+        return (
+          <AppTemplateSettingsPanel
+            projectId={projectId}
+            planId={planId}
+            defaultTitle={displayName}
+            hasFiles={hasFiles}
+          />
+        );
+      case "code":
+        return (
+          <div className="mx-auto w-full max-w-2xl space-y-3">
+            <SectionCard title="Generated code">
+              <EmptyHint text={`${fileCount} file${fileCount === 1 ? "" : "s"} in your project.`} />
+              <Link
+                href={`/apps/${projectId}/builder?tab=code`}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-[12px] font-semibold text-white"
+              >
+                <Code2 className="size-3.5" />
+                Open code editor
+              </Link>
+            </SectionCard>
+            {pageRoutes.length > 0 ? (
+              <SectionCard title="Routes">
+                <ul className="space-y-1 font-mono text-[11px]">
+                  {pageRoutes.slice(0, 16).map((p) => (
+                    <li key={p} className="truncate rounded-lg bg-background/80 px-2 py-1 ring-1 ring-border/60">
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </SectionCard>
+            ) : null}
+          </div>
+        );
       case "publish":
         return (
-          <div className="space-y-3">
+          <div className="mx-auto w-full max-w-2xl space-y-3">
+            <PublishVisibilitySettings
+              projectId={projectId}
+              initialPublic={Boolean(dashProject.is_public)}
+              published={published}
+            />
             <ProductionCertificationCenter projectId={projectId} />
             {publishSetupGaps.length > 0 ? (
               <PublishSetupChecklist projectId={projectId} gaps={publishSetupGaps} />
@@ -918,10 +946,6 @@ export function AppDashboardPanel({
         return overviewContent;
     }
   }
-
-  const pageRoutes = filePaths.filter(
-    (p) => /\/(page|pages)\//i.test(p) || /page\.(tsx|jsx|html)$/i.test(p),
-  );
 
   const advancedContent = (() => {
     switch (advancedTech) {
@@ -1000,67 +1024,19 @@ export function AppDashboardPanel({
       projectId={projectId}
       defaultTitle={displayName}
     />
-    <div className="flex h-full min-h-0 bg-gradient-to-b from-[#f6f9ff] to-background" data-testid="app-dashboard-panel">
-      <nav
-        className="hidden w-44 shrink-0 flex-col gap-0.5 border-r border-border/60 bg-background/80 p-2 lg:flex"
-        data-testid="dashboard-internal-nav"
-      >
-        {MAIN_NAV.map((s) => {
-          const Icon = s.icon;
-          const access = getDashboardSectionAccess(dashProject, s.id, planId);
-          const locked = access !== "unlocked" && s.id !== "overview";
-          return (
-            <button
-              key={s.id}
-              type="button"
-              data-dashboard-section={s.id}
-              onClick={() => setSection(s.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11.5px] font-medium transition",
-                section === s.id
-                  ? "bg-accent/10 text-accent ring-1 ring-accent/20"
-                  : "text-muted-foreground hover:bg-surface hover:text-foreground",
-              )}
-            >
-              <Icon className="size-3.5 shrink-0" strokeWidth={1.65} />
-              <span className="truncate">{s.label}</span>
-              {locked ? <Lock className="ml-auto size-3 opacity-50" /> : null}
-            </button>
-          );
-        })}
-      </nav>
+    <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-[#f6f9ff] to-background lg:flex-row" data-testid="app-dashboard-panel">
+      <DashboardSectionNav
+        projectId={projectId}
+        section={section}
+        onSectionChange={setSection}
+        project={dashProject}
+        planId={planId}
+      />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div
-          className="shrink-0 border-b border-border/60 bg-background/95 backdrop-blur-sm lg:hidden"
-          data-testid="dashboard-mobile-tabs"
-        >
-          <div className="flex gap-1 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {MAIN_NAV.map((s) => {
-              const Icon = s.icon;
-              const active = section === s.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  data-dashboard-section={s.id}
-                  onClick={() => setSection(s.id)}
-                  className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold transition",
-                    active
-                      ? "bg-accent/10 text-accent ring-1 ring-accent/25"
-                      : "text-muted-foreground hover:bg-surface hover:text-foreground",
-                  )}
-                >
-                  <Icon className="size-3.5" strokeWidth={1.65} />
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4">
+          <div className="mx-auto w-full max-w-3xl lg:max-w-none">{renderSectionBody()}</div>
         </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{renderSectionBody()}</div>
       </div>
     </div>
     </>

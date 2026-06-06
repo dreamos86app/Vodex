@@ -10,7 +10,6 @@ type AppSettingsInlineFormProps = {
   projectId: string;
   initialName: string;
   initialDescription: string;
-  initialPublic: boolean;
   iconSrc: string;
   onSaved?: () => void;
 };
@@ -19,13 +18,11 @@ export function AppSettingsInlineForm({
   projectId,
   initialName,
   initialDescription,
-  initialPublic,
   iconSrc: initialIconSrc,
   onSaved,
 }: AppSettingsInlineFormProps) {
   const [name, setName] = React.useState(initialName);
   const [description, setDescription] = React.useState(initialDescription);
-  const [isPublic, setIsPublic] = React.useState(initialPublic);
   const [iconSrc, setIconSrc] = React.useState(initialIconSrc);
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
@@ -38,9 +35,8 @@ export function AppSettingsInlineForm({
   React.useEffect(() => {
     setName(initialName);
     setDescription(initialDescription);
-    setIsPublic(initialPublic);
     setIconSrc(initialIconSrc);
-  }, [initialName, initialDescription, initialPublic, initialIconSrc, projectId]);
+  }, [initialName, initialDescription, initialIconSrc, projectId]);
 
   React.useEffect(() => {
     fetch(`/api/projects/${projectId}/identity/regenerate-logo`, { method: "POST" })
@@ -109,7 +105,6 @@ export function AppSettingsInlineForm({
         body: JSON.stringify({
           app_name: name.trim(),
           short_description: description.trim(),
-          is_public: isPublic,
         }),
       });
       const body = (await res.json()) as { error?: string };
@@ -193,15 +188,6 @@ export function AppSettingsInlineForm({
               maxLength={500}
             />
           </div>
-          <label className="flex items-center gap-2 text-[12px] text-foreground">
-            <input
-              type="checkbox"
-              checked={isPublic}
-              onChange={(e) => setIsPublic(e.target.checked)}
-              className="size-4 rounded border-border"
-            />
-            List in community when published
-          </label>
         </div>
       </div>
 

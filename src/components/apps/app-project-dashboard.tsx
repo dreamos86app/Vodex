@@ -20,8 +20,8 @@ export function AppProjectDashboard({ project }: { project: ProjectRow }) {
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
-      <div className="min-h-[420px] flex-1 overflow-hidden rounded-[var(--radius-xl)] ring-1 ring-border bg-background">
-        <div className="border-b border-border bg-gradient-to-r from-accent/[0.06] to-transparent px-4 py-3">
+      <div className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-[var(--radius-xl)] bg-background ring-1 ring-border">
+        <div className="shrink-0 border-b border-border bg-gradient-to-r from-accent/[0.06] to-transparent px-4 py-3">
           <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             <LayoutGrid className="size-3.5" />
             {isImport ? "Imported app" : "App dashboard"}
@@ -36,18 +36,20 @@ export function AppProjectDashboard({ project }: { project: ProjectRow }) {
             </Link>
           </p>
         </div>
-        <div className="max-h-[min(70vh,720px)] overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col">
           {isImport && (
-            <div className="border-b border-border p-4">
+            <div className="shrink-0 border-b border-border p-4">
               <ImportPreviewStatusPanel appId={project.id} />
             </div>
           )}
+          <div className="min-h-0 flex-1">
           <AppDashboardPanel
             project={project}
             isBusy={false}
             activeSection={active}
             onSectionChange={setActive}
           />
+          </div>
         </div>
       </div>
     </div>
