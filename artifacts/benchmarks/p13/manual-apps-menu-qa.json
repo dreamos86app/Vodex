@@ -1,0 +1,15 @@
+{
+  "executed": true,
+  "pass": true,
+  "timestamp": "2026-06-07T10:07:07.296Z",
+  "project_id": null,
+  "screenshots": [],
+  "steps": [
+    {
+      "id": "apps_menu",
+      "pass": true
+    }
+  ],
+  "failed_step": null,
+  "root_cause": null
+}

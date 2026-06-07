@@ -128,6 +128,15 @@
 
 /* Vodex — atmospheric white × blue (calm, cinematic, OS-grade) */
 :root {
+  --z-page: 1;
+  --z-dropdown: 100;
+  --z-popover: 200;
+  --z-modal-backdrop: 500;
+  --z-modal: 600;
+  --z-drawer: 650;
+  --z-toast: 900;
+  --z-critical-alert: 1000;
+  --z-command-menu: 1100;
   --background: #f4f7fd;
   --foreground: #071018;
   --muted: #e8eef8;

@@ -8,6 +8,10 @@ import {
   pickUniqueBrandName,
   validateGeneratedName,
 } from "@/lib/projects/app-identity-naming-engine";
+import {
+  deriveUserFacingAppDescription,
+  sanitizeStoredDescription,
+} from "@/lib/projects/derive-user-facing-description";
 
 export type AppNameResult = {
   appName: string;
@@ -100,7 +104,7 @@ export async function generateAppName(input: {
     return {
       appName: fallback,
       slug: await ensureUniqueSlug(input.writer, slugifyAppName(fallback), input.projectId),
-      shortDescription: intent.slice(0, 240),
+      shortDescription: deriveUserFacingAppDescription({ originalPrompt: input.buildIntent, appName: fallback }),
       namingConfidence: 0.3,
       source: "fallback",
     };
@@ -145,7 +149,10 @@ export async function generateAppName(input: {
       return {
         appName,
         slug,
-        shortDescription: (parsed?.shortDescription ?? intent).trim().slice(0, 240),
+        shortDescription: sanitizeStoredDescription(parsed?.shortDescription ?? null, {
+          originalPrompt: input.buildIntent,
+          appName,
+        }),
         namingConfidence: Math.min(1, Math.max(0, parsed?.namingConfidence ?? 0.85)),
         source: "build_intent",
       };
@@ -158,7 +165,7 @@ export async function generateAppName(input: {
   return {
     appName,
     slug: await ensureUniqueSlug(input.writer, slugifyAppName(appName), input.projectId),
-    shortDescription: intent.slice(0, 240),
+    shortDescription: deriveUserFacingAppDescription({ originalPrompt: input.buildIntent, appName }),
     namingConfidence: 0.4,
     source: "fallback",
   };

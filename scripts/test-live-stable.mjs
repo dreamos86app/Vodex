@@ -215,8 +215,8 @@ async function main() {
       id: "setup:e2e-auth:headless",
       cmd: "npm",
       args: ["run", "setup:e2e-auth:headless"],
-      env: { SETUP_E2E_FORCE: "1", E2E_AUTO_PROVISION: "1" },
-      timeoutMs: 180_000,
+      env: { E2E_AUTO_PROVISION: "1" },
+      timeoutMs: 65_000,
     },
     {
       id: "setup:e2e-credits",

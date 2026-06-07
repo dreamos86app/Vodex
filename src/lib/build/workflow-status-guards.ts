@@ -1,6 +1,11 @@
 import type { BuildJobEventRow, BuildJobEventType } from "@/lib/build/build-job-events";
 import type { BuildJobPollState } from "@/hooks/use-build-job-progress";
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
+import {
+  copyForCanonicalBuildState,
+  mustNotShowBuildFailedHeadline,
+  resolveCanonicalBuildState,
+} from "@/lib/build/build-state-truth";
 
 /** Facts computed before showing any terminal status card. */
 export type BuildStatusFacts = {
@@ -327,20 +332,9 @@ export function resolveBuildRunSummary(input: {
       ].filter(Boolean),
     },
     completed: {
-      headline:
-        input.previewReady === true
-          ? "Done — preview is ready"
-          : input.uiRichnessPasses === false
-            ? "Draft saved — additional generation needed"
-            : input.appName
-              ? `Draft generated — improving ${input.appName}`
-              : "Draft generated — improving UI quality",
+      headline: "Done — preview is ready",
       bodyLines: [
-        input.previewReady === true
-          ? "Preview is live with populated dashboard sections."
-          : input.uiRichnessPasses === false
-            ? "Files are saved but the UI is still shallow — run another build pass or repair."
-            : "Files are saved. Run repair or retry preview to finish.",
+        "Preview is live with populated dashboard sections.",
         typeof filesCount === "number" && filesCount > 0
           ? `${filesCount} file${filesCount === 1 ? "" : "s"} created or updated`
           : "",
@@ -418,17 +412,45 @@ export function resolveBuildRunSummary(input: {
   }
 
   const block = copy[status] ?? copy.preview_failed;
+  const canonical = resolveCanonicalBuildState({
+    fileCount: filesCount,
+    sourceIntegrityOk: input.sourceIntegrityOk,
+    previewReady: input.previewReady === true,
+    previewFailed: input.facts.previewFailed,
+    previewPending: savedFilesOk && input.previewReady !== true && !input.facts.previewFailed,
+    queuedNextSteps: input.uiRichnessPasses === false && savedFilesOk,
+    runtimeFailed: status === "failed_before_generation" && !savedFilesOk,
+  });
+  const canonicalCopy = copyForCanonicalBuildState(canonical, {
+    appName: input.appName,
+    fileCount: filesCount,
+  });
+
+  let headline = mustNotShowBuildFailedHeadline(savedFilesOk, block.headline);
+  let bodyLines = block.bodyLines;
+
+  if (savedFilesOk && status !== "completed" && status !== "preview_ready") {
+    headline = canonicalCopy.headline;
+    bodyLines = canonicalCopy.bodyLines;
+  }
+  if (savedFilesOk && /draft saved.*additional generation needed/i.test(headline)) {
+    headline = canonicalCopy.headline;
+    bodyLines = canonicalCopy.bodyLines;
+  }
+
   const variant: BuildRunSummaryResolved["variant"] =
     status === "completed" || status === "preview_ready"
       ? "completed"
       : status === "partial_credit_stop"
         ? "partial"
-        : "failed";
+        : savedFilesOk
+          ? "partial"
+          : "failed";
 
   return {
     status,
-    headline: block.headline,
-    bodyLines: block.bodyLines,
+    headline,
+    bodyLines,
     showRefundLine,
     showRepairActions,
     showPreviewActions,
@@ -463,7 +485,13 @@ export function failureKindForPersist(input: {
   return "failed_after_generation";
 }
 
-export function userSafeFailureTitle(kind: NonNullable<BuildStatusFacts["failureKind"]>): string {
+export function userSafeFailureTitle(
+  kind: NonNullable<BuildStatusFacts["failureKind"]>,
+  hasFiles = false,
+): string {
+  if (hasFiles && kind === "failed_before_generation") {
+    return "Build saved — preview is being prepared";
+  }
   switch (kind) {
     case "failed_before_generation":
       return "Couldn't start the build";

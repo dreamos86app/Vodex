@@ -1,6 +1,6 @@
 # P1.3 Benchmark Scoreboard
 
-Generated: 2026-06-06T22:05:43.449Z
+Generated: 2026-06-07T10:15:46.449Z
 
 | Category | Prev | New | Pass | Cap reason |
 | --- | ---: | ---: | --- | --- |

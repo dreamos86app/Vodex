@@ -213,10 +213,13 @@ function mergeIncomingBuildFiles(
       filePath: path,
       ...(fileLineMeta ? { fileLineMeta } : {}),
     };
+    const countDetail = fileLineMeta
+      ? `+${fileLineMeta.added_lines} -${fileLineMeta.removed_lines}`
+      : path;
     if (prev) {
-      trackFn(events, "editing", `Updated ${path}`, path, meta);
+      trackFn(events, "editing", `Modified ${path}`, countDetail, meta);
     } else {
-      trackFn(events, "writing", `Created ${path}`, path, meta);
+      trackFn(events, "writing", `Created ${path}`, countDetail, meta);
     }
     merged.set(f.path, f);
   }

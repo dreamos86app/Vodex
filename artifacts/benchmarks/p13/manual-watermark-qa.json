@@ -1,0 +1,15 @@
+{
+  "executed": true,
+  "pass": true,
+  "timestamp": "2026-06-07T10:06:43.856Z",
+  "project_id": "7e344622-e0ce-4eb7-8860-48e4dcc37184",
+  "screenshots": [],
+  "steps": [
+    {
+      "id": "watermark_settings",
+      "pass": true
+    }
+  ],
+  "failed_step": null,
+  "root_cause": null
+}

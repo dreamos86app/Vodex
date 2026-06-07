@@ -103,8 +103,15 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
   const Icon = isDelete ? FileMinus : isCreate ? FilePlus : FilePen;
   const prefix = isDelete ? "−" : isCreate ? "+" : "~";
   const path = event.filePath!;
-  const hasCounts =
-    typeof event.addedLines === "number" || typeof event.removedLines === "number";
+  const parsedFromSubtitle = (() => {
+    const d = event.subtitle ?? "";
+    const m = d.match(/\+(\d+)\s*-\s*(\d+)/);
+    if (!m) return {};
+    return { added: Number(m[1]), removed: Number(m[2]) };
+  })();
+  const addedLines = event.addedLines ?? parsedFromSubtitle.added;
+  const removedLines = event.removedLines ?? parsedFromSubtitle.removed;
+  const hasCounts = typeof addedLines === "number" || typeof removedLines === "number";
 
   return (
     <motion.div
@@ -124,8 +131,8 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
       <code className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground">{path}</code>
       {hasCounts && !isDelete ? (
         <AnimatedLineDelta
-          added={event.addedLines}
-          removed={event.removedLines}
+          added={addedLines}
+          removed={removedLines}
           active={event.status === "active"}
         />
       ) : null}
@@ -318,6 +325,20 @@ export function AgentWorkflowStream({
     ? timeline.filter((ev) => ev.stableKey !== active.stableKey)
     : timeline;
 
+  const fileDiffSummary = React.useMemo(() => {
+    let files = 0;
+    let added = 0;
+    let removed = 0;
+    for (const ev of timeline) {
+      if (!isFileEvent(ev)) continue;
+      files += 1;
+      added += ev.addedLines ?? 0;
+      removed += ev.removedLines ?? 0;
+    }
+    if (files === 0) return null;
+    return { files, added, removed };
+  }, [timeline]);
+
   const streamRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!working || !active) return;
@@ -348,6 +369,16 @@ export function AgentWorkflowStream({
           </li>
         ) : null}
       </ul>
+
+      {fileDiffSummary ? (
+        <p
+          className="mr-6 px-1 text-[10.5px] font-medium text-muted-foreground sm:mr-10"
+          data-testid="workflow-file-diff-summary"
+        >
+          {fileDiffSummary.files} file{fileDiffSummary.files === 1 ? "" : "s"} changed · +
+          {fileDiffSummary.added} -{fileDiffSummary.removed}
+        </p>
+      ) : null}
 
       {failed ? (
         <div className="mr-6 space-y-2 sm:mr-10">

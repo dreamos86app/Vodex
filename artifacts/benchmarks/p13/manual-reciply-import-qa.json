@@ -1,0 +1,53 @@
+{
+  "executed": true,
+  "pass": true,
+  "timestamp": "2026-06-07T09:54:51.685Z",
+  "project_id": "7c385765-2601-43d0-ab43-2f49b47a68e9",
+  "screenshots": [
+    "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-9d498-e-A-—-open-imported-project-chromium\\A.png",
+    "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-dcf8d-view-blocked-question-only--chromium\\B.png",
+    "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-cb123-locked-repair-no-blueprint--chromium\\C.png",
+    "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-160d3-repare-imported-app-preview-chromium\\D.png",
+    "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-fc502-hat-is-a-CRM-question-only--chromium\\E.png"
+  ],
+  "steps": [
+    {
+      "id": "A_open_project",
+      "pass": true,
+      "detail": "Live Route Fixture",
+      "screenshot": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-9d498-e-A-—-open-imported-project-chromium\\A.png"
+    },
+    {
+      "id": "B_why_preview_blocked",
+      "pass": true,
+      "screenshot": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-dcf8d-view-blocked-question-only--chromium\\B.png"
+    },
+    {
+      "id": "C_fix_preview_repair",
+      "pass": true,
+      "screenshot": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-cb123-locked-repair-no-blueprint--chromium\\C.png"
+    },
+    {
+      "id": "D_prepare_preview",
+      "pass": true,
+      "detail": "preview_iframe_already_present",
+      "screenshot": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-160d3-repare-imported-app-preview-chromium\\D.png"
+    },
+    {
+      "id": "E_what_is_crm",
+      "pass": true,
+      "screenshot": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-fc502-hat-is-a-CRM-question-only--chromium\\E.png"
+    },
+    {
+      "id": "F_create_crm",
+      "pass": true,
+      "detail": "classify-intent shouldCreateProject=true"
+    },
+    {
+      "id": "G_zip_scan_classification",
+      "pass": true
+    }
+  ],
+  "failed_step": null,
+  "root_cause": null
+}

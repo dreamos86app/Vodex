@@ -63,7 +63,7 @@ test.describe("P1.3.8 — imported Reciply manual QA @live", () => {
   });
 
   test.afterAll(() => {
-    writeP138Artifact("imported-reciply-manual-qa.json", finalizeArtifact(steps, projectId || null));
+    writeP138Artifact("manual-reciply-import-qa.json", finalizeArtifact(steps, projectId || null));
   });
 
   test("A — open imported project", async ({ page, liveGate }, testInfo) => {

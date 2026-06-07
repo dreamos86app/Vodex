@@ -1,0 +1,20 @@
+{
+  "executed": true,
+  "pass": true,
+  "timestamp": "2026-06-07T10:07:24.741Z",
+  "project_id": "7e344622-e0ce-4eb7-8860-48e4dcc37184",
+  "screenshots": [],
+  "steps": [
+    {
+      "id": "mobile_setup",
+      "pass": true
+    },
+    {
+      "id": "overlay_z",
+      "pass": true,
+      "detail": "--z-critical-alert=1000"
+    }
+  ],
+  "failed_step": null,
+  "root_cause": null
+}

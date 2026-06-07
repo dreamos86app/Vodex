@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { WorkflowRunStatus } from "@/lib/build/workflow-status-guards";
+import { mustNotShowBuildFailedHeadline } from "@/lib/build/build-state-truth";
 
 export type BuildRunSummaryVariant = "completed" | "partial" | "failed";
 
@@ -52,17 +53,20 @@ export function BuildRunSummaryCard({
   const partial = variant === "partial" || status === "partial_credit_stop";
   const failed = variant === "failed";
 
-  const title =
+  const hasFiles = typeof filesCount === "number" && filesCount > 0;
+  const title = mustNotShowBuildFailedHeadline(
+    hasFiles,
     headline ??
-    (failed
-      ? status === "preview_failed"
-        ? "App files were created, but preview needs attention"
-        : status === "failed_before_generation"
-        ? "Couldn't start the build"
-        : "Build needs attention"
-      : partial
-        ? "Partial progress saved"
-        : "Build complete");
+      (failed
+        ? status === "preview_failed"
+          ? "Files were saved. Preview needs repair."
+          : status === "failed_before_generation"
+            ? "Couldn't start the build"
+            : "Build needs attention"
+        : partial
+          ? "Build saved — next steps queued"
+          : "Build complete"),
+  );
 
   const lines =
     bodyLines.length > 0

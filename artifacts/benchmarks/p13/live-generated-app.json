@@ -1,17 +1,17 @@
 {
-  "capturedAt": "2026-06-06T22:03:04.331Z",
+  "capturedAt": "2026-06-07T10:14:10.037Z",
   "pass": true,
-  "project_id": "5603b030-b66c-4432-9c70-edaba03d8d2d",
+  "project_id": "1ef49ee6-0468-4387-9e2b-5f81b1289e80",
   "build_job_id": null,
-  "archetype": "restaurant_inventory",
-  "scaffold_id": "restaurant_inventory",
+  "archetype": "unknown",
+  "scaffold_id": "unknown",
   "files_persisted": 26,
   "source_integrity_score": null,
   "source_integrity_ok": true,
   "preview_status": null,
-  "preview_session_id": "64c3081a-fef9-4564-80d4-d6460ca98fd8",
+  "preview_session_id": "03aee3c9-4401-4d23-8e96-3433d3373477",
   "slug": null,
-  "publish_url": "https://vodex-mozgfgook-noamrubin14-7781s-projects.vercel.app",
+  "publish_url": "https://vodex-b8lmdviw4-noamrubin14-7781s-projects.vercel.app",
   "failure_kind": null,
   "failure_detail": null
 }

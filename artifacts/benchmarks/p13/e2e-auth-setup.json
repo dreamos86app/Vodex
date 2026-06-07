@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-06-07T10:10:05.094Z",
+  "base_url": "http://localhost:3000",
+  "force": false,
+  "auto_provision": true,
+  "duration_ms": 18594,
+  "pass": true,
+  "reused": true,
+  "credits_status": 200
+}

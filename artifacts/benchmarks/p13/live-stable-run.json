@@ -1,29 +1,80 @@
 {
   "server_started_by_runner": true,
-  "server_pid": "20840",
+  "server_pid": "19992",
   "server_ownership_mode": "runner_started",
   "base_url": "http://localhost:3000",
-  "total_runtime_ms": 241967,
+  "total_runtime_ms": 391664,
   "tests_run": [
     {
       "id": "setup:e2e-auth:headless",
-      "pass": false,
-      "exitCode": 1,
-      "durationMs": 181207,
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 19684,
+      "category": null
+    },
+    {
+      "id": "setup:e2e-credits",
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 3937,
+      "category": null
+    },
+    {
+      "id": "verify:preview-metadata-consistency",
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 3288,
+      "category": "preview"
+    },
+    {
+      "id": "live:generated-app",
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 236264,
+      "category": "generated_app"
+    },
+    {
+      "id": "live:public-rendering",
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 15389,
+      "category": "public_rendering"
+    },
+    {
+      "id": "live:zip-import",
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 33628,
+      "category": "zip_import"
+    },
+    {
+      "id": "live:publish-state",
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 564,
+      "category": "publish"
+    },
+    {
+      "id": "live:mobile-smoke",
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 19446,
+      "category": "mobile"
+    },
+    {
+      "id": "benchmark:p13-scoreboard",
+      "pass": true,
+      "exitCode": 0,
+      "durationMs": 20921,
       "category": null
     }
   ],
-  "tests_passed": 0,
-  "tests_failed": 1,
-  "first_failure": {
-    "step": "setup:e2e-auth:headless",
-    "exitCode": 1,
-    "stderr": "",
-    "stdout": "\n> vodex-platform@0.1.0 setup:e2e-auth:headless\n> node scripts/setup-e2e-auth-headless.mjs\n\n\n=== setup:e2e-auth (headless) ===\n\n✓ E2E user already exists (e2e-live@dreamos86.test) — resetting password for local proof\n"
-  },
+  "tests_passed": 9,
+  "tests_failed": 0,
+  "first_failure": null,
   "server_crashed": false,
   "server_recoveries": [],
   "failed_categories": [],
-  "final_go_no_go": "NO-GO",
-  "generatedAt": "2026-06-07T08:42:41.114Z"
+  "final_go_no_go": "GO",
+  "generatedAt": "2026-06-07T10:09:14.820Z"
 }

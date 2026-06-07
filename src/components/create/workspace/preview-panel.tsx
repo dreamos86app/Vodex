@@ -379,23 +379,26 @@ export function PreviewPanel({
         {showIframe && (
           <div
             className={cn(
-              "absolute inset-0 flex items-center justify-center overflow-auto p-3",
-              viewport !== "desktop" && "bg-black/85",
+              "absolute inset-0 overflow-hidden",
+              viewport !== "desktop" && "flex items-center justify-center overflow-auto bg-black/85 p-3",
             )}
+            data-testid="preview-fit-canvas"
           >
             <AnimatePresence mode="wait">
               <motion.div
                 key={reloadKey}
-                initial={{ opacity: 0, scale: 0.97 }}
+                initial={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.97 }}
+                exit={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.97 }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  "relative flex max-h-full flex-col overflow-hidden rounded-[var(--radius-lg)] bg-white shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border",
-                  viewport === "desktop" && "h-full min-h-[480px] w-full max-w-[1440px]",
-                  viewport === "tablet" && "h-[min(100%,900px)] w-[768px] max-w-[calc(100%-24px)]",
+                  "relative flex flex-col overflow-hidden bg-white",
+                  viewport === "desktop" &&
+                    "absolute inset-0 h-full w-full rounded-none shadow-none ring-0",
+                  viewport === "tablet" &&
+                    "max-h-full w-[min(768px,calc(100%-24px))] rounded-[var(--radius-lg)] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border",
                   viewport === "mobile" &&
-                    "z-10 h-[min(100%,844px)] max-h-[90vh] w-[390px] max-w-[calc(100%-24px)] shadow-[0_0_40px_rgba(0,0,0,0.5)]",
+                    "z-10 max-h-[90vh] w-[min(390px,calc(100%-24px))] rounded-[var(--radius-lg)] shadow-[0_0_40px_rgba(0,0,0,0.5)] ring-1 ring-border",
                 )}
               >
                 {viewport === "mobile" && (

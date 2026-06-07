@@ -82,21 +82,26 @@ export function AppSettingsDashboardPanel({
         />
       </SectionCard>
 
-      <SectionCard title="Branding" description="How your published app presents itself to end users.">
-        <div className="rounded-xl bg-gradient-to-br from-muted/40 to-background p-4 ring-1 ring-border/60">
-          <p className="text-[12px] font-semibold text-foreground">Published footer preview</p>
-          <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-900 px-4 py-3 text-white">
-            <span className="text-[12px] opacity-80">Your app content</span>
-            {!watermarkDisabled || !canHideWatermark ? (
-              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px]">Made with Vodex</span>
-            ) : (
-              <span className="text-[10px] text-emerald-300">No watermark</span>
-            )}
+      <SectionCard title="Watermark" description="Small “Made with Vodex” footer link on your published app.">
+        <div className="rounded-xl bg-muted/30 p-4 ring-1 ring-border/60">
+          <p className="text-[11px] font-medium text-muted-foreground">Published footer preview</p>
+          <div className="mt-3 min-h-[72px] rounded-lg bg-background px-4 py-6 text-center ring-1 ring-border/50">
+            <span className="text-[11px] text-muted-foreground">Your app content</span>
+            <div className="mt-6 border-t border-border/40 pt-3">
+              {!watermarkDisabled || !canHideWatermark ? (
+                <a
+                  href="https://vodex.dev"
+                  className="text-[12px] font-medium text-foreground/80 underline-offset-2 hover:underline"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  Made with Vodex
+                </a>
+              ) : (
+                <span className="text-[11px] text-emerald-600">Watermark hidden</span>
+              )}
+            </div>
           </div>
         </div>
-      </SectionCard>
-
-      <SectionCard title="Watermark" description="Control the “Made with Vodex” badge on your live published app.">
         {watermarkLoading ? (
           <div className="h-16 animate-pulse rounded-xl bg-muted/40" />
         ) : canHideWatermark ? (

@@ -2,12 +2,12 @@
   "executed": true,
   "status": "EXECUTED",
   "pass": true,
-  "timestamp": "2026-06-06T22:03:55.820Z",
+  "timestamp": "2026-06-07T10:15:02.369Z",
   "environment": {
     "baseUrl": "http://localhost:3000",
     "e2eRunLive": true
   },
-  "projectId": "9c534acf-1299-4d89-b2a1-bbfc88555ca1",
+  "projectId": "f33df4a3-e6c6-4920-9fff-aa7cab593b90",
   "route": "/api/projects/import-zip",
   "failureReason": null
 }

@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { PlaceholderRepairCard, type PlaceholderFindingUi } from "@/components/publish/placeholder-repair-card";
 import type { PublishReadinessCard } from "@/components/publish/publish-readiness-cards";
 import { PublishReadinessCompact } from "@/components/publish/publish-readiness-compact";
+import { filterWebPublishBlockers } from "@/lib/publish/publish-readiness-separation";
 import { MobileSigningConfigDrawer } from "@/components/mobile/mobile-signing-config-drawer";
 import { PublishSuccessOverlay } from "@/components/publish/publish-success-overlay";
 import { fetchDedupe, getCached, invalidateCache } from "@/lib/cache/fetch-dedupe";
@@ -310,8 +311,9 @@ export function PublishModal({
   const customAllowed = getEntitlements(planId).canUseCustomDomain;
   const canPublish = Boolean(readiness?.canPublishWeb ?? readiness?.artifactsReady);
   const webPublishLocked = !projectId || (!canPublish && !artifactsReady);
+  const webBlockers = filterWebPublishBlockers(readiness?.blockers ?? []);
   const publishBlockerLabel =
-    readiness?.blockers?.find((b) => !b.includes("placeholder_content:")) ??
+    webBlockers.find((b) => !b.includes("placeholder_content:")) ??
     (readiness?.placeholderFindings?.length
       ? "Placeholder content found — fix before publish"
       : readiness?.fileCount === 0 && readiness?.buildStatus === "completed"
@@ -407,9 +409,16 @@ export function PublishModal({
       card("integrations", "Integrations", integrationsOk, !integrationsOk),
       card("payments", "Payments", paymentsOk, !paymentsOk),
       card("security", "Security", !hasBlocker(/security/i), true),
-      card("mobile", "Mobile", mobileGatePassed, !mobileGatePassed),
     ];
-  }, [loading, readiness, mobileGatePassed]);
+  }, [loading, readiness]);
+
+  const mobileReadinessRows = React.useMemo(
+    () => [
+      { id: "signing", label: "Signing configured", status: mobileGatePassed ? ("verified" as const) : ("blocker" as const) },
+      { id: "version", label: "Version & build", status: mobileGatePassed ? ("verified" as const) : ("blocker" as const) },
+    ],
+    [mobileGatePassed],
+  );
 
   return (
     <>
@@ -426,7 +435,7 @@ export function PublishModal({
       />
       {!open || typeof document === "undefined" ? null : createPortal(
     <div
-      className="fixed inset-0 z-[10050] flex items-end justify-center bg-foreground/25 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[var(--z-modal-backdrop)] flex items-end justify-center bg-foreground/25 p-4 backdrop-blur-sm sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="publish-title"
@@ -535,7 +544,20 @@ export function PublishModal({
           className="relative min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4"
           data-testid="publish-modal-body"
         >
-          {projectId ? <PublishReadinessCompact cards={readinessCards} /> : null}
+          {projectId ? (
+            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Web publish readiness</p>
+              <PublishReadinessCompact cards={readinessCards} />
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Mobile packaging (does not block web)</p>
+              <PublishReadinessCompact
+                cards={[]}
+                extraRows={mobileReadinessRows.map((r) => ({
+                  ...r,
+                  reason: "Configure in Mobile App tab before store submit",
+                }))}
+              />
+            </div>
+          ) : null}
           {posting && (
             <div
               className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/92 px-6 backdrop-blur-sm"

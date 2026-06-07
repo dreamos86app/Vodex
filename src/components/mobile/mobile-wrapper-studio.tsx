@@ -139,7 +139,12 @@ export function MobileWrapperStudio({
   const canView = entitlements.mobile_wrapper_view;
   const locked = !entitlements.mobile_android_build && !entitlements.mobile_ios_build;
 
-  const [loading, setLoading] = React.useState(true);
+  const cacheKey = `mobile-config:${projectId}`;
+  const [loading, setLoading] = React.useState(() => {
+    if (typeof window === "undefined") return true;
+    return !sessionStorage.getItem(cacheKey);
+  });
+  const [slowLoad, setSlowLoad] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [scanning, setScanning] = React.useState(false);
   const [building, setBuilding] = React.useState<null | "android" | "ios">(null);
@@ -165,7 +170,8 @@ export function MobileWrapperStudio({
   const [engineScore, setEngineScore] = React.useState<number | null>(null);
 
   const load = React.useCallback(async () => {
-    setLoading(true);
+    if (!sessionStorage.getItem(cacheKey)) setLoading(true);
+    const slowTimer = window.setTimeout(() => setSlowLoad(true), 2500);
     try {
       const [cfgRes, jobsRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/mobile/config`, { credentials: "include" }),
@@ -196,6 +202,11 @@ export function MobileWrapperStudio({
           });
         }
         setConfig(migrated);
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), config: migrated }));
+        } catch {
+          /* ignore */
+        }
         setWrapperType(migrated.wrapper_type ?? "capacitor");
         const meta =
           migrated.meta && typeof migrated.meta === "object"
@@ -224,9 +235,11 @@ export function MobileWrapperStudio({
       }
       setJobs(jobsJson.jobs ?? []);
     } finally {
+      window.clearTimeout(slowTimer);
+      setSlowLoad(false);
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, cacheKey, projectName]);
 
   React.useEffect(() => {
     void load();
@@ -402,11 +415,28 @@ export function MobileWrapperStudio({
     );
   }
 
-  if (loading) {
+  if (loading && !Object.keys(config).length) {
     return (
-      <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        <span className="text-[13px]">Loading mobile setup…</span>
+      <div className="flex h-full flex-col gap-4 p-4" data-testid="mobile-setup-skeleton">
+        <div className="h-16 animate-pulse rounded-2xl bg-muted/50" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="h-28 animate-pulse rounded-xl bg-muted/40" />
+          <div className="h-28 animate-pulse rounded-xl bg-muted/40" />
+        </div>
+        <div className="h-40 animate-pulse rounded-xl bg-muted/30" />
+        {slowLoad ? (
+          <div className="flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2 text-[12px] text-amber-900">
+            <span>Still loading mobile setup…</span>
+            <button type="button" className="font-semibold underline" onClick={() => void load()}>
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Loading mobile setup…
+          </div>
+        )}
       </div>
     );
   }

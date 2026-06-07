@@ -79,7 +79,7 @@ export function Toaster() {
   return createPortal(
     <div
       aria-label="Notifications"
-      className="pointer-events-none fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-2"
+      className="pointer-events-none fixed bottom-6 right-6 z-[var(--z-critical-alert)] flex flex-col items-end gap-2"
     >
       <AnimatePresence initial={false} mode="sync">
         {toasts.map((t) => (

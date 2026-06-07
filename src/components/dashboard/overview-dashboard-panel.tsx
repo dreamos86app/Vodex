@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchDedupe } from "@/lib/cache/fetch-dedupe";
+import { OverviewPreviewThumbnailControl } from "@/components/dashboard/overview-preview-thumbnail-control";
 
 type HealthLabel = "Excellent" | "Good" | "Needs Attention" | "Critical";
 
@@ -231,6 +232,8 @@ export function OverviewDashboardPanel({
           </div>
         </div>
       </motion.div>
+
+      <OverviewPreviewThumbnailControl projectId={projectId} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatusCard icon={Eye} title="Preview" value={data?.preview.label ?? "—"} ok={data?.preview.ok} onClick={() => onNavigate?.("publish")} />

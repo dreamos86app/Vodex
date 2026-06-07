@@ -19,6 +19,7 @@ import {
   authFileExists,
   readAuthFile,
   playwrightBrowsersInstalled,
+  cookiesHeader,
 } from "./lib/e2e-live.mjs";
 import {
   isTlsRejectDisabled,
@@ -28,6 +29,8 @@ import {
 } from "./lib/tls-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
+const AUTH_ARTIFACT_PATH = join(ROOT, "artifacts", "benchmarks", "p13", "e2e-auth-setup.json");
+const HARD_TIMEOUT_MS = 60_000;
 
 function loadEnvLocal() {
   const p = join(ROOT, ".env.local");
@@ -53,21 +56,113 @@ let password = env.E2E_TEST_PASSWORD?.trim();
 const autoProvision = env.E2E_AUTO_PROVISION === "1";
 const baseUrl = getBaseUrl();
 const force = env.SETUP_E2E_FORCE === "1" || process.argv.includes("--force");
+const setupStartedAt = Date.now();
+
+function writeAuthArtifact(payload) {
+  fs.mkdirSync(dirname(AUTH_ARTIFACT_PATH), { recursive: true });
+  fs.writeFileSync(
+    AUTH_ARTIFACT_PATH,
+    JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        base_url: baseUrl,
+        force,
+        auto_provision: autoProvision,
+        duration_ms: Date.now() - setupStartedAt,
+        ...payload,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+function failAuth(reason, extra = {}) {
+  writeAuthArtifact({ pass: false, reason, ...extra });
+  console.error(`✗ ${reason}`);
+  process.exit(1);
+}
+
+function assertWithinHardTimeout(phase) {
+  if (Date.now() - setupStartedAt > HARD_TIMEOUT_MS) {
+    failAuth(`hard_timeout_exceeded during ${phase} (max ${HARD_TIMEOUT_MS / 1000}s)`, {
+      phase,
+      timeout_ms: HARD_TIMEOUT_MS,
+    });
+  }
+}
+
+async function validateCreditsSession() {
+  if (!authFileExists()) return { ok: false, reason: "auth_file_missing" };
+  const auth = readAuthFile();
+  if (!auth.ok) return { ok: false, reason: "auth_file_invalid", errors: auth.errors };
+  const cookie = cookiesHeader(auth.json);
+  if (!cookie) return { ok: false, reason: "no_cookies" };
+  if (!(await serverUp())) return { ok: false, reason: "server_down" };
+  try {
+    const r = await fetch(`${baseUrl}/api/credits`, {
+      headers: { Cookie: cookie },
+      redirect: "manual",
+    });
+    if (r.status === 401) return { ok: false, reason: "session_expired", status: r.status };
+    if (r.status >= 500) return { ok: false, reason: "server_error", status: r.status };
+    return { ok: true, status: r.status, bytes: auth.meta?.bytes, cookies: auth.meta?.cookieCount };
+  } catch (err) {
+    return { ok: false, reason: "fetch_failed", detail: String(err?.message ?? err) };
+  }
+}
+
+function supabaseAdminConfig() {
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SECRET_KEY;
+  if (!supabaseUrl?.startsWith("http") || !serviceKey) return null;
+  return { supabaseUrl, serviceKey };
+}
+
+async function resetE2eUserPassword(reason) {
+  const admin = supabaseAdminConfig();
+  if (!admin) return false;
+  email = email || "e2e-live@dreamos86.test";
+  password = password || `E2e-${crypto.randomUUID().slice(0, 12)}!Aa1`;
+  assertWithinHardTimeout("password_reset");
+  const listRes = await safeFetch(`${admin.supabaseUrl}/auth/v1/admin/users?page=1&per_page=200`, {
+    headers: { apikey: admin.serviceKey, Authorization: `Bearer ${admin.serviceKey}` },
+    signal: AbortSignal.timeout(Math.max(5_000, HARD_TIMEOUT_MS - (Date.now() - setupStartedAt))),
+  });
+  if (!listRes.ok) return false;
+  const body = await listRes.json();
+  const match = (body?.users ?? []).find(
+    (u) => String(u.email ?? "").toLowerCase() === email.toLowerCase(),
+  );
+  if (!match?.id) return false;
+  const updateRes = await safeFetch(`${admin.supabaseUrl}/auth/v1/admin/users/${match.id}`, {
+    method: "PUT",
+    headers: {
+      apikey: admin.serviceKey,
+      Authorization: `Bearer ${admin.serviceKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ password, email_confirm: true }),
+    signal: AbortSignal.timeout(Math.max(5_000, HARD_TIMEOUT_MS - (Date.now() - setupStartedAt))),
+  });
+  if (!updateRes.ok) return false;
+  console.log(`✓ Reset E2E password (${reason})`);
+  return true;
+}
 
 async function ensureProvisionedUser() {
   if (!autoProvision) return;
   email = email || "e2e-live@dreamos86.test";
   password = password || `E2e-${crypto.randomUUID().slice(0, 12)}!Aa1`;
 
-  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SECRET_KEY;
-  if (!supabaseUrl?.startsWith("http") || !serviceKey) {
+  const admin = supabaseAdminConfig();
+  if (!admin) {
     console.error("✗ E2E_AUTO_PROVISION=1 requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY");
     process.exit(1);
   }
 
-  const listRes = await safeFetch(`${supabaseUrl}/auth/v1/admin/users?page=1&per_page=200`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+  const listRes = await safeFetch(`${admin.supabaseUrl}/auth/v1/admin/users?page=1&per_page=200`, {
+    headers: { apikey: admin.serviceKey, Authorization: `Bearer ${admin.serviceKey}` },
   });
   let existingId = null;
   if (listRes.ok) {
@@ -77,29 +172,20 @@ async function ensureProvisionedUser() {
     );
     existingId = match?.id ?? null;
     if (existingId) {
-      console.log(`✓ E2E user already exists (${email}) — resetting password for local proof`);
-      const updateRes = await safeFetch(`${supabaseUrl}/auth/v1/admin/users/${existingId}`, {
-        method: "PUT",
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ password, email_confirm: true }),
-      });
-      if (!updateRes.ok) {
-        console.error(`✗ Failed to reset E2E user password (HTTP ${updateRes.status})`);
-        process.exit(1);
+      if (force) {
+        await resetE2eUserPassword("SETUP_E2E_FORCE=1");
+      } else {
+        console.log(`✓ E2E user already exists (${email}) — skipping password reset`);
       }
       return;
     }
   }
 
-  const createRes = await safeFetch(`${supabaseUrl}/auth/v1/admin/users`, {
+  const createRes = await safeFetch(`${admin.supabaseUrl}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+      apikey: admin.serviceKey,
+      Authorization: `Bearer ${admin.serviceKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ email, password, email_confirm: true }),
@@ -165,10 +251,15 @@ if (force && fs.existsSync(AUTH_PATH)) {
 }
 
 if (authFileExists() && !force) {
-  const auth = readAuthFile();
-  console.log(`✓ .playwright-auth.json already exists (${auth.meta?.bytes ?? "?"} bytes)`);
-  const v = spawnSync("node", ["scripts/verify-e2e-auth.mjs"], { cwd: ROOT, shell: true, stdio: "inherit" });
-  process.exit(v.status ?? 0);
+  const session = await validateCreditsSession();
+  if (session.ok) {
+    console.log(
+      `✓ Reusing .playwright-auth.json (${session.bytes ?? "?"} bytes, GET /api/credits → ${session.status})`,
+    );
+    writeAuthArtifact({ pass: true, reused: true, credits_status: session.status });
+    process.exit(0);
+  }
+  console.log(`ℹ Existing auth invalid (${session.reason}) — re-authenticating`);
 }
 
 async function writeApiAuthFallback() {
@@ -215,6 +306,27 @@ async function writeApiAuthFallback() {
   return true;
 }
 
+async function verifyAuthFileOrFail() {
+  const verifyApi = spawnSync("node", [join(scriptDir, "verify-e2e-auth.mjs")], {
+    cwd: ROOT,
+    shell: true,
+    stdio: "inherit",
+  });
+  return verifyApi.status === 0;
+}
+
+if (await writeApiAuthFallback() && (await verifyAuthFileOrFail())) {
+  writeAuthArtifact({ pass: true, reused: false, method: "api_sign_in" });
+  process.exit(0);
+}
+
+if (autoProvision && (await resetE2eUserPassword("credential_mismatch_recovery"))) {
+  if (await writeApiAuthFallback() && (await verifyAuthFileOrFail())) {
+    writeAuthArtifact({ pass: true, reused: false, method: "api_sign_in_after_reset" });
+    process.exit(0);
+  }
+}
+
 console.log(`Signing in at ${baseUrl}/auth/login (headless)…\n`);
 
 const browser = await chromium.launch({ headless: true });
@@ -228,7 +340,7 @@ try {
   await page.click('button[type="submit"]:not([disabled])');
 
   // Next.js client router.replace does not always emit a navigation event Playwright can wait on.
-  const loginDeadline = Date.now() + 60_000;
+  const loginDeadline = Math.min(Date.now() + 45_000, setupStartedAt + HARD_TIMEOUT_MS);
   let leftLogin = false;
   while (Date.now() < loginDeadline) {
     const pathname = new URL(page.url()).pathname;
@@ -242,9 +354,17 @@ try {
       .textContent()
       .catch(() => "");
     if (errText?.trim()) {
-      console.error("✗ Login failed — check E2E credentials or Supabase auth.");
-      console.error(`  UI: ${errText.trim().slice(0, 200)}`);
-      process.exit(1);
+      if (/incorrect|invalid|password/i.test(errText) && autoProvision) {
+        console.log("ℹ UI login rejected credentials — one-time password recovery…");
+        await browser.close();
+        if (await resetE2eUserPassword("ui_login_mismatch")) {
+          if (await writeApiAuthFallback() && (await verifyAuthFileOrFail())) {
+            writeAuthArtifact({ pass: true, reused: false, method: "api_sign_in_after_ui_mismatch" });
+            process.exit(0);
+          }
+        }
+      }
+      failAuth("ui_login_failed", { ui_error: errText.trim().slice(0, 200) });
     }
     await page.waitForTimeout(500);
   }
@@ -252,16 +372,17 @@ try {
   if (!leftLogin) {
     console.warn("⚠ Headless UI login timed out — trying API auth fallback…");
     await browser.close();
-    if (!(await writeApiAuthFallback())) {
-      console.error("✗ Headless login timed out and API auth fallback failed.");
-      process.exit(1);
+    if (
+      !(await writeApiAuthFallback()) &&
+      !(autoProvision && (await resetE2eUserPassword("browser_timeout_recovery")) && (await writeApiAuthFallback()))
+    ) {
+      failAuth("headless_login_timeout_and_api_fallback_failed", { phase: "browser_login" });
     }
-    const verifyFallback = spawnSync("node", [join(scriptDir, "verify-e2e-auth.mjs")], {
-      cwd: ROOT,
-      shell: true,
-      stdio: "inherit",
-    });
-    process.exit(verifyFallback.status ?? 1);
+    if (!(await verifyAuthFileOrFail())) {
+      failAuth("auth_verify_failed_after_browser_timeout_recovery", { phase: "browser_login" });
+    }
+    writeAuthArtifact({ pass: true, reused: false, method: "api_sign_in_after_browser_timeout" });
+    process.exit(0);
   }
 
   await page.goto(`${baseUrl}/create`, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -292,4 +413,7 @@ const verify = spawnSync("node", [join(scriptDir, "verify-e2e-auth.mjs")], {
   shell: true,
   stdio: "inherit",
 });
+if (verify.status === 0) {
+  writeAuthArtifact({ pass: true, reused: false, method: "headless_login" });
+}
 process.exit(verify.status ?? 1);

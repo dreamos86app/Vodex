@@ -1,18 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Settings2 } from "lucide-react";
-import { AppAuthSettingsPanel } from "@/components/settings/app-auth-settings-panel";
-import { AuthProviderCard } from "@/components/settings/auth-provider-card";
+import {
+  Loader2,
+  Mail,
+  Phone,
+} from "lucide-react";
+import { AuthProviderRow } from "@/components/settings/auth-provider-row";
 import { CustomOAuthWizard, type OAuthWizardProvider } from "@/components/settings/custom-oauth-wizard";
 import { AuthFallbackPanel } from "@/components/settings/auth-fallback-panel";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 type AuthSettings = {
   email_password_enabled: boolean;
   google_enabled: boolean;
   github_enabled: boolean;
   apple_enabled: boolean;
+  phone_enabled?: boolean;
   oauth_mode: "vodex_managed" | "custom";
   last_auth_error?: string | null;
   customOAuth?: {
@@ -31,20 +36,28 @@ type Diagnostics = {
   googleEnabled: boolean;
 };
 
-const OAUTH_PROVIDERS: Array<{
-  id: OAuthWizardProvider;
-  settingsKey?: keyof AuthSettings;
-  label: string;
-  customKey?: "google" | "github";
-}> = [
-  { id: "google", settingsKey: "google_enabled", label: "Google", customKey: "google" },
-  { id: "github", settingsKey: "github_enabled", label: "GitHub", customKey: "github" },
-  { id: "apple", settingsKey: "apple_enabled", label: "Apple" },
-  { id: "microsoft", label: "Microsoft" },
-  { id: "discord", label: "Discord" },
-  { id: "facebook", label: "Facebook" },
-  { id: "custom", label: "Custom OAuth" },
-];
+function ProviderIcon({ label, className }: { label: string; className?: string }) {
+  const initials = label.slice(0, 1).toUpperCase();
+  const colors: Record<string, string> = {
+    Google: "bg-white text-[#4285F4]",
+    GitHub: "bg-[#24292f] text-white",
+    Apple: "bg-black text-white",
+    Microsoft: "bg-[#00A4EF] text-white",
+    Discord: "bg-[#5865F2] text-white",
+    Facebook: "bg-[#1877F2] text-white",
+  };
+  return (
+    <span
+      className={cn(
+        "flex size-6 items-center justify-center rounded-md text-[11px] font-bold",
+        colors[label] ?? "bg-accent/15 text-accent",
+        className,
+      )}
+    >
+      {initials}
+    </span>
+  );
+}
 
 export function AppAuthCenter({
   projectId,
@@ -57,9 +70,9 @@ export function AppAuthCenter({
   const [diagnostics, setDiagnostics] = React.useState<Diagnostics | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [wizardProvider, setWizardProvider] = React.useState<OAuthWizardProvider | null>(null);
-  const [showLegacy, setShowLegacy] = React.useState(false);
 
-  const canCustomOAuth = planTier === "pro" || planTier === "infinity";
+  const canCustomOAuth = planTier !== "free";
+  const starterPlus = planTier === "starter" || planTier === "pro" || planTier === "infinity";
 
   async function load() {
     const [settingsRes, diagRes] = await Promise.all([
@@ -81,7 +94,6 @@ export function AppAuthCenter({
   }, [projectId]);
 
   async function patchSettings(patch: Partial<AuthSettings>) {
-    const next = { ...settings!, ...patch };
     const res = await fetch(`/api/projects/${projectId}/auth-settings`, {
       method: "PATCH",
       credentials: "include",
@@ -91,7 +103,6 @@ export function AppAuthCenter({
     const body = (await res.json()) as { error?: string; settings?: AuthSettings };
     if (!res.ok) throw new Error(body.error ?? "Could not update");
     if (body.settings) setSettings((s) => ({ ...s!, ...body.settings }));
-    else setSettings(next);
     await load();
   }
 
@@ -114,7 +125,7 @@ export function AppAuthCenter({
 
   if (loading || !settings) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="flex justify-center py-12" data-testid="app-auth-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -123,12 +134,15 @@ export function AppAuthCenter({
   const oauthFailed = Boolean(diagnostics?.lastAuthError || settings.last_auth_error);
   const redirectUri = diagnostics?.centralOAuthCallbackUrl ?? diagnostics?.publishedAppCallbackUrl;
 
+  const healthFor = (enabled: boolean): "ok" | "warn" | "off" =>
+    oauthFailed && enabled ? "warn" : enabled ? "ok" : "off";
+
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-4" data-testid="app-auth-center">
+    <div className="mx-auto w-full max-w-3xl space-y-4" data-testid="app-auth-center">
       <div>
-        <h2 className="text-[16px] font-semibold text-foreground">Authentication</h2>
+        <h2 className="text-[18px] font-semibold tracking-tight text-foreground">Authentication</h2>
         <p className="mt-1 text-[13px] text-muted-foreground">
-          Provider cards, health checks, and custom OAuth — same quality bar as Integrations.
+          Enable sign-in methods for your published app. Gmail and email login are recommended first.
         </p>
       </div>
 
@@ -136,59 +150,126 @@ export function AppAuthCenter({
         oauthFailed={oauthFailed}
         emailEnabled={settings.email_password_enabled}
         loginUrl={diagnostics?.publishedLoginUrl}
-        onEnableEmail={() => void patchSettings({ email_password_enabled: true }).then(() => toast.success("Email login enabled"))}
+        onEnableEmail={() =>
+          void patchSettings({ email_password_enabled: true }).then(() => toast.success("Email login enabled"))
+        }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {OAUTH_PROVIDERS.map((p) => {
-          const enabled = p.settingsKey ? Boolean(settings[p.settingsKey]) : false;
+      <div className="space-y-2.5">
+        <AuthProviderRow
+          id="email"
+          testId="auth-provider-row-email"
+          icon={<Mail className="size-5 text-accent" />}
+          title="Gmail / Email & Password"
+          description="Email and password login with optional magic link. Enabled by default for most apps."
+          enabled={settings.email_password_enabled}
+          health={healthFor(settings.email_password_enabled)}
+          statusBadge={settings.email_password_enabled ? "Primary" : undefined}
+          onToggle={(on) => void patchSettings({ email_password_enabled: on })}
+          onConfigure={() => toast.info("Configure SMTP and password rules in your app settings")}
+          configureLabel="Email options"
+          docsHref="https://vodex.dev/docs/auth/email"
+        />
+
+        <AuthProviderRow
+          id="google"
+          icon={<ProviderIcon label="Google" />}
+          title="Google"
+          description="Vodex-managed Google sign-in, or connect your own OAuth client below."
+          enabled={settings.google_enabled}
+          health={healthFor(settings.google_enabled)}
+          onToggle={(on) => void patchSettings({ google_enabled: on })}
+          onConfigure={() => setWizardProvider("google")}
+          configureLabel={settings.customOAuth?.google.configured ? "Manage Google OAuth" : "Connect Google"}
+          docsHref="https://vodex.dev/docs/auth/google"
+        />
+
+        <AuthProviderRow
+          id="google-custom"
+          nested
+          icon={<ProviderIcon label="Google" className="opacity-80" />}
+          title="Custom Google OAuth"
+          description="Use your own Google Cloud OAuth client ID and secret."
+          enabled={settings.customOAuth?.google.configured ?? false}
+          health={settings.customOAuth?.google.configured ? "ok" : "off"}
+          locked={!starterPlus}
+          lockBadge={starterPlus ? undefined : "Starter+"}
+          showToggle={false}
+          onConfigure={() => (starterPlus ? setWizardProvider("google") : toast.info("Upgrade to Starter+ for custom OAuth"))}
+          configureLabel="Configure client"
+        />
+
+        <AuthProviderRow
+          id="phone"
+          icon={<Phone className="size-5 text-accent" />}
+          title="Phone number"
+          description="SMS OTP sign-in. Visible to end users once SMS provider is configured."
+          enabled={settings.phone_enabled ?? false}
+          health={settings.phone_enabled ? "warn" : "off"}
+          statusBadge="Visible"
+          onToggle={(on) => void patchSettings({ phone_enabled: on } as Partial<AuthSettings>)}
+          onConfigure={() => toast.info("Configure Twilio or Supabase phone auth in Integrations")}
+          configureLabel="Setup SMS"
+          docsHref="https://vodex.dev/docs/auth/phone"
+        />
+
+        {(
+          [
+            { id: "github" as const, label: "GitHub", key: "github_enabled" as const, customKey: "github" as const },
+            { id: "apple" as const, label: "Apple", key: "apple_enabled" as const },
+            { id: "microsoft" as const, label: "Microsoft" },
+            { id: "discord" as const, label: "Discord" },
+            { id: "facebook" as const, label: "Facebook" },
+          ] as const
+        ).map((p) => {
+          const enabled = "key" in p && p.key ? Boolean(settings[p.key]) : false;
           const configured =
-            p.customKey && settings.customOAuth
-              ? settings.customOAuth[p.customKey]?.configured
-              : p.id === "custom"
-                ? settings.oauth_mode === "custom"
-                : undefined;
-          const health: "ok" | "warn" | "off" = oauthFailed && enabled ? "warn" : enabled ? "ok" : "off";
+            "customKey" in p && p.customKey
+              ? settings.customOAuth?.[p.customKey]?.configured
+              : undefined;
           return (
-            <AuthProviderCard
+            <AuthProviderRow
               key={p.id}
-              name={p.label}
-              enabled={enabled || settings.oauth_mode === "custom"}
-              health={health}
-              configured={configured}
+              id={p.id}
+              icon={<ProviderIcon label={p.label} />}
+              title={p.label}
+              description={`Let users sign in with ${p.label}.`}
+              enabled={enabled}
+              health={healthFor(enabled)}
+              statusBadge={configured ? "Configured" : undefined}
               onToggle={
-                p.settingsKey
-                  ? (on) => void patchSettings({ [p.settingsKey!]: on } as Partial<AuthSettings>)
+                "key" in p && p.key
+                  ? (on) => void patchSettings({ [p.key]: on } as Partial<AuthSettings>)
                   : undefined
               }
+              showToggle={"key" in p && Boolean(p.key)}
               onConfigure={() => {
-                if (p.id === "microsoft" || p.id === "discord" || p.id === "facebook") {
-                  toast.info(`${p.label} uses Vodex-managed OAuth — custom wizard available on request`);
-                  return;
-                }
-                if (!canCustomOAuth && p.id !== "custom") {
-                  toast.info("Custom OAuth setup requires Pro or higher");
-                  return;
-                }
-                setWizardProvider(p.id);
+                if (p.id === "github") setWizardProvider("github");
+                else if (p.id === "apple") setWizardProvider("apple");
+                else toast.info(`${p.label} uses Vodex-managed OAuth`);
               }}
+              docsHref={`https://vodex.dev/docs/auth/${p.id}`}
             />
           );
         })}
+
+        <AuthProviderRow
+          id="custom-oauth"
+          icon={<ProviderIcon label="OAuth" />}
+          title="Custom OAuth"
+          description="Bring your own OAuth provider with client ID, secret, and redirect URI."
+          enabled={settings.oauth_mode === "custom"}
+          health={settings.oauth_mode === "custom" ? "ok" : "off"}
+          locked={!canCustomOAuth}
+          lockBadge={canCustomOAuth ? undefined : "Starter+"}
+          showToggle={false}
+          onConfigure={() =>
+            canCustomOAuth ? setWizardProvider("custom") : toast.info("Upgrade to Starter+ for custom OAuth")
+          }
+          configureLabel="Open setup wizard"
+          docsHref="https://vodex.dev/docs/auth/custom-oauth"
+        />
       </div>
-
-      <button
-        type="button"
-        onClick={() => setShowLegacy((v) => !v)}
-        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground"
-      >
-        <Settings2 className="size-3.5" />
-        {showLegacy ? "Hide" : "Show"} advanced auth settings
-      </button>
-
-      {showLegacy ? (
-        <AppAuthSettingsPanel projectId={projectId} planTier={planTier} />
-      ) : null}
 
       {wizardProvider ? (
         <CustomOAuthWizard
@@ -206,9 +287,9 @@ export function AppAuthCenter({
           }
           initialClientId={
             wizardProvider === "google"
-              ? settings.customOAuth?.google.clientIdPreview ?? ""
+              ? (settings.customOAuth?.google.clientIdPreview ?? "")
               : wizardProvider === "github"
-                ? settings.customOAuth?.github.clientIdPreview ?? ""
+                ? (settings.customOAuth?.github.clientIdPreview ?? "")
                 : ""
           }
           onSave={async (creds) => {

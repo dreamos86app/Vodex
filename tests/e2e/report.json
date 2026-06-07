@@ -59,309 +59,93 @@
   },
   "suites": [
     {
-      "title": "imported-reciply-manual-qa.spec.ts",
-      "file": "imported-reciply-manual-qa.spec.ts",
+      "title": "live-journeys.spec.ts",
+      "file": "live-journeys.spec.ts",
       "column": 0,
       "line": 0,
-      "specs": [],
-      "suites": [
+      "specs": [
         {
-          "title": "P1.3.8 — imported Reciply manual QA @live",
-          "file": "imported-reciply-manual-qa.spec.ts",
-          "line": 56,
-          "column": 6,
-          "specs": [
+          "title": "@live 09 mobile create no overflow",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
             {
-              "title": "A — open imported project",
-              "ok": false,
-              "tags": [
-                "live"
-              ],
-              "tests": [
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
                 {
-                  "timeout": 60000,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9481,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-07T10:15:07.928Z",
                   "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 65032,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
-                      },
-                      "errors": [
-                        {
-                          "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
-                        },
-                        {
-                          "location": {
-                            "file": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\imported-reciply-manual-qa.spec.ts",
-                            "column": 18,
-                            "line": 39
-                          },
-                          "message": "Error: page.waitForTimeout: Test timeout of 60000ms exceeded.\n\n  37 |       break;\n  38 |     } catch {\n> 39 |       await page.waitForTimeout(1000);\n     |                  ^\n  40 |       if (attempt === 2) throw new Error(`openBuilder failed for ${url}`);\n  41 |     }\n  42 |   }\n    at openBuilder (C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\imported-reciply-manual-qa.spec.ts:39:18)\n    at C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\tests\\e2e\\imported-reciply-manual-qa.spec.ts:73:7"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-06-07T08:41:03.810Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-9d498-e-A-—-open-imported-project-chromium\\error-context.md"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "C:\\Users\\XenoD\\Desktop\\DreamOS86\\dreamos-platform\\test-results\\imported-reciply-manual-qa-9d498-e-A-—-open-imported-project-chromium\\error-context.md"
-                        }
-                      ]
-                    }
-                  ],
-                  "status": "unexpected"
+                  "attachments": []
                 }
               ],
-              "id": "0ea9e47096d2e0a73b44-11250161d19daaaf68c5",
-              "file": "imported-reciply-manual-qa.spec.ts",
-              "line": 69,
-              "column": 7
-            },
-            {
-              "title": "B — Why is preview blocked? (question_only)",
-              "ok": true,
-              "tags": [
-                "live"
-              ],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": -1,
-                      "parallelIndex": -1,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-06-07T08:42:09.130Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "0ea9e47096d2e0a73b44-3b41b4e84d6c5e7225e3",
-              "file": "imported-reciply-manual-qa.spec.ts",
-              "line": 87,
-              "column": 7
-            },
-            {
-              "title": "C — Fix preview blocked (repair, no blueprint)",
-              "ok": true,
-              "tags": [
-                "live"
-              ],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": -1,
-                      "parallelIndex": -1,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-06-07T08:42:09.130Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "0ea9e47096d2e0a73b44-c2b1a216220e4997651a",
-              "file": "imported-reciply-manual-qa.spec.ts",
-              "line": 104,
-              "column": 7
-            },
-            {
-              "title": "D — Prepare imported app preview",
-              "ok": true,
-              "tags": [
-                "live"
-              ],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": -1,
-                      "parallelIndex": -1,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-06-07T08:42:09.130Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "0ea9e47096d2e0a73b44-16a2b9b4f8f6dbac053f",
-              "file": "imported-reciply-manual-qa.spec.ts",
-              "line": 120,
-              "column": 7
-            },
-            {
-              "title": "E — What is a CRM? (question_only)",
-              "ok": true,
-              "tags": [
-                "live"
-              ],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": -1,
-                      "parallelIndex": -1,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-06-07T08:42:09.130Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "0ea9e47096d2e0a73b44-b9bb9fe49a313d6702c5",
-              "file": "imported-reciply-manual-qa.spec.ts",
-              "line": 148,
-              "column": 7
-            },
-            {
-              "title": "F — Create a CRM app (project_build)",
-              "ok": true,
-              "tags": [
-                "live"
-              ],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": -1,
-                      "parallelIndex": -1,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-06-07T08:42:09.131Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "0ea9e47096d2e0a73b44-dec35bf3be2d09e1e5c7",
-              "file": "imported-reciply-manual-qa.spec.ts",
-              "line": 167,
-              "column": 7
-            },
-            {
-              "title": "G — ZIP scan defers mobile packaging",
-              "ok": true,
-              "tags": [
-                "live"
-              ],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": -1,
-                      "parallelIndex": -1,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-06-07T08:42:09.131Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "0ea9e47096d2e0a73b44-9f34b56f28673d5b0ea4",
-              "file": "imported-reciply-manual-qa.spec.ts",
-              "line": 180,
-              "column": 7
+              "status": "expected"
             }
-          ]
+          ],
+          "id": "8d64248fcd62e74b16e5-fa93a7d52836c52dbc2e",
+          "file": "live-journeys.spec.ts",
+          "line": 150,
+          "column": 5
+        },
+        {
+          "title": "@live 10 mobile dashboard no overflow",
+          "ok": true,
+          "tags": [
+            "live"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5573,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-07T10:15:19.160Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8d64248fcd62e74b16e5-d0bc44eceacc68e6f158",
+          "file": "live-journeys.spec.ts",
+          "line": 162,
+          "column": 5
         }
       ]
     }
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-06-07T08:41:02.892Z",
-    "duration": 66286.562,
-    "expected": 0,
-    "skipped": 6,
-    "unexpected": 1,
+    "startTime": "2026-06-07T10:15:07.247Z",
+    "duration": 17560.449999999997,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
     "flaky": 0
   }
 }

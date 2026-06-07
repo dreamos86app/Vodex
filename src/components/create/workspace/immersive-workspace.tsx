@@ -92,6 +92,16 @@ import {
   replaceBrowserUrl,
   syncProjectIdInAddressBar,
 } from "@/lib/navigation/builder-url";
+import {
+  BUILDER_SECTION_NAV_EVENT,
+  builderSectionPath,
+  type BuilderSectionNavEvent,
+  type BuilderSectionTarget,
+} from "@/lib/navigation/builder-section-navigation";
+import {
+  VersionHistoryDrawer,
+  VersionHistoryEntryButton,
+} from "@/components/builder/version-history-drawer";
 import { PROMPT_QUEUE_FULL_MESSAGE, PROMPT_QUEUE_MAX } from "@/lib/create/queue-constants";
 import {
   canSubmitComposer,
@@ -422,13 +432,36 @@ export function ImmersiveWorkspace({
   const userPinnedScrollRef = React.useRef(false);
   const [showJumpToLatest, setShowJumpToLatest] = React.useState(false);
   const tabFromUrl = searchParams.get("tab");
+  const sectionFromUrl = searchParams.get("section");
+  const dashboardSectionsFromUrl: DashSection[] = [
+    "overview",
+    "publish",
+    "integrations",
+    "secrets",
+    "users",
+    "data",
+    "analytics",
+    "payments",
+    "domains",
+    "security",
+    "auth",
+    "code",
+    "template",
+    "settings",
+  ];
+  const resolvedDashboardSection: DashSection =
+    sectionFromUrl && dashboardSectionsFromUrl.includes(sectionFromUrl as DashSection)
+      ? (sectionFromUrl as DashSection)
+      : "overview";
   const resolvedRightTab: WorkspaceRightTab =
     tabFromUrl === "code" ||
     tabFromUrl === "dashboard" ||
     tabFromUrl === "preview" ||
     tabFromUrl === "mobile"
       ? tabFromUrl
-      : "preview";
+      : sectionFromUrl && dashboardSectionsFromUrl.includes(sectionFromUrl as DashSection)
+        ? "dashboard"
+        : "preview";
   const [rightTab, setRightTab] = React.useState<WorkspaceRightTab>(resolvedRightTab);
   React.useEffect(() => {
     setRightTab(resolvedRightTab);
@@ -437,33 +470,57 @@ export function ImmersiveWorkspace({
   const [mobilePanel, setMobilePanel] = React.useState<MobileCreatePanel>("chat");
   const lastSubmitFingerprintRef = React.useRef<{ text: string; at: number } | null>(null);
   const pendingOperationIdRef = React.useRef<string | null>(null);
-  const [dashboardSection, setDashboardSection] = React.useState<DashSection>("overview");
+  const [dashboardSection, setDashboardSection] = React.useState<DashSection>(resolvedDashboardSection);
+  const [versionDrawerOpen, setVersionDrawerOpen] = React.useState(false);
   const insertPromptConsumedRef = React.useRef(false);
   const [lastSubmitAt, setLastSubmitAt] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     const section = searchParams.get("section");
     if (!section) return;
-    const allowed: DashSection[] = [
-      "overview",
-      "publish",
-      "integrations",
-      "secrets",
-      "users",
-      "data",
-      "analytics",
-      "payments",
-      "domains",
-      "security",
-      "auth",
-      "code",
-      "template",
-      "settings",
-    ];
-    if (!allowed.includes(section as DashSection)) return;
+    if (!dashboardSectionsFromUrl.includes(section as DashSection)) return;
     setDashboardSection(section as DashSection);
     setRightTab("dashboard");
   }, [searchParams]);
+
+  const applyBuilderSectionTarget = React.useCallback(
+    (target: BuilderSectionTarget) => {
+      const tabMap: Partial<Record<BuilderSectionTarget, WorkspaceRightTab>> = {
+        "builder.chat": "preview",
+        "builder.preview": "preview",
+        "builder.code": "code",
+        "builder.mobile": "mobile",
+        "builder.dashboard.overview": "dashboard",
+        "builder.dashboard.deploy": "dashboard",
+        "builder.dashboard.integrations": "dashboard",
+        "builder.dashboard.secrets": "dashboard",
+        "builder.dashboard.payments": "dashboard",
+        "builder.dashboard.auth": "dashboard",
+        "builder.dashboard.settings": "dashboard",
+        "builder.publish": "dashboard",
+        "builder.diagnostics": "dashboard",
+        "builder.versions": "code",
+      };
+      const sectionMap: Partial<Record<BuilderSectionTarget, DashSection>> = {
+        "builder.dashboard.overview": "overview",
+        "builder.dashboard.deploy": "publish",
+        "builder.dashboard.integrations": "integrations",
+        "builder.dashboard.secrets": "secrets",
+        "builder.dashboard.payments": "payments",
+        "builder.dashboard.auth": "auth",
+        "builder.dashboard.settings": "settings",
+        "builder.publish": "publish",
+        "builder.diagnostics": "overview",
+      };
+      const nextTab = tabMap[target];
+      if (nextTab) setRightTab(nextTab);
+      const nextSection = sectionMap[target];
+      if (nextSection) setDashboardSection(nextSection);
+      if (target === "builder.versions") setVersionDrawerOpen(true);
+      if (target === "builder.chat") setMobilePanel("chat");
+    },
+    [],
+  );
 
   React.useEffect(() => {
     const raw = searchParams.get("insertPrompt");
@@ -520,6 +577,20 @@ export function ImmersiveWorkspace({
   const projectIdRef = React.useRef<string | null>(null);
   const effectiveProjectId = localProjectId ?? project?.id ?? null;
   projectIdRef.current = effectiveProjectId;
+
+  React.useEffect(() => {
+    const onNav = (e: Event) => {
+      const detail = (e as CustomEvent<BuilderSectionNavEvent>).detail;
+      const pid = projectIdRef.current;
+      if (!detail?.projectId || !pid) return;
+      if (detail.projectId !== pid) return;
+      applyBuilderSectionTarget(detail.target);
+      replaceBrowserUrl(builderSectionPath(detail.projectId, detail.target));
+    };
+    window.addEventListener(BUILDER_SECTION_NAV_EVENT, onNav);
+    return () => window.removeEventListener(BUILDER_SECTION_NAV_EVENT, onNav);
+  }, [applyBuilderSectionTarget]);
+
   const [projectDataRefresh, setProjectDataRefresh] = React.useState(0);
   const {
     files: projectFiles,
@@ -2859,6 +2930,12 @@ export function ImmersiveWorkspace({
                 {modeStyle.badge.label}
               </span>
             )}
+            {effectiveProjectId ? (
+              <VersionHistoryEntryButton
+                className="ml-auto"
+                onClick={() => setVersionDrawerOpen(true)}
+              />
+            ) : null}
           </div>
 
           <div
@@ -3569,9 +3646,17 @@ export function ImmersiveWorkspace({
         }
       />
 
+      {effectiveProjectId ? (
+        <VersionHistoryDrawer
+          projectId={effectiveProjectId}
+          open={versionDrawerOpen}
+          onClose={() => setVersionDrawerOpen(false)}
+        />
+      ) : null}
+
       {showFreeWatermark && (
         <div
-          className="pointer-events-none fixed bottom-3 right-3 z-[5000] select-none rounded-lg bg-foreground/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-background shadow-md backdrop-blur-sm"
+          className="pointer-events-none fixed bottom-3 right-3 z-[var(--z-dropdown)] select-none rounded-lg bg-foreground/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-background shadow-md backdrop-blur-sm"
           aria-hidden
         >
           Vodex

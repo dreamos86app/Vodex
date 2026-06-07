@@ -33,6 +33,8 @@ import { subscribeProjectCatalogUpdated } from "@/lib/projects/project-catalog-s
 import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
 import type { ProjectCardStatus } from "@/lib/projects/project-card-status";
 import { computeProjectCardUiState } from "@/lib/projects/project-visibility-status";
+import { ProjectCardOverflowMenu } from "@/components/apps/project-card-overflow-menu";
+import { sanitizeStoredDescription } from "@/lib/projects/derive-user-facing-description";
 
 type ProjectRow = Omit<Project, "metadata"> & {
   metadata?: Record<string, unknown> | null;
@@ -83,10 +85,12 @@ function ProjectCardSkeleton() {
 function ProjectCard({
   project,
   onToggleFavorite,
+  onRefresh,
   isAdmin,
 }: {
   project: ProjectRow;
   onToggleFavorite: (projectId: string, next: boolean) => void;
+  onRefresh?: () => void;
   isAdmin: boolean;
 }) {
   const cfg = cardStatusLabel(project);
@@ -109,9 +113,10 @@ function ProjectCard({
       null,
     name: project.name,
   });
-  const shortDesc =
-    (project as Project & { short_description?: string }).short_description ||
-    project.description;
+  const shortDesc = sanitizeStoredDescription(
+    (project as Project & { short_description?: string }).short_description || project.description,
+    { originalPrompt: project.description, appName },
+  );
   const iconSvg =
     typeof (project as Project & { icon_svg?: string }).icon_svg === "string"
       ? (project as Project & { icon_svg: string }).icon_svg
@@ -180,9 +185,21 @@ function ProjectCard({
             )}
             </div>
           </Link>
-          <div className="flex shrink-0 items-center gap-1 rounded-full bg-background px-2 py-0.5">
-            <span className={cn("size-1.5 rounded-full", cfg.dot)} />
-            <span className={cn("text-[10px] font-medium", cfg.text)}>{cfg.label}</span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex items-center gap-1 rounded-full bg-background px-2 py-0.5">
+              <span className={cn("size-1.5 rounded-full", cfg.dot)} />
+              <span className={cn("text-[10px] font-medium", cfg.text)}>{cfg.label}</span>
+            </div>
+            <ProjectCardOverflowMenu
+              projectId={project.id}
+              appName={appName}
+              previewUrl={project.preview_url}
+              publicUrl={publicUrl}
+              isFavorite={Boolean(project.is_favorite)}
+              onToggleFavorite={(next) => onToggleFavorite(project.id, next)}
+              onRenamed={onRefresh}
+              onDeleted={onRefresh}
+            />
           </div>
         </div>
 
@@ -299,7 +316,6 @@ export function ProjectsView() {
   projectsRef.current = projects;
 
   const loadProjects = React.useCallback((reconcile = false) => {
-    if (!ownerId) return;
     const now = Date.now();
     const hasCache = projectsRef.current.length > 0;
     if (!reconcile && now - lastLoadRef.current < 60_000 && hasCache) return;
@@ -307,7 +323,7 @@ export function ProjectsView() {
     if (!hasCache) setLoading(true);
     setLoadError(null);
     const qs = reconcile ? "?reconcile=1" : "";
-    fetch(`/api/projects${qs}`)
+    fetch(`/api/projects${qs}`, { credentials: "include" })
       .then((r) => r.json())
       .then((body: { projects?: ProjectRow[] }) => {
         const list = body.projects ?? [];
@@ -321,6 +337,12 @@ export function ProjectsView() {
         setLoading(false);
       })
       .catch(() => {
+        if (!ownerId) {
+          setLoadError("Could not load your apps. Try again.");
+          setHasFetchedOnce(true);
+          setLoading(false);
+          return;
+        }
         void Promise.resolve(
           supabase
             .from("projects")
@@ -365,13 +387,7 @@ export function ProjectsView() {
   }, []);
 
   React.useEffect(() => {
-    if (!ownerId) {
-      if (!authLoading) {
-        setLoading(false);
-        setHasFetchedOnce(true);
-      }
-      return;
-    }
+    if (authLoading) return;
     if (projectsRef.current.length > 0) {
       setLoading(false);
       setHasFetchedOnce(true);
@@ -650,7 +666,13 @@ export function ProjectsView() {
               </h2>
               <div className={gridClass}>
                 {readyList.map((p) => (
-                  <ProjectCard key={p.id} project={p} onToggleFavorite={toggleFavorite} isAdmin={isAdmin} />
+                  <ProjectCard
+                    key={p.id}
+                    project={p}
+                    onToggleFavorite={toggleFavorite}
+                    onRefresh={() => loadProjects(true)}
+                    isAdmin={isAdmin}
+                  />
                 ))}
               </div>
             </section>
@@ -662,7 +684,13 @@ export function ProjectsView() {
               </h2>
               <div className={gridClass}>
                 {draftList.map((p) => (
-                  <ProjectCard key={p.id} project={p} onToggleFavorite={toggleFavorite} isAdmin={isAdmin} />
+                  <ProjectCard
+                    key={p.id}
+                    project={p}
+                    onToggleFavorite={toggleFavorite}
+                    onRefresh={() => loadProjects(true)}
+                    isAdmin={isAdmin}
+                  />
                 ))}
               </div>
             </section>
