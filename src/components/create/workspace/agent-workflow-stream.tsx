@@ -24,6 +24,8 @@ import { shouldAutoOpenOwnerDiagnostics } from "@/lib/build/owner-diagnostics-au
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { userMessageForPreviewFailure, isPreviewFailureCode } from "@/lib/preview/preview-failure-codes";
+import { mustNotShowBuildFailedHeadline } from "@/lib/build/build-state-truth";
+import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { AnimatedLineDelta } from "@/components/create/workspace/animated-line-delta";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
@@ -174,12 +176,24 @@ function mapStepStatus(event: AgentWorkflowEvent): WorkflowStepCardStatus {
   return "pending";
 }
 
+function workflowEventSavedFileCount(event: AgentWorkflowEvent): number {
+  const meta = event.metadata ?? {};
+  if (typeof meta.file_count === "number") return meta.file_count;
+  if (typeof meta.files_persisted === "number") return meta.files_persisted;
+  return 0;
+}
+
 function ProgressRow({ event, reducedMotion }: { event: AgentWorkflowEvent; reducedMotion: boolean }) {
   const code = event.metadata?.preview_failure_code;
   const friendlyFailure =
     typeof code === "string" && isPreviewFailureCode(code)
       ? userMessageForPreviewFailure(code)
       : event.subtitle;
+  const hasSavedFiles = workflowEventSavedFileCount(event) >= MIN_RENDERABLE_FILES;
+  const label =
+    event.status === "failed"
+      ? mustNotShowBuildFailedHeadline(hasSavedFiles, event.title)
+      : event.title;
 
   return (
     <motion.div
@@ -190,7 +204,7 @@ function ProgressRow({ event, reducedMotion }: { event: AgentWorkflowEvent; redu
     >
       <WorkflowStepCard
         status={mapStepStatus(event)}
-        label={event.title}
+        label={label}
         sublabel={event.status === "failed" ? friendlyFailure : event.subtitle}
         progress={event.progress}
         error={event.status === "failed" ? friendlyFailure : undefined}

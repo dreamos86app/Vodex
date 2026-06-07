@@ -55,7 +55,8 @@ export async function assertBuildFilesPersisted(
   input: AssertBuildFilesPersistedInput,
 ): Promise<AssertBuildFilesPersistedResult> {
   const minFiles = input.minFiles ?? MIN_RENDERABLE_FILES;
-  const minComponents = input.minComponents ?? 5;
+  /** Small valid apps often ship 2–3 shared components; pages carry the rest. */
+  const minComponents = input.minComponents ?? 2;
   const failures: string[] = [];
   const writer = (createServiceRoleClient() ?? input.writer) as Writer;
 

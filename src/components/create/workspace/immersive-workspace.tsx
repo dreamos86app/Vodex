@@ -2619,6 +2619,41 @@ export function ImmersiveWorkspace({
       )
     : null;
   const previewSrcRenderable = previewRuntime?.previewRenderable === true;
+
+  const previewAutoStartRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    previewAutoStartRef.current = null;
+  }, [effectiveProjectId]);
+
+  React.useEffect(() => {
+    if (!effectiveProjectId || projectFiles.length < 4) return;
+    if (buildJobActive || buildStarting || previewStarting) return;
+    if (previewSrcRenderable) return;
+    if (!previewRuntime) return;
+    if (previewAutoStartRef.current === effectiveProjectId) return;
+
+    const jobMissing =
+      previewRuntime.previewFailureKind === "no_preview_job" ||
+      previewRuntime.previewStatus === "not_started";
+    const jobStuck =
+      Boolean(previewRuntime.jobId) &&
+      !previewRuntime.previewRenderable &&
+      previewRuntime.jobStatus !== "running";
+    if (!jobMissing && !jobStuck) return;
+
+    previewAutoStartRef.current = effectiveProjectId;
+    void startPreviewSession();
+  }, [
+    effectiveProjectId,
+    projectFiles.length,
+    buildJobActive,
+    buildStarting,
+    previewStarting,
+    previewSrcRenderable,
+    previewRuntime,
+    startPreviewSession,
+  ]);
+
   const importedPreviewClassification = React.useMemo(
     () =>
       classifyImportedPreviewState(previewRuntime, {

@@ -12,6 +12,7 @@ import { persistGeneratedBuildFiles } from "@/lib/build/persist-generated-files"
 import { assertBuildFilesPersisted } from "@/lib/build/assert-build-files-persisted";
 import { startPreviewSession } from "@/lib/preview/preview-build-service";
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
+import { canCompleteWithSavedFiles } from "@/lib/build/post-build-contract";
 import { lifecyclePatch } from "@/lib/projects/project-lifecycle";
 
 type Writer = SupabaseClient<Database>;
@@ -134,21 +135,23 @@ export function createStagedBuildStreamResponse(input: {
           archetypeId: pr.appArchetype,
         });
 
-        const previewResult =
-          persist.ok && fileGate.ok
-            ? await startPreviewSession({
-                writer: input.writer,
-                userId: input.userId,
-                projectId: input.projectId,
-              })
-            : { ok: false as const, error: "files not persisted", code: "no_files" };
+        const filesSavable =
+          persist.ok &&
+          persist.savedCount >= MIN_RENDERABLE_FILES &&
+          canCompleteWithSavedFiles(fileGate.fileCount, fileGate.failures);
+
+        const previewResult = filesSavable
+          ? await startPreviewSession({
+              writer: input.writer,
+              userId: input.userId,
+              projectId: input.projectId,
+            })
+          : { ok: false as const, error: "files not persisted", code: "no_files" };
 
         const buildSucceeded =
           pr.ok &&
           pr.buildContract.passed &&
-          persist.ok &&
-          persist.savedCount >= MIN_RENDERABLE_FILES &&
-          fileGate.ok &&
+          filesSavable &&
           previewResult.ok;
 
         if (!buildSucceeded) {

@@ -783,25 +783,37 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       return;
     }
 
-    if (!persist.persistOk || persist.savedCount < MIN_RENDERABLE_FILES || !fileGate.ok) {
+    const persistHardFail = !persist.persistOk || persist.savedCount < MIN_RENDERABLE_FILES;
+    const gateBlocksCompletion =
+      !fileGate.ok &&
+      !canCompleteWithSavedFiles(fileGate.fileCount, fileGate.failures);
+
+    if (persistHardFail || gateBlocksCompletion) {
+      const savedCount = persistHardFail
+        ? 0
+        : Math.max(persist.savedCount, fileGate.fileCount);
       if (process.env.NODE_ENV !== "production") {
         console.warn("[execute-staged-build] files_persistence_failed", {
           projectId: input.projectId,
-          persistOk: persist.ok,
+          persistOk: persist.persistOk,
           savedCount: persist.savedCount,
           renderableCount: persist.renderableCount,
           persistError: persist.error,
           fileGateFailures: fileGate.failures,
+          persistHardFail,
+          gateBlocksCompletion,
         });
       }
-      await clearGeneratedBuildFiles({
-        writer: input.writer,
-        projectId: input.projectId,
-        ownerId: input.userId,
-        buildJobId: input.buildJobId,
-        executionInstanceId: workerCtx.executionInstanceId,
-        context: "contract_failed_before_persist",
-      }).catch(() => undefined);
+      if (savedCount < MIN_RENDERABLE_FILES) {
+        await clearGeneratedBuildFiles({
+          writer: input.writer,
+          projectId: input.projectId,
+          ownerId: input.userId,
+          buildJobId: input.buildJobId,
+          executionInstanceId: workerCtx.executionInstanceId,
+          context: "contract_failed_before_persist",
+        }).catch(() => undefined);
+      }
 
       await refundBuildReservation({
         writer: input.writer,
@@ -835,13 +847,13 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       });
 
       const persistFailKind = failureKindForPersist({
-        fileCount: 0,
+        fileCount: savedCount,
         repairAttempted: false,
       });
       await persistBuildJobEvent(input.writer, {
         ...eventCtx,
         type: "failed",
-        title: userSafeFailureTitle(persistFailKind),
+        title: userSafeFailureTitle(persistFailKind, savedCount > 0),
         detail: userSafeFailureDetail(
           persistFailKind,
           fileGate.code ?? "files_persistence_failed",
@@ -851,7 +863,8 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
           failures: fileGate.failures,
           persist_error: persist.error,
           failure_kind: persistFailKind,
-          file_count: 0,
+          file_count: savedCount,
+          files_persisted: savedCount,
         },
       });
       return;
