@@ -76,6 +76,12 @@ export function classifyBuildIntent(prompt: string): BuildIntentResult {
   }
 
   if (DEBUG.test(lower) && !BUILD_VERBS.test(lower)) {
+    if (/\b(fix|repair|resolve)\b/i.test(lower)) {
+      return { intent: "edit_app", confidence: 0.86, reason: "repair_action_in_project" };
+    }
+    if (QUESTION_START.test(lower) || /\?\s*$/.test(text)) {
+      return { intent: "discuss_question", confidence: 0.9, reason: "debug_question_not_repair" };
+    }
     return { intent: "debug_help", confidence: 0.84, reason: "debug_or_quality_question" };
   }
 

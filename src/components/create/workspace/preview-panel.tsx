@@ -23,6 +23,8 @@ import { PreviewPageSwitcher } from "@/components/create/workspace/preview-page-
 import type { PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
 import type { PreviewRouteEntry } from "@/lib/preview/detect-preview-routes";
 import { navigatePreviewIframe } from "@/lib/preview/preview-route-navigation";
+import type { ImportedPreviewStateResult } from "@/lib/preview/imported-preview-state";
+import { ImportedPreviewEmptyState } from "@/components/preview/imported-preview-empty-state";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 
@@ -58,6 +60,10 @@ export interface PreviewPanelProps {
   onStartPreview?: () => void;
   previewRebuilding?: boolean;
   previewStarting?: boolean;
+  importedPreviewState?: ImportedPreviewStateResult | null;
+  onPrepareImportedPreview?: () => void;
+  onRepairPreview?: () => void;
+  prepareImportBusy?: boolean;
 }
 
 function isUnrenderableSrcDoc(doc: string | null | undefined): boolean {
@@ -105,6 +111,10 @@ export function PreviewPanel({
   onStartPreview,
   previewRebuilding = false,
   previewStarting = false,
+  importedPreviewState = null,
+  onPrepareImportedPreview,
+  onRepairPreview,
+  prepareImportBusy = false,
 }: PreviewPanelProps) {
   const [viewport, setViewport] = React.useState<Viewport>("desktop");
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -281,14 +291,24 @@ export function PreviewPanel({
           />
         )}
 
-        {!showArtifact && (
+        {!showArtifact &&
+        importedPreviewState &&
+        importedPreviewState.state !== "preview_ready" ? (
+          <ImportedPreviewEmptyState
+            classification={importedPreviewState}
+            previewUrl={url}
+            onPreparePreview={onPrepareImportedPreview}
+            onRunRepair={onRepairPreview}
+            preparing={prepareImportBusy}
+          />
+        ) : !showArtifact ? (
           <BuildPreviewSurface
             state={shellState}
             appName={appName}
             currentStep={buildStepLabel}
             stepIndex={buildStepIndex}
           />
-        )}
+        ) : null}
 
         {showRuntimeOverlay && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-atmosphere p-6">
@@ -309,11 +329,11 @@ export function PreviewPanel({
               <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10 ring-1 ring-destructive/20">
                 <ShieldAlert className="size-5 text-destructive" strokeWidth={1.7} />
               </div>
-              <p className="text-[13px] font-semibold text-foreground">Preview blocked</p>
+              <p className="text-[13px] font-semibold text-foreground">Preview embed blocked</p>
               <p className="text-[11.5px] leading-relaxed text-muted-foreground">
                 {embedBlocked
-                  ? "Preview cannot be embedded because this route blocks iframe rendering or is not the Vodex preview artifact URL."
-                  : "This route refused to connect or timed out — often caused by X-Frame-Options, CSP, or a missing preview artifact."}
+                  ? "This route blocks iframe embedding. Open the preview in a new tab or run embed repair."
+                  : "The preview timed out while loading. Try opening in a new tab or preparing the imported app preview."}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {url ? (

@@ -70,6 +70,10 @@ const DESIGN_ONLY = /\b(design|wireframe|mockup)\b/i;
 const IMPORT_QUESTION = /\b(import.*zip|zip import|upload.*zip)\b/i;
 const SUPABASE_QUESTION = /\b(supabase|database provider)\b/i;
 const PUBLISH_EXPLAIN = /\b(explain.*publish|how.*publish|publishing works)\b/i;
+const PREVIEW_QUESTION =
+  /\b(why is preview|what does preview blocked|preview blocked mean|why can't i preview|what should i do about preview)\b/i;
+const REPAIR_ACTION =
+  /\b(fix|repair|resolve|unblock)\b.+\b(preview|blocked|error|build)\b/i;
 
 const UNSAFE = [/\b(hack|steal|bypass|illegal|malware)\b/i];
 
@@ -194,8 +198,39 @@ export function classifyCreateIntent(prompt: string, hasProjectId: boolean): Cre
     );
   }
 
-  /** Inside an existing app builder, honor Build mode for substantive prompts. */
-  if (hasProjectId && (buildSignals || buildIntent.intent === "build_app" || buildIntent.intent === "edit_app")) {
+  if (hasProjectId && PREVIEW_QUESTION.test(text) && !REPAIR_ACTION.test(text)) {
+    return baseQuestionResult(
+      "This is a question about preview — we will answer without starting a build or changing files.",
+      0.94,
+    );
+  }
+
+  if (hasProjectId && REPAIR_ACTION.test(text)) {
+    return {
+      intent: "app_edit_request",
+      confidence: 0.92,
+      shouldCreateProject: false,
+      shouldReserveBuildCredits: false,
+      shouldFullBuild: false,
+      needsClarification: false,
+      userMessage: "Repair request — we will inspect files and apply a patch directly.",
+    };
+  }
+
+  /** Inside an existing app builder — edit/repair vs full build. */
+  if (hasProjectId && buildIntent.intent === "edit_app") {
+    return {
+      intent: "app_edit_request",
+      confidence: buildIntent.confidence,
+      shouldCreateProject: false,
+      shouldReserveBuildCredits: false,
+      shouldFullBuild: false,
+      needsClarification: false,
+      userMessage: "We will apply edits directly to this app.",
+    };
+  }
+
+  if (hasProjectId && buildSignals && buildIntent.intent === "build_app") {
     return {
       intent: "app_build_request",
       confidence: 0.9,

@@ -7502,3 +7502,4 @@ https://react.dev/link/hydration-mismatch
  GET /api/dev/ping 200 in 58ms (proxy.ts: 43ms)
  GET / 200 in 1111ms (next.js: 109ms, proxy.ts: 43ms, application-code: 960ms)
  GET / 200 in 1113ms (next.js: 72ms, proxy.ts: 881ms, application-code: 160ms)
+[?25h

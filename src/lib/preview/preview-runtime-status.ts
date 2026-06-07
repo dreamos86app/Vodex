@@ -100,10 +100,16 @@ export function previewRuntimeStateLabel(status: PreviewRuntimeStatusPayload): s
   if (status.jobStatus === "failed" || status.previewStatus === "failed") return "Preview failed";
   if (status.workerUnavailable) return "Worker unavailable";
   if (status.previewFailureKind === "no_preview_job" || status.previewStatus === "not_started") {
-    return "Preview not started";
+    return "Preview needs to be prepared";
+  }
+  if (status.previewFailureKind === "iframe_blocked") {
+    return "Preview embed blocked";
+  }
+  if (status.previewFailureKind === "no_artifact") {
+    return "Preview artifact missing";
   }
   if (status.previewFailureKind && status.previewFailureKind !== "unknown") {
-    return "Preview blocked";
+    return "Preview needs repair";
   }
   return "Preview not ready";
 }

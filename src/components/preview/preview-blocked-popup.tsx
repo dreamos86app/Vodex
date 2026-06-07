@@ -15,13 +15,16 @@ export function PreviewBlockedPopup({
   onFixInChat,
   onDismiss,
   className,
+  variant = "runtime",
 }: {
   issue: PreviewBlockingIssue;
   repairPrompt: string;
   onFixInChat: (autoSend: boolean) => void;
   onDismiss?: () => void;
   className?: string;
+  variant?: "runtime" | "iframe";
 }) {
+  const headline = variant === "iframe" ? "Preview embed blocked" : "Preview needs repair";
   const [open, setOpen] = React.useState(false);
 
   const copyPrompt = async () => {
@@ -49,7 +52,7 @@ export function PreviewBlockedPopup({
                 <AlertTriangle className="size-4 text-red-500" strokeWidth={1.75} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-red-500/90">Preview blocked</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-red-500/90">{headline}</p>
                 <p className="mt-0.5 text-[13px] font-semibold leading-snug text-foreground">{issue.title}</p>
                 <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">{issue.summary}</p>
               </div>

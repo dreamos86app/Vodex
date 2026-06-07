@@ -18,6 +18,15 @@ import { useCreditsSync } from "@/hooks/use-credits-sync";
 import { useNotificationsStore } from "@/lib/stores/notifications-store";
 import type { Notification } from "@/lib/supabase/types";
 import { ReferralCapture } from "@/components/referrals/referral-capture";
+import {
+  confirmAuthenticated,
+  confirmUnauthenticated,
+  markInitialSessionLoaded,
+  markTokenRefreshStarted,
+  markTokenRefreshSuccess,
+  recordGetUserTransientFailure,
+  shouldRedirectToLogin,
+} from "@/lib/auth/auth-session-state";
 import { AuthStateDebug } from "@/components/dev/auth-state-debug";
 import { hasActiveSession, isStalePersistedProfile } from "@/lib/auth/client-identity";
 import { isE2eCreditTestAccount } from "@/lib/credits/e2e-credit-account";
@@ -309,10 +318,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!disposed) setLoading(false);
     }, 2_500);
 
-    void supabase.auth.getUser().then(async ({ data: { user: liveUser } }) => {
+    void supabase.auth.getUser().then(async ({ data: { user: liveUser }, error: getUserError }) => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(liveUser ?? null);
+
+      if (getUserError && session?.user) {
+        recordGetUserTransientFailure(getUserError.message);
+        markTokenRefreshStarted();
+        setLoading(false);
+        window.clearTimeout(authTimeout);
+        return;
+      }
 
       const persisted = useAuthStore.getState().profile;
       if (isStalePersistedProfile(session, persisted, liveUser)) {
@@ -320,6 +337,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (liveUser) {
+        confirmAuthenticated();
+        markInitialSessionLoaded(true);
         if (persisted && persisted.id !== liveUser.id) {
           setProfile(null);
         }
@@ -327,6 +346,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         void bootstrapUser(liveUser.id);
       } else {
+        confirmUnauthenticated();
+        markInitialSessionLoaded(false);
         setProfile(null);
         try {
           await useAuthStore.persist.clearStorage();
@@ -337,7 +358,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       window.clearTimeout(authTimeout);
-    }).catch(() => {
+    }).catch((err) => {
+      recordGetUserTransientFailure(err instanceof Error ? err.message : String(err));
       setLoading(false);
       window.clearTimeout(authTimeout);
     });
@@ -357,9 +379,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === "SIGNED_OUT") {
+        confirmUnauthenticated();
         invalidateBootstrapCache();
         bootstrapGeneration += 1;
         teardownRealtime();
+        if (!shouldRedirectToLogin()) {
+          return;
+        }
         try {
           void useAuthStore.persist.clearStorage();
         } catch { /* ignore */ }
@@ -384,14 +410,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === "TOKEN_REFRESHED" && session?.user) {
-        void useCreditsStore.getState().syncFromDB({ reason: "manual", force: false });
-      }
-
-      if (event === "TOKEN_REFRESHED" && session?.user) {
+        markTokenRefreshSuccess();
         setUser(session.user);
+        void useCreditsStore.getState().syncFromDB({ reason: "manual", force: false });
         void supabase.auth.getUser().then(({ data: { user: u }, error }) => {
           if (error || !u) return;
           setUser(u);
+          confirmAuthenticated();
         });
       }
 

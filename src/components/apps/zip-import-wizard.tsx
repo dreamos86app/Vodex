@@ -14,6 +14,7 @@ import { toast } from "@/lib/toast";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ZIP_IMPORT_MAX_MB } from "@/lib/import/zip-import-limits";
+import { splitZipScanBlockers, webPreviewReady } from "@/lib/import/zip-scan-classification";
 
 // ─── Detection types ──────────────────────────────────────────────────────────
 
@@ -39,11 +40,19 @@ type ZipCreditEstimate = {
   frameworkLabel: string;
 };
 
+interface ScanBlockerGroup {
+  webPreviewBlockers: Array<{ message: string }>;
+  configurationNeeded: Array<{ message: string }>;
+  mobilePackagingLater: Array<{ message: string }>;
+}
+
 interface ScanResult {
   framework: string;
   packageManager: string;
   detected: DetectedItem[];
   warnings: string[];
+  blockers?: ScanBlockerGroup;
+  webPreviewReady?: boolean;
   estimatedRestore: string;
   creditEstimate?: ZipCreditEstimate | null;
   workerConnected?: boolean;
@@ -64,6 +73,9 @@ function scanResultFromImportApi(j: {
   qualityScore?: number;
   routes?: string[];
   warnings?: string[];
+  blockers?: string[];
+  blockerGroups?: ScanBlockerGroup;
+  webPreviewReady?: boolean;
   scanStats?: ScanResult["scanStats"];
 }): ScanResult {
   const fwLabel = j.frameworkLabel ??
@@ -86,12 +98,15 @@ function scanResultFromImportApi(j: {
     packageManager: "npm",
     estimatedRestore: j.qualityScore != null && j.qualityScore >= 90 ? "Production-grade import" : "Complete — source is in Vodex",
     scanStats: stats,
+    blockers: j.blockerGroups,
+    webPreviewReady: j.webPreviewReady,
     warnings: [
       ...(skipped != null && skipped > 0
         ? [`Imported safely. Skipped ${skipped} dependency, build, cache, or non-text files.`]
         : []),
       ...(j.warnings ?? []),
       ".env secrets are never imported from ZIP — add keys in Vodex settings.",
+      "Mobile packaging (Android package ID, SHA, etc.) is only required later under Mobile App — not for web preview scan.",
       "Scan uses deterministic analysis only — estimated AI cost: $0.00. Optional AI repair is quoted separately.",
     ].filter((w, i, arr) => arr.indexOf(w) === i),
     detected: [
@@ -352,6 +367,7 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
       qualityScore?: number;
       routes?: string[];
       warnings?: string[];
+      blockers?: string[];
       scanStats?: ScanResult["scanStats"];
       creditEstimate?: ZipCreditEstimate;
       workerConnected?: boolean;
@@ -401,6 +417,8 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
       warnings: j.warnings,
       scanStats: j.scanStats,
     });
+    const blockerGroups = splitZipScanBlockers(j.blockers ?? []);
+    const hasRenderableEntry = blockerGroups.webPreviewBlockers.length === 0;
     setScanResult(
       scanResultFromImportApi({
         fileCount: j.fileCount ?? 0,
@@ -409,6 +427,9 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
         qualityScore: j.qualityScore,
         routes: j.routes,
         warnings: j.warnings,
+        blockers: j.blockers,
+        blockerGroups,
+        webPreviewReady: webPreviewReady(blockerGroups.webPreviewBlockers, hasRenderableEntry),
         scanStats: j.scanStats,
       }),
     );
@@ -713,6 +734,14 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
                       <dt className="text-muted-foreground">Estimated preview cost</dt>
                       <dd className="font-semibold text-foreground tabular-nums">
                         {scanPayload.creditEstimate.estimatedActionCredits} Action Credits
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-muted-foreground">Web preview readiness</dt>
+                      <dd className="font-medium text-foreground">
+                        {scanResult.webPreviewReady
+                          ? "Ready to prepare web preview"
+                          : "Web preview blockers detected — fix before preview"}
                       </dd>
                     </div>
                     <div>

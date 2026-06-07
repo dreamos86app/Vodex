@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { safeAuthReturnPath } from "@/lib/auth/oauth-prep";
+import { markRedirectToNextAfterValidSession } from "@/lib/auth/auth-session-state";
 
 function safeNextPath(raw: string | null): string {
   return safeAuthReturnPath(raw) ?? "/create";
@@ -34,7 +35,9 @@ export function AuthPageGuard({ children }: { children: React.ReactNode }) {
             await supabase.auth.signOut({ scope: "local" });
           }
         } else {
-          router.replace(safeNextPath(searchParams.get("next")));
+          const dest = safeNextPath(searchParams.get("next"));
+          markRedirectToNextAfterValidSession(dest);
+          router.replace(dest);
         }
       } catch {
         /* show login — user can retry */

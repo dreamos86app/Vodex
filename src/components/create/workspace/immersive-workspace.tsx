@@ -57,6 +57,8 @@ import { AttachmentRail, DropZone, type Attachment } from "@/components/create/w
 import { PreviewPanel } from "@/components/create/workspace/preview-panel";
 import { PreviewBlockedPopup, type PreviewBlockingIssue } from "@/components/preview/preview-blocked-popup";
 import { resolveAuthoritativePreviewBlocker } from "@/lib/preview/preview-blocker-priority";
+import { classifyImportedPreviewState } from "@/lib/preview/imported-preview-state";
+import { routeBuilderTask } from "@/lib/intent/task-router";
 import { RepairCenter } from "@/components/repair/repair-center";
 import { buildRepairChatPrompt } from "@/lib/repair/repair-chat-prompt";
 import { BuildLiveProgress } from "@/components/create/workspace/build-live-progress";
@@ -1335,7 +1337,10 @@ export function ImmersiveWorkspace({
     return composerHasMeaningfulText(dom) ? dom : text;
   }, [composerLiveText, resolveComposerTextareaEl, composerDomTick]);
   const planFirstEnabled =
-    mode === "build" && buildStrategy === "plan_first" && !blueprintApproved;
+    mode === "build" &&
+    buildStrategy === "plan_first" &&
+    !blueprintApproved &&
+    !effectiveProjectId;
   const composerBuildStrategy =
     mode === "discuss" ? "discuss" : mode === "edit" ? "edit" : buildStrategy;
   const canEnqueueBuild =
@@ -1835,11 +1840,35 @@ export function ImmersiveWorkspace({
       setLockedTaskMode(submitMode);
       lockedTaskModeRef.current = submitMode;
       const activeProjectId = projectIdRef.current ?? effectiveProjectId;
+      const taskRoute = routeBuilderTask(text, {
+        projectId: activeProjectId,
+        hasFiles: codeFiles.length > 0 || projectFiles.length > 0,
+        mode: submitMode,
+      });
+
+      if (taskRoute.route === "question_only") {
+        submitMode = "discuss";
+        setLockedTaskMode("discuss");
+        setBuildStarting(false);
+      } else if (
+        activeProjectId &&
+        (taskRoute.route === "project_edit" || taskRoute.route === "project_repair")
+      ) {
+        submitMode = "edit";
+        setLockedTaskMode("edit");
+        setMode("edit");
+        if (buildStrategyRef.current === "plan_first") {
+          buildStrategyRef.current = "build_now";
+          setBuildStrategy("build_now");
+        }
+      }
+
       const isQuestion =
-        !activeProjectId &&
-        (intentPreview?.intent === "question_only" ||
-          intentPreview?.shouldCreateProject === false ||
-          intentPreview?.shouldAnswerQuestion);
+        taskRoute.route === "question_only" ||
+        (!activeProjectId &&
+          (intentPreview?.intent === "question_only" ||
+            intentPreview?.shouldCreateProject === false ||
+            intentPreview?.shouldAnswerQuestion));
 
       if (submitMode === "build" && isQuestion) {
         submitMode = "discuss";
@@ -1847,7 +1876,9 @@ export function ImmersiveWorkspace({
         setBuildStarting(false);
       }
       const planFirstPlanning =
-        buildStrategyRef.current === "plan_first" && !blueprintApprovedRef.current;
+        !activeProjectId &&
+        buildStrategyRef.current === "plan_first" &&
+        !blueprintApprovedRef.current;
 
       if (activeProjectId) {
         projectIdRef.current = activeProjectId;
@@ -1976,10 +2007,14 @@ export function ImmersiveWorkspace({
         options?.forceBuild === true ||
         shouldStartBuildPipeline(submitMode, buildIntent);
       const useAsyncBuild =
-        submitMode === "build" &&
+        (submitMode === "build" || (submitMode === "edit" && taskRoute.route === "project_repair")) &&
         Boolean(asyncProjectId) &&
         wantsBuildPipeline &&
-        !(buildStrategyRef.current === "plan_first" && !blueprintApprovedRef.current);
+        !(
+          !activeProjectId &&
+          buildStrategyRef.current === "plan_first" &&
+          !blueprintApprovedRef.current
+        );
 
       if (useAsyncBuild && asyncProjectId) {
         setSubmitStatusLabel("Build queued");
@@ -2333,6 +2368,7 @@ export function ImmersiveWorkspace({
     fileCount: zipImportMeta?.file_count,
     loadedPathCount: projectFiles.length,
   });
+  const isImportedZipProject = zipImportMeta !== null;
 
   async function prepareImportedApp() {
     if (!effectiveProjectId || prepareImportBusy) return;
@@ -2536,6 +2572,14 @@ export function ImmersiveWorkspace({
       )
     : null;
   const previewSrcRenderable = previewRuntime?.previewRenderable === true;
+  const importedPreviewClassification = React.useMemo(
+    () =>
+      classifyImportedPreviewState(previewRuntime, {
+        isImported: isImportedZipProject,
+        hasFiles: codeFiles.length > 0 || projectFiles.length > 0,
+      }),
+    [previewRuntime, isImportedZipProject, codeFiles.length, projectFiles.length],
+  );
   const activeMode = lockedTaskMode ?? mode;
   const buildActive =
     activeMode === "build" &&
@@ -2577,6 +2621,15 @@ export function ImmersiveWorkspace({
       return;
     }
     if (previewSrcRenderable) {
+      setPreviewIssue(null);
+      return;
+    }
+    if (
+      isImportedZipProject &&
+      (importedPreviewClassification.state === "preview_not_started" ||
+        importedPreviewClassification.state === "preview_loading" ||
+        importedPreviewClassification.state === "preview_artifact_missing")
+    ) {
       setPreviewIssue(null);
       return;
     }
@@ -2631,6 +2684,8 @@ export function ImmersiveWorkspace({
     projectDataRefresh,
     previewSrcRenderable,
     previewRuntime,
+    isImportedZipProject,
+    importedPreviewClassification.state,
   ]);
   const extractedCode = React.useMemo(() => extractFencedCode(lastAssistantText), [lastAssistantText]);
   const integrationSecretKeys = React.useMemo(
@@ -2920,6 +2975,7 @@ export function ImmersiveWorkspace({
                   const showPlanInChat =
                     m.role === "assistant" &&
                     isLastAssistant &&
+                    !effectiveProjectId &&
                     buildStrategy === "plan_first" &&
                     !blueprintApproved &&
                     Boolean(blueprint);
@@ -3363,6 +3419,16 @@ export function ImmersiveWorkspace({
                 }
                 previewRebuilding={previewRebuilding}
                 previewStarting={previewStarting}
+                importedPreviewState={isImportedZipProject ? importedPreviewClassification : null}
+                onPrepareImportedPreview={
+                  isImportedZipProject ? () => void prepareImportedApp() : undefined
+                }
+                onRepairPreview={
+                  effectiveProjectId
+                    ? () => sendPreviewRepairToChat(true)
+                    : undefined
+                }
+                prepareImportBusy={prepareImportBusy}
                 onEditTarget={(info) => {
                   setEditTarget(info.section);
                   setScope(info.section.toLowerCase().replace(/\s+/g, "_") as EditScope);
@@ -3374,12 +3440,20 @@ export function ImmersiveWorkspace({
                   previewIssue && !previewDismissed && "opacity-60",
                 )}
               />
-              {previewIssue && !previewDismissed ? (
+              {previewIssue &&
+              !previewDismissed &&
+              (importedPreviewClassification.state === "preview_blocked_iframe" ||
+                importedPreviewClassification.state === "preview_runtime_failed") ? (
                 <PreviewBlockedPopup
                   issue={previewIssue}
                   repairPrompt={repairChatPrompt}
                   onFixInChat={sendPreviewRepairToChat}
                   onDismiss={() => setPreviewDismissed(true)}
+                  variant={
+                    importedPreviewClassification.state === "preview_blocked_iframe"
+                      ? "iframe"
+                      : "runtime"
+                  }
                 />
               ) : null}
               {effectiveProject?.id &&

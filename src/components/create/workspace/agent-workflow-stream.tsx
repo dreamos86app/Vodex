@@ -101,7 +101,7 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
   const isCreate = event.category === "file_created";
   const isDelete = event.category === "file_deleted";
   const Icon = isDelete ? FileMinus : isCreate ? FilePlus : FilePen;
-  const verb = isDelete ? "Deleted" : isCreate ? "Created" : "Edited";
+  const prefix = isDelete ? "−" : isCreate ? "+" : "~";
   const path = event.filePath!;
   const hasCounts =
     typeof event.addedLines === "number" || typeof event.removedLines === "number";
@@ -120,7 +120,7 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
       data-testid="workflow-file-card"
     >
       <Icon className="size-3.5 shrink-0 text-accent/85" strokeWidth={1.75} />
-      <span className="shrink-0 text-[10.5px] font-medium text-muted-foreground">{verb}</span>
+      <span className="shrink-0 font-mono text-[10.5px] font-semibold text-muted-foreground">{prefix}</span>
       <code className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground">{path}</code>
       {hasCounts && !isDelete ? (
         <AnimatedLineDelta

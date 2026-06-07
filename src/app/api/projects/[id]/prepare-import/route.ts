@@ -4,10 +4,11 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build";
 import { isZipImportProject, readImportMeta, preferredEntryFile } from "@/lib/projects/imported-project-state";
 import { requireAuthUser, requireMutationProjectId, isNextResponse } from "@/lib/ids/api-mutation-guard";
+import { runProjectPreviewBuild } from "@/lib/imports/run-project-preview-build";
 
 export const dynamic = "force-dynamic";
 
-/** Normalize imported ZIP app: entry file, preview flags, routes — no AI rebuild. */
+/** Normalize imported ZIP app and queue honest preview build — no fake preview_ready. */
 export async function POST(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -57,18 +58,19 @@ export async function POST(
   const paths = files.map((f) => f.path);
   const entry = preferredEntryFile(paths) ?? paths.find((p) => /\.html?$/i.test(p)) ?? paths[0];
   const imp = readImportMeta(meta);
-  const previewReady = Boolean(entry && (imp.preview_ready || /\.html?$/i.test(entry ?? "")));
 
   const nextMeta = {
     ...meta,
     source: "zip_import",
-    lifecycle_status: previewReady ? "imported_preview_ready" : "imported",
-    preview_ready: previewReady,
-    preview_honest: previewReady,
+    lifecycle_status: "imported",
+    preview_ready: false,
+    preview_honest: false,
+    preview_renderable: false,
+    preview_status: "queued",
     file_count: files.length,
     import: {
       ...imp,
-      preview_ready: previewReady,
+      preview_ready: false,
       entry_file: entry,
       prepared_at: new Date().toISOString(),
     },
@@ -85,10 +87,18 @@ export async function POST(
 
   await reconcileProjectBuildState(admin, projectId, authUser.id);
 
+  const build = await runProjectPreviewBuild({
+    admin,
+    writer: admin,
+    userId: authUser.id,
+    projectId,
+  });
+
   return NextResponse.json({
     ok: true,
     fileCount: files.length,
     entryFile: entry,
-    previewReady,
+    previewReady: false,
+    previewBuild: build,
   });
 }
