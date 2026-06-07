@@ -7,6 +7,8 @@ import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { lifecyclePatch, legacyProjectStatus } from "@/lib/projects/project-lifecycle";
 import { hasMeaningfulProjectFiles } from "@/lib/projects/project-visibility-status";
 import { sanitizeUserFacingDescription } from "@/lib/projects/user-facing-description";
+import { resolvePersistedBuildStatus } from "@/lib/build/build-state-truth-resolver";
+import type { BuildJobEventRow } from "@/lib/build/build-job-events";
 
 type Writer = SupabaseClient<Database>;
 
@@ -164,15 +166,70 @@ export async function finalizeBuildFailed(input: {
   projectId?: string;
   userId?: string;
   skipJobStatusUpdate?: boolean;
+  memoryFileCount?: number;
+  persistedFileCount?: number;
+  failureKind?: string | null;
+  previewFailed?: boolean;
+  workflowEvents?: BuildJobEventRow[];
 }): Promise<void> {
   const now = new Date().toISOString();
+
+  let appFilesCount = input.persistedFileCount ?? 0;
+  let previewSessionsCount = 0;
+  let workflowEvents = input.workflowEvents ?? [];
+
+  if (input.projectId) {
+    if (appFilesCount === 0) {
+      const { count } = await input.writer
+        .from("app_files")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", input.projectId);
+      appFilesCount = count ?? 0;
+    }
+    previewSessionsCount = await (async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (input.writer as any)
+        .from("preview_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", input.projectId);
+      return count ?? 0;
+    })();
+
+    if (workflowEvents.length === 0 && input.buildJobId) {
+      const { data: rows } = await input.writer
+        .from("build_job_events")
+        .select("id, job_id, project_id, user_id, type, title, detail, file_path, progress_percent, metadata, created_at")
+        .eq("job_id", input.buildJobId)
+        .order("created_at", { ascending: true });
+      workflowEvents = (rows ?? []) as BuildJobEventRow[];
+    }
+  }
+
+  const resolved = resolvePersistedBuildStatus({
+    appFilesCount,
+    previewSessionsCount,
+    workflowEvents,
+    failureKind: input.failureKind,
+    failureMessage: input.errorMessage,
+    previewFailed: input.previewFailed,
+    wasPersistenceAttempted: workflowEvents.some((e) => e.type === "saving_files"),
+    wasPreviewStartAttempted: workflowEvents.some((e) => e.type === "preparing_preview"),
+  });
+
+  const jobStatus = resolved.jobStatus;
+  const jobError =
+    jobStatus === "completed" ? null : input.errorMessage.slice(0, 2000);
+
   if (input.buildJobId && !input.skipJobStatusUpdate) {
     await input.writer
       .from("build_jobs")
       .update({
-        status: "failed",
-        error_message: input.errorMessage.slice(0, 2000),
+        status: jobStatus,
+        error_message: jobError,
         completed_at: now,
+        ...(jobStatus === "completed"
+          ? { result_summary: resolved.headline.slice(0, 500) }
+          : {}),
       } as never)
       .eq("id", input.buildJobId);
   }
@@ -187,15 +244,26 @@ export async function finalizeBuildFailed(input: {
       cur?.metadata && typeof cur.metadata === "object" && !Array.isArray(cur.metadata)
         ? (cur.metadata as Record<string, unknown>)
         : {};
-    const meaningful = hasMeaningfulProjectFiles(prevMeta);
+    const meaningful =
+      hasMeaningfulProjectFiles(prevMeta) || appFilesCount >= MIN_RENDERABLE_FILES;
+    const lifecycle =
+      resolved.buildStatus === "failed"
+        ? "failed"
+        : resolved.buildStatus === "preview_failed"
+          ? "needs_attention"
+          : "generated";
+
     await input.writer
       .from("projects")
       .update({
-        build_status: "failed",
-        status: "error",
+        build_status: resolved.buildStatus,
+        status: resolved.buildStatus === "failed" ? "error" : "draft",
         metadata: {
           ...prevMeta,
-          ...lifecyclePatch("failed", { error: input.errorMessage.slice(0, 500) }),
+          ...lifecyclePatch(lifecycle, { error: input.errorMessage.slice(0, 500) }),
+          ...resolved.metadataPatch,
+          terminal_summary_headline: resolved.headline,
+          terminal_summary_body: resolved.bodyLines.join(" "),
           visibility_status: meaningful ? "draft" : "failed_attempt",
           hide_from_list: !meaningful,
           hide_from_home: !meaningful,

@@ -527,6 +527,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         userId: input.userId,
         errorMessage: pr.buildContract.userMessage,
         skipJobStatusUpdate: true,
+        failureKind: "failed_before_generation",
+        memoryFileCount: 0,
+        persistedFileCount: 0,
       });
 
       const preGenKind = failureKindForPersist({
@@ -789,6 +792,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         userId: input.userId,
         errorMessage: "Files were created but content could not be read. Try repair in chat.",
         skipJobStatusUpdate: true,
+        persistedFileCount: postPersist.visibleFileCount,
+        memoryFileCount: pr.files.length,
+        failureKind: "failed_after_generation",
       });
       await persistBuildJobEvent(input.writer, {
         ...eventCtx,
@@ -918,8 +924,11 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         buildJobId: input.buildJobId,
         projectId: input.projectId,
         userId: input.userId,
-        errorMessage: failDetail,
+        errorMessage: terminalTruth.headline,
         skipJobStatusUpdate: true,
+        memoryFileCount: pr.files.length,
+        persistedFileCount: persistResult.savedCount,
+        failureKind: truthFailureKindForPersist(terminalTruth),
       });
 
       const truthKind = truthFailureKindForPersist(terminalTruth);

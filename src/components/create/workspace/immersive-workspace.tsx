@@ -165,6 +165,19 @@ import { CREATE_BUILD_BUNDLE } from "@/lib/dev/create-build-bundle";
 import type { Tables } from "@/lib/supabase/types";
 import type { CreateIntentResult } from "@/lib/intent/create-intent-classifier";
 
+async function repairPersistedBuildStateTruth(projectId: string): Promise<void> {
+  try {
+    await fetch(`/api/projects/${projectId}/build-state-truth`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startPreview: true }),
+    });
+  } catch {
+    /* best-effort server repair */
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const SEND_COOLDOWN_MS = 900;
@@ -985,6 +998,7 @@ export function ImmersiveWorkspace({
         let creditsRefundedFlag = false;
         if (uid && pid) {
           await reconcileProjectBuildState(supabase, pid, uid);
+          await repairPersistedBuildStateTruth(pid);
           if (mode === "build") {
             const { data: proj } = await supabase
               .from("projects")
@@ -1213,9 +1227,11 @@ export function ImmersiveWorkspace({
         }
         if (pid) clearWorkspaceTask(pid);
         if (pid && uid) {
-          void reconcileProjectBuildState(supabase, pid, uid).then(() => {
-            setProjectDataRefresh((n) => n + 1);
-          });
+          void reconcileProjectBuildState(supabase, pid, uid)
+            .then(() => repairPersistedBuildStateTruth(pid))
+            .then(() => {
+              setProjectDataRefresh((n) => n + 1);
+            });
         }
         setTimeout(() => drainPromptQueueRef.current(), 400);
       },

@@ -11,6 +11,8 @@ import {
   type PreviewFailureCode,
 } from "@/lib/preview/preview-failure-codes";
 import { computeProjectCardStatus } from "@/lib/projects/project-card-status";
+import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
+import { repairBuildStateTruth } from "@/lib/build/build-state-truth-repair";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,28 @@ export async function GET(
       ? (project.metadata as Record<string, unknown>)
       : {};
   const lifecycle = readLifecycleFromMetadata(project.metadata);
+
+  const { count: appFileCount } = await reader
+    .from("app_files")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId);
+
+  if (
+    (appFileCount ?? 0) >= MIN_RENDERABLE_FILES &&
+    (project.build_status === "failed" || project.build_status === "needs_repair")
+  ) {
+    await repairBuildStateTruth(reader, projectId, user.id, {
+      startPreview: true,
+      apply: true,
+    });
+    const { data: refreshed } = await reader
+      .from("projects")
+      .select("id, build_status, metadata, preview_url, owner_id")
+      .eq("id", projectId)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (refreshed) Object.assign(project, refreshed);
+  }
 
   const { data: files } = await reader
     .from("app_files")

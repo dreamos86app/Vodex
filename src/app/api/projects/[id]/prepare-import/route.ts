@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
-import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build";
+import { reconcileProjectBuildStateServer } from "@/lib/build/reconcile-project-build-server";
 import { isZipImportProject, readImportMeta, preferredEntryFile } from "@/lib/projects/imported-project-state";
 import { requireAuthUser, requireMutationProjectId, isNextResponse } from "@/lib/ids/api-mutation-guard";
 import { runProjectPreviewBuild } from "@/lib/imports/run-project-preview-build";
@@ -85,7 +85,7 @@ export async function POST(
     .eq("id", projectId)
     .eq("owner_id", authUser.id);
 
-  await reconcileProjectBuildState(admin, projectId, authUser.id);
+  await reconcileProjectBuildStateServer(admin, projectId, authUser.id);
 
   const build = await runProjectPreviewBuild({
     admin,

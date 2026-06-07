@@ -12,10 +12,10 @@ import {
   Pencil,
   Copy,
   Settings,
-  FolderInput,
   Star,
   Download,
   Trash2,
+  Rocket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
@@ -38,6 +38,7 @@ export function ProjectCardOverflowMenu({
   appName,
   previewUrl,
   publicUrl,
+  publishHref,
   isFavorite,
   onToggleFavorite,
   onRenamed,
@@ -47,6 +48,7 @@ export function ProjectCardOverflowMenu({
   appName: string;
   previewUrl?: string | null;
   publicUrl?: string | null;
+  publishHref?: string | null;
   isFavorite?: boolean;
   onToggleFavorite?: (next: boolean) => void;
   onRenamed?: () => void;
@@ -169,17 +171,14 @@ export function ProjectCardOverflowMenu({
     { id: "share", label: "Share", icon: Share2, onClick: () => void shareApp() },
     { id: "rename", label: "Rename", icon: Pencil, onClick: openRename },
     { id: "clone", label: "Clone app", icon: Copy, onClick: () => void cloneApp(), disabled: busy },
+    ...(publishHref
+      ? [{ id: "publish", label: "Publish app", icon: Rocket, href: publishHref }]
+      : []),
     {
       id: "settings",
       label: "App settings",
       icon: Settings,
       href: `/apps/${projectId}/builder?tab=dashboard&section=settings`,
-    },
-    {
-      id: "folder",
-      label: "Move to folder",
-      icon: FolderInput,
-      onClick: () => { toast.info("Folders coming soon"); closeMenu(); },
     },
     {
       id: "favorite",
@@ -235,32 +234,37 @@ export function ProjectCardOverflowMenu({
         returnFocusRef={btnRef}
         data-testid="project-card-overflow-dropdown"
         layer="contextMenu"
+        scrim
+        width={272}
       >
-        <ul className="py-1">
-          {items.map((item) => {
+        <div className="border-b border-border/60 px-3.5 py-2.5">
+          <p className="truncate text-[13px] font-semibold text-foreground">{appName}</p>
+          <p className="text-[10.5px] text-muted-foreground">App actions</p>
+        </div>
+        <ul className="max-h-[min(70vh,420px)] overflow-y-auto py-1.5">
+          {items.map((item, index) => {
             const Icon = item.icon;
+            const showDivider = item.destructive && index > 0;
             const cls = cn(
-              "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[12.5px] font-medium transition",
-              "hover:bg-accent/8 focus-visible:bg-accent/8 focus-visible:outline-none",
-              item.destructive ? "text-destructive hover:bg-destructive/8" : "text-foreground",
+              "flex w-full cursor-pointer items-center gap-3 px-3.5 py-2.5 text-left text-[13px] font-medium transition",
+              "hover:bg-accent/10 focus-visible:bg-accent/10 focus-visible:outline-none",
+              item.destructive ? "text-destructive hover:bg-destructive/10" : "text-foreground",
               item.disabled && "pointer-events-none opacity-50",
             );
-            if (item.href) {
-              return (
-                <li key={item.id}>
-                  <Link href={item.href} className={cls} onClick={closeMenu}>
-                    <Icon className="size-3.5 shrink-0" />
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            }
             return (
               <li key={item.id}>
-                <button type="button" className={cls} onClick={item.onClick} disabled={item.disabled}>
-                  <Icon className="size-3.5 shrink-0" />
-                  {item.label}
-                </button>
+                {showDivider ? <div className="my-1.5 border-t border-border/60" role="separator" /> : null}
+                {item.href ? (
+                  <Link href={item.href} className={cls} onClick={closeMenu}>
+                    <Icon className="size-4 shrink-0 opacity-80" strokeWidth={2} />
+                    {item.label}
+                  </Link>
+                ) : (
+                  <button type="button" className={cls} onClick={item.onClick} disabled={item.disabled}>
+                    <Icon className="size-4 shrink-0 opacity-80" strokeWidth={2} />
+                    {item.label}
+                  </button>
+                )}
               </li>
             );
           })}

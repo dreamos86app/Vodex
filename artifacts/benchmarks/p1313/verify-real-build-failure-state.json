@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-06-07T21:08:30.739Z",
+  "fixture": {
+    "failure_kind": "failed_before_generation",
+    "memory_phrase": "12 files in memory",
+    "app_files_count": 12,
+    "preview_sessions_count": 0
+  },
+  "expected": {
+    "build_status": "files_saved_preview_pending",
+    "headline_not": "Couldn't start the build"
+  },
+  "actual": {
+    "build_status": "files_saved_preview_pending",
+    "headline": "Build saved — preparing preview…",
+    "failure_kind": "files_generated_preview_pending",
+    "job_status": "completed"
+  }
+}

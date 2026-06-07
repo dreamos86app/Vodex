@@ -204,6 +204,7 @@ function ProjectCard({
               appName={appName}
               previewUrl={project.preview_url}
               publicUrl={publicUrl}
+              publishHref={canPublish ? `/projects/${project.id}?tab=publish` : null}
               isFavorite={Boolean(project.is_favorite)}
               onToggleFavorite={(next) => onToggleFavorite(project.id, next)}
               onRenamed={onRefresh}

@@ -43,3 +43,11 @@ export const OVERLAY_DIALOG_PANEL_CLASS =
 /** Shared dialog backdrop. */
 export const OVERLAY_DIALOG_BACKDROP_CLASS =
   "fixed inset-0 bg-foreground/30 backdrop-blur-sm";
+
+/** Full-screen scrim for context menus — hides page content behind heavy blur. */
+export const OVERLAY_MENU_SCRIM_CLASS =
+  "fixed inset-0 bg-background/72 backdrop-blur-2xl backdrop-saturate-150 dark:bg-background/82";
+
+/** Solid menu panel when scrim is active (no see-through to cards below). */
+export const OVERLAY_MENU_SOLID_SURFACE_CLASS =
+  "overflow-hidden rounded-2xl border border-border/90 bg-background shadow-2xl ring-1 ring-border/70";

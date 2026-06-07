@@ -26,11 +26,17 @@ export function computeProjectCardStatus(input: ProjectCardStatusInput): Project
   const previewFailed =
     buildStatus === "preview_failed" || Boolean(meta.files_ready_preview_failed);
 
-  if (buildStatus === "running" || buildStatus === "queued") {
+  if (buildStatus === "running" || buildStatus === "queued" || buildStatus === "building") {
     return "building";
   }
   if (previewFailed) {
     return "preview_failed";
+  }
+  if (
+    buildStatus === "files_saved_preview_pending" ||
+    buildStatus === "needs_repair"
+  ) {
+    return "preview_preparing";
   }
   if (buildStatus === "failed") {
     return "failed";

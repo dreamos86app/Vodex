@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import * as React from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Plug } from "lucide-react";
 import { IntegrationIconWell } from "@/components/brand/integration-icons";
 import { variants } from "@/lib/motion";
@@ -10,33 +11,206 @@ export interface IntegrationShowcaseItem {
   name: string;
   desc: string;
   slug: string;
-  iconWrap?: string;
+  /** Tailwind gradient for center glow */
+  glow: string;
+  ring: string;
 }
 
+/** Player-visible integrations only — no model API keys (OpenAI, Gemini, etc.). */
 export const INTEGRATION_SHOWCASE_ITEMS: IntegrationShowcaseItem[] = [
-  { name: "Supabase", desc: "Database, Auth, Storage, Realtime", slug: "supabase" },
-  { name: "Stripe", desc: "Payments, subscriptions, billing", slug: "stripe" },
-  { name: "GitHub", desc: "Source control, CI/CD", slug: "github" },
-  { name: "Vercel", desc: "Deployment and edge network", slug: "vercel" },
-  { name: "Resend", desc: "Transactional email delivery", slug: "resend" },
-  { name: "Slack", desc: "Notifications and webhooks", slug: "slack" },
-  { name: "OpenAI", desc: "AI completions and embeddings", slug: "openai" },
-  { name: "Gemini", desc: "Google multimodal models", slug: "gemini" },
+  {
+    name: "Supabase",
+    desc: "Database, Auth, Storage",
+    slug: "supabase",
+    glow: "from-[#3ECF8E]/35 via-[#3ECF8E]/10 to-transparent",
+    ring: "ring-[#3ECF8E]/35",
+  },
+  {
+    name: "Stripe",
+    desc: "Payments & billing",
+    slug: "stripe",
+    glow: "from-[#635BFF]/35 via-[#635BFF]/10 to-transparent",
+    ring: "ring-[#635BFF]/35",
+  },
+  {
+    name: "GitHub",
+    desc: "Source control & CI",
+    slug: "github",
+    glow: "from-slate-400/30 via-slate-300/10 to-transparent dark:from-white/25 dark:via-white/8",
+    ring: "ring-border/60 dark:ring-white/20",
+  },
+  {
+    name: "Vercel",
+    desc: "Deploy & edge",
+    slug: "vercel",
+    glow: "from-slate-500/25 via-slate-400/8 to-transparent dark:from-white/22",
+    ring: "ring-border/60 dark:ring-white/20",
+  },
+  {
+    name: "Resend",
+    desc: "Transactional email",
+    slug: "resend",
+    glow: "from-neutral-500/25 via-neutral-400/8 to-transparent",
+    ring: "ring-border/55",
+  },
+  {
+    name: "Slack",
+    desc: "Alerts & webhooks",
+    slug: "slack",
+    glow: "from-[#E01E5A]/30 via-[#36C5F0]/12 to-transparent",
+    ring: "ring-[#36C5F0]/30",
+  },
+  {
+    name: "Discord",
+    desc: "Community hooks",
+    slug: "discord",
+    glow: "from-[#5865F2]/35 via-[#5865F2]/10 to-transparent",
+    ring: "ring-[#5865F2]/35",
+  },
+  {
+    name: "Firebase",
+    desc: "Mobile auth & data",
+    slug: "firebase",
+    glow: "from-[#FFCA28]/30 via-[#FFA000]/12 to-transparent",
+    ring: "ring-[#FFA000]/30",
+  },
+  {
+    name: "Paddle",
+    desc: "SaaS subscriptions",
+    slug: "paddle",
+    glow: "from-[#FDDD35]/28 via-[#FDDD35]/10 to-transparent",
+    ring: "ring-[#FDDD35]/28",
+  },
 ];
 
-function BrandIcon({
-  name,
-  slug,
-  dense,
-  iconWrap,
-}: IntegrationShowcaseItem & { dense: boolean }) {
+const LOOP_ITEMS = [...INTEGRATION_SHOWCASE_ITEMS, ...INTEGRATION_SHOWCASE_ITEMS];
+
+function ElectricPlugIcon() {
   return (
-    <IntegrationIconWell
-      provider={slug}
-      size={dense ? "sm" : "md"}
-      wellClassName={iconWrap}
-      title={name}
-    />
+    <div className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-1 ring-accent/35 shadow-[0_0_24px_-6px_rgba(99,102,241,0.55)]">
+      <div className="integration-electric-plug absolute inset-0 opacity-90" aria-hidden />
+      <div
+        className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.45),transparent_55%)]"
+        aria-hidden
+      />
+      <Plug className="relative z-10 size-[18px] text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.35)]" strokeWidth={2.25} />
+    </div>
+  );
+}
+
+function IntegrationCarouselTile({
+  item,
+  centerWeight,
+}: {
+  item: IntegrationShowcaseItem;
+  centerWeight: number;
+}) {
+  const scale = 0.72 + centerWeight * 0.38;
+  const opacity = 0.35 + centerWeight * 0.65;
+  const lift = centerWeight * -10;
+
+  return (
+    <div
+      className="flex w-[148px] shrink-0 flex-col items-center justify-end px-1"
+      style={{
+        transform: `translateY(${lift}px) scale(${scale})`,
+        opacity,
+        transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease",
+      }}
+    >
+      <div
+        className={cn(
+          "relative flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl px-3 py-3.5 ring-1 transition-shadow duration-300",
+          "bg-gradient-to-b",
+          item.glow,
+          item.ring,
+          centerWeight > 0.72 && "shadow-[0_20px_48px_-18px_rgba(30,107,255,0.45)]",
+        )}
+      >
+        <IntegrationIconWell provider={item.slug} size="md" title={item.name} />
+        <div className="text-center">
+          <p className="text-[12px] font-semibold tracking-tight text-foreground">{item.name}</p>
+          <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground">{item.desc}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IntegrationMarqueeRail() {
+  const reduceMotion = useReducedMotion();
+  const trackRef = React.useRef<HTMLDivElement>(null);
+  const [offsets, setOffsets] = React.useState<number[]>([]);
+  const [phase, setPhase] = React.useState(0);
+
+  React.useEffect(() => {
+    if (reduceMotion) return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(32, now - last);
+      last = now;
+      setPhase((p) => p + dt * 0.028);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [reduceMotion]);
+
+  React.useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const measure = () => {
+      const children = Array.from(track.children) as HTMLElement[];
+      const container = track.parentElement;
+      if (!container || children.length === 0) return;
+      const centerX = container.getBoundingClientRect().left + container.clientWidth / 2;
+      const next = children.map((el) => {
+        const r = el.getBoundingClientRect();
+        const itemCenter = r.left + r.width / 2;
+        const dist = Math.abs(itemCenter - centerX);
+        const norm = Math.max(0, 1 - dist / (container.clientWidth * 0.38));
+        return norm;
+      });
+      setOffsets(next);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(track);
+    const id = window.setInterval(measure, 120);
+    return () => {
+      ro.disconnect();
+      window.clearInterval(id);
+    };
+  }, [phase, reduceMotion]);
+
+  return (
+    <div className="relative overflow-hidden py-2">
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-surface/95 to-transparent dark:from-background/90"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-surface/95 to-transparent dark:from-background/90"
+        aria-hidden
+      />
+      <div
+        ref={trackRef}
+        className={cn(
+          "flex w-max items-end gap-2 will-change-transform",
+          reduceMotion ? "" : "animate-[integration-marquee_42s_linear_infinite]",
+        )}
+        style={reduceMotion ? undefined : { animationPlayState: "running" }}
+      >
+        {LOOP_ITEMS.map((item, i) => (
+          <IntegrationCarouselTile
+            key={`${item.slug}-${i}`}
+            item={item}
+            centerWeight={offsets[i] ?? 0}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -47,35 +221,29 @@ export function IntegrationShowcaseGrid({
   className?: string;
   dense?: boolean;
 }) {
+  if (!dense) {
+    return (
+      <div className={cn("overflow-hidden rounded-2xl bg-background/40 ring-1 ring-border/70", className)}>
+        <IntegrationMarqueeRail />
+      </div>
+    );
+  }
+
   return (
-    <motion.div
-      className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${className}`}
-    >
+    <motion.div className={cn("flex flex-wrap gap-2", className)}>
       {INTEGRATION_SHOWCASE_ITEMS.map((intg, i) => (
         <motion.div
           key={intg.name}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.03, duration: 0.2 }}
-          className={
-            dense
-              ? "flex items-center gap-3 rounded-[var(--radius-lg)] bg-background px-3 py-2.5 ring-1 ring-border"
-              : "group relative flex flex-col gap-2 overflow-hidden rounded-2xl bg-gradient-to-br from-surface to-background p-4 ring-1 ring-border transition hover:ring-accent/30 hover:shadow-lg"
-          }
+          className="flex items-center gap-2 rounded-xl bg-background px-3 py-2 ring-1 ring-border"
         >
-          <motion.div className="flex items-center gap-3">
-            <BrandIcon {...intg} dense={dense} />
-            <motion.div className="min-w-0 flex-1">
-              <p className={`font-semibold text-foreground ${dense ? "text-[12.5px]" : "text-[14px]"}`}>
-                {intg.name}
-              </p>
-              <p
-                className={`text-muted-foreground ${dense ? "truncate text-[10.5px]" : "mt-0.5 text-[12px] leading-snug line-clamp-2"}`}
-              >
-                {intg.desc}
-              </p>
-            </motion.div>
-          </motion.div>
+          <IntegrationIconWell provider={intg.slug} size="sm" title={intg.name} />
+          <div className="min-w-0">
+            <p className="text-[12px] font-semibold text-foreground">{intg.name}</p>
+            <p className="truncate text-[10px] text-muted-foreground">{intg.desc}</p>
+          </div>
         </motion.div>
       ))}
     </motion.div>
@@ -90,22 +258,16 @@ export function IntegrationShowcaseSection({ variant = "default" }: { variant?: 
       initial="hidden"
       animate="show"
       className="mx-auto w-full max-w-5xl"
+      data-testid="integrations-showcase"
     >
       <motion.div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <motion.div className="flex items-center gap-2">
-          <motion.div
-            className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-2xl ring-1 ring-accent/25 shadow-sm",
-              premium ? "bg-gradient-to-br from-accent/25 to-violet-500/15" : "bg-accent/12",
-            )}
-          >
-            <Plug className="size-[18px] text-accent" strokeWidth={2} />
-          </motion.div>
+        <motion.div className="flex items-center gap-3">
+          <ElectricPlugIcon />
           <motion.div>
             <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Integrations</h2>
             <p className="text-[12px] text-muted-foreground">
               {premium
-                ? "Drop-in adapters for data, payments, email, and AI — wire them up per app as you publish."
+                ? "Wire data, payments, email, and deploy targets per app — connect after you publish."
                 : "Connect services inside each app after you create it — overview only here."}
             </p>
           </motion.div>
@@ -113,10 +275,10 @@ export function IntegrationShowcaseSection({ variant = "default" }: { variant?: 
       </motion.div>
       <motion.div
         className={cn(
-          "rounded-2xl p-4 backdrop-blur-sm sm:p-5",
+          "rounded-2xl p-3 backdrop-blur-sm sm:p-4",
           premium
             ? "border border-accent/15 bg-gradient-to-br from-accent/[0.06] via-surface/50 to-background shadow-[0_20px_50px_-24px_rgba(30,107,255,0.35)] ring-1 ring-border/80"
-            : "bg-surface/40 ring-1 ring-border/80",
+            : "bg-surface/50 ring-1 ring-border/80 dark:bg-surface/30",
         )}
       >
         <IntegrationShowcaseGrid />

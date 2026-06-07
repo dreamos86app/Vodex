@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { scanAppSourceForReadiness } from "@/lib/publish/readiness-scan";
-import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build";
+import { reconcileProjectBuildStateServer } from "@/lib/build/reconcile-project-build-server";
 import { requireAuthUser, requireMutationProjectId, isNextResponse } from "@/lib/ids/api-mutation-guard";
 import { checkPublishReadiness } from "@/lib/publish/publish-readiness";
 import {
@@ -45,7 +45,7 @@ export async function GET(
 
   const admin = createServiceRoleClient() ?? supabase;
 
-  const buildReconcile = await reconcileProjectBuildState(admin, projectId, authUser.id);
+  const buildReconcile = await reconcileProjectBuildStateServer(admin, projectId, authUser.id);
 
   const { data: files } = await admin
     .from("app_files")

@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { reconcileProjectLifecycle } from "@/lib/projects/reconcile-lifecycle";
 import { completeBuildWithValidation } from "@/lib/build/complete-build-with-validation";
-
 type Writer = SupabaseClient<Database>;
 
 const STALE_BUILD_MS = 20 * 60 * 1000;

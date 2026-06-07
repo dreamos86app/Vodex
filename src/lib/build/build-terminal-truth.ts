@@ -223,14 +223,22 @@ export function resolveBuildTerminalTruth(
     showRepairActions = true;
     showPreviewActions = true;
   } else if (persistenceConfirmed && !previewRenderable) {
-    const pending =
-      input.previewStatus === "not_started" ||
-      input.previewStatus === "pending" ||
-      input.previewStatus === "preparing";
-    state = pending ? "files_generated_preview_pending" : "files_generated_preview_repair";
-    effectiveFailureKind = pending ? "files_generated_preview_pending" : "preview_failed";
-    showPreviewActions = true;
-    if (!pending) showRepairActions = true;
+    if (previewFailed) {
+      state = "files_generated_preview_repair";
+      effectiveFailureKind = "preview_failed";
+      showRepairActions = true;
+      showPreviewActions = true;
+    } else {
+      const pending =
+        input.previewStatus == null ||
+        input.previewStatus === "not_started" ||
+        input.previewStatus === "pending" ||
+        input.previewStatus === "preparing";
+      state = pending ? "files_generated_preview_pending" : "files_generated_preview_repair";
+      effectiveFailureKind = pending ? "files_generated_preview_pending" : "preview_failed";
+      showPreviewActions = true;
+      if (!pending) showRepairActions = true;
+    }
   } else if (recoverable && !persistenceConfirmed) {
     state = "files_generated_saving";
     effectiveFailureKind = "files_generated_preview_pending";

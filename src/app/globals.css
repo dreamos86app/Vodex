@@ -142,6 +142,8 @@
   --z-critical-alert: 1800;
   --z-toast: 1900;
   --z-debug: 2000;
+  /* Portal mount — ensures body-portaled overlays stack above page chrome */
+  --z-portal-root: 900;
   /* Legacy aliases — prefer dialog/sheet/confirmation above */
   --z-modal-backdrop: var(--z-dialog-backdrop);
   --z-modal: var(--z-dialog);
@@ -334,6 +336,53 @@
   100% {
     transform: translateX(120%);
   }
+}
+
+@keyframes integration-electric-mix {
+  0% {
+    background-position: 0% 50%;
+    filter: hue-rotate(0deg) saturate(1.2);
+  }
+  33% {
+    background-position: 100% 50%;
+    filter: hue-rotate(45deg) saturate(1.45);
+  }
+  66% {
+    background-position: 50% 100%;
+    filter: hue-rotate(-35deg) saturate(1.35);
+  }
+  100% {
+    background-position: 0% 50%;
+    filter: hue-rotate(0deg) saturate(1.2);
+  }
+}
+
+@keyframes integration-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+#vodex-portal-root [role="menu"],
+#vodex-portal-root [role="dialog"],
+#vodex-portal-root button[aria-label="Close menu"] {
+  pointer-events: auto;
+}
+
+.integration-electric-plug {
+  background: linear-gradient(
+    125deg,
+    #22d3ee 0%,
+    #6366f1 28%,
+    #a855f7 52%,
+    #f59e0b 78%,
+    #22d3ee 100%
+  );
+  background-size: 240% 240%;
+  animation: integration-electric-mix 5.5s ease-in-out infinite;
 }
 
 @keyframes ds-gen-scan {

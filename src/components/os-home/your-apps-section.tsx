@@ -35,6 +35,8 @@ export type YourAppsProject = ProjectCardInput & {
   is_favorite?: boolean | null;
 };
 
+const PUBLISHED_APPS_MAX = 7;
+
 export function YourAppsSection({
   projects,
   title = "Published & ready",
@@ -45,6 +47,7 @@ export function YourAppsSection({
   const { user, profile } = useAuthStore();
   const isAdmin = isDreamosOwnerEmail(user?.email ?? profile?.email);
   const hasApps = projects.length > 0;
+  const visibleApps = projects.slice(0, PUBLISHED_APPS_MAX);
 
   return (
     <section className="w-full" data-testid="your-apps-section">
@@ -68,7 +71,7 @@ export function YourAppsSection({
 
       {hasApps ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
-          {projects.slice(0, 12).map((p, i) => {
+          {visibleApps.map((p, i) => {
             const status = getProjectCardStatus(p);
             const badges = getUserSafeProjectBadges(p, { mode: "user" });
             const actions = getProjectCardActions(p, { isAdmin });
@@ -180,15 +183,14 @@ export function YourAppsSection({
               </motion.div>
             );
           })}
-          {projects.length < 12 ? (
           <Link
             href="/create"
             className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/80 px-4 py-6 transition hover:border-accent/40 hover:bg-accent/5"
+            data-testid="home-new-app-card"
           >
             <Plus className="size-5 text-accent" strokeWidth={2} />
             <span className="text-[11.5px] font-medium text-muted-foreground">New app</span>
           </Link>
-          ) : null}
         </div>
       ) : (
         <motion.div
