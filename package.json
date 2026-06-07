@@ -80,6 +80,8 @@
     "verify:build-terminal-truth": "node scripts/verify-build-terminal-truth.mjs",
     "verify:files-in-memory-not-catastrophic": "node scripts/verify-files-in-memory-not-catastrophic.mjs",
     "verify:p139-production": "node scripts/verify-p139-production.mjs",
+    "verify:generated-app-quality": "node scripts/verify-generated-app-quality.mjs",
+    "benchmark:generation-quality": "node scripts/benchmark-generation-quality.mjs",
     "verify:workflow-events-live": "node scripts/verify-p0-workflow-diagnostics.mjs workflow-events-live",
     "verify:build-diagnostics-center": "node scripts/verify-p0-workflow-diagnostics.mjs build-diagnostics-center",
     "verify:preview-failure-diagnostics": "node scripts/verify-p0-workflow-diagnostics.mjs preview-failure-diagnostics",

@@ -69,7 +69,7 @@ export function scoreTaskScope(prompt: string): TaskScopeResult {
     tooLarge,
     coreV1Only: tooLarge,
     backlog,
-    maxWorkUnits: 8,
-    maxFiles: 14,
+    maxWorkUnits: complexity >= 8 ? 14 : complexity >= 5 ? 12 : 10,
+    maxFiles: complexity >= 8 ? 82 : complexity >= 5 ? 58 : 38,
   };
 }

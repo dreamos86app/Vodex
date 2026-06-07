@@ -105,6 +105,20 @@ import {
   userFacingArchetypeLabel,
   userFacingRepairPassLabel,
 } from "@/lib/workflow/user-facing-workflow-events";
+import {
+  resolveFullAppGenerationPlan,
+  type FullAppGenerationBudget,
+} from "@/lib/build/full-app-generation-plan";
+import {
+  scoreGeneratedAppQuality,
+  formatQualitySummaryForStream,
+  type GeneratedAppQualityReport,
+} from "@/lib/build/generated-app-quality-score";
+import {
+  buildContinuationFrontendPrompt,
+  shouldContinueGeneration,
+} from "@/lib/build/generation-continuation";
+import { checkRouteConnectivity } from "@/lib/build/route-connectivity-check";
 
 export type WorkflowEventType =
   | "thinking"
@@ -167,6 +181,10 @@ export type StagedBuildResult = {
   filesBeforeScaffoldFallback?: number;
   filesAfterScaffoldFallback?: number;
   partialCreditStop?: boolean;
+  generationQualityReport?: GeneratedAppQualityReport;
+  generationBudget?: FullAppGenerationBudget;
+  modelFilesCount?: number;
+  scaffoldFilesCount?: number;
 };
 
 type Writer = SupabaseClient<Database>;
@@ -441,8 +459,16 @@ export async function runStagedBuildPipeline(input: {
   const heavyBudget = new HeavyInputBudgetTracker();
 
   const scope = scoreTaskScope(executionPrompt);
-  const effectiveComplexity = firstPassScope?.complexity ?? scope.complexity;
-  const effectiveMaxFiles = firstPassScope?.maxFiles ?? scope.maxFiles;
+  const generationBudget = resolveFullAppGenerationPlan({
+    prompt: executionPrompt,
+    complexity: firstPassScope?.complexity ?? scope.complexity,
+    intake: intakeResult?.summary ?? null,
+  });
+  const effectiveComplexity = generationBudget.complexity;
+  const effectiveMaxFiles = Math.max(
+    generationBudget.maxFiles,
+    firstPassScope?.maxFiles ?? scope.maxFiles,
+  );
 
   const primaryMix = resolveModelMix({
     operationType: "frontend_implementation",
@@ -909,6 +935,89 @@ export async function runStagedBuildPipeline(input: {
 
   allFiles = filterRenderableBuildFiles(allFiles);
 
+  const modelFilesBeforeScaffold = allFiles.length;
+  let generationQualityReport = scoreGeneratedAppQuality({
+    files: allFiles,
+    budget: generationBudget,
+    userPrompt: executionPrompt,
+    appType: archetypeToLegacyAppType(archetype.id),
+    routeMap: designBrief.routes,
+  });
+
+  let continuationPass = 0;
+  while (accumulatedCost < FULL_BUILD_CAP_USD * 0.92) {
+    const continuationDecision = shouldContinueGeneration({
+      report: generationQualityReport,
+      budget: generationBudget,
+      passIndex: continuationPass,
+      maxPasses: generationBudget.maxContinuationPasses,
+      budgetRemainingRatio: 1 - accumulatedCost / FULL_BUILD_CAP_USD,
+    });
+    if (!continuationDecision.shouldContinue) break;
+
+    trackAssistant(events, continuationDecision.userMessage, emit);
+    track(events, "writing", "Continuing app generation");
+    const contPrompt = buildContinuationFrontendPrompt({
+      executionBrief: executionPrompt,
+      planJson,
+      existingFiles: allFiles,
+      budget: generationBudget,
+      report: generationQualityReport,
+      passIndex: continuationPass,
+    });
+    heavyBudget.record([contPrompt, BUILD_SYSTEM]);
+    const contCall = await callProviderWithBuildTimeout(
+      {
+        writer: input.writer,
+        userId: input.userId,
+        userEmail: input.userEmail,
+        operationId: `${input.operationId}:frontend-cont-${continuationPass}`,
+        operationType: "frontend_implementation",
+        system: BUILD_SYSTEM,
+        prompt: contPrompt,
+        complexity,
+        accumulatedCostUsd: accumulatedCost,
+        userSelectedModelId: input.userSelectedModelId,
+        timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
+      },
+      input.buildTrace,
+    );
+    if (!contCall.ok) break;
+    accumulatedCost += contCall.result.providerCostUsd;
+    totalIn += contCall.result.inputTokens ?? 0;
+    totalOut += contCall.result.outputTokens ?? 0;
+    primaryModelId = contCall.result.spec.modelId;
+    const contPayload = parseFilePayload(contCall.result.text);
+    if (!contPayload.files.length) break;
+    allFiles = filterRenderableBuildFiles(
+      mergeIncomingBuildFiles(
+        allFiles,
+        contPayload.files,
+        events,
+        track,
+        effectiveMaxFiles,
+        onFileThinking,
+      ),
+    );
+    continuationPass += 1;
+    generationQualityReport = scoreGeneratedAppQuality({
+      files: allFiles,
+      budget: generationBudget,
+      userPrompt: executionPrompt,
+      appType: archetypeToLegacyAppType(archetype.id),
+      routeMap: designBrief.routes,
+    });
+  }
+
+  if (generationQualityReport.score > 0) {
+    track(
+      events,
+      "validating",
+      `Quality score ${generationQualityReport.score}/${generationBudget.minQualityScore}`,
+      formatQualitySummaryForStream(generationQualityReport),
+    );
+  }
+
   if (isPortfolioBuildPrompt(input.userPrompt)) {
     const preIntegrity = evaluateSourceIntegrity(allFiles);
     if (!preIntegrity.sourceIntegrityOk) {
@@ -1324,8 +1433,27 @@ export async function runStagedBuildPipeline(input: {
     }
   }
 
-  const ok = postContract.passed && sourceIntegrity.sourceIntegrityOk;
-  const summaryText = postContract.userMessage;
+  generationQualityReport = scoreGeneratedAppQuality({
+    files: allFiles,
+    budget: generationBudget,
+    userPrompt: executionPrompt,
+    appType: archetypeToLegacyAppType(archetype.id),
+    routeMap: designBrief.routes,
+  });
+  const routeCheck = checkRouteConnectivity(allFiles);
+  const scaffoldFilesCount = Math.max(0, allFiles.length - modelFilesBeforeScaffold);
+
+  const ok =
+    postContract.passed &&
+    sourceIntegrity.sourceIntegrityOk &&
+    generationQualityReport.passes;
+  const summaryText = generationQualityReport.passes
+    ? postContract.userMessage
+    : generationQualityReport.needsContinuation
+      ? "Build saved — continuing generation needed to reach full app quality."
+      : routeCheck.orphanRoutes.length > 0
+        ? `Preview ready with route issues — ${routeCheck.verifiedCount}/${routeCheck.totalCount} routes linked.`
+        : `Build saved — quality repair needed (score ${generationQualityReport.score}/${generationBudget.minQualityScore}).`;
 
   const modelRuntime = resolveModelRuntime(primaryModelId);
 
@@ -1348,7 +1476,7 @@ export async function runStagedBuildPipeline(input: {
     files: allFiles.map((f) => ({ path: f.path, action: "created" as const })),
     summary: ok
       ? buildContract.previewReady
-        ? `Done — preview is ready for ${resolvedAppName} (${allFiles.length} files).`
+        ? `Build complete — ${resolvedAppName} (${formatQualitySummaryForStream(generationQualityReport)}).`
         : uiQuality.uiRichnessPasses
           ? `Draft generated for ${resolvedAppName} — improving UI quality.`
           : `Draft saved for ${resolvedAppName} — additional generation needed.`
@@ -1428,6 +1556,14 @@ export async function runStagedBuildPipeline(input: {
       scaffold_fallback_reason: scaffoldFallback.reason,
       files_before_scaffold_fallback: scaffoldFallback.beforeCount,
       files_after_scaffold_fallback: scaffoldFallback.afterCount,
+      model_files_count: modelFilesBeforeScaffold,
+      scaffold_files_count: scaffoldFilesCount,
+      generation_quality_score: generationQualityReport.score,
+      generation_quality_passes: generationQualityReport.passes,
+      generation_tier: generationBudget.tier,
+      route_connectivity_verified: routeCheck.verifiedCount,
+      route_connectivity_total: routeCheck.totalCount,
+      generation_quality_failures: generationQualityReport.failures,
       user_selected_model_label: modelRuntime.userSelectedModelLabel,
       actual_provider: modelRuntime.actualProvider,
       actual_model_id: modelRuntime.actualModelId,
@@ -1499,5 +1635,9 @@ export async function runStagedBuildPipeline(input: {
     scaffoldFallbackReason: scaffoldFallback.usedFallback ? scaffoldFallback.reason : undefined,
     filesBeforeScaffoldFallback: scaffoldFallback.beforeCount,
     filesAfterScaffoldFallback: scaffoldFallback.afterCount,
+    generationQualityReport,
+    generationBudget,
+    modelFilesCount: modelFilesBeforeScaffold,
+    scaffoldFilesCount,
   };
 }

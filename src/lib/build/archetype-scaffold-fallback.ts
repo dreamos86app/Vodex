@@ -237,6 +237,41 @@ export function applyArchetypeScaffoldFallback(
     return emptyFallbackMetrics(id, before, "not_needed");
   }
 
+  /** Model-first: rich model output — gap-fill only, never replace with generic scaffold. */
+  const modelPages = countRenderablePages(before);
+  const modelComponents = countComponentFiles(before);
+  if (
+    beforeCount >= 12 &&
+    modelPages >= 5 &&
+    modelComponents >= 8 &&
+    integrityBefore &&
+    rootPageContentOk(before)
+  ) {
+    const gapOnly = filterRenderableBuildFiles(gapFillScaffoldForArchetype(id, files, appName));
+    const gapAdded = gapOnly.length - beforeCount;
+    if (gapAdded <= 3) {
+      return emptyFallbackMetrics(id, before, "not_needed");
+    }
+    return {
+      files: gapOnly,
+      usedFallback: true,
+      reason: "llm_output_too_weak",
+      beforeCount,
+      afterCount: gapOnly.length,
+      componentCount: countComponentFiles(gapOnly),
+      pageCount: countRenderablePages(gapOnly),
+      archetypeId: id,
+      filesAdded: Math.max(0, gapAdded),
+      filesReplaced: 0,
+      stubsReplaced: 0,
+      rootPageReplaced: false,
+      sourceBytesBefore: bytesBefore,
+      sourceBytesAfter: sourceBytes(gapOnly),
+      integrityBefore,
+      integrityAfter: evaluateSourceIntegrity(gapOnly).sourceIntegrityOk,
+    };
+  }
+
   const weak =
     isWeakBuildOutput(files, id) ||
     !rootPageContentOk(before) ||

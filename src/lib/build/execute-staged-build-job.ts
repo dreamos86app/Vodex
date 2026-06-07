@@ -1297,14 +1297,22 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       workingFiles.length,
     );
 
+    const generationQualityReport =
+      "generationQualityReport" in pr ? pr.generationQualityReport : undefined;
+    const generationQualityPasses = generationQualityReport?.passes ?? false;
+    const generationScore = generationQualityReport?.score ?? pr.uiQualityScore;
     const richnessOk = pr.uiRichnessPasses && pr.uiQualityScore >= 85;
-    const canShowDone = previewLive && richnessOk && pr.buildContract.previewReady;
+    const canShowDone =
+      previewLive && richnessOk && pr.buildContract.previewReady && generationQualityPasses;
+    const routeVerified = generationQualityReport?.routeConnectivity;
     const doneSummary = canShowDone
       ? pr.meta?.summary?.trim() ||
-        `Done — preview is ready for ${pr.appName} (${fileGate.fileCount} files).`
-      : richnessOk
-        ? `Draft generated — improving UI quality (${fileGate.fileCount} files saved).`
-        : `Draft saved — additional generation needed (${fileGate.fileCount} files).`;
+        `Build complete — ${pr.appName} (${fileGate.fileCount} files, quality ${generationScore}/100).`
+      : generationQualityReport?.needsContinuation
+        ? `Continuing generation needed — ${fileGate.fileCount} files saved (quality ${generationScore}/100).`
+        : richnessOk
+          ? `Build saved — quality repair needed (${fileGate.fileCount} files, score ${generationScore}/100).`
+          : `Draft saved — additional generation needed (${fileGate.fileCount} files).`;
     await persistAssistantBuildMessage(input.writer, eventCtx, {
       message: doneSummary.slice(0, 280),
       progressPercent: 98,
@@ -1312,12 +1320,22 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     await persistBuildJobEvent(input.writer, {
       ...eventCtx,
       type: "completed",
-      title: canShowDone ? "Done — preview is ready" : richnessOk ? "Draft generated" : "Draft saved",
+      title: canShowDone
+        ? "Build complete"
+        : generationQualityReport?.needsContinuation
+          ? "Continuing generation needed"
+          : richnessOk
+            ? "Build saved — quality repair needed"
+            : "Draft saved",
       detail: canShowDone
-        ? "Preview is live with rich dashboard UI."
-        : richnessOk
-          ? "Draft generated — improving UI quality."
-          : "Draft saved — additional generation needed.",
+        ? routeVerified
+          ? `Preview live · routes ${routeVerified.verifiedCount}/${routeVerified.totalCount} · quality ${generationScore}/100`
+          : "Preview is live with rich dashboard UI."
+        : generationQualityReport?.needsContinuation
+          ? "More pages are needed before this app is complete."
+          : richnessOk
+            ? `Quality score ${generationScore}/100 — repair pass recommended.`
+            : "Draft saved — additional generation needed.",
       progressPercent: 100,
       metadata: {
         credits_charged: creditsCharged,

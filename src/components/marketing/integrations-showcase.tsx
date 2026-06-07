@@ -84,8 +84,8 @@ export const INTEGRATION_SHOWCASE_ITEMS: IntegrationShowcaseItem[] = [
 ];
 
 /** Fixed gap between carousel slots — every tile moves at the same track speed. */
-const CAROUSEL_SLOT_GAP_PX = 12;
-const CAROUSEL_SLOT_WIDTH_PX = 136;
+const CAROUSEL_SLOT_GAP_PX = 20;
+const CAROUSEL_SLOT_WIDTH_PX = 140;
 const CAROUSEL_SLOT_STEP_PX = CAROUSEL_SLOT_WIDTH_PX + CAROUSEL_SLOT_GAP_PX;
 const MARQUEE_SPEED_PX_PER_SEC = 38;
 const MARQUEE_LOOP_ITEMS = [
@@ -110,23 +110,33 @@ function ElectricPlugIcon() {
 
 function IntegrationCarouselTile({
   item,
-  highlighted,
+  centerWeight,
 }: {
   item: IntegrationShowcaseItem;
-  highlighted: boolean;
+  centerWeight: number;
 }) {
+  const scale = 0.84 + centerWeight * 0.2;
+  const lift = centerWeight * -11;
+
   return (
     <div
       className="flex shrink-0 flex-col items-center justify-end"
       style={{ width: CAROUSEL_SLOT_WIDTH_PX }}
     >
       <div
+        className="w-full transition-[transform,filter] duration-300 ease-out will-change-transform"
+        style={{
+          transform: `translateY(${lift}px) scale(${scale})`,
+          transformOrigin: "center bottom",
+        }}
+      >
+      <div
         className={cn(
           "relative flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl bg-background/80 px-3 py-3.5 ring-1 transition-shadow duration-300",
           "bg-gradient-to-b",
           item.glow,
           item.ring,
-          highlighted
+          centerWeight > 0.68
             ? "shadow-[0_20px_48px_-18px_rgba(30,107,255,0.45)] ring-2 brightness-100 saturate-100"
             : "brightness-[0.94] saturate-[0.92]",
         )}
@@ -137,6 +147,7 @@ function IntegrationCarouselTile({
           <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground">{item.desc}</p>
         </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -146,12 +157,23 @@ function IntegrationMarqueeRail() {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const trackRef = React.useRef<HTMLDivElement>(null);
   const offsetRef = React.useRef(0);
-  const [centerTileIndex, setCenterTileIndex] = React.useState(-1);
+  const [scrollOffset, setScrollOffset] = React.useState(0);
+  const [containerWidth, setContainerWidth] = React.useState(0);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(() => setContainerWidth(container.clientWidth));
+    ro.observe(container);
+    setContainerWidth(container.clientWidth);
+    return () => ro.disconnect();
+  }, []);
 
   React.useEffect(() => {
     if (reduceMotion) return;
     let raf = 0;
     let last = performance.now();
+    let frame = 0;
 
     const tick = (now: number) => {
       const dt = Math.min(48, now - last) / 1000;
@@ -166,13 +188,9 @@ function IntegrationMarqueeRail() {
         track.style.transform = `translate3d(${-offsetRef.current}px, 0, 0)`;
       }
 
-      const container = containerRef.current;
-      if (container) {
-        const viewportCenter = offsetRef.current + container.clientWidth / 2;
-        const rawIndex = Math.round(
-          (viewportCenter - CAROUSEL_SLOT_WIDTH_PX / 2) / CAROUSEL_SLOT_STEP_PX,
-        );
-        setCenterTileIndex(rawIndex);
+      frame += 1;
+      if (frame % 2 === 0) {
+        setScrollOffset(offsetRef.current);
       }
 
       raf = requestAnimationFrame(tick);
@@ -197,13 +215,22 @@ function IntegrationMarqueeRail() {
         className="flex w-max items-end will-change-transform"
         style={{ gap: CAROUSEL_SLOT_GAP_PX }}
       >
-        {MARQUEE_LOOP_ITEMS.map((item, i) => (
-          <IntegrationCarouselTile
-            key={`${item.slug}-${i}`}
-            item={item}
-            highlighted={!reduceMotion && i === centerTileIndex}
-          />
-        ))}
+        {MARQUEE_LOOP_ITEMS.map((item, i) => {
+          const tileCenter =
+            i * CAROUSEL_SLOT_STEP_PX + CAROUSEL_SLOT_WIDTH_PX / 2 - scrollOffset;
+          const dist = Math.abs(tileCenter - containerWidth / 2);
+          const centerWeight =
+            reduceMotion || containerWidth === 0
+              ? 0
+              : Math.max(0, 1 - dist / (containerWidth * 0.34));
+          return (
+            <IntegrationCarouselTile
+              key={`${item.slug}-${i}`}
+              item={item}
+              centerWeight={centerWeight}
+            />
+          );
+        })}
       </div>
     </div>
   );

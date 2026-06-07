@@ -8,6 +8,7 @@ import { buildStageObjective, sliceBriefForStage } from "@/lib/build/heavy-input
 
 import type { DesignBrief } from "@/lib/build/design-brief-generator";
 import { formatQualityContractForPrompt } from "@/lib/build/ui-quality-contract";
+import { formatGenerationBudgetForPrompt, resolveFullAppGenerationPlan } from "@/lib/build/full-app-generation-plan";
 
 export const JSON_ONLY_RULE =
   "Return ONLY valid JSON. No markdown, no code fences, no prose outside JSON.";
@@ -24,7 +25,8 @@ export const FILE_PAYLOAD_RULE = [
   "Use Tailwind className on all layout elements — mobile-first responsive (sm:/md: breakpoints).",
   "You are generating the first production-quality version — premium SaaS UI, not a demo.",
   "Never ship Welcome + 3 plain cards only. Include app shell, nav, rich sections, realistic data.",
-  "Include 3–8 route files under app/ matching the design brief routes.",
+  "Include 6–12 route files under app/ matching the design brief — each with real UI, not stubs.",
+  "Never use generic copy like 'metrics, workflows, and team tools'.",
 ].join("\n");
 
 function productionUiBlock(designBrief?: DesignBrief | null, executionBrief?: string): string {
@@ -131,12 +133,14 @@ export function frontendPrompt(
   const brief = slices
     ? sliceBriefForStage(slices, "frontend_implementation")
     : sliceToTokenBudget(executionBrief, 800);
+  const genPlan = resolveFullAppGenerationPlan({ prompt: executionBrief, complexity: maxFiles >= 60 ? 8 : maxFiles >= 40 ? 6 : 4 });
   return [
     FILE_PAYLOAD_RULE,
     buildStageObjective("frontend_implementation"),
     "You are not generating a simple demo. Ship production-quality UI that looks like a premium SaaS product.",
+    formatGenerationBudgetForPrompt(genPlan),
     productionUiBlock(designBrief, brief),
-    `Max ${maxFiles} files. REQUIRED: app/layout.tsx shell, app/page.tsx rich home/dashboard, and feature routes under app/.`,
+    `Use up to ${maxFiles} files. REQUIRED: app/layout.tsx shell, AppShell/Sidebar, app/page.tsx, app/dashboard/page.tsx, and ${genPlan.minRoutes}+ feature routes.`,
     "Do NOT return preview-only output — route files under app/ are mandatory.",
     designBrief
       ? `App name: ${designBrief.appName}. Use domain terms: ${designBrief.terminology.join(", ")}.`

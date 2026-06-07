@@ -1,7 +1,8 @@
 /**
- * First-pass build scope — preview-ready UI and core flows only.
+ * Build scope — full-app generation minimums (P1.3.14).
  */
 import type { BuildIntakeSummary } from "@/lib/ai/build-intake-types";
+import { resolveFullAppGenerationPlan } from "@/lib/build/full-app-generation-plan";
 
 export type FirstPassTier = "simple" | "standard" | "advanced";
 
@@ -56,11 +57,17 @@ export function rankTasksByFirstPassValue(tasks: string[]): string[] {
   return [...tasks].sort((a, b) => rankTaskValue(b) - rankTaskValue(a));
 }
 
+function taskCapTier(tier: string): keyof typeof FIRST_PASS_TASK_CAPS {
+  if (tier === "medium" || tier === "complex" || tier === "advanced") return "advanced";
+  if (tier === "standard") return "standard";
+  return "simple";
+}
+
 export function selectFirstPassTasks(
   tasks: string[],
   tier: FirstPassTier,
 ): { selected: string[]; deferred: string[] } {
-  const cap = FIRST_PASS_TASK_CAPS[tier];
+  const cap = FIRST_PASS_TASK_CAPS[taskCapTier(tier)];
   const ranked = rankTasksByFirstPassValue(tasks);
   const selected = ranked.slice(0, cap.max);
   const deferred = ranked.slice(cap.max);
@@ -88,18 +95,29 @@ export function planFirstPassScope(intake: BuildIntakeSummary): FirstPassScope {
     ...integrations.filter((i) => DEFER_SIGNALS.test(i)),
   ].slice(0, 80);
 
-  const complexity = tier === "advanced" ? 7 : tier === "standard" ? 5 : 3;
+  const promptText = [
+    intake.appPurpose ?? "",
+    ...(intake.coreScreens ?? []),
+    ...(intake.mustHaveFirstVersionFeatures ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const genPlan = resolveFullAppGenerationPlan({
+    prompt: promptText,
+    intake,
+    complexity: tier === "advanced" ? 8 : tier === "standard" ? 6 : 4,
+  });
+  const complexity = genPlan.complexity;
 
   const includeBackend =
-    tier === "advanced" &&
-    integrations.some((i) => /\b(database|schema|api|backend)\b/i.test(i)) &&
-    firstPassMust.length <= FIRST_PASS_TASK_CAPS.advanced.max;
+    genPlan.tier !== "simple" &&
+    integrations.some((i) => /\b(database|schema|api|backend)\b/i.test(i));
 
   return {
-    tier,
+    tier: taskCapTier(genPlan.tier),
     complexity,
-    maxFiles: tier === "advanced" ? 14 : tier === "standard" ? 12 : 10,
-    maxWorkUnits: tier === "advanced" ? 10 : 8,
+    maxFiles: genPlan.maxFiles,
+    maxWorkUnits: genPlan.tier === "complex" ? 14 : genPlan.tier === "medium" ? 12 : 10,
     includeBackend,
     includeAuth: false,
     includePayments: false,
@@ -109,13 +127,14 @@ export function planFirstPassScope(intake: BuildIntakeSummary): FirstPassScope {
     firstPassTaskCount: firstPassMust.length,
     backlogTaskCount: deferredFeatures.length,
     scopeNote: [
-      "First pass: beautiful UI preview, app shell, core screens, main user flow, demo-safe data.",
-      "Defer full backend, payments, auth matrix, admin systems, and external API wiring unless essential for preview.",
+      `Full app generation (${genPlan.tier}): minimum ${genPlan.minFiles} files, ${genPlan.minRoutes} routes, ${genPlan.minComponents} components.`,
+      "Model generates all UI — scaffolds are emergency gap-fill only.",
+      "Include app shell, navigation, feature routes, mock data, loading/empty/error states.",
       firstPassMust.length
-        ? `Build now (${firstPassMust.length} items): ${firstPassMust.slice(0, 8).join("; ")}`
+        ? `Priority features (${firstPassMust.length}): ${firstPassMust.slice(0, 8).join("; ")}`
         : "",
       deferredFeatures.length
-        ? `Queued next (${deferredFeatures.length} items): ${deferredFeatures.slice(0, 6).join("; ")}`
+        ? `Phase 2 (${deferredFeatures.length}): ${deferredFeatures.slice(0, 6).join("; ")}`
         : "",
     ]
       .filter(Boolean)
@@ -131,5 +150,7 @@ export function firstPassTierCredits(tier: FirstPassTier): { min: number; max: n
       return { min: 6, max: 9 };
     case "advanced":
       return { min: 9, max: 14 };
+    default:
+      return { min: 6, max: 9 };
   }
 }

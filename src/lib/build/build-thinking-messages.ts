@@ -28,7 +28,15 @@ export function thinkingForFilePath(path: string): string {
 }
 
 export function thinkingForFrontendRetry(): string {
-  return "The first generation pass didn't return enough files — retrying with a tighter scope.";
+  return "First pass was thin — expanding with more routes, components, and app-specific UI.";
+}
+
+export function thinkingForContinuation(currentFiles: number, targetFiles: number): string {
+  return `Continuing generation: adding remaining pages (${currentFiles}/${targetFiles} files)…`;
+}
+
+export function thinkingForRouteConnectivity(verified: number, total: number): string {
+  return `Wiring navigation — ${verified}/${total} routes linked and reachable.`;
 }
 
 export function thinkingForFrontendFailed(): string {

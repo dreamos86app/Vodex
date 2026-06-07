@@ -18,7 +18,7 @@ export function genericSaaSScaffoldFiles(archetypeId: AppArchetypeId, appName: s
           ? "Track spending, budgets, and goals at a glance."
           : archetypeId === "marketplace"
             ? "Browse listings, vendors, and orders in one dashboard."
-            : "Your metrics, workflows, and team tools — all in one app.";
+            : `Everything you need to run ${name} — schedules, records, and daily operations in one place.`;
 
   const files: BuildFile[] = [
     {
