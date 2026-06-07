@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/types";
 import { runStagedBuildPipeline } from "@/lib/build/build-pipeline";
-import { calculateCreditsForStagedBuild } from "@/lib/credits/credit-pricing";
+import {
+  calculateCreditsForStagedBuild,
+  resolveStagedBuildChargeCredits,
+} from "@/lib/credits/credit-pricing";
 import { reconcileGenerationReservation } from "@/lib/billing/credit-reservations";
-import { assertProfitableCharge } from "@/lib/billing/credit-profit-guard";
 import { finalizeBuildSuccess, finalizeBuildFailed } from "@/lib/build/finalize-build";
 import { finalizeBuildPartial } from "@/lib/build/finalize-build-partial";
 import {
@@ -102,6 +104,34 @@ export type ExecuteStagedBuildJobInput = {
   blueprintBlock?: string;
   userSelectedModelId?: string | null;
 };
+
+async function chargeStagedBuildIfNeeded(input: {
+  writer: Writer;
+  userId: string;
+  operationId: string;
+  projectId: string;
+  reservedCredits?: number;
+  chargeCalc: ReturnType<typeof calculateCreditsForStagedBuild>;
+  complexity: number;
+}): Promise<number> {
+  if (!input.reservedCredits || input.reservedCredits <= 0) return 0;
+  const actualUserCredits = resolveStagedBuildChargeCredits({
+    chargeCalc: input.chargeCalc,
+    reservedCredits: input.reservedCredits,
+    complexity: input.complexity,
+  });
+  if (actualUserCredits <= 0) return 0;
+  const recon = await reconcileGenerationReservation(input.writer, {
+    userId: input.userId,
+    generationId: input.operationId,
+    reservedCredits: input.reservedCredits,
+    actualUserCredits,
+    providerCostUsd: input.chargeCalc.estimatedProviderCostUsd,
+    success: true,
+    projectId: input.projectId,
+  });
+  return recon.finalCharged;
+}
 
 async function refundBuildReservation(input: {
   writer: Writer;
@@ -369,30 +399,23 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
 
       await persistStage("persist_completed", `${persist.savedCount} files written`);
 
-      if (!alreadyCharged && input.reservedCredits && input.reservedCredits > 0) {
-        const chargeCalc = calculateCreditsForStagedBuild({
-          providerCostUsd: pr.totalProviderCostUsd,
+      if (!alreadyCharged) {
+        await chargeStagedBuildIfNeeded({
+          writer: input.writer,
+          userId: input.userId,
+          operationId: input.operationId,
+          projectId: input.projectId,
+          reservedCredits: input.reservedCredits,
+          chargeCalc: calculateCreditsForStagedBuild({
+            providerCostUsd: pr.totalProviderCostUsd,
+            complexity: pr.complexity,
+            inputTokens: pr.totalInputTokens,
+            outputTokens: pr.totalOutputTokens,
+            primaryModelId: pr.primaryModelId,
+            fileCount: Math.max(persist.savedCount, saveableFileCount),
+          }),
           complexity: pr.complexity,
-          inputTokens: pr.totalInputTokens,
-          outputTokens: pr.totalOutputTokens,
-          primaryModelId: pr.primaryModelId,
-          fileCount: Math.max(persist.savedCount, saveableFileCount),
         });
-        const profitable = assertProfitableCharge(
-          chargeCalc.creditsToCharge,
-          chargeCalc.estimatedProviderCostUsd,
-        );
-        if (profitable.ok) {
-          await reconcileGenerationReservation(input.writer, {
-            userId: input.userId,
-            generationId: input.operationId,
-            reservedCredits: input.reservedCredits,
-            actualUserCredits: Math.min(input.reservedCredits, chargeCalc.creditsToCharge),
-            providerCostUsd: chargeCalc.estimatedProviderCostUsd,
-            success: true,
-            projectId: input.projectId,
-          });
-        }
       }
 
       if (persist.savedCount > 0) {
@@ -702,30 +725,23 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         },
       });
 
-      if (!alreadyCharged && input.reservedCredits && input.reservedCredits > 0) {
-        const chargeCalc = calculateCreditsForStagedBuild({
-          providerCostUsd: pr.totalProviderCostUsd,
+      if (!alreadyCharged) {
+        await chargeStagedBuildIfNeeded({
+          writer: input.writer,
+          userId: input.userId,
+          operationId: input.operationId,
+          projectId: input.projectId,
+          reservedCredits: input.reservedCredits,
+          chargeCalc: calculateCreditsForStagedBuild({
+            providerCostUsd: pr.totalProviderCostUsd,
+            complexity: pr.complexity,
+            inputTokens: pr.totalInputTokens,
+            outputTokens: pr.totalOutputTokens,
+            primaryModelId: pr.primaryModelId,
+            fileCount: postPersist.visibleFileCount,
+          }),
           complexity: pr.complexity,
-          inputTokens: pr.totalInputTokens,
-          outputTokens: pr.totalOutputTokens,
-          primaryModelId: pr.primaryModelId,
-          fileCount: postPersist.visibleFileCount,
         });
-        const profitable = assertProfitableCharge(
-          chargeCalc.creditsToCharge,
-          chargeCalc.estimatedProviderCostUsd,
-        );
-        if (profitable.ok) {
-          await reconcileGenerationReservation(input.writer, {
-            userId: input.userId,
-            generationId: input.operationId,
-            reservedCredits: input.reservedCredits,
-            actualUserCredits: Math.min(input.reservedCredits, chargeCalc.creditsToCharge),
-            providerCostUsd: chargeCalc.estimatedProviderCostUsd,
-            success: true,
-            projectId: input.projectId,
-          });
-        }
       }
 
       await logServerOperation({
@@ -1151,28 +1167,31 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         },
       });
 
-      if (!alreadyCharged && input.reservedCredits && input.reservedCredits > 0) {
-        const chargeCalc = calculateCreditsForStagedBuild({
-          providerCostUsd: pr.totalProviderCostUsd,
+      if (!alreadyCharged) {
+        const previewFailCharged = await chargeStagedBuildIfNeeded({
+          writer: input.writer,
+          userId: input.userId,
+          operationId: input.operationId,
+          projectId: input.projectId,
+          reservedCredits: input.reservedCredits,
+          chargeCalc: calculateCreditsForStagedBuild({
+            providerCostUsd: pr.totalProviderCostUsd,
+            complexity: pr.complexity,
+            inputTokens: pr.totalInputTokens,
+            outputTokens: pr.totalOutputTokens,
+            primaryModelId: pr.primaryModelId,
+            fileCount: filesKept,
+          }),
           complexity: pr.complexity,
-          inputTokens: pr.totalInputTokens,
-          outputTokens: pr.totalOutputTokens,
-          primaryModelId: pr.primaryModelId,
-          fileCount: filesKept,
         });
-        const profitable = assertProfitableCharge(
-          chargeCalc.creditsToCharge,
-          chargeCalc.estimatedProviderCostUsd,
-        );
-        if (profitable.ok) {
-          await reconcileGenerationReservation(input.writer, {
-            userId: input.userId,
-            generationId: input.operationId,
-            reservedCredits: input.reservedCredits,
-            actualUserCredits: Math.min(input.reservedCredits, chargeCalc.creditsToCharge),
-            providerCostUsd: chargeCalc.estimatedProviderCostUsd,
-            success: true,
-            projectId: input.projectId,
+        if (previewFailCharged > 0) {
+          await persistBuildJobEvent(input.writer, {
+            ...eventCtx,
+            type: "completed",
+            title: "Build saved — preview needs repair",
+            detail: `${filesKept} files saved`,
+            progressPercent: 100,
+            metadata: { credits_charged: previewFailCharged, files_persisted: filesKept },
           });
         }
       }
@@ -1236,33 +1255,25 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     });
 
     let creditsCharged = 0;
-    if (!alreadyCharged && input.reservedCredits && input.reservedCredits > 0) {
-      const chargeCalc = calculateCreditsForStagedBuild({
-        providerCostUsd: pr.totalProviderCostUsd,
+    if (!alreadyCharged) {
+      creditsCharged = await chargeStagedBuildIfNeeded({
+        writer: input.writer,
+        userId: input.userId,
+        operationId: input.operationId,
+        projectId: input.projectId,
+        reservedCredits: input.reservedCredits,
+        chargeCalc: calculateCreditsForStagedBuild({
+          providerCostUsd: pr.totalProviderCostUsd,
+          complexity: pr.complexity,
+          inputTokens: pr.totalInputTokens,
+          outputTokens: pr.totalOutputTokens,
+          primaryModelId: pr.primaryModelId,
+          fileCount: fileGate.fileCount,
+        }),
         complexity: pr.complexity,
-        inputTokens: pr.totalInputTokens,
-        outputTokens: pr.totalOutputTokens,
-        primaryModelId: pr.primaryModelId,
-        fileCount: fileGate.fileCount,
       });
 
-      const profitable = assertProfitableCharge(
-        chargeCalc.creditsToCharge,
-        chargeCalc.estimatedProviderCostUsd,
-      );
-
-      if (profitable.ok) {
-        const recon = await reconcileGenerationReservation(input.writer, {
-          userId: input.userId,
-          generationId: input.operationId,
-          reservedCredits: input.reservedCredits,
-          actualUserCredits: Math.min(input.reservedCredits, chargeCalc.creditsToCharge),
-          providerCostUsd: chargeCalc.estimatedProviderCostUsd,
-          success: true,
-          projectId: input.projectId,
-        });
-        creditsCharged = recon.finalCharged;
-
+      if (creditsCharged > 0) {
         await finalizeBuildSuccess({
           writer: input.writer,
           userId: input.userId,
@@ -1274,7 +1285,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
           iconSvg: pr.iconSvg,
           meta: pr.meta,
           fileCount: fileGate.fileCount,
-          creditsCharged: recon.finalCharged,
+          creditsCharged,
           charged: true,
           skipJobStatusUpdate: true,
         });

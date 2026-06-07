@@ -104,12 +104,21 @@ export function MessageCostBadge({
   className?: string;
 }) {
   if (state === "idle") return null;
-  const label =
-    state === "pending" || state === "finalizing"
-      ? "…"
-      : typeof credits === "number"
-        ? formatCredits(credits)
-        : "—";
+  if (state === "pending" || state === "finalizing") {
+    return (
+      <span
+        className={cn(
+          "rounded-md bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground",
+          className,
+        )}
+        data-testid="message-cost-badge"
+        aria-label="Calculating credits"
+      >
+        …
+      </span>
+    );
+  }
+  if (typeof credits !== "number" || credits <= 0) return null;
   return (
     <span
       className={cn(
@@ -117,8 +126,9 @@ export function MessageCostBadge({
         className,
       )}
       data-testid="message-cost-badge"
+      title={`${formatCredits(credits)} build credits`}
     >
-      {label}c
+      {formatCredits(credits)}
     </span>
   );
 }

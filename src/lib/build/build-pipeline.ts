@@ -589,7 +589,7 @@ export async function runStagedBuildPipeline(input: {
   const category = identityResult.category;
   let iconSvg = identityResult.iconSvg;
   if (!identityResult.iconUrl && !(iconSvg && iconSvg.startsWith("<svg"))) {
-    iconSvg = appIconSvgDataUrl(appName);
+    iconSvg = appIconSvgDataUrl(appName, category);
   }
   if (identityResult.userNotice) {
     track(events, "icon", identityResult.userNotice);

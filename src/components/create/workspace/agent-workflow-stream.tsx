@@ -384,8 +384,9 @@ export function AgentWorkflowStream({
   const hasServerActivity = serverSequential.some(
     (e) => e.status === "active" || e.category === "file_created" || e.category === "file_edited",
   );
+  const hasLiveFileEvents = serverSequential.some((e) => isFileEvent(e));
   const ephemeral =
-    working && (!hasServerActivity || serverSequential.length < 2)
+    working && !hasLiveFileEvents && (!hasServerActivity || serverSequential.length < 2)
       ? buildEphemeralWorkflowEvents(
           startedAt,
           now,
@@ -405,9 +406,9 @@ export function AgentWorkflowStream({
   const timeline = useStaggeredWorkflowEvents(timelineRaw, batchPersistStagger);
 
   const active = [...timeline].reverse().find((e) => e.status === "active");
-  const completedTimeline = (active ? timeline.filter((ev) => ev.stableKey !== active.stableKey) : timeline).filter(
-    (ev) => !(working && isFileEvent(ev)),
-  );
+  const completedTimeline = active
+    ? timeline.filter((ev) => ev.stableKey !== active.stableKey || isFileEvent(ev))
+    : timeline;
 
   const fileDiffSummary = React.useMemo(() => {
     let files = 0;

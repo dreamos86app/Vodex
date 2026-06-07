@@ -1179,13 +1179,25 @@ export function ImmersiveWorkspace({
           if (m) terminalFiles = Math.max(terminalFiles, Number(m[1]));
         }
         applyTerminalBuildSummary(terminal, terminalFiles);
-        setLastMessageCost({ state: "final", credits: 0 });
+        let creditsFromJob = 0;
+        for (const e of terminal.events ?? []) {
+          const charged = e.metadata?.credits_charged;
+          if (typeof charged === "number" && charged > creditsFromJob) {
+            creditsFromJob = charged;
+          }
+        }
+        const creditsBeforeRefresh = useCreditsStore.getState().remaining;
+        setLastMessageCost({
+          state: "final",
+          credits: creditsFromJob,
+        });
         if (uid) {
           void refreshCredits({ reason: "charge" }).then(() => {
-            const before = useCreditsStore.getState().remaining;
+            const after = useCreditsStore.getState().remaining;
+            const delta = Math.max(0, creditsBeforeRefresh - after);
             setLastMessageCost({
               state: "final",
-              credits: Math.max(0, before - useCreditsStore.getState().remaining),
+              credits: creditsFromJob > 0 ? creditsFromJob : delta,
             });
           });
         }
@@ -3156,6 +3168,7 @@ export function ImmersiveWorkspace({
               </AnimatePresence>
 
               {showOptimisticAssistant &&
+                !(activeMode === "build" && (buildJobActive || buildStarting || buildJobProgress || frozenBuildWorkflow)) &&
                 (pendingUserBubble ||
                   isBusy ||
                   ((buildStarting || buildJobActive) && activeMode === "build")) && (

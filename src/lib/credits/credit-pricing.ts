@@ -6,8 +6,13 @@ import {
   creditsFromProviderCostUsd,
   quoteDiscussCost,
   quoteCreateQuestionCost,
+  assertProfitableCharge,
 } from "@/lib/billing/credit-profit-guard";
-import type { BuildCreditOperationType } from "@/lib/billing/build-credit-floors";
+import {
+  type BuildCreditOperationType,
+  applyBuildCreditPricing,
+  resolveBuildCreditOperationType,
+} from "@/lib/billing/build-credit-floors";
 
 /** @deprecated Use TARGET_REVENUE_MULTIPLIER */
 export const DREAMOS_CREDIT_MARKUP = TARGET_REVENUE_MULTIPLIER;
@@ -88,6 +93,33 @@ export function calculateCreditsForStagedBuild(input: {
 export function normalizeCreditCharge(amount: number): number {
   if (!Number.isFinite(amount) || amount < 0.1) return 0.1;
   return Math.ceil(amount * 10) / 10;
+}
+
+/** Billable credits for a completed staged build (respects full_build floors). */
+export function resolveStagedBuildChargeCredits(input: {
+  chargeCalc: ChargeCalculationResult;
+  reservedCredits: number;
+  complexity: number;
+}): number {
+  if (input.reservedCredits <= 0) return 0;
+  const opType = resolveBuildCreditOperationType({
+    mode: "full_build",
+    complexity: input.complexity,
+  });
+  const pricing = applyBuildCreditPricing({
+    operationType: opType,
+    providerCostUsd: input.chargeCalc.estimatedProviderCostUsd,
+  });
+  const floor = pricing.userCreditsRequired;
+  const profitable = assertProfitableCharge(
+    input.chargeCalc.creditsToCharge,
+    input.chargeCalc.estimatedProviderCostUsd,
+    opType,
+  );
+  const billable = profitable.ok
+    ? input.chargeCalc.creditsToCharge
+    : Math.max(input.chargeCalc.creditsToCharge, floor);
+  return Math.min(input.reservedCredits, normalizeCreditCharge(billable));
 }
 
 export type ChargeCalculationInput = {
