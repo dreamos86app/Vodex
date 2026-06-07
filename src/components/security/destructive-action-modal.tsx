@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { motion } from "framer-motion";
 import { AlertTriangle, Loader2, Mail, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OverlayDialog } from "@/components/ui/overlay-dialog";
 import {
   DESTRUCTIVE_ACTION_PHRASES,
   destructiveActionSummary,
@@ -18,6 +18,7 @@ type Props = {
   targetName?: string | null;
   targetId?: string | null;
   onVerifiedDelete: (verificationId: string) => Promise<void>;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 };
 
 export function DestructiveActionModal({
@@ -27,6 +28,7 @@ export function DestructiveActionModal({
   targetName,
   targetId,
   onVerifiedDelete,
+  returnFocusRef,
 }: Props) {
   const phrase = DESTRUCTIVE_ACTION_PHRASES[actionType];
   const summary = destructiveActionSummary(actionType, targetName);
@@ -50,8 +52,6 @@ export function DestructiveActionModal({
       setLoading(false);
     }
   }, [open]);
-
-  if (!open) return null;
 
   const phraseOk = typedPhrase.trim().toLowerCase() === phrase;
 
@@ -120,15 +120,14 @@ export function DestructiveActionModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[10050] flex items-center justify-center bg-foreground/30 p-4 backdrop-blur-sm"
+    <OverlayDialog
+      open={open}
+      onClose={onClose}
+      layer="confirmation"
+      returnFocusRef={returnFocusRef}
       data-testid="destructive-action-modal"
+      panelClassName="max-w-md"
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-md overflow-hidden rounded-[var(--radius-xl)] bg-background shadow-2xl ring-1 ring-border"
-      >
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-full bg-destructive/10">
@@ -259,7 +258,6 @@ export function DestructiveActionModal({
             </>
           ) : null}
         </div>
-      </motion.div>
-    </div>
+    </OverlayDialog>
   );
 }

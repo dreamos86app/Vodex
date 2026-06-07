@@ -26,7 +26,7 @@ export function PublishConfetti({ active }: { active: boolean }) {
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[30000] overflow-hidden"
+      className="pointer-events-none fixed inset-0 z-[var(--z-debug)] overflow-hidden"
       aria-hidden
       data-testid="publish-confetti"
     >

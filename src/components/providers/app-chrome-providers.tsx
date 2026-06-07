@@ -6,6 +6,7 @@ import { AppearanceProvider } from "@/components/providers/appearance-provider";
 import { CreditsServerHydrator } from "@/components/providers/credits-server-hydrator";
 import { VodexSessionIntroGate } from "@/components/session/vodex-session-intro-gate";
 import { Toaster } from "@/components/ui/toaster";
+import { OverlayProvider } from "@/components/ui/overlay-provider";
 import type { CanonicalCreditsPayload } from "@/lib/credits/canonical-credits";
 
 const AppChromeExtras = dynamic(
@@ -30,14 +31,16 @@ export function AppChromeProviders({
     <AppProvider>
       <CreditsServerHydrator userId={serverUserId} initialCredits={initialCredits} />
       <AppearanceProvider>
-        <AppChromeExtras />
-        <VodexSessionIntroGate
-          serverUserId={serverUserId}
-          pendingLoginIntro={pendingLoginIntro}
-        >
-          {children}
-        </VodexSessionIntroGate>
-        <Toaster />
+        <OverlayProvider>
+          <AppChromeExtras />
+          <VodexSessionIntroGate
+            serverUserId={serverUserId}
+            pendingLoginIntro={pendingLoginIntro}
+          >
+            {children}
+          </VodexSessionIntroGate>
+          <Toaster />
+        </OverlayProvider>
       </AppearanceProvider>
     </AppProvider>
   );

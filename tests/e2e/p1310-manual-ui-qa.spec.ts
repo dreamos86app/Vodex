@@ -138,15 +138,15 @@ test.describe("P1.3.10 — Mobile + overlay QA @live", () => {
       await page.goto("/projects", { waitUntil: "load", timeout: 60_000 });
       await page.waitForFunction(
         () =>
-          getComputedStyle(document.documentElement).getPropertyValue("--z-critical-alert").trim() ===
-          "1000",
+          getComputedStyle(document.documentElement).getPropertyValue("--z-confirmation").trim() ===
+          "1600",
         { timeout: 15_000 },
       );
       const css = await page.evaluate(() =>
-        getComputedStyle(document.documentElement).getPropertyValue("--z-critical-alert").trim(),
+        getComputedStyle(document.documentElement).getPropertyValue("--z-confirmation").trim(),
       );
-      expect(css).toBe("1000");
-      steps.push({ id, pass: true, detail: `--z-critical-alert=${css}` });
+      expect(css).toBe("1600");
+      steps.push({ id, pass: true, detail: `--z-confirmation=${css}` });
     } catch (err) {
       steps.push({ id, pass: false, root_cause: String(err) });
       throw err;

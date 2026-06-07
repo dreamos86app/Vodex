@@ -1,0 +1,359 @@
+{
+  "generated_at": "2026-06-07T15:07:06.113Z",
+  "layer_tokens": [
+    "--z-base",
+    "--z-dropdown",
+    "--z-popover",
+    "--z-tooltip",
+    "--z-context-menu",
+    "--z-sheet",
+    "--z-dialog-backdrop",
+    "--z-dialog",
+    "--z-confirmation",
+    "--z-command-palette",
+    "--z-critical-alert",
+    "--z-toast",
+    "--z-debug"
+  ],
+  "components": [
+    {
+      "component": "src/components/apps/project-card-overflow-menu.tsx",
+      "currentLayer": "contextMenu/popover",
+      "newLayer": "contextMenu/popover",
+      "portalized": true
+    },
+    {
+      "component": "src/components/auth/logout-confirm-modal.tsx",
+      "currentLayer": "confirmation",
+      "newLayer": "confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/billing/billing-downgrade-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": false
+    },
+    {
+      "component": "src/components/billing/billing-interval-picker-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": false
+    },
+    {
+      "component": "src/components/billing/plan-upgrade-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": false
+    },
+    {
+      "component": "src/components/build/blueprint-confirmation-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": false
+    },
+    {
+      "component": "src/components/builder/version-history-drawer.tsx",
+      "currentLayer": "sheet",
+      "newLayer": "sheet",
+      "portalized": true
+    },
+    {
+      "component": "src/components/chat/chat-delete-confirm-modal.tsx",
+      "currentLayer": "confirmation",
+      "newLayer": "confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/chat/credits-upgrade-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": false
+    },
+    {
+      "component": "src/components/community/discussion-detail-drawer.tsx",
+      "currentLayer": "unknown",
+      "newLayer": "unknown",
+      "portalized": true
+    },
+    {
+      "component": "src/components/create/workspace/preview-page-switcher.tsx",
+      "currentLayer": "contextMenu/popover",
+      "newLayer": "contextMenu/popover",
+      "portalized": true
+    },
+    {
+      "component": "src/components/create/workspace/publish-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/create/workspace/workspace-integrations-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": false
+    },
+    {
+      "component": "src/components/dev/admin-diagnostics-drawer.tsx",
+      "currentLayer": "unknown",
+      "newLayer": "unknown",
+      "portalized": false
+    },
+    {
+      "component": "src/components/dev/runtime-diagnostics-drawer.tsx",
+      "currentLayer": "unknown",
+      "newLayer": "unknown",
+      "portalized": false
+    },
+    {
+      "component": "src/components/integrations/integration-connect-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": false
+    },
+    {
+      "component": "src/components/integrations/supabase-connect-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/layout/quick-collaborator-popover.tsx",
+      "currentLayer": "unknown",
+      "newLayer": "unknown",
+      "portalized": false
+    },
+    {
+      "component": "src/components/layout/user-menu.tsx",
+      "currentLayer": "unknown",
+      "newLayer": "unknown",
+      "portalized": false
+    },
+    {
+      "component": "src/components/mobile/mobile-readiness-scan-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/mobile/mobile-signing-config-drawer.tsx",
+      "currentLayer": "unknown",
+      "newLayer": "unknown",
+      "portalized": true
+    },
+    {
+      "component": "src/components/security/destructive-action-modal.tsx",
+      "currentLayer": "confirmation",
+      "newLayer": "confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/templates/publish-template-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/templates/template-use-confirm-modal.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/ui/floating-menu.tsx",
+      "currentLayer": "contextMenu/popover",
+      "newLayer": "contextMenu/popover",
+      "portalized": true
+    },
+    {
+      "component": "src/components/ui/overlay-dialog.tsx",
+      "currentLayer": "dialog/confirmation",
+      "newLayer": "dialog/confirmation",
+      "portalized": true
+    },
+    {
+      "component": "src/components/ui/toaster.tsx",
+      "currentLayer": "toast",
+      "newLayer": "toast",
+      "portalized": true
+    },
+    {
+      "component": "src/components/ui/vodex-confirm-modal.tsx",
+      "currentLayer": "confirmation",
+      "newLayer": "confirmation",
+      "portalized": true
+    }
+  ],
+  "hardcoded_z_index_offenders": [
+    {
+      "file": "src/components/admin/admin-users-panel.tsx",
+      "value": "10050"
+    },
+    {
+      "file": "src/components/apps/zip-import-wizard.tsx",
+      "value": "80"
+    },
+    {
+      "file": "src/components/community/discussion-detail-drawer.tsx",
+      "value": "10050"
+    },
+    {
+      "file": "src/components/create/workspace/admin-diagnostics-fab.tsx",
+      "value": "85"
+    },
+    {
+      "file": "src/components/create/workspace/admin-diagnostics-fab.tsx",
+      "value": "85"
+    },
+    {
+      "file": "src/components/create/workspace/build-diagnostics-center.tsx",
+      "value": "130"
+    },
+    {
+      "file": "src/components/create/workspace/model-picker.tsx",
+      "value": "9999"
+    },
+    {
+      "file": "src/components/create/workspace/workspace-integrations-modal.tsx",
+      "value": "10001"
+    },
+    {
+      "file": "src/components/create/workspace/workspace-integrations-modal.tsx",
+      "value": "10002"
+    },
+    {
+      "file": "src/components/create/workspace/workspace-launcher.tsx",
+      "value": "10000"
+    },
+    {
+      "file": "src/components/create/workspace/workspace-launcher.tsx",
+      "value": "10000"
+    },
+    {
+      "file": "src/components/create/workspace/workspace-launcher.tsx",
+      "value": "10000"
+    },
+    {
+      "file": "src/components/dev/admin-diagnostics-drawer.tsx",
+      "value": "90"
+    },
+    {
+      "file": "src/components/dev/admin-diagnostics-drawer.tsx",
+      "value": "100"
+    },
+    {
+      "file": "src/components/dev/auth-state-debug.tsx",
+      "value": "9990"
+    },
+    {
+      "file": "src/components/dev/auth-state-debug.tsx",
+      "value": "9990"
+    },
+    {
+      "file": "src/components/dev/owner-incident-console.tsx",
+      "value": "200"
+    },
+    {
+      "file": "src/components/dev/runtime-diagnostics-drawer.tsx",
+      "value": "85"
+    },
+    {
+      "file": "src/components/dev/runtime-diagnostics-drawer.tsx",
+      "value": "120"
+    },
+    {
+      "file": "src/components/integrations/app-secrets-integrations-panel.tsx",
+      "value": "120"
+    },
+    {
+      "file": "src/components/integrations/integration-connect-modal.tsx",
+      "value": "10003"
+    },
+    {
+      "file": "src/components/integrations/integrations-catalog-panel.tsx",
+      "value": "130"
+    },
+    {
+      "file": "src/components/integrations/supabase-connect-modal.tsx",
+      "value": "20000"
+    },
+    {
+      "file": "src/components/integrations/supabase-connect-modal.tsx",
+      "value": "20001"
+    },
+    {
+      "file": "src/components/layout/navigation-progress.tsx",
+      "value": "10050"
+    },
+    {
+      "file": "src/components/layout/quick-collaborator-popover.tsx",
+      "value": "80"
+    },
+    {
+      "file": "src/components/layout/quick-collaborator-popover.tsx",
+      "value": "90"
+    },
+    {
+      "file": "src/components/marketing/public-landing.tsx",
+      "value": "10040"
+    },
+    {
+      "file": "src/components/mobile/mobile-readiness-scan-modal.tsx",
+      "value": "20000"
+    },
+    {
+      "file": "src/components/mobile/mobile-readiness-scan-modal.tsx",
+      "value": "20001"
+    },
+    {
+      "file": "src/components/mobile/mobile-signing-config-drawer.tsx",
+      "value": "10055"
+    },
+    {
+      "file": "src/components/pricing/pricing-view.tsx",
+      "value": "10000"
+    },
+    {
+      "file": "src/components/pricing/pricing-view.tsx",
+      "value": "10000"
+    },
+    {
+      "file": "src/components/pricing/pricing-view.tsx",
+      "value": "9998"
+    },
+    {
+      "file": "src/components/pricing/pricing-view.tsx",
+      "value": "9999"
+    },
+    {
+      "file": "src/components/publish/publish-readiness-compact.tsx",
+      "value": "10060"
+    },
+    {
+      "file": "src/components/referrals/referral-notice-banner.tsx",
+      "value": "10050"
+    },
+    {
+      "file": "src/components/session/vodex-session-intro-gate.tsx",
+      "value": "9998"
+    },
+    {
+      "file": "src/components/session/vodex-session-intro.tsx",
+      "value": "9999"
+    },
+    {
+      "file": "src/components/settings/custom-oauth-wizard.tsx",
+      "value": "10060"
+    },
+    {
+      "file": "src/components/templates/template-use-confirm-modal.tsx",
+      "value": "10060"
+    },
+    {
+      "file": "src/components/templates/templates-view.tsx",
+      "value": "200"
+    }
+  ],
+  "hardcoded_count": 42
+}

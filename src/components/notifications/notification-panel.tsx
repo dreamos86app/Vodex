@@ -157,7 +157,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[9998] bg-foreground/20 backdrop-blur-[2px]"
+                  className="fixed inset-0 z-[var(--z-popover)] bg-foreground/20 backdrop-blur-[2px]"
                   aria-label="Close notifications"
                   onClick={onClose}
                 />
@@ -170,7 +170,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                 transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
                 data-testid="notification-panel"
                 className={cn(
-                  "z-[9999] overflow-hidden rounded-2xl bg-background shadow-[0_20px_60px_-12px_rgba(0,0,0,0.35)] ring-1 ring-border",
+                  "z-[var(--z-popover)] overflow-hidden rounded-2xl bg-background shadow-[0_20px_60px_-12px_rgba(0,0,0,0.35)] ring-1 ring-border",
                   isMobile
                     ? "fixed left-3 right-3 top-[max(calc(env(safe-area-inset-top)+3.25rem),3.5rem)] mx-auto w-auto max-w-[420px]"
                     : "fixed",

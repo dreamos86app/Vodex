@@ -268,12 +268,12 @@ export function CommandCenter() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[9990] bg-black/50 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[var(--z-command-palette)] bg-black/50 backdrop-blur-[2px]"
             onClick={() => notifyListeners(false)}
           />
 
           {/* Panel */}
-          <div className="fixed inset-x-0 top-[20vh] z-[9991] flex justify-center px-4">
+          <div className="fixed inset-x-0 top-[20vh] z-[var(--z-command-palette)] flex justify-center px-4">
             <motion.div
               initial={{ opacity: 0, y: -20, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

@@ -64,6 +64,7 @@
     "verify:user-facing-description": "node scripts/verify-p139-production.mjs user-facing-description",
     "verify:publish-readiness-separation": "node scripts/verify-p139-production.mjs publish-readiness-separation",
     "verify:overlay-z-index": "node scripts/verify-p139-production.mjs overlay-z-index",
+    "verify:overlay-system": "node scripts/verify-overlay-system.mjs",
     "verify:builder-section-navigation": "node scripts/verify-p139-production.mjs builder-section-navigation",
     "verify:auth-page-redesign": "node scripts/verify-p139-production.mjs auth-page-redesign",
     "verify:version-history-entrypoint": "node scripts/verify-p139-production.mjs version-history-entrypoint",

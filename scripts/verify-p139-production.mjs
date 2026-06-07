@@ -72,9 +72,11 @@ const suites = {
   },
   "overlay-z-index": () => {
     const errors = [];
-    must(read("src/app/globals.css"), "--z-critical-alert", "z tokens", errors);
-    must(read("src/components/ui/toaster.tsx"), "var(--z-critical-alert)", "toast layer", errors);
+    must(read("src/app/globals.css"), "--z-dialog", "dialog token", errors);
+    must(read("src/app/globals.css"), "--z-confirmation", "confirmation token", errors);
+    must(read("src/components/ui/toaster.tsx"), "overlayZClass(\"toast\")", "toast layer", errors);
     must(read("src/components/create/workspace/publish-modal.tsx"), "var(--z-modal-backdrop)", "modal layer", errors);
+    must(read("src/components/ui/overlay-layers.ts"), "overlayZClass", "overlay layer helper", errors);
     return errors;
   },
   "builder-section-navigation": () => {
@@ -107,6 +109,7 @@ const suites = {
   "apps-card-menu": () => {
     const errors = [];
     must(read("src/components/apps/project-card-overflow-menu.tsx"), "project-card-overflow-menu", "menu component", errors);
+    must(read("src/components/apps/project-card-overflow-menu.tsx"), "FloatingMenu", "portal floating menu", errors);
     must(read("src/components/apps/projects-view.tsx"), "ProjectCardOverflowMenu", "menu wired", errors);
     return errors;
   },

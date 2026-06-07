@@ -129,14 +129,24 @@
 /* Vodex — atmospheric white × blue (calm, cinematic, OS-grade) */
 :root {
   --z-page: 1;
-  --z-dropdown: 100;
-  --z-popover: 200;
-  --z-modal-backdrop: 500;
-  --z-modal: 600;
-  --z-drawer: 650;
-  --z-toast: 900;
-  --z-critical-alert: 1000;
-  --z-command-menu: 1100;
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-popover: 1100;
+  --z-tooltip: 1200;
+  --z-context-menu: 1300;
+  --z-sheet: 1400;
+  --z-dialog-backdrop: 1490;
+  --z-dialog: 1500;
+  --z-confirmation: 1600;
+  --z-command-palette: 1700;
+  --z-critical-alert: 1800;
+  --z-toast: 1900;
+  --z-debug: 2000;
+  /* Legacy aliases — prefer dialog/sheet/confirmation above */
+  --z-modal-backdrop: var(--z-dialog-backdrop);
+  --z-modal: var(--z-dialog);
+  --z-drawer: var(--z-sheet);
+  --z-command-menu: var(--z-command-palette);
   --background: #f4f7fd;
   --foreground: #071018;
   --muted: #e8eef8;

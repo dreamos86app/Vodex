@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { createPortal } from "react-dom";
+import { Portal } from "@/components/ui/portal-root";
+import { overlayZClass } from "@/components/ui/overlay-layers";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, XCircle, Info, AlertTriangle, X } from "lucide-react";
 import { toast, type ToastItem, type ToastVariant } from "@/lib/toast";
@@ -76,10 +77,14 @@ export function Toaster() {
 
   if (!mounted) return null;
 
-  return createPortal(
+  return (
+    <Portal layer="toast">
     <div
       aria-label="Notifications"
-      className="pointer-events-none fixed bottom-6 right-6 z-[var(--z-critical-alert)] flex flex-col items-end gap-2"
+      className={cn(
+        "pointer-events-none fixed bottom-6 right-6 flex flex-col items-end gap-2",
+        overlayZClass("toast"),
+      )}
     >
       <AnimatePresence initial={false} mode="sync">
         {toasts.map((t) => (
@@ -88,7 +93,7 @@ export function Toaster() {
           </div>
         ))}
       </AnimatePresence>
-    </div>,
-    document.body,
+    </div>
+    </Portal>
   );
 }

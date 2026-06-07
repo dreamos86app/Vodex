@@ -1,10 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   MoreHorizontal,
   ExternalLink,
@@ -22,6 +20,8 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { DestructiveActionModal } from "@/components/security/destructive-action-modal";
+import { FloatingMenu } from "@/components/ui/floating-menu";
+import { OverlayDialog } from "@/components/ui/overlay-dialog";
 
 type MenuItem = {
   id: string;
@@ -60,30 +60,24 @@ export function ProjectCardOverflowMenu({
   const [renameValue, setRenameValue] = React.useState(appName);
   const [busy, setBusy] = React.useState(false);
   const btnRef = React.useRef<HTMLButtonElement>(null);
-  const [pos, setPos] = React.useState({ top: 0, left: 0 });
 
   React.useEffect(() => {
-    if (!open || !btnRef.current) return;
-    const r = btnRef.current.getBoundingClientRect();
-    setPos({ top: r.bottom + 6, left: Math.max(8, r.right - 220) });
-  }, [open]);
+    setRenameValue(appName);
+  }, [appName]);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    const onClick = (e: MouseEvent) => {
-      if (btnRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("mousedown", onClick);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("mousedown", onClick);
-    };
-  }, [open]);
+  function closeMenu() {
+    setOpen(false);
+  }
+
+  function openRename() {
+    closeMenu();
+    setRenameOpen(true);
+  }
+
+  function openDelete() {
+    closeMenu();
+    setDeleteOpen(true);
+  }
 
   async function shareApp() {
     const url = publicUrl ?? previewUrl ?? `${window.location.origin}/apps/${projectId}/builder`;
@@ -97,7 +91,7 @@ export function ProjectCardOverflowMenu({
     } catch {
       toast.error("Could not share");
     }
-    setOpen(false);
+    closeMenu();
   }
 
   async function cloneApp() {
@@ -112,7 +106,7 @@ export function ProjectCardOverflowMenu({
       toast.error(e instanceof Error ? e.message : "Clone failed");
     } finally {
       setBusy(false);
-      setOpen(false);
+      closeMenu();
     }
   }
 
@@ -160,7 +154,7 @@ export function ProjectCardOverflowMenu({
       toast.error(e instanceof Error ? e.message : "Export failed");
     } finally {
       setExportBusy(false);
-      setOpen(false);
+      closeMenu();
     }
   }
 
@@ -173,7 +167,7 @@ export function ProjectCardOverflowMenu({
       ? [{ id: "preview", label: "Preview", icon: MonitorPlay, href: previewUrl }]
       : []),
     { id: "share", label: "Share", icon: Share2, onClick: () => void shareApp() },
-    { id: "rename", label: "Rename", icon: Pencil, onClick: () => { setRenameOpen(true); setOpen(false); } },
+    { id: "rename", label: "Rename", icon: Pencil, onClick: openRename },
     { id: "clone", label: "Clone app", icon: Copy, onClick: () => void cloneApp(), disabled: busy },
     {
       id: "settings",
@@ -185,13 +179,13 @@ export function ProjectCardOverflowMenu({
       id: "folder",
       label: "Move to folder",
       icon: FolderInput,
-      onClick: () => { toast.info("Folders coming soon"); setOpen(false); },
+      onClick: () => { toast.info("Folders coming soon"); closeMenu(); },
     },
     {
       id: "favorite",
       label: isFavorite ? "Remove favorite" : "Favorite",
       icon: Star,
-      onClick: () => { onToggleFavorite?.(!isFavorite); setOpen(false); },
+      onClick: () => { onToggleFavorite?.(!isFavorite); closeMenu(); },
     },
     {
       id: "export",
@@ -205,7 +199,7 @@ export function ProjectCardOverflowMenu({
       label: "Delete",
       icon: Trash2,
       destructive: true,
-      onClick: () => { setDeleteOpen(true); setOpen(false); },
+      onClick: openDelete,
     },
   ];
 
@@ -216,14 +210,16 @@ export function ProjectCardOverflowMenu({
         type="button"
         aria-label={`Actions for ${appName}`}
         aria-expanded={open}
+        aria-haspopup="menu"
         data-testid="project-card-overflow-menu"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          if (deleteOpen || renameOpen) return;
           setOpen((v) => !v);
         }}
         className={cn(
-          "relative z-[2] flex size-8 cursor-pointer items-center justify-center rounded-lg ring-1 transition",
+          "relative flex size-8 cursor-pointer items-center justify-center rounded-lg ring-1 transition",
           "bg-background text-accent ring-border hover:bg-accent hover:text-white hover:ring-accent/40",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-95",
           open && "bg-accent text-white ring-accent",
@@ -232,90 +228,81 @@ export function ProjectCardOverflowMenu({
         <MoreHorizontal className="size-4" strokeWidth={2.25} />
       </button>
 
-      {typeof document !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {open ? (
-              <motion.div
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                style={{ top: pos.top, left: pos.left }}
-                className="fixed z-[var(--z-popover)] w-[220px] overflow-hidden rounded-xl bg-background shadow-xl ring-1 ring-border"
-                data-testid="project-card-overflow-dropdown"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ul className="py-1">
-                  {items.map((item) => {
-                    const Icon = item.icon;
-                    const cls = cn(
-                      "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[12.5px] font-medium transition",
-                      "hover:bg-accent/8 focus-visible:bg-accent/8 focus-visible:outline-none",
-                      item.destructive ? "text-destructive hover:bg-destructive/8" : "text-foreground",
-                      item.disabled && "pointer-events-none opacity-50",
-                    );
-                    if (item.href) {
-                      return (
-                        <li key={item.id}>
-                          <Link href={item.href} className={cls} onClick={() => setOpen(false)}>
-                            <Icon className="size-3.5 shrink-0" />
-                            {item.label}
-                          </Link>
-                        </li>
-                      );
-                    }
-                    return (
-                      <li key={item.id}>
-                        <button type="button" className={cls} onClick={item.onClick} disabled={item.disabled}>
-                          <Icon className="size-3.5 shrink-0" />
-                          {item.label}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>,
-          document.body,
-        )}
+      <FloatingMenu
+        open={open && !deleteOpen && !renameOpen}
+        onClose={closeMenu}
+        anchorRef={btnRef}
+        returnFocusRef={btnRef}
+        data-testid="project-card-overflow-dropdown"
+        layer="contextMenu"
+      >
+        <ul className="py-1">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const cls = cn(
+              "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-[12.5px] font-medium transition",
+              "hover:bg-accent/8 focus-visible:bg-accent/8 focus-visible:outline-none",
+              item.destructive ? "text-destructive hover:bg-destructive/8" : "text-foreground",
+              item.disabled && "pointer-events-none opacity-50",
+            );
+            if (item.href) {
+              return (
+                <li key={item.id}>
+                  <Link href={item.href} className={cls} onClick={closeMenu}>
+                    <Icon className="size-3.5 shrink-0" />
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            }
+            return (
+              <li key={item.id}>
+                <button type="button" className={cls} onClick={item.onClick} disabled={item.disabled}>
+                  <Icon className="size-3.5 shrink-0" />
+                  {item.label}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </FloatingMenu>
 
-      {renameOpen ? (
-        <div
-          className="fixed inset-0 z-[var(--z-modal-backdrop)] flex items-center justify-center bg-foreground/25 p-4 backdrop-blur-sm"
-          onClick={() => setRenameOpen(false)}
-        >
-          <div
-            className="z-[var(--z-modal)] w-full max-w-sm rounded-xl bg-background p-5 shadow-xl ring-1 ring-border"
-            onClick={(e) => e.stopPropagation()}
+      <OverlayDialog
+        open={renameOpen}
+        onClose={() => setRenameOpen(false)}
+        returnFocusRef={btnRef}
+        panelClassName="max-w-sm p-5"
+        data-testid="project-rename-dialog"
+      >
+        <p className="text-[14px] font-semibold">Rename app</p>
+        <input
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          className="mt-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-[13px]"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            className="rounded-lg px-3 py-1.5 text-[12px] font-medium ring-1 ring-border"
+            onClick={() => setRenameOpen(false)}
           >
-            <p className="text-[14px] font-semibold">Rename app</p>
-            <input
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              className="mt-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-[13px]"
-              autoFocus
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" className="rounded-lg px-3 py-1.5 text-[12px] font-medium ring-1 ring-border" onClick={() => setRenameOpen(false)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-semibold text-white"
-                onClick={() => void saveRename()}
-              >
-                Save
-              </button>
-            </div>
-          </div>
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-semibold text-white"
+            onClick={() => void saveRename()}
+          >
+            Save
+          </button>
         </div>
-      ) : null}
+      </OverlayDialog>
 
       <DestructiveActionModal
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
+        returnFocusRef={btnRef}
         actionType="delete_project"
         targetId={projectId}
         targetName={appName}
