@@ -58,13 +58,8 @@ const PROVIDER_ALIASES: Record<string, IntegrationProvider> = {
   "lemon-squeezy": "lemonsqueezy",
 };
 
-/** Marks that use `currentColor` for light/dark contrast (not brand hex on dark UI). */
-const MONOCHROME_PROVIDERS = new Set<IntegrationProvider>([
-  "github",
-  "vercel",
-  "resend",
-  "openai",
-]);
+/** Marks that default to currentColor only when mono variant is requested. */
+const MONOCHROME_PROVIDERS = new Set<IntegrationProvider>(["openai"]);
 
 export const INTEGRATION_BRANDS: Record<
   IntegrationProvider,
@@ -86,17 +81,17 @@ export const INTEGRATION_BRANDS: Record<
   },
   github: {
     title: "GitHub",
-    wellClassName: "bg-[#f6f8fa] ring-border/70 dark:bg-white/12 dark:ring-white/15",
+    wellClassName: "bg-[#2ea44f]/14 ring-[#2ea44f]/32 dark:bg-[#238636]/22 dark:ring-[#3fb950]/35",
     simpleIcon: siGithub,
   },
   vercel: {
     title: "Vercel",
-    wellClassName: "bg-[#f6f8fa] ring-border/70 dark:bg-white/12 dark:ring-white/15",
+    wellClassName: "bg-[#0070F3]/14 ring-[#0070F3]/30 dark:bg-[#0070F3]/22 dark:ring-[#3291ff]/40",
     simpleIcon: siVercel,
   },
   resend: {
     title: "Resend",
-    wellClassName: "bg-[#f6f8fa] ring-border/70 dark:bg-white/12 dark:ring-white/15",
+    wellClassName: "bg-[#FF6B35]/14 ring-[#FF6B35]/30 dark:bg-[#FF6B35]/18 dark:ring-[#FF8C5A]/35",
     simpleIcon: siResend,
   },
   slack: {
@@ -243,11 +238,7 @@ function SimpleIconMark({
   className?: string;
 }) {
   const mono = MONOCHROME_PROVIDERS.has(provider);
-  const forceMono =
-    mono &&
-    (variant === "mono-light" ||
-      variant === "mono-dark" ||
-      variant === "brand");
+  const forceMono = mono && (variant === "mono-light" || variant === "mono-dark");
   const useBrandColor = !forceMono;
 
   return (
@@ -347,6 +338,7 @@ export interface IntegrationIconWellProps {
   wellClassName?: string;
   className?: string;
   title?: string;
+  iconVariant?: "brand" | "mono-light" | "mono-dark";
 }
 
 /** Circular icon well — consistent size and centering across cards. */
@@ -387,6 +379,7 @@ export function IntegrationIconWell({
   wellClassName,
   className,
   title,
+  iconVariant = "brand",
 }: IntegrationIconWellProps) {
   const provider = resolveProvider(
     typeof providerProp === "string" ? providerProp : providerProp,
@@ -411,13 +404,18 @@ export function IntegrationIconWell({
       <IntegrationIcon
         provider={provider ?? "supabase"}
         size={iconSize}
+        variant={iconVariant}
         title={title ?? brand?.title}
         className={
           provider === "openai"
             ? "text-[#10A37F] dark:text-white"
-            : provider && MONOCHROME_PROVIDERS.has(provider)
-              ? "text-zinc-900 dark:text-white"
-              : undefined
+            : provider === "github"
+              ? "text-[#24292f] dark:text-white"
+              : provider === "vercel"
+                ? "text-[#000000] dark:text-white"
+                : provider === "resend"
+                  ? "text-[#000000] dark:text-white"
+                  : undefined
         }
       />
     </span>

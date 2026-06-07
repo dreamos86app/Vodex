@@ -36,22 +36,22 @@ export const INTEGRATION_SHOWCASE_ITEMS: IntegrationShowcaseItem[] = [
     name: "GitHub",
     desc: "Source control & CI",
     slug: "github",
-    glow: "from-[#24292f]/28 via-[#57606a]/12 to-transparent dark:from-white/22 dark:via-[#8b949e]/10",
-    ring: "ring-[#57606a]/35 dark:ring-white/25",
+    glow: "from-[#2ea44f]/42 via-[#238636]/18 to-[#6e40c9]/10 dark:from-[#3fb950]/38 dark:via-[#238636]/16",
+    ring: "ring-[#2ea44f]/40 dark:ring-[#3fb950]/45",
   },
   {
     name: "Vercel",
     desc: "Deploy & edge",
     slug: "vercel",
-    glow: "from-[#111111]/30 via-[#333333]/10 to-transparent dark:from-white/24 dark:via-white/8",
-    ring: "ring-[#111111]/30 dark:ring-white/22",
+    glow: "from-[#0070F3]/40 via-[#000000]/16 to-transparent dark:from-[#3291ff]/36 dark:via-[#0070F3]/14",
+    ring: "ring-[#0070F3]/42 dark:ring-[#3291ff]/48",
   },
   {
     name: "Resend",
     desc: "Transactional email",
     slug: "resend",
-    glow: "from-[#171717]/28 via-[#404040]/10 to-transparent dark:from-neutral-200/18 dark:via-neutral-500/8",
-    ring: "ring-[#404040]/30 dark:ring-neutral-400/25",
+    glow: "from-[#FF6B35]/40 via-[#FF8C5A]/16 to-transparent dark:from-[#FF6B35]/34 dark:via-[#FF8C5A]/12",
+    ring: "ring-[#FF6B35]/40 dark:ring-[#FF8C5A]/45",
   },
   {
     name: "Slack",
@@ -84,6 +84,9 @@ export const INTEGRATION_SHOWCASE_ITEMS: IntegrationShowcaseItem[] = [
 ];
 
 const LOOP_ITEMS = [...INTEGRATION_SHOWCASE_ITEMS, ...INTEGRATION_SHOWCASE_ITEMS];
+/** Fixed gap between carousel slots (layout box — unaffected by scale). */
+const CAROUSEL_SLOT_GAP_PX = 12;
+const CAROUSEL_SLOT_WIDTH_PX = 136;
 
 function ElectricPlugIcon() {
   return (
@@ -105,29 +108,31 @@ function IntegrationCarouselTile({
   item: IntegrationShowcaseItem;
   centerWeight: number;
 }) {
-  const scale = 0.72 + centerWeight * 0.38;
-  const opacity = 0.35 + centerWeight * 0.65;
+  const scale = 0.8 + centerWeight * 0.28;
   const lift = centerWeight * -10;
 
   return (
     <div
-      className="flex w-[148px] shrink-0 flex-col items-center justify-end px-1"
+      className="flex shrink-0 flex-col items-center justify-end"
       style={{
+        width: CAROUSEL_SLOT_WIDTH_PX,
         transform: `translateY(${lift}px) scale(${scale})`,
-        opacity,
-        transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease",
+        transformOrigin: "center bottom",
+        transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
       <div
         className={cn(
-          "relative flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl px-3 py-3.5 ring-1 transition-shadow duration-300",
+          "relative flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl bg-background/80 px-3 py-3.5 ring-1 transition-shadow duration-300",
           "bg-gradient-to-b",
           item.glow,
           item.ring,
           centerWeight > 0.72 && "shadow-[0_20px_48px_-18px_rgba(30,107,255,0.45)]",
+          centerWeight < 0.35 && "brightness-[0.92] saturate-[0.88]",
+          centerWeight >= 0.35 && "brightness-100 saturate-100",
         )}
       >
-        <IntegrationIconWell provider={item.slug} size="md" title={item.name} />
+        <IntegrationIconWell provider={item.slug} size="md" title={item.name} iconVariant="brand" />
         <div className="text-center">
           <p className="text-[12px] font-semibold tracking-tight text-foreground">{item.name}</p>
           <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground">{item.desc}</p>
@@ -197,10 +202,13 @@ function IntegrationMarqueeRail() {
       <div
         ref={trackRef}
         className={cn(
-          "flex w-max items-end gap-2 will-change-transform",
+          "flex w-max items-end will-change-transform",
           reduceMotion ? "" : "animate-[integration-marquee_42s_linear_infinite]",
         )}
-        style={reduceMotion ? undefined : { animationPlayState: "running" }}
+        style={{
+          gap: CAROUSEL_SLOT_GAP_PX,
+          ...(reduceMotion ? {} : { animationPlayState: "running" }),
+        }}
       >
         {LOOP_ITEMS.map((item, i) => (
           <IntegrationCarouselTile
