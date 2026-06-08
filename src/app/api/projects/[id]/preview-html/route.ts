@@ -6,7 +6,7 @@ import { downloadPreviewArtifactFile } from "@/lib/imports/preview-artifact-writ
 import { analyzeLegacyAdapter, injectPreviewShims } from "@/lib/imports/base44-lovable-adapter";
 import { detectImportedFramework } from "@/lib/imports/framework-detector";
 import { analyzePreviewHtml } from "@/lib/preview/preview-html-diagnostics";
-import { loadProjectFilesWithContent } from "@/lib/preview/project-preview-html";
+import { countProjectFiles, loadProjectFilesWithContent } from "@/lib/preview/project-preview-html";
 import { rewritePreviewArtifactHtml } from "@/lib/preview/rewrite-preview-artifact-html";
 import { loadPreviewRuntimeStatus } from "@/lib/preview/load-preview-runtime-status";
 import { buildPreviewStatusHtml } from "@/lib/preview/preview-status-html";
@@ -98,21 +98,34 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         })
       : null;
     if (file) {
-      const files = await loadProjectFilesWithContent(supabase, projectId);
-      fileCount = files.length;
-      const zipFiles = files.map((f) => ({
-        path: f.path,
-        content: f.content,
-        sizeBytes: Buffer.byteLength(f.content, "utf8"),
-      }));
-      const fw = detectImportedFramework(zipFiles);
-      const legacy = analyzeLegacyAdapter(zipFiles, fw);
+      const storedCount =
+        typeof meta.import_file_count === "number" && meta.import_file_count > 0
+          ? meta.import_file_count
+          : null;
+      fileCount = storedCount ?? (await countProjectFiles(supabase, projectId));
+      const shimHints: Array<{ path: string; content: string; sizeBytes: number }> = [];
+      for (const hintPath of ["package.json", ".env.example", "vite.config.ts"]) {
+        const { data: hintRow } = await supabase
+          .from("app_files")
+          .select("content")
+          .eq("project_id", projectId)
+          .eq("path", hintPath)
+          .maybeSingle();
+        if (hintRow?.content) {
+          shimHints.push({
+            path: hintPath,
+            content: hintRow.content,
+            sizeBytes: Buffer.byteLength(hintRow.content, "utf8"),
+          });
+        }
+      }
+      const fw = detectImportedFramework(
+        shimHints.length ? shimHints : [{ path: "package.json", content: "{}", sizeBytes: 2 }],
+      );
+      const legacy = analyzeLegacyAdapter(shimHints, fw);
       html = injectPreviewShims(file.data.toString("utf8"), legacy);
       html = rewritePreviewArtifactHtml(html, projectId, buildId, previewRoute);
-      diagnostics = analyzePreviewHtml(
-        html,
-        zipFiles.map((f) => ({ path: f.path, content: f.content })),
-      );
+      diagnostics = analyzePreviewHtml(html, shimHints.map((f) => ({ path: f.path, content: f.content })));
       servedFromArtifact = true;
 
       if (!diagnostics.previewRenderable) {

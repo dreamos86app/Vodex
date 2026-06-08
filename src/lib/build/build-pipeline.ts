@@ -662,12 +662,6 @@ export async function runStagedBuildPipeline(input: {
   });
   primaryModelId = primaryMix.mainModelId;
 
-  track(
-    events,
-    "classified",
-    `Complexity ${effectiveComplexity}/10`,
-    firstPassScope ? `First pass (${firstPassScope.tier})` : scope.coreV1Only ? "Core V1 first" : undefined,
-  );
   trackAssistant(events, userFacingArchetypeLabel(archetypeEarly.label), emit);
 
   const scopeNote = firstPassScope
@@ -932,15 +926,7 @@ export async function runStagedBuildPipeline(input: {
     uiJson,
   );
 
-  const entityHint =
-    planParsed?.entities?.length && planParsed.entities.length > 0
-      ? String(planParsed.entities.slice(0, 3).join(", "))
-      : archetype.label;
-  trackAssistant(
-    events,
-    `Data model and routes are set (${entityHint}) — I'll generate screens and components next.`,
-    emit,
-  );
+  track(events, "writing", "Generating screens and components");
 
   if (accumulatedCost >= FULL_BUILD_CAP_USD * 0.85) {
     return {

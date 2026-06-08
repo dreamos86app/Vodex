@@ -56,18 +56,55 @@ function formatBucketLabel(key: string, period: Period): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+type TimeseriesPoint = { date: string; label: string; views: number };
+
 function buildTimeseries(
   rows: Array<Record<string, unknown>>,
   period: Period,
-): Array<{ date: string; label: string; views: number }> {
-  const m = new Map<string, number>();
+  metric: "pageViews" | "sessions" | "signups" | "uniqueVisitors" = "pageViews",
+): TimeseriesPoint[] {
+  const counts = new Map<string, number>();
+  const uniques = new Map<string, Set<string>>();
+
   for (const r of rows) {
-    if (r.event_type !== "page_view" && r.event_type !== "route_change") continue;
     const created = String(r.created_at ?? "");
     const key = bucketKey(created, period);
-    m.set(key, (m.get(key) ?? 0) + 1);
+    const type = String(r.event_type ?? "");
+    const visitor =
+      (r.session_id as string) ||
+      (r.meta as { visitor_id?: string } | undefined)?.visitor_id ||
+      "";
+
+    if (metric === "pageViews") {
+      if (type !== "page_view" && type !== "route_change") continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      continue;
+    }
+    if (metric === "signups") {
+      if (!["signup", "signup_success"].includes(type)) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      continue;
+    }
+    if (metric === "sessions" || metric === "uniqueVisitors") {
+      if (type !== "page_view" && type !== "route_change" && type !== "session_start") continue;
+      if (!visitor) continue;
+      const set = uniques.get(key) ?? new Set<string>();
+      set.add(visitor);
+      uniques.set(key, set);
+    }
   }
-  return [...m.entries()]
+
+  if (metric === "sessions" || metric === "uniqueVisitors") {
+    return [...uniques.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, set]) => ({
+        date,
+        label: formatBucketLabel(date, period),
+        views: set.size,
+      }));
+  }
+
+  return [...counts.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, views]) => ({ date, label: formatBucketLabel(date, period), views }));
 }
@@ -260,7 +297,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     errors: rows
       .filter((r) => ["error", "error_event"].includes(String(r.event_type)))
       .slice(0, 20),
-    timeseries: buildTimeseries(rows, period),
+    timeseries: buildTimeseries(rows, period, "pageViews"),
+    timeseriesByMetric: {
+      pageViews: buildTimeseries(rows, period, "pageViews"),
+      sessions: buildTimeseries(rows, period, "sessions"),
+      signups: buildTimeseries(rows, period, "signups"),
+      uniqueVisitors: buildTimeseries(rows, period, "uniqueVisitors"),
+    },
     revenue: paymentRow
       ? { connected: true, provider: (paymentRow as { provider?: string }).provider }
       : null,

@@ -12,6 +12,44 @@ export type DnsVerificationResult = {
   errors: string[];
 };
 
+export type CustomDomainDnsRecords = {
+  cname: { type: "CNAME"; name: string; host: string; value: string };
+  txt: { type: "TXT"; name: string; host: string; value: string };
+  apexRedirectNote?: string;
+  inputHostname?: string;
+};
+
+/** Apex = registrable root (example.com). CNAME cannot target apex — use www. */
+export function isApexHostname(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase().replace(/\.$/, "");
+  const parts = host.split(".").filter(Boolean);
+  return parts.length === 2;
+}
+
+/** Normalize user input: apex domains become www.{apex} for CNAME verification. */
+export function normalizeCustomDomainHostname(raw: string): {
+  inputHostname: string;
+  hostname: string;
+  isApex: boolean;
+} {
+  const inputHostname = raw
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    ?.replace(/\.$/, "") ?? "";
+  const isApex = isApexHostname(inputHostname);
+  const hostname = isApex ? `www.${inputHostname}` : inputHostname;
+  return { inputHostname, hostname, isApex };
+}
+
+/** DNS provider "Name" column — subdomain label only, never the full apex domain. */
+export function dnsRecordLabel(hostname: string): string {
+  const parts = hostname.split(".").filter(Boolean);
+  if (parts.length <= 2) return "www";
+  return parts[0] ?? hostname;
+}
+
 export async function verifyCustomDomainDns(
   hostname: string,
   verificationToken: string,
@@ -22,15 +60,16 @@ export async function verifyCustomDomainDns(
   const cnameRecords: string[] = [];
 
   let txtVerified = false;
+  const txtHost = `_vodex.${host}`;
   try {
-    const txts = await dns.resolveTxt(`_vodex.${host}`);
+    const txts = await dns.resolveTxt(txtHost);
     for (const row of txts) {
       const joined = row.join("");
       txtRecords.push(joined);
       if (joined === `${TXT_PREFIX}${verificationToken}`) txtVerified = true;
     }
   } catch {
-    errors.push("TXT record not found at _vodex." + host);
+    errors.push(`TXT record not found at ${txtHost}`);
   }
 
   let cnameVerified = false;
@@ -39,13 +78,7 @@ export async function verifyCustomDomainDns(
     cnameRecords.push(...cnames);
     cnameVerified = cnames.some((c) => c.toLowerCase().replace(/\.$/, "") === CNAME_TARGET);
   } catch {
-    try {
-      const cnames = await dns.resolveCname(`www.${host}`);
-      cnameRecords.push(...cnames);
-      cnameVerified = cnames.some((c) => c.toLowerCase().replace(/\.$/, "") === CNAME_TARGET);
-    } catch {
-      errors.push(`CNAME should point to ${CNAME_TARGET}`);
-    }
+    errors.push(`CNAME on ${host} should point to ${CNAME_TARGET}`);
   }
 
   return {
@@ -56,11 +89,26 @@ export async function verifyCustomDomainDns(
   };
 }
 
-export function buildCustomDomainDnsInstructions(hostname: string, token: string) {
+export function buildCustomDomainDnsInstructions(
+  hostname: string,
+  token: string,
+): CustomDomainDnsRecords {
+  const normalized = normalizeCustomDomainHostname(hostname);
+  const host = normalized.hostname;
+  const cnameName = dnsRecordLabel(host);
+  const txtName = `_vodex.${cnameName}`;
+
   return {
-    cname: { host: hostname, type: "CNAME", value: CNAME_TARGET },
-    txt: { host: `_vodex.${hostname}`, type: "TXT", value: `${TXT_PREFIX}${token}` },
-    apexNote:
-      "For apex domains (example.com), use your DNS provider ALIAS/ANAME or redirect to www.",
+    inputHostname: normalized.inputHostname,
+    cname: { type: "CNAME", name: cnameName, host, value: CNAME_TARGET },
+    txt: {
+      type: "TXT",
+      name: txtName,
+      host: `_vodex.${host}`,
+      value: `${TXT_PREFIX}${token}`,
+    },
+    apexRedirectNote: normalized.isApex
+      ? `Root domains cannot use CNAME. Add records for ${host}, then redirect ${normalized.inputHostname} → ${host} at your registrar.`
+      : undefined,
   };
 }

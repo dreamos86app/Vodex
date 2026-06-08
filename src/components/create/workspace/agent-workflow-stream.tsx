@@ -316,6 +316,22 @@ function TimelineRow({
   workflowEvents: BuildJobPollState["events"];
 }) {
   if (isFileEvent(event)) return <FileChangeCard event={event} />;
+  if (event.category === "assistant_message" && event.status === "active") {
+    return (
+      <ProgressRow
+        event={{
+          ...event,
+          category: "phase_started",
+          title: "Working on it…",
+          subtitle: event.subtitle ?? event.title,
+        }}
+        reducedMotion={reducedMotion}
+        streamFileCount={streamFileCount}
+        previewSucceeded={previewSucceeded}
+        workflowEvents={workflowEvents}
+      />
+    );
+  }
   if (event.category === "assistant_message" || isInlineWorkflowStatus(event.title)) {
     const copy = event.subtitle ?? event.title;
     return (

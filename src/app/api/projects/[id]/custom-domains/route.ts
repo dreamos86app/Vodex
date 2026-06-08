@@ -5,6 +5,7 @@ import { getEntitlements } from "@/lib/billing/plan-entitlements";
 import { normalizePlanId } from "@/lib/billing/plans";
 import {
   buildCustomDomainDnsInstructions,
+  normalizeCustomDomainHostname,
   verifyCustomDomainDns,
 } from "@/lib/publish/custom-domain-dns";
 
@@ -95,13 +96,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ ok: true });
   }
 
-  const hostname = body.hostname?.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!hostname || !hostname.includes(".")) {
+  const rawHost = body.hostname?.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!rawHost || !rawHost.includes(".")) {
     return NextResponse.json({ error: "Invalid domain" }, { status: 400 });
   }
 
+  const { hostname } = normalizeCustomDomainHostname(rawHost);
   const token = crypto.randomUUID().replace(/-/g, "");
-  const instructions = buildCustomDomainDnsInstructions(hostname, token);
+  const instructions = buildCustomDomainDnsInstructions(rawHost, token);
 
   const { data, error } = await admin
     .from("custom_domains" as never)

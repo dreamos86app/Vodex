@@ -224,6 +224,14 @@ const PALETTES: Record<AppArchetypeId, GeneratedDesignSystem["palette"]> = {
     muted: "text-slate-600",
     border: "border-indigo-100",
   },
+  podcast_listener: {
+    primary: "#7c3aed",
+    accent: "#22c55e",
+    background: "bg-violet-950/5",
+    surface: "bg-white",
+    muted: "text-slate-500",
+    border: "border-violet-200",
+  },
   generic_app: {
     primary: "#4f46e5",
     accent: "#0ea5e9",

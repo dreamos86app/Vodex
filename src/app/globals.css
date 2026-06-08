@@ -2582,3 +2582,20 @@ body {
     animation: none !important;
   }
 }
+
+/* Clickable affordance — buttons, links, and common interactive controls */
+button:not(:disabled),
+a[href],
+[role="button"]:not([aria-disabled="true"]),
+summary,
+label[for],
+input[type="checkbox"],
+input[type="radio"],
+select {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}

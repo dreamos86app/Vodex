@@ -37,7 +37,7 @@ function DnsCopyField({ label, value }: { label: string; value: string }) {
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
         <button
           type="button"
-          className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600"
+          className="inline-flex cursor-pointer items-center gap-1 text-[10px] font-semibold text-blue-600"
           onClick={() => {
             void navigator.clipboard.writeText(value);
             toast.success(`${label} copied`);
@@ -269,6 +269,11 @@ export function CustomDomainsPanel({
             </li>
           ))}
         </ol>
+        <p className="mb-2 text-[11px] text-muted-foreground">
+          Use a subdomain (e.g. <code className="font-mono">app</code> or <code className="font-mono">www</code>).
+          Root domains like <code className="font-mono">example.com</code> are auto-mapped to{" "}
+          <code className="font-mono">www.example.com</code> because CNAME cannot target apex.
+        </p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             value={hostname}
@@ -276,14 +281,14 @@ export function CustomDomainsPanel({
               setHostname(e.target.value);
               setWizardStep(0);
             }}
-            placeholder="app.yourdomain.com"
+            placeholder="app.yourdomain.com or www.yourdomain.com"
             className="flex-1 rounded-xl bg-background px-4 py-3 text-[13px] ring-1 ring-border focus:ring-2 focus:ring-accent/30"
           />
           <button
             type="button"
             disabled={busy || !hostname.includes(".")}
             onClick={() => void addDomain()}
-            className="rounded-xl bg-accent px-5 py-3 text-[13px] font-semibold text-white disabled:opacity-40"
+            className="cursor-pointer rounded-xl bg-accent px-5 py-3 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             Add domain
           </button>
@@ -315,19 +320,46 @@ export function CustomDomainsPanel({
                 <div className="mt-3 space-y-3 rounded-xl bg-muted/30 p-3 text-[12px]">
                   <p className="font-semibold text-foreground">DNS records — add at your domain provider</p>
                   <p className="text-[11px] text-muted-foreground">
-                    Step 2: Configure DNS. After both records propagate, click Verify DNS.
+                    Step 2: Configure DNS for <span className="font-mono font-semibold">{d.hostname}</span>.
+                    After both records propagate, click Verify DNS.
                   </p>
+                  {typeof d.dns_records?.apexRedirectNote === "string" ? (
+                    <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-900 ring-1 ring-amber-500/20">
+                      {d.dns_records.apexRedirectNote}
+                    </p>
+                  ) : null}
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">CNAME record</p>
-                    <DnsCopyField label="Type" value="CNAME" />
-                    <DnsCopyField label="Name" value={d.hostname} />
-                    <DnsCopyField label="Value" value="cname.vodex.dev" />
+                    <DnsCopyField
+                      label="Type"
+                      value={String((d.dns_records?.cname as { type?: string } | undefined)?.type ?? "CNAME")}
+                    />
+                    <DnsCopyField
+                      label="Name"
+                      value={String((d.dns_records?.cname as { name?: string } | undefined)?.name ?? d.hostname.split(".")[0] ?? "www")}
+                    />
+                    <DnsCopyField
+                      label="Value"
+                      value={String((d.dns_records?.cname as { value?: string } | undefined)?.value ?? "cname.vodex.dev")}
+                    />
                   </div>
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">TXT record</p>
-                    <DnsCopyField label="Type" value="TXT" />
-                    <DnsCopyField label="Name" value={`_vodex.${d.hostname}`} />
-                    <DnsCopyField label="Value" value={`vodex-verify=${d.verification_token ?? ""}`} />
+                    <DnsCopyField
+                      label="Type"
+                      value={String((d.dns_records?.txt as { type?: string } | undefined)?.type ?? "TXT")}
+                    />
+                    <DnsCopyField
+                      label="Name"
+                      value={String((d.dns_records?.txt as { name?: string } | undefined)?.name ?? `_vodex.${d.hostname.split(".")[0] ?? "www"}`)}
+                    />
+                    <DnsCopyField
+                      label="Value"
+                      value={String(
+                        (d.dns_records?.txt as { value?: string } | undefined)?.value ??
+                          `vodex-verify=${d.verification_token ?? ""}`,
+                      )}
+                    />
                   </div>
                 </div>
               ) : null}
@@ -339,7 +371,7 @@ export function CustomDomainsPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => void verifyDomain(d.id)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-accent/10 px-3 py-2 text-[12px] font-semibold text-accent ring-1 ring-accent/25"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-accent/10 px-3 py-2 text-[12px] font-semibold text-accent ring-1 ring-accent/25 disabled:cursor-not-allowed"
                 >
                   <RefreshCw className="size-3.5" /> Verify DNS
                 </button>
@@ -347,7 +379,7 @@ export function CustomDomainsPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => setRemoveTarget(d.id)}
-                  className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-semibold text-destructive ring-1 ring-destructive/25"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-semibold text-destructive ring-1 ring-destructive/25 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="size-3.5" /> Remove
                 </button>

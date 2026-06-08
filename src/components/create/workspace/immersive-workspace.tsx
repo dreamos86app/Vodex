@@ -1936,6 +1936,7 @@ export function ImmersiveWorkspace({
     }
     setLockedTaskMode(submitModeEarly);
     lockedTaskModeRef.current = submitModeEarly;
+    setMode(submitModeEarly);
     if (submitModeEarly === "build") {
       setBuildStarting(true);
       buildStartedAtRef.current = Date.now();

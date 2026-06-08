@@ -153,7 +153,10 @@ export function mapUserFacingWorkflowEvent(input: UserFacingWorkflowInput): User
     (rawTitle === "Still working" && meta.stream_category !== "assistant_message") ||
     rawTitle === "worker_claim_attempt" ||
     traceStage === "worker_claim_attempt" ||
-    traceStage === "build_pipeline_entered";
+    traceStage === "build_pipeline_entered" ||
+    /^Complexity \d+\/10$/i.test(rawTitle) ||
+    /^First pass \(/i.test(rawDetail) ||
+    /data model and routes are set/i.test(rawTitle);
 
   let streamCategory = typeof meta.stream_category === "string" ? meta.stream_category : undefined;
   if (isFileEvent) {

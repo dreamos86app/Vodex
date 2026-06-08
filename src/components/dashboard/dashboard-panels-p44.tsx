@@ -43,9 +43,13 @@ function MetricCard({
 function TrafficLineChart({
   data,
   expanded,
+  metricLabel = "views",
+  chartKey,
 }: {
   data: Array<{ date: string; label?: string; views: number }>;
   expanded?: boolean;
+  metricLabel?: string;
+  chartKey?: string;
 }) {
   const [hover, setHover] = React.useState<number | null>(null);
   if (!data.length) {
@@ -53,21 +57,34 @@ function TrafficLineChart({
   }
   const max = Math.max(1, ...data.map((d) => d.views));
   const w = 640;
-  const h = expanded ? 200 : 96;
+  const h = expanded ? 180 : 88;
+  const padX = 12;
+  const plotW = w - padX * 2;
   const points = data.map((d, i) => {
-    const x = (i / Math.max(1, data.length - 1)) * w;
-    const y = h - (d.views / max) * (h - 16) - 8;
+    const x = padX + (i / Math.max(1, data.length - 1)) * plotW;
+    const y = h - (d.views / max) * (h - 20) - 10;
     return { x, y, ...d };
   });
   const poly = points.map((p) => `${p.x},${p.y}`).join(" ");
   const active = hover != null ? points[hover] : null;
+  const xLabels = [
+    data[0],
+    data[Math.floor((data.length - 1) / 2)],
+    data[data.length - 1],
+  ].filter(Boolean);
 
   return (
-    <div className="relative">
+    <motion.div
+      key={chartKey}
+      className="relative"
+      initial={{ opacity: 0.35 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35 }}
+    >
       <svg
         viewBox={`0 0 ${w} ${h}`}
-        className={cn("w-full text-blue-500", expanded ? "h-52" : "h-24")}
-        preserveAspectRatio="none"
+        className={cn("mx-auto block w-full max-w-3xl text-blue-500", expanded ? "h-44" : "h-28")}
+        preserveAspectRatio="xMidYMid meet"
         onMouseLeave={() => setHover(null)}
       >
         <defs>
@@ -110,10 +127,15 @@ function TrafficLineChart({
       </svg>
       {active ? (
         <div className="pointer-events-none absolute right-2 top-2 rounded-lg bg-blue-600 px-2.5 py-1.5 text-[10px] font-semibold text-white shadow-lg">
-          {active.label ?? active.date} · {active.views} views
+          {active.label ?? active.date} · {active.views} {metricLabel}
         </div>
       ) : null}
-    </div>
+      <div className="mx-auto mt-1 flex max-w-3xl justify-between px-1 text-[9px] tabular-nums text-muted-foreground">
+        {xLabels.map((d) => (
+          <span key={d!.date}>{d!.label ?? d!.date}</span>
+        ))}
+      </div>
+    </motion.div>
   );
 }
 
@@ -165,6 +187,8 @@ function MiniBarChart({ data }: { data: Array<{ name: string; count: number }> }
   );
 }
 
+type ChartMetric = "pageViews" | "sessions" | "signups" | "uniqueVisitors";
+
 type AnalyticsPayload = {
   period: string;
   pageViews: number;
@@ -187,13 +211,15 @@ type AnalyticsPayload = {
   revenue: { connected: boolean; provider?: string } | null;
   empty: boolean;
   timeseries?: Array<{ date: string; label?: string; views: number }>;
+  timeseriesByMetric?: Partial<
+    Record<ChartMetric, Array<{ date: string; label?: string; views: number }>>
+  >;
   realtimeNote?: string;
   since?: string;
   until?: string;
 };
 
 const PERIODS = ["realtime", "24h", "7d", "30d", "90d", "365d", "custom"] as const;
-type ChartMetric = "pageViews" | "sessions" | "signups" | "uniqueVisitors";
 
 export function InsightsDashboardPanel({
   projectId,
@@ -209,6 +235,17 @@ export function InsightsDashboardPanel({
   const [chartExpanded, setChartExpanded] = React.useState(false);
   const [data, setData] = React.useState<AnalyticsPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
+
+  const chartSeries =
+    data?.timeseriesByMetric?.[chartMetric] ?? data?.timeseries ?? [];
+  const chartMetricLabel =
+    chartMetric === "pageViews"
+      ? "views"
+      : chartMetric === "sessions"
+        ? "sessions"
+        : chartMetric === "signups"
+          ? "signups"
+          : "visitors";
 
   const analyticsUrl = React.useMemo(() => {
     const params = new URLSearchParams({ period });
@@ -253,7 +290,7 @@ export function InsightsDashboardPanel({
               type="button"
               onClick={() => setPeriod(p)}
               className={cn(
-                "rounded-lg px-2 py-0.5 text-[10px] font-medium capitalize",
+                "cursor-pointer rounded-lg px-2 py-0.5 text-[10px] font-medium capitalize",
                 period === p ? "bg-blue-600 text-white" : "bg-surface ring-1 ring-border text-muted-foreground",
               )}
             >
@@ -307,7 +344,7 @@ export function InsightsDashboardPanel({
                 type="button"
                 onClick={() => setChartMetric(key)}
                 className={cn(
-                  "rounded-xl bg-gradient-to-br from-surface to-muted/20 p-3 text-left ring-1 transition",
+                  "cursor-pointer rounded-xl bg-gradient-to-br from-surface to-muted/20 p-3 text-left ring-1 transition",
                   chartMetric === key
                     ? "ring-2 ring-blue-500 shadow-sm shadow-blue-500/20"
                     : "ring-border hover:ring-blue-300/50",
@@ -326,7 +363,7 @@ export function InsightsDashboardPanel({
             <MetricCard label="Live now" value={data?.realtimeVisitors ?? 0} />
           </div>
 
-          {(data?.timeseries?.length ?? 0) > 0 ? (
+          {chartSeries.length > 0 ? (
             <div
               className={cn(
                 "rounded-xl bg-surface p-3 ring-1 transition-all duration-300",
@@ -347,12 +384,17 @@ export function InsightsDashboardPanel({
                 <button
                   type="button"
                   onClick={() => setChartExpanded((v) => !v)}
-                  className="text-[10px] font-medium text-blue-600"
+                  className="cursor-pointer text-[10px] font-medium text-blue-600"
                 >
                   {chartExpanded ? "Collapse" : "Expand"}
                 </button>
               </div>
-              <TrafficLineChart data={data?.timeseries ?? []} expanded={chartExpanded} />
+              <TrafficLineChart
+                data={chartSeries}
+                expanded={chartExpanded}
+                metricLabel={chartMetricLabel}
+                chartKey={`${period}-${chartMetric}-${chartSeries.length}`}
+              />
             </div>
           ) : null}
 

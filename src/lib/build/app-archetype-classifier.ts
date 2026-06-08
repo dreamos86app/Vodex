@@ -28,6 +28,7 @@ export type AppArchetypeId =
   | "product_launch_pad"
   | "food_delivery_marketplace"
   | "recipe_cookbook"
+  | "podcast_listener"
   | "generic_app";
 
 export type AppArchetype = {
@@ -52,6 +53,13 @@ const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: 
     id: "recipe_cookbook",
     patterns: [/recipe app|cookbook|meal planner|full recipes|cooking app|ingredient/i],
     weight: 4,
+  },
+  {
+    id: "podcast_listener",
+    patterns: [
+      /podcast listener|podcast app|show subscriptions?|episode queue|playback speed|shareable audio clips?|podcast player|listen to podcasts/i,
+    ],
+    weight: 6,
   },
   {
     id: "food_delivery_marketplace",
@@ -447,6 +455,32 @@ export const ARCHETYPE_DEFS: Record<AppArchetypeId, Omit<AppArchetype, "id" | "c
     ],
     visualTone: "energetic, modern, conversion-focused",
     terminology: ["events", "tickets", "orders", "attendees", "check-in", "organizers"],
+  },
+  podcast_listener: {
+    label: "Podcast listener",
+    navigationStyle: "mobile_stack",
+    coreRoutes: [
+      "/",
+      "/discover",
+      "/shows",
+      "/shows/[id]",
+      "/episode/[id]",
+      "/queue",
+      "/library",
+      "/clips",
+      "/profile",
+      "/settings",
+    ],
+    primarySections: [
+      "show discovery grid",
+      "subscription management",
+      "episode queue with drag reorder",
+      "audio player with speed control",
+      "clip sharing modal",
+      "continue listening row",
+    ],
+    visualTone: "Spotify-inspired, dark-friendly, media-forward",
+    terminology: ["shows", "episodes", "queue", "subscriptions", "clips", "playback speed"],
   },
   generic_app: {
     label: "Application",

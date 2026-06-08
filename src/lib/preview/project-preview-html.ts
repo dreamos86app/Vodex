@@ -13,6 +13,19 @@ import type { Database } from "@/lib/supabase/types";
 
 const PAGE = 500;
 
+/** Fast path count — avoids loading file bodies (prevents statement timeouts on large ZIP imports). */
+export async function countProjectFiles(
+  client: SupabaseClient<Database>,
+  projectId: string,
+): Promise<number> {
+  const { count, error } = await client
+    .from("app_files")
+    .select("path", { count: "exact", head: true })
+    .eq("project_id", projectId);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 export async function loadProjectFilesWithContent(
   client: SupabaseClient<Database>,
   projectId: string,
