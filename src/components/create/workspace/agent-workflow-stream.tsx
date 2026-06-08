@@ -112,14 +112,15 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
   );
 }
 
-function AssistantBubble({ children }: { children: React.ReactNode }) {
+/** Plain narration line — matches Discuss/Build chat text (no pill background). */
+function WorkflowNarrationLine({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="mr-6 max-w-[min(100%,34rem)] rounded-2xl bg-accent/[0.07] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-foreground ring-1 ring-accent/20 sm:mr-10"
+    <p
+      className="mr-6 max-w-[min(100%,34rem)] px-1 text-[13px] leading-relaxed text-foreground sm:mr-10"
       data-testid="workflow-chat-assistant"
     >
       {children}
-    </div>
+    </p>
   );
 }
 
@@ -131,10 +132,10 @@ function AnalyzingRequestBubble({ base = "Analyzing your request" }: { base?: st
   }, []);
   return (
     <div data-testid="analyzing-request-message">
-      <AssistantBubble>
+      <WorkflowNarrationLine>
         {base}
         {".".repeat(dots)}
-      </AssistantBubble>
+      </WorkflowNarrationLine>
     </div>
   );
 }
@@ -239,7 +240,7 @@ function TimelineRow({
 }) {
   if (isFileEvent(event)) return <FileChangeCard event={event} />;
   if (event.category === "assistant_message" || isInlineWorkflowStatus(event.title)) {
-    return <AssistantBubble>{event.subtitle ?? event.title}</AssistantBubble>;
+    return <WorkflowNarrationLine>{event.subtitle ?? event.title}</WorkflowNarrationLine>;
   }
   return (
     <ProgressRow

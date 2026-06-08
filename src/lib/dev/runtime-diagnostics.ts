@@ -1,5 +1,10 @@
 import { dreamosLog } from "@/lib/diagnostics/dreamos-logger";
 import { sanitizeDiagnosticMetadata } from "@/lib/diagnostics/truncate-large-diagnostic-string";
+import {
+  isAuthRelatedDiagnosticMessage,
+  sanitizeDiagnosticDetail,
+  sanitizeDiagnosticMessage,
+} from "@/lib/diagnostics/sanitize-diagnostic-message";
 
 /** Owner-only in-app runtime event log (sessionStorage, max 50). */
 
@@ -105,21 +110,56 @@ function mirrorFailedDiagnosticToOwner(
 ): void {
   if (typeof window === "undefined") return;
   if (!event.includes("failed") && event !== "error_boundary") return;
+  const safe = sanitizeDiagnosticDetail(detail);
   void import("@/lib/dev/owner-incident-store").then(({ pushOwnerIncident }) => {
     pushOwnerIncident({
       kind: event === "error_boundary" ? "render" : "diagnostic",
       title: event.replace(/_/g, " "),
-      message: detail ? JSON.stringify(detail).slice(0, 2000) : undefined,
-      meta: detail,
+      message: safe ? JSON.stringify(safe).slice(0, 2000) : undefined,
+      meta: safe,
     });
   });
+}
+
+function isStaleAuthStreamFailure(entry: RuntimeDiagnosticEntry): boolean {
+  if (entry.event !== "stream_failed") return false;
+  const message =
+    typeof entry.detail?.message === "string"
+      ? entry.detail.message
+      : JSON.stringify(entry.detail ?? "");
+  return isAuthRelatedDiagnosticMessage(message);
+}
+
+/** Drop superseded auth stream failures once providers are healthy again. */
+export function purgeStaleAuthStreamDiagnostics(): number {
+  if (typeof sessionStorage === "undefined") return 0;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const prev: RuntimeDiagnosticEntry[] = raw ? (JSON.parse(raw) as RuntimeDiagnosticEntry[]) : [];
+    const next = prev.filter((entry) => !isStaleAuthStreamFailure(entry));
+    if (next.length !== prev.length) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    }
+    return prev.length - next.length;
+  } catch {
+    return 0;
+  }
+}
+
+function migrateDiagnosticEntry(entry: RuntimeDiagnosticEntry): RuntimeDiagnosticEntry {
+  const detail = entry.detail ? sanitizeDiagnosticDetail(sanitizeDiagnosticMetadata(entry.detail)) : undefined;
+  return detail === entry.detail ? entry : { ...entry, detail };
 }
 
 export function pushRuntimeDiagnostic(
   event: RuntimeDiagnosticEvent,
   detail?: Record<string, unknown>,
 ): void {
-  const safeDetail = detail ? sanitizeDiagnosticMetadata(detail) : undefined;
+  let safeDetail = detail ? sanitizeDiagnosticMetadata(detail) : undefined;
+  safeDetail = sanitizeDiagnosticDetail(safeDetail);
+  if (event === "stream_finished" || event === "preflight_ok") {
+    purgeStaleAuthStreamDiagnostics();
+  }
   dreamosLog({
     source: "client",
     category: EVENT_CATEGORY[event] ?? "general",
@@ -156,7 +196,8 @@ export function readRuntimeDiagnostics(): RuntimeDiagnosticEntry[] {
   if (typeof sessionStorage === "undefined") return [];
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as RuntimeDiagnosticEntry[]) : [];
+    const rows = raw ? (JSON.parse(raw) as RuntimeDiagnosticEntry[]) : [];
+    return rows.map(migrateDiagnosticEntry);
   } catch {
     return [];
   }
@@ -165,4 +206,25 @@ export function readRuntimeDiagnostics(): RuntimeDiagnosticEntry[] {
 export function clearRuntimeDiagnostics(): void {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.removeItem(STORAGE_KEY);
+}
+
+/** Owner console: verify providers, then drop stale auth stream failures from storage. */
+export async function reconcileRuntimeDiagnosticsWithProviderHealth(): Promise<{
+  openaiAvailable: boolean;
+  purged: number;
+}> {
+  if (typeof window === "undefined") return { openaiAvailable: false, purged: 0 };
+  try {
+    const res = await fetch("/api/ai/provider-status", { credentials: "include", cache: "no-store" });
+    if (!res.ok) return { openaiAvailable: false, purged: 0 };
+    const body = (await res.json()) as { providers?: Record<string, string> };
+    const openaiAvailable = body.providers?.openai === "available";
+    const purged = openaiAvailable ? purgeStaleAuthStreamDiagnostics() : 0;
+    if (openaiAvailable && purged > 0) {
+      pushRuntimeDiagnostic("preflight_ok", { source: "provider_status_reconcile", purged });
+    }
+    return { openaiAvailable, purged };
+  } catch {
+    return { openaiAvailable: false, purged: 0 };
+  }
 }

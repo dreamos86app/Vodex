@@ -1,4 +1,9 @@
 import { readRuntimeDiagnostics, type RuntimeDiagnosticEntry } from "@/lib/dev/runtime-diagnostics";
+import {
+  isAuthRelatedDiagnosticMessage,
+  redactSecretsInDiagnosticText,
+  sanitizeDiagnosticMessage,
+} from "@/lib/diagnostics/sanitize-diagnostic-message";
 
 export type OwnerIncidentKind = "error" | "slow" | "api_failure" | "render" | "diagnostic";
 
@@ -38,8 +43,8 @@ export function pushOwnerIncident(
     at: input.at ?? new Date().toISOString(),
     kind: input.kind,
     title: input.title,
-    message: input.message,
-    stack: input.stack,
+    message: input.message ? sanitizeDiagnosticMessage(input.message) : undefined,
+    stack: input.stack ? redactSecretsInDiagnosticText(input.stack) : undefined,
     route: input.route ?? (typeof window !== "undefined" ? window.location.pathname : undefined),
     meta: input.meta,
   };
@@ -53,14 +58,28 @@ export function subscribeOwnerIncidents(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+export function purgeStaleAuthIncidents(): number {
+  const before = incidents.length;
+  incidents = incidents.filter((inc) => {
+    if (inc.kind !== "diagnostic" && inc.kind !== "api_failure") return true;
+    const text = `${inc.title} ${inc.message ?? ""}`;
+    return !isAuthRelatedDiagnosticMessage(text);
+  });
+  if (incidents.length !== before) emit();
+  return before - incidents.length;
+}
+
 function diagnosticToIncident(entry: RuntimeDiagnosticEntry): OwnerIncident | null {
   if (!entry.event.includes("failed") && entry.event !== "error_boundary") return null;
+  const message = entry.detail
+    ? sanitizeDiagnosticMessage(JSON.stringify(entry.detail).slice(0, 1200))
+    : undefined;
   return {
     id: `diag_${entry.at}_${entry.event}`,
     kind: entry.event === "error_boundary" ? "render" : "diagnostic",
     at: entry.at,
     title: entry.event.replace(/_/g, " "),
-    message: entry.detail ? JSON.stringify(entry.detail).slice(0, 1200) : undefined,
+    message,
     meta: entry.detail,
   };
 }

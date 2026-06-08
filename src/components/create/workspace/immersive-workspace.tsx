@@ -981,6 +981,10 @@ export function ImmersiveWorkspace({
       setTimeout(() => drainPromptQueueRef.current(), 300);
     },
     onFinish: () => {
+      pushRuntimeDiagnostic("stream_finished", {
+        projectId: projectIdRef.current,
+        conversationId: conversationIdRef.current,
+      });
       setLockedTaskMode(null);
       if (lastPlanPromptRef.current) {
         void loadBlueprintRef.current(lastPlanPromptRef.current);

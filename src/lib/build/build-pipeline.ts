@@ -74,6 +74,7 @@ import {
 import { PROVIDER_TIMEOUT_MS } from "@/lib/ai/provider-timeouts";
 import { appIconSvgDataUrl } from "@/lib/creation/app-icon-svg";
 import { resolveModelRuntime } from "@/lib/ai/model-catalog";
+import { isAutomaticModelId } from "@/lib/ai/resolve-automatic-model";
 import { logServerOperation } from "@/lib/ops/server-ops-log";
 import { requireId } from "@/lib/diagnostics/require-ids";
 import { dreamosLog } from "@/lib/diagnostics/dreamos-logger";
@@ -801,6 +802,10 @@ export async function runStagedBuildPipeline(input: {
     filterRenderableBuildFiles(allFiles).length >= MIN_FULL_SCAFFOLD_FILES &&
     rootPageContentOk(allFiles);
 
+  const userPickedPremiumModel =
+    Boolean(input.userSelectedModelId) && !isAutomaticModelId(input.userSelectedModelId);
+  const frontendComplexity = smokeBuild ? 3 : userPickedPremiumModel ? Math.max(complexity, 7) : complexity;
+
   if (!scaffoldSufficient) {
     track(events, "writing", "Generating source files");
     const fePrompt = smokeBuild
@@ -817,7 +822,7 @@ export async function runStagedBuildPipeline(input: {
         operationType: "frontend_implementation",
         system: BUILD_SYSTEM,
         prompt: fePrompt,
-        complexity: smokeBuild ? 3 : complexity,
+        complexity: frontendComplexity,
         accumulatedCostUsd: accumulatedCost,
         userSelectedModelId: input.userSelectedModelId,
         timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
@@ -855,6 +860,9 @@ export async function runStagedBuildPipeline(input: {
     }
 
     if (!isModelOutputSufficient(allFiles) && accumulatedCost < FULL_BUILD_CAP_USD * 0.92) {
+      const retryPrompt = smokeBuild
+        ? minimalFrontendPrompt(executionPrompt, planJson, contextSlices, designBrief)
+        : frontendPrompt(executionPrompt, planJson!, uiJson, effectiveMaxFiles, contextSlices, designBrief);
       const retryCall = await callProviderWithBuildTimeout(
         {
           writer: input.writer,
@@ -863,8 +871,8 @@ export async function runStagedBuildPipeline(input: {
           operationId: `${input.operationId}:frontend-retry`,
           operationType: "frontend_implementation",
           system: BUILD_SYSTEM,
-          prompt: minimalFrontendPrompt(executionPrompt, planJson, contextSlices, designBrief),
-          complexity: Math.max(4, complexity),
+          prompt: retryPrompt,
+          complexity: Math.max(frontendComplexity, 6),
           accumulatedCostUsd: accumulatedCost,
           userSelectedModelId: input.userSelectedModelId,
           timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
@@ -899,6 +907,9 @@ export async function runStagedBuildPipeline(input: {
 
   if (!hasRouteFiles(allFiles) && accumulatedCost < FULL_BUILD_CAP_USD * 0.92) {
     track(events, "writing", "Retrying with compact route set");
+    const routeRetryPrompt = smokeBuild
+      ? minimalFrontendPrompt(executionPrompt, planJson, contextSlices, designBrief)
+      : frontendPrompt(executionPrompt, planJson!, uiJson, effectiveMaxFiles, contextSlices, designBrief);
     const miniCall = await callProviderWithBuildTimeout(
       {
         writer: input.writer,
@@ -907,8 +918,8 @@ export async function runStagedBuildPipeline(input: {
         operationId: `${input.operationId}:frontend-mini`,
         operationType: "frontend_implementation",
         system: BUILD_SYSTEM,
-        prompt: minimalFrontendPrompt(executionPrompt, planJson, contextSlices, designBrief),
-        complexity: 4,
+        prompt: routeRetryPrompt,
+        complexity: Math.max(frontendComplexity, 5),
         accumulatedCostUsd: accumulatedCost,
         userSelectedModelId: input.userSelectedModelId,
         timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,

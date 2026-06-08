@@ -9,13 +9,18 @@ import { buildOwnerFixPrompt } from "@/lib/dev/owner-incident-prompt";
 import {
   clearOwnerIncidents,
   pushOwnerIncident,
+  purgeStaleAuthIncidents,
   readOwnerIncidents,
   subscribeOwnerIncidents,
   syncDiagnosticsToOwnerIncidents,
   wireOwnerIncidentCapture,
   type OwnerIncident,
 } from "@/lib/dev/owner-incident-store";
-import { readRuntimeDiagnostics } from "@/lib/dev/runtime-diagnostics";
+import {
+  clearRuntimeDiagnostics,
+  readRuntimeDiagnostics,
+  reconcileRuntimeDiagnosticsWithProviderHealth,
+} from "@/lib/dev/runtime-diagnostics";
 import { toast } from "@/lib/toast";
 
 export function OwnerIncidentConsole() {
@@ -29,11 +34,20 @@ export function OwnerIncidentConsole() {
   React.useEffect(() => {
     if (!isOwner) return;
     wireOwnerIncidentCapture();
-    syncDiagnosticsToOwnerIncidents();
-    setIncidents(readOwnerIncidents());
-    return subscribeOwnerIncidents(() => {
+    let cancelled = false;
+    void reconcileRuntimeDiagnosticsWithProviderHealth().then(() => {
+      if (cancelled) return;
+      purgeStaleAuthIncidents();
+      syncDiagnosticsToOwnerIncidents();
       setIncidents(readOwnerIncidents());
     });
+    const unsub = subscribeOwnerIncidents(() => {
+      setIncidents(readOwnerIncidents());
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, [isOwner]);
 
   React.useEffect(() => {
@@ -91,6 +105,7 @@ export function OwnerIncidentConsole() {
           type="button"
           onClick={() => {
             clearOwnerIncidents();
+            clearRuntimeDiagnostics();
             setIncidents([]);
           }}
           className="rounded-lg p-1 text-amber-200 hover:bg-amber-900"

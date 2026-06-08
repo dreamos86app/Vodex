@@ -152,6 +152,7 @@ export function frontendPrompt(
   ].join("\n");
 }
 
+/** Smoke / emergency compact pass only — production retries use full frontendPrompt. */
 export function minimalFrontendPrompt(
   executionBrief: string,
   planJson: string,
@@ -161,17 +162,16 @@ export function minimalFrontendPrompt(
   const brief = slices
     ? sliceBriefForStage(slices, "frontend_implementation")
     : sliceToTokenBudget(executionBrief, 600);
+  const genPlan = resolveFullAppGenerationPlan({ prompt: executionBrief, complexity: 5 });
   return [
     FILE_PAYLOAD_RULE,
     buildStageObjective("frontend_implementation"),
-    "Return EXACTLY 5 files with complete JSX (concise but premium):",
-    "1) package.json — next/react deps with dev/build/start scripts",
-    "2) app/layout.tsx — root shell with sidebar or top nav + Tailwind",
-    "3) app/page.tsx — rich dashboard (metrics + table/panel + actions) — NOT welcome-only",
-    "4) app/dashboard/page.tsx OR primary feature route — data table/cards",
-    "5) app/[feature]/page.tsx — second feature screen with realistic mock data",
+    "Return at least 10 files with complete JSX — premium SaaS UI, not a demo.",
+    "Required: package.json, app/layout.tsx, app/globals.css, lib/mock-data.ts, app/page.tsx (40+ lines), app/dashboard/page.tsx, and 4+ feature routes.",
+    "app/page.tsx MUST be a rich dashboard (KPI cards, charts/tables, sections) — never a lone welcome hero.",
+    formatGenerationBudgetForPrompt(genPlan),
     productionUiBlock(designBrief, brief),
-    designBrief ? `Routes: ${designBrief.routes.slice(0, 4).join(", ")}` : `Brief: ${brief}`,
+    designBrief ? `Routes: ${designBrief.routes.slice(0, 8).join(", ")}` : `Brief: ${brief}`,
     `Plan: ${slices ? slices.planSlice : sliceToTokenBudget(planJson, 400)}`,
   ].join("\n");
 }

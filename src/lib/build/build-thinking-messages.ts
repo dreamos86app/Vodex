@@ -40,7 +40,7 @@ export function thinkingForRouteConnectivity(verified: number, total: number): s
 }
 
 export function thinkingForFrontendFailed(): string {
-  return "Model generation didn't complete — I'll fill only the missing pieces without overwriting what we have.";
+  return "First pass was incomplete — I'll add the missing routes and components without replacing what's already there.";
 }
 
 export function thinkingForQualityCheck(): string {

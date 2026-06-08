@@ -1,5 +1,6 @@
 import type { AppArchetypeId } from "@/lib/build/app-archetype-classifier";
 import {
+  gapFillScaffoldForArchetype,
   mergeScaffoldForArchetype,
   replaceStubFilesWithArchetypeScaffold,
 } from "@/lib/build/archetype-scaffold-fallback";
@@ -64,6 +65,30 @@ export function repairRootPageContent(
       repairBudgetBlocked: opts?.repairBudgetBlocked ?? false,
       integrityBefore,
       integrityAfterRepair: integrityBefore,
+    };
+  }
+
+  const rootBefore = files.find((f) =>
+    /^app\/page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)),
+  );
+  const modelRootAttempt =
+    Boolean(rootBefore?.content?.trim()) &&
+    !isGeneratedFileStub(rootBefore!.content, rootBefore!.path);
+
+  /** Keep model-authored pages — UI repair pass enriches thin output instead of violet template swap. */
+  if (modelRootAttempt) {
+    const gapFilled = filterRenderableBuildFiles(
+      gapFillScaffoldForArchetype(archetypeId, files, appName),
+    );
+    const integrityAfterDefer = evaluateSourceIntegrity(gapFilled);
+    return {
+      files: gapFilled,
+      rootPageRepaired: false,
+      deterministicRepairApplied: false,
+      repairModelAttempted: opts?.repairModelAttempted ?? false,
+      repairBudgetBlocked: opts?.repairBudgetBlocked ?? false,
+      integrityBefore,
+      integrityAfterRepair: integrityAfterDefer,
     };
   }
 

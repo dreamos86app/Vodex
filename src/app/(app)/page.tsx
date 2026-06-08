@@ -54,7 +54,8 @@ export default async function HomePage({
   }
 
   const supabase = await createClient();
-  if (await userNeedsOnboarding(supabase, user.id)) {
+  const needsOnboarding = await userNeedsOnboarding(supabase, user.id);
+  if (needsOnboarding) {
     redirect("/onboarding");
   }
 

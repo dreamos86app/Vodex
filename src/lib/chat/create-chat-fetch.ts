@@ -1,6 +1,7 @@
 "use client";
 
 import { toast } from "@/lib/toast";
+import { sanitizeUserFacingAiError } from "@/lib/ai/provider-errors";
 
 export type ChatFetchOptions = {
   label?: string;
@@ -28,7 +29,7 @@ async function parseApiError(res: Response): Promise<string> {
       /* ignore */
     }
   }
-  return msg;
+  return sanitizeUserFacingAiError(msg);
 }
 
 /**

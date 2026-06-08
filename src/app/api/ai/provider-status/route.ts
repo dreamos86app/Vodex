@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { getProviderStatus } from "@/lib/ai/provider-availability";
+import {
+  getProviderStatus,
+  recoverConfiguredProvidersFromAuthError,
+} from "@/lib/ai/provider-availability";
 import type { ProviderName } from "@/lib/ai/provider-errors";
 
 export const dynamic = "force-dynamic";
 
 /** Public-safe provider availability — no balances, keys, or quota wording. */
 export async function GET() {
+  recoverConfiguredProvidersFromAuthError();
   const providers: ProviderName[] = ["anthropic", "openai", "google", "xai"];
   const status: Record<string, "available" | "unavailable" | "coming_soon"> = {};
 
