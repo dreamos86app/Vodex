@@ -50,11 +50,23 @@ export function thinkingForQualityCheck(): string {
 export function thinkingForIconStatus(
   status: string,
   appName: string,
+  error?: string | null,
+  mode?: string | null,
 ): string | null {
-  if (status === "generated") return `Designed an app icon for ${appName}.`;
-  if (status === "insufficient_credits")
-    return "Action credits ran low — saved a brand placeholder icon. You can generate or upload one later.";
-  if (status === "fallback") return "Using a brand placeholder icon for now — upload or regenerate from project settings.";
+  if (status === "generated") return `Designed an app-specific icon for ${appName}.`;
+  if (status === "insufficient_credits") {
+    return "Logo skipped — not enough Action Credits. Using a temporary placeholder until you generate or upload one.";
+  }
+  if (status === "failed") {
+    const reason = error?.trim() ? ` (${error.trim()})` : "";
+    return `Logo generation failed — using temporary placeholder${reason}.`;
+  }
+  if (mode === "skipped_no_openai_key" || mode === "skipped_provider_disabled") {
+    return "Logo skipped — image provider is not configured. Using a temporary placeholder.";
+  }
+  if (status === "fallback" || status === "skipped") {
+    return "Logo generation unavailable — using temporary placeholder (not AI-generated). Upload or regenerate from project settings.";
+  }
   return null;
 }
 

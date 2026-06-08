@@ -62,25 +62,38 @@ export function buildContinuationFrontendPrompt(input: {
   budget: FullAppGenerationBudget;
   report: GeneratedAppQualityReport;
   passIndex: number;
+  weakFilePaths?: string[];
 }): string {
   const existingPaths = input.existingFiles.map((f) => f.path).slice(0, 40);
   const missingRoutes = input.report.routeConnectivity.orphanRoutes.slice(0, 8);
+  const weakPaths = (input.weakFilePaths ?? []).slice(0, 12);
   const brief = sliceToTokenBudget(input.executionBrief, 700);
 
   return [
     FILE_PAYLOAD_RULE,
     formatGenerationBudgetForPrompt(input.budget),
-    `CONTINUATION PASS ${input.passIndex + 1}: Do NOT shrink or replace existing files.`,
+    `CONTINUATION PASS ${input.passIndex + 1}: First pass is thin — expand the real UI, not replace your app.`,
     `Current gaps: ${input.report.failures.join(", ") || "expand routes and components"}.`,
-    `Existing files (${existingPaths.length}): ${existingPaths.join(", ")}`,
+    weakPaths.length
+      ? `REWRITE these weak/shallow files with app-specific depth (mark as file_rewritten): ${weakPaths.join(", ")}`
+      : "Rewrite app/page.tsx and dashboard routes if they are welcome-only or generic tables.",
+    `Preserve strong files — only improve weak ones. Strong paths: ${existingPaths.slice(0, 20).join(", ")}`,
     missingRoutes.length
       ? `Wire navigation to orphan routes: ${missingRoutes.join(", ")}`
       : "Add missing feature routes and link them from AppShell navigation.",
-    "Generate ONLY new files and updates to navigation/layout — app-specific UI, no generic shell.",
+    "Each page: KPI cards, tables with data, filters, detail sections, empty states — app-specific copy only.",
     `Brief: ${brief}`,
     `Plan: ${sliceToTokenBudget(input.planJson, 400)}`,
-    `Return additional files until at least ${input.budget.minFiles} meaningful files and ${input.budget.minRoutes} routes exist.`,
+    `Target at least ${input.budget.minFiles} meaningful files and ${input.budget.minRoutes} rich routes.`,
   ].join("\n");
 }
 
-/** Fix typo in shouldContinueGeneration - I used report.report which is wrong. Let me fix generation-continuation.ts */
+export function continuationUserMessage(
+  report: GeneratedAppQualityReport,
+  weakCount: number,
+): string {
+  if (weakCount > 0) {
+    return `First pass is thin — expanding the real UI across ${weakCount} weak file${weakCount === 1 ? "" : "s"}, not replacing your app.`;
+  }
+  return `Continuing generation: adding remaining pages (${report.counts.files} files so far)…`;
+}

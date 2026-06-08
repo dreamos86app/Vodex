@@ -3146,12 +3146,6 @@ export function ImmersiveWorkspace({
                     buildStrategy === "plan_first" &&
                     !blueprintApproved &&
                     Boolean(blueprint);
-                  const workflowStreamOwnsFiles =
-                    activeMode === "build" &&
-                    m.role === "assistant" &&
-                    i === messages.length - 1 &&
-                    (buildJobActive || buildStarting || frozenBuildWorkflow);
-                  if (workflowStreamOwnsFiles) return null;
                   return (
                   <MessageBubble
                     key={m.id}

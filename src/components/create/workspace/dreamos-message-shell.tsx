@@ -56,7 +56,7 @@ export function DreamOSMessageShell({
             )}
             <div className="ml-auto flex items-center gap-1.5">
               <MessageCostBadge state={costState ?? "idle"} credits={creditsUsed ?? null} />
-              {messageTextForCopy && (status === "done" || status === "error") && (
+              {messageTextForCopy && (
                 <MessageActionsMenu
                   messageText={messageTextForCopy}
                   credits={creditsUsed}

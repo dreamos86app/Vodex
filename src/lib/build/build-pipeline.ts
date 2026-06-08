@@ -117,9 +117,16 @@ import {
 } from "@/lib/build/generated-app-quality-score";
 import {
   buildContinuationFrontendPrompt,
+  continuationUserMessage,
   shouldContinueGeneration,
 } from "@/lib/build/generation-continuation";
 import { checkRouteConnectivity } from "@/lib/build/route-connectivity-check";
+import { runBuildStage } from "@/lib/build/build-stage-orchestrator";
+import { streamExtractBuildFiles } from "@/lib/build/extraction-file-stream";
+import {
+  formatMeaningfulQualityForStream,
+  scoreMeaningfulUiQuality,
+} from "@/lib/build/meaningful-ui-quality";
 
 export type WorkflowEventType =
   | "thinking"
@@ -145,6 +152,18 @@ export type WorkflowEventMeta = {
   filePath?: string;
   fileLineMeta?: import("@/lib/build/file-line-counts").FileLineMeta;
   streamCategory?: string;
+  build_stage?: string;
+  stage_status?: string;
+  stage_started_at?: string;
+  completed_at?: string;
+  duration_ms?: number;
+  model_used?: string;
+  provider_used?: string;
+  actual_operation_id?: string;
+  honest?: boolean;
+  heartbeat?: boolean;
+  stream_mode?: "model_stream" | "extraction_stream";
+  extraction_stream?: boolean;
 };
 
 export type WorkflowEvent = {
@@ -183,6 +202,7 @@ export type StagedBuildResult = {
   filesAfterScaffoldFallback?: number;
   partialCreditStop?: boolean;
   generationQualityReport?: GeneratedAppQualityReport;
+  meaningfulQualityReport?: import("@/lib/build/meaningful-ui-quality").MeaningfulUiQualityReport;
   generationBudget?: FullAppGenerationBudget;
   modelFilesCount?: number;
   scaffoldFilesCount?: number;
@@ -242,6 +262,9 @@ function mergeIncomingBuildFiles(
     const path = f.path;
     const meta: WorkflowEventMeta = {
       filePath: path,
+      stream_mode: "extraction_stream",
+      extraction_stream: true,
+      honest: true,
       ...(fileLineMeta ? { fileLineMeta } : {}),
     };
     const countDetail = fileLineMeta
@@ -260,6 +283,37 @@ function mergeIncomingBuildFiles(
 
 function parseFilePayload(text: string) {
   return parseBuildFilesFromModel(text);
+}
+
+async function ingestModelFilesWithExtractionStream(
+  text: string,
+  allFiles: BuildFile[],
+  events: WorkflowEvent[],
+  trackFn: (
+    events: WorkflowEvent[],
+    type: WorkflowEventType,
+    label: string,
+    detail?: string,
+    meta?: WorkflowEventMeta,
+  ) => void,
+  maxFiles: number,
+  onFileThinking?: (path: string) => void,
+): Promise<BuildFile[]> {
+  const existingByPath = new Map(allFiles.map((f) => [f.path, f.content]));
+  let merged = [...allFiles];
+  await streamExtractBuildFiles(
+    text,
+    {
+      onEvent: async (ev) => {
+        if (ev.type === "file_started") onFileThinking?.(ev.path);
+      },
+      onFile: async (f) => {
+        merged = mergeIncomingBuildFiles(merged, [f], events, trackFn, maxFiles, onFileThinking);
+      },
+    },
+    { existingByPath, interFileDelayMs: 95 },
+  );
+  return merged;
 }
 
 function buildVisibleNarrative(
@@ -584,30 +638,40 @@ export async function runStagedBuildPipeline(input: {
     reused: false,
   };
 
-  track(events, "identity", "Creating app identity");
   if (input.buildTrace) traceBuildWorkerStage(input.buildTrace, "identity_started");
-  const identityTimed = await withTimeout(
-    createAppIdentityForBuild({
-      writer: input.writer,
-      userId: input.userId,
-      userEmail: input.userEmail,
-      projectId: input.projectId,
-      buildOperationId: input.operationId,
-      buildIntent: executionPrompt,
-      planSummary: planParsed?.summary ?? planJson.slice(0, 800),
-      categoryHint: planParsed?.entities?.[0] ? String(planParsed.entities[0]) : undefined,
-      userSelectedModelId: input.userSelectedModelId,
-      onProgress: (step) => track(events, "identity", step),
-      skipLogo: false,
-    }),
-    PROVIDER_TIMEOUT_MS.app_identity ?? 45_000,
-    "app_identity",
-  );
-  const identityResult = identityTimed.ok ? identityTimed.value : identityFallback;
+  const identityResult = await runBuildStage({
+    stage: "generate_app_name",
+    operationId: `${input.operationId}:identity`,
+    modelUsed: primaryModelId,
+    heartbeatMs: 2000,
+    emit: (type, label, detail, meta) =>
+      track(events, type as WorkflowEventType, label, detail, meta),
+    emitAssistant: (msg) => trackAssistant(events, msg, emit),
+    fn: async () => {
+      const identityTimed = await withTimeout(
+        createAppIdentityForBuild({
+          writer: input.writer,
+          userId: input.userId,
+          userEmail: input.userEmail,
+          projectId: input.projectId,
+          buildOperationId: input.operationId,
+          buildIntent: executionPrompt,
+          planSummary: planParsed?.summary ?? planJson.slice(0, 800),
+          categoryHint: planParsed?.entities?.[0] ? String(planParsed.entities[0]) : undefined,
+          userSelectedModelId: input.userSelectedModelId,
+          onProgress: (step) => track(events, "identity", step),
+          skipLogo: false,
+        }),
+        PROVIDER_TIMEOUT_MS.app_identity ?? 45_000,
+        "app_identity",
+      );
+      return identityTimed.ok ? identityTimed.value : identityFallback;
+    },
+  });
   if (input.buildTrace) {
     traceBuildWorkerStage(
       input.buildTrace,
-      identityTimed.ok ? "identity_completed" : "identity_failed",
+      identityResult.logoGenerationStatus === "failed" ? "identity_failed" : "identity_completed",
     );
   }
 
@@ -618,13 +682,14 @@ export async function runStagedBuildPipeline(input: {
   if (!identityResult.iconUrl && !(iconSvg && iconSvg.startsWith("<svg"))) {
     iconSvg = appIconSvgDataUrl(appName, category);
   }
-  if (identityResult.userNotice) {
-    track(events, "icon", identityResult.userNotice);
-  }
-  const iconThinking = thinkingForIconStatus(identityResult.logoGenerationStatus, appName);
-  if (iconThinking) {
-    trackAssistant(events, iconThinking, emit);
-  }
+  if (identityResult.userNotice) track(events, "icon", identityResult.userNotice);
+  const iconThinking = thinkingForIconStatus(
+    identityResult.logoGenerationStatus,
+    appName,
+    identityResult.logoGenerationError,
+    identityResult.iconGenerationMode,
+  );
+  if (iconThinking) trackAssistant(events, iconThinking, emit);
 
   track(events, "classified", `Archetype: ${archetype.label}`);
   trackAssistant(events, thinkingForArchetypeRoutes(archetype.id), emit);
@@ -834,24 +899,21 @@ export async function runStagedBuildPipeline(input: {
       totalIn += feCall.result.inputTokens ?? 0;
       totalOut += feCall.result.outputTokens ?? 0;
       primaryModelId = feCall.result.spec.modelId;
-      const fePayload = parseFilePayload(feCall.result.text);
-      if (fePayload.files.length) {
-        const beforeCount = allFiles.length;
-        allFiles = mergeIncomingBuildFiles(
-          allFiles,
-          fePayload.files,
+      const beforeCount = allFiles.length;
+      allFiles = await ingestModelFilesWithExtractionStream(
+        feCall.result.text,
+        allFiles,
+        events,
+        track,
+        effectiveMaxFiles,
+        onFileThinking,
+      );
+      if (allFiles.length > beforeCount) {
+        trackAssistant(
           events,
-          track,
-          effectiveMaxFiles,
-          onFileThinking,
+          `Generated ${allFiles.length - beforeCount} file${allFiles.length - beforeCount === 1 ? "" : "s"} — checking quality next.`,
+          emit,
         );
-        if (allFiles.length > beforeCount) {
-          trackAssistant(
-            events,
-            `Generated ${allFiles.length - beforeCount} file${allFiles.length - beforeCount === 1 ? "" : "s"} — checking quality next.`,
-            emit,
-          );
-        }
       } else {
         trackAssistant(events, thinkingForFrontendRetry(), emit);
       }
@@ -884,17 +946,14 @@ export async function runStagedBuildPipeline(input: {
         totalIn += retryCall.result.inputTokens ?? 0;
         totalOut += retryCall.result.outputTokens ?? 0;
         primaryModelId = retryCall.result.spec.modelId;
-        const retryPayload = parseFilePayload(retryCall.result.text);
-        if (retryPayload.files.length) {
-          allFiles = mergeIncomingBuildFiles(
-            allFiles,
-            retryPayload.files,
-            events,
-            track,
-            effectiveMaxFiles,
-            onFileThinking,
-          );
-        }
+        allFiles = await ingestModelFilesWithExtractionStream(
+          retryCall.result.text,
+          allFiles,
+          events,
+          track,
+          effectiveMaxFiles,
+          onFileThinking,
+        );
       }
     }
   } else if (input.buildTrace) {
@@ -930,17 +989,14 @@ export async function runStagedBuildPipeline(input: {
       /* keep scaffold/files */
     } else {
     accumulatedCost += miniCall.result.providerCostUsd;
-    const miniPayload = parseFilePayload(miniCall.result.text);
-    if (miniPayload.files.length) {
-      allFiles = mergeIncomingBuildFiles(
-        allFiles,
-        miniPayload.files,
-        events,
-        track,
-        effectiveMaxFiles,
-        onFileThinking,
-      );
-    }
+    allFiles = await ingestModelFilesWithExtractionStream(
+      miniCall.result.text,
+      allFiles,
+      events,
+      track,
+      effectiveMaxFiles,
+      onFileThinking,
+    );
     }
   }
 
@@ -955,6 +1011,13 @@ export async function runStagedBuildPipeline(input: {
     routeMap: designBrief.routes,
   });
 
+  let meaningfulQualityReport = scoreMeaningfulUiQuality({
+    files: allFiles,
+    budget: generationBudget,
+    userPrompt: executionPrompt,
+    routeMap: designBrief.routes,
+  });
+
   let continuationPass = 0;
   while (accumulatedCost < FULL_BUILD_CAP_USD * 0.92) {
     const continuationDecision = shouldContinueGeneration({
@@ -964,9 +1027,18 @@ export async function runStagedBuildPipeline(input: {
       maxPasses: generationBudget.maxContinuationPasses,
       budgetRemainingRatio: 1 - accumulatedCost / FULL_BUILD_CAP_USD,
     });
-    if (!continuationDecision.shouldContinue) break;
+    const needsMeaningfulRepair =
+      !meaningfulQualityReport.passes && meaningfulQualityReport.weak_file_paths.length > 0;
+    if (!continuationDecision.shouldContinue && !needsMeaningfulRepair) break;
 
-    trackAssistant(events, continuationDecision.userMessage, emit);
+    trackAssistant(
+      events,
+      continuationUserMessage(
+        generationQualityReport,
+        meaningfulQualityReport.weak_file_paths.length,
+      ),
+      emit,
+    );
     track(events, "writing", "Continuing app generation");
     const contPrompt = buildContinuationFrontendPrompt({
       executionBrief: executionPrompt,
@@ -975,6 +1047,7 @@ export async function runStagedBuildPipeline(input: {
       budget: generationBudget,
       report: generationQualityReport,
       passIndex: continuationPass,
+      weakFilePaths: meaningfulQualityReport.weak_file_paths,
     });
     heavyBudget.record([contPrompt, BUILD_SYSTEM]);
     const contCall = await callProviderWithBuildTimeout(
@@ -998,18 +1071,18 @@ export async function runStagedBuildPipeline(input: {
     totalIn += contCall.result.inputTokens ?? 0;
     totalOut += contCall.result.outputTokens ?? 0;
     primaryModelId = contCall.result.spec.modelId;
-    const contPayload = parseFilePayload(contCall.result.text);
-    if (!contPayload.files.length) break;
+    const beforeCont = allFiles.length;
     allFiles = filterRenderableBuildFiles(
-      mergeIncomingBuildFiles(
+      await ingestModelFilesWithExtractionStream(
+        contCall.result.text,
         allFiles,
-        contPayload.files,
         events,
         track,
         effectiveMaxFiles,
         onFileThinking,
       ),
     );
+    if (allFiles.length <= beforeCont) break;
     continuationPass += 1;
     generationQualityReport = scoreGeneratedAppQuality({
       files: allFiles,
@@ -1018,14 +1091,22 @@ export async function runStagedBuildPipeline(input: {
       appType: archetypeToLegacyAppType(archetype.id),
       routeMap: designBrief.routes,
     });
+    meaningfulQualityReport = scoreMeaningfulUiQuality({
+      files: allFiles,
+      budget: generationBudget,
+      userPrompt: executionPrompt,
+      routeMap: designBrief.routes,
+    });
+    if (meaningfulQualityReport.passes && !generationQualityReport.needsContinuation) break;
   }
 
-  if (generationQualityReport.score > 0) {
+  if (generationQualityReport.score > 0 || meaningfulQualityReport.final_quality_score > 0) {
     track(
       events,
       "validating",
-      `Quality score ${generationQualityReport.score}/${generationBudget.minQualityScore}`,
-      formatQualitySummaryForStream(generationQualityReport),
+      `Quality score ${meaningfulQualityReport.final_quality_score}/${meaningfulQualityReport.min_required_score}`,
+      formatMeaningfulQualityForStream(meaningfulQualityReport),
+      { streamCategory: "quality_check" },
     );
   }
 
@@ -1451,13 +1532,20 @@ export async function runStagedBuildPipeline(input: {
     appType: archetypeToLegacyAppType(archetype.id),
     routeMap: designBrief.routes,
   });
+  meaningfulQualityReport = scoreMeaningfulUiQuality({
+    files: allFiles,
+    budget: generationBudget,
+    userPrompt: executionPrompt,
+    routeMap: designBrief.routes,
+  });
   const routeCheck = checkRouteConnectivity(allFiles);
   const scaffoldFilesCount = Math.max(0, allFiles.length - modelFilesBeforeScaffold);
 
   const ok =
     postContract.passed &&
     sourceIntegrity.sourceIntegrityOk &&
-    generationQualityReport.passes;
+    generationQualityReport.passes &&
+    meaningfulQualityReport.passes;
   const summaryText = generationQualityReport.passes
     ? postContract.userMessage
     : generationQualityReport.needsContinuation
@@ -1647,6 +1735,7 @@ export async function runStagedBuildPipeline(input: {
     filesBeforeScaffoldFallback: scaffoldFallback.beforeCount,
     filesAfterScaffoldFallback: scaffoldFallback.afterCount,
     generationQualityReport,
+    meaningfulQualityReport,
     generationBudget,
     modelFilesCount: modelFilesBeforeScaffold,
     scaffoldFilesCount,

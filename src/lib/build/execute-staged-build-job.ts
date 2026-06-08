@@ -199,10 +199,11 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
   });
 
   let stepIndex = 0;
-  const progressForStep = () => undefined;
+  const progressForStep = () => Math.min(95, 8 + stepIndex * 4);
   let lastActivityAt = Date.now();
   let currentStepLabel = "Creating the app plan";
   let lastHeartbeatPersist = 0;
+  let heartbeatTick = 0;
 
   const persistStage = async (
     stage: Parameters<typeof traceBuildWorkerStage>[1],
@@ -220,25 +221,27 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
 
   setTraceHeartbeatRunning(trace, true);
   const heartbeat = setInterval(() => {
-    if (Date.now() - lastActivityAt < 5000) return;
+    if (Date.now() - lastActivityAt < 1800) return;
+    if (Date.now() - lastHeartbeatPersist < 1800) return;
+    lastHeartbeatPersist = Date.now();
+    heartbeatTick += 1;
     const snap = getBuildWorkerTrace(input.buildJobId);
     const stageLabel = snap?.lastStage ?? "working";
-    if (Date.now() - lastHeartbeatPersist < 5000) return;
-    lastHeartbeatPersist = Date.now();
-    void persistBuildJobEvent(input.writer, {
-      ...eventCtx,
-      type: "understanding_request",
-      title: "Still working",
-      detail: `Still working on ${currentStepLabel}…`,
-      progressPercent: undefined,
+    const detail = `Still working on ${currentStepLabel}…`;
+    void persistAssistantBuildMessage(input.writer, eventCtx, {
+      message: detail,
       metadata: {
         trace_stage: stageLabel,
         heartbeat: true,
+        honest: true,
+        stream_category: "assistant_message",
+        build_stage: stageLabel,
         operation_id: input.operationId,
         execution_instance_id: workerCtx.executionInstanceId,
+        heartbeat_tick: heartbeatTick,
       },
     }).catch(() => {});
-  }, 8000);
+  }, 2000);
 
   const PIPELINE_HARD_CAP_MS = 5 * 60 * 1000;
 
@@ -283,6 +286,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       onWorkflowEvent: async (ev) => {
         lastActivityAt = Date.now();
         currentStepLabel = ev.label;
+        if (ev.type !== "thinking" && ev.type !== "writing" && ev.type !== "editing") {
+          stepIndex += 1;
+        }
         if (input.partialCreditBuild && Number.isFinite(creditTracker.budget)) {
           creditTracker.used += workflowEventCreditStageCost(ev.type);
           if (creditTracker.used >= creditTracker.budget) {
@@ -975,6 +981,19 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         },
       });
       return;
+    }
+
+    const meaningfulQuality =
+      "meaningfulQualityReport" in pr ? pr.meaningfulQualityReport : undefined;
+    if (meaningfulQuality && !meaningfulQuality.passes) {
+      await persistAssistantBuildMessage(input.writer, eventCtx, {
+        message: `Preview starting with quality warning — score ${meaningfulQuality.final_quality_score}/${meaningfulQuality.min_required_score}.`,
+        metadata: {
+          quality_warning: true,
+          meaningful_routes: meaningfulQuality.meaningful_routes,
+          placeholder_routes: meaningfulQuality.placeholder_routes,
+        },
+      });
     }
 
     await persistStage("preview_started");

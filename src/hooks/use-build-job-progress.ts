@@ -17,7 +17,7 @@ export type BuildJobPollState = {
 
 const MAX_404_ATTEMPTS = 5;
 /** Cap client-side event buffer to avoid React freeze during long builds. */
-const MAX_CLIENT_EVENTS = 240;
+const MAX_CLIENT_EVENTS = 600;
 
 export function useBuildJobProgress(
   job: { jobId: string; eventsUrl: string } | null,

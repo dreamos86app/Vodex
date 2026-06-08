@@ -255,7 +255,7 @@ export async function persistWorkflowEvent(
 export async function persistAssistantBuildMessage(
   writer: Writer,
   ctx: { jobId: string; projectId: string; userId: string },
-  input: { message: string; progressPercent?: number },
+  input: { message: string; progressPercent?: number; metadata?: Record<string, unknown> },
 ): Promise<void> {
   await persistBuildJobEvent(writer, {
     ...ctx,
@@ -266,6 +266,8 @@ export async function persistAssistantBuildMessage(
     metadata: {
       stream_category: "assistant_message",
       display_title: input.message.slice(0, 200),
+      honest: true,
+      ...input.metadata,
     },
   });
 }

@@ -27,6 +27,7 @@ import { userMessageForPreviewFailure, isPreviewFailureCode } from "@/lib/previe
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { resolveBuildTerminalTruth } from "@/lib/build/build-terminal-truth";
 import { AnimatedLineDelta } from "@/components/create/workspace/animated-line-delta";
+import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
   return (
@@ -35,8 +36,45 @@ function isFileEvent(ev: AgentWorkflowEvent): boolean {
   );
 }
 
-function groupFileEvents(events: AgentWorkflowEvent[]): AgentWorkflowEvent[] {
-  return events;
+/** During active builds, keep one live file row + collapsed summary for completed files. */
+function compressFileEventsForDisplay(
+  events: AgentWorkflowEvent[],
+  working: boolean,
+): AgentWorkflowEvent[] {
+  if (!working) return events;
+  const fileEvents = events.filter(isFileEvent);
+  if (fileEvents.length <= 2) return events;
+  const nonFile = events.filter((e) => !isFileEvent(e));
+  const activeFile =
+    [...fileEvents].reverse().find((e) => e.status === "active") ?? fileEvents[fileEvents.length - 1];
+  const completed = fileEvents.filter(
+    (e) => e.stableKey !== activeFile?.stableKey && e.status !== "active",
+  );
+  if (!completed.length || !activeFile) return events;
+  let added = 0;
+  let removed = 0;
+  for (const e of completed) {
+    added += e.addedLines ?? 0;
+    removed += e.removedLines ?? 0;
+  }
+  const summary: AgentWorkflowEvent = {
+    id: "file-batch-summary",
+    category: "file_created",
+    title: `${completed.length} files saved`,
+    subtitle: `+${added} −${removed}`,
+    status: "done",
+    stableKey: "file-batch-summary",
+    at: completed[completed.length - 1]!.at,
+    metadata: {
+      file_group: completed.map((e) => e.filePath).filter(Boolean) as string[],
+      collapsed_file_summary: true,
+    },
+  };
+  return [...nonFile, summary, activeFile];
+}
+
+function groupFileEvents(events: AgentWorkflowEvent[], working: boolean): AgentWorkflowEvent[] {
+  return compressFileEventsForDisplay(events, working);
 }
 
 function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
@@ -362,13 +400,13 @@ export function AgentWorkflowStream({
         )
       : [];
   const merged = mergeEphemeralWithServerEvents(ephemeral, serverSequential);
-  const grouped = groupFileEvents(merged);
+  const grouped = groupFileEvents(merged, working);
   const streamFileCount = Math.max(
     savedFileCount,
     grouped.filter((e) => isFileEvent(e)).length,
     (progress.events ?? []).filter((e) => e.type === "writing_file").length,
   );
-  const timelineRaw = applySingleActiveWorkflowStep(grouped, working).slice(-32);
+  const timelineRaw = applySingleActiveWorkflowStep(grouped, working);
   const batchPersistStagger = timelineRaw.some((e) => e.metadata?.batch_persist === true);
   const timeline = useStaggeredWorkflowEvents(timelineRaw, batchPersistStagger);
 
@@ -399,8 +437,29 @@ export function AgentWorkflowStream({
     el.scrollIntoView({ block: "end", behavior: reducedMotion ? "auto" : "smooth" });
   }, [active?.stableKey, working, reducedMotion]);
 
+  const narrationCopy = React.useMemo(() => {
+    const lines = completedTimeline
+      .filter((e) => e.category === "assistant_message")
+      .map((e) => e.subtitle ?? e.title);
+    if (active?.category === "assistant_message") {
+      lines.push(active.subtitle ?? active.title);
+    }
+    return lines.join("\n");
+  }, [completedTimeline, active]);
+
+  const fileSummaryLine = fileDiffSummary
+    ? `Generated ${fileDiffSummary.files} files · +${fileDiffSummary.added} −${fileDiffSummary.removed}`
+    : "";
+
   return (
-    <div ref={streamRef} className={cn("space-y-2.5", className)} data-testid="agent-workflow-stream">
+    <DreamOSMessageShell
+      mode="build"
+      status={working ? "thinking" : "done"}
+      costState={working ? "pending" : "idle"}
+      messageTextForCopy={[narrationCopy, fileSummaryLine].filter(Boolean).join("\n\n") || userPrompt}
+      className={className}
+    >
+    <div ref={streamRef} className="space-y-2.5" data-testid="agent-workflow-stream">
       {progress.reconnecting ? (
         <p className="px-1 text-[10px] text-muted-foreground">Reconnecting to build status…</p>
       ) : null}
@@ -475,5 +534,6 @@ export function AgentWorkflowStream({
         />
       ) : null}
     </div>
+    </DreamOSMessageShell>
   );
 }
