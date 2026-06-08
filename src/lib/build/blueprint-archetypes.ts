@@ -55,6 +55,13 @@ export function detectArchetype(prompt: string, templateId?: string | null): Blu
     return "analytics";
   if (t.includes("landing") || /\b(landing|marketing site)\b/.test(p)) return "landing";
   if (/\b(internal tool|ops tool|workflow)\b/.test(p)) return "internal";
+  if (
+    /\b(pantry|smart pantry|barcode scan|expiry alert|shopping list|recipe suggestion|food inventory|kitchen inventory|stock tracking)\b/.test(
+      p,
+    )
+  ) {
+    return "saas";
+  }
   if (/\b(saas|subscription|dashboard)\b/.test(p)) return "saas";
   return "saas";
 }

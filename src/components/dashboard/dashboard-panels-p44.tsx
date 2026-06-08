@@ -40,39 +40,80 @@ function MetricCard({
   );
 }
 
-function AnimatedLineChart({ data }: { data: Array<{ date: string; views: number }> }) {
+function TrafficLineChart({
+  data,
+  expanded,
+}: {
+  data: Array<{ date: string; label?: string; views: number }>;
+  expanded?: boolean;
+}) {
+  const [hover, setHover] = React.useState<number | null>(null);
   if (!data.length) {
     return <p className="text-[11px] text-muted-foreground">No traffic yet</p>;
   }
   const max = Math.max(1, ...data.map((d) => d.views));
-  const w = 320;
-  const h = 80;
+  const w = 640;
+  const h = expanded ? 200 : 96;
   const points = data.map((d, i) => {
     const x = (i / Math.max(1, data.length - 1)) * w;
-    const y = h - (d.views / max) * (h - 8) - 4;
-    return `${x},${y}`;
+    const y = h - (d.views / max) * (h - 16) - 8;
+    return { x, y, ...d };
   });
+  const poly = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const active = hover != null ? points[hover] : null;
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-20 w-full" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="analyticsFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polyline
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="text-accent"
-        points={points.join(" ")}
-      />
-      <polygon
-        fill="url(#analyticsFill)"
-        className="text-accent"
-        points={`0,${h} ${points.join(" ")} ${w},${h}`}
-      />
-    </svg>
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className={cn("w-full text-blue-500", expanded ? "h-52" : "h-24")}
+        preserveAspectRatio="none"
+        onMouseLeave={() => setHover(null)}
+      >
+        <defs>
+          <linearGradient id="trafficFillBlue" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <line
+            key={i}
+            x1={0}
+            x2={w}
+            y1={8 + (i * (h - 16)) / 3}
+            y2={8 + (i * (h - 16)) / 3}
+            stroke="currentColor"
+            className="text-border/40"
+            strokeWidth="0.5"
+          />
+        ))}
+        <polygon fill="url(#trafficFillBlue)" points={`0,${h} ${poly} ${w},${h}`} />
+        <polyline fill="none" stroke="#3b82f6" strokeWidth="2.5" points={poly} />
+        {points.map((p, i) => (
+          <rect
+            key={p.date}
+            x={p.x - w / data.length / 2}
+            y={0}
+            width={w / data.length}
+            height={h}
+            fill="transparent"
+            onMouseEnter={() => setHover(i)}
+          />
+        ))}
+        {active ? (
+          <>
+            <line x1={active.x} x2={active.x} y1={0} y2={h} stroke="#3b82f6" strokeOpacity="0.35" />
+            <circle cx={active.x} cy={active.y} r="4" fill="#3b82f6" stroke="white" strokeWidth="2" />
+          </>
+        ) : null}
+      </svg>
+      {active ? (
+        <div className="pointer-events-none absolute right-2 top-2 rounded-lg bg-blue-600 px-2.5 py-1.5 text-[10px] font-semibold text-white shadow-lg">
+          {active.label ?? active.date} · {active.views} views
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -145,10 +186,14 @@ type AnalyticsPayload = {
   errors: Array<Record<string, unknown>>;
   revenue: { connected: boolean; provider?: string } | null;
   empty: boolean;
-  timeseries?: Array<{ date: string; views: number }>;
+  timeseries?: Array<{ date: string; label?: string; views: number }>;
+  realtimeNote?: string;
+  since?: string;
+  until?: string;
 };
 
-const PERIODS = ["realtime", "24h", "7d", "30d", "90d"] as const;
+const PERIODS = ["realtime", "24h", "7d", "30d", "90d", "365d", "custom"] as const;
+type ChartMetric = "pageViews" | "sessions" | "signups" | "uniqueVisitors";
 
 export function InsightsDashboardPanel({
   projectId,
@@ -158,18 +203,27 @@ export function InsightsDashboardPanel({
   publicUrl?: string | null;
 }) {
   const [period, setPeriod] = React.useState<(typeof PERIODS)[number]>("7d");
+  const [customFrom, setCustomFrom] = React.useState("");
+  const [customTo, setCustomTo] = React.useState("");
+  const [chartMetric, setChartMetric] = React.useState<ChartMetric>("pageViews");
+  const [chartExpanded, setChartExpanded] = React.useState(false);
   const [data, setData] = React.useState<AnalyticsPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
+
+  const analyticsUrl = React.useMemo(() => {
+    const params = new URLSearchParams({ period });
+    if (period === "custom" && customFrom) params.set("from", customFrom);
+    if (period === "custom" && customTo) params.set("to", customTo);
+    return `/api/projects/${projectId}/analytics?${params.toString()}`;
+  }, [projectId, period, customFrom, customTo]);
 
   React.useEffect(() => {
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
     const load = () => {
       setLoading(true);
-      void fetchDedupe(`analytics:${projectId}:${period}`, (signal) =>
-        fetch(`/api/projects/${projectId}/analytics?period=${period}`, { credentials: "include", signal }).then(
-          (r) => r.json(),
-        ),
+      void fetchDedupe(`analytics:${projectId}:${analyticsUrl}`, (signal) =>
+        fetch(analyticsUrl, { credentials: "include", signal }).then((r) => r.json()),
       )
         .then((json) => {
           if (!cancelled) setData(json as AnalyticsPayload);
@@ -184,7 +238,7 @@ export function InsightsDashboardPanel({
       cancelled = true;
       if (interval) clearInterval(interval);
     };
-  }, [projectId, period]);
+  }, [projectId, period, analyticsUrl]);
 
   return (
     <div className="space-y-4">
@@ -200,14 +254,36 @@ export function InsightsDashboardPanel({
               onClick={() => setPeriod(p)}
               className={cn(
                 "rounded-lg px-2 py-0.5 text-[10px] font-medium capitalize",
-                period === p ? "bg-accent text-white" : "bg-surface ring-1 ring-border text-muted-foreground",
+                period === p ? "bg-blue-600 text-white" : "bg-surface ring-1 ring-border text-muted-foreground",
               )}
             >
-              {p}
+              {p === "365d" ? "Year" : p}
             </button>
           ))}
         </div>
       </div>
+
+      {period === "custom" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(e) => setCustomFrom(e.target.value)}
+            className="rounded-lg bg-surface px-2 py-1 text-[11px] ring-1 ring-border"
+          />
+          <span className="text-[11px] text-muted-foreground">to</span>
+          <input
+            type="date"
+            value={customTo}
+            onChange={(e) => setCustomTo(e.target.value)}
+            className="rounded-lg bg-surface px-2 py-1 text-[11px] ring-1 ring-border"
+          />
+        </div>
+      ) : null}
+
+      {period === "realtime" && data?.realtimeNote ? (
+        <p className="text-[11px] text-blue-600">{data.realtimeNote}</p>
+      ) : null}
 
       {loading && !data ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -218,11 +294,29 @@ export function InsightsDashboardPanel({
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <MetricCard label="Page views" value={data?.pageViews ?? 0} />
-            <MetricCard label="Unique visitors" value={data?.uniqueVisitors ?? 0} />
-            <MetricCard label="Sessions" value={data?.sessions ?? 0} />
-            <MetricCard label="Signups" value={data?.signups ?? 0} />
-            <MetricCard label="Logins" value={data?.logins ?? 0} />
+            {(
+              [
+                ["pageViews", "Page views", data?.pageViews ?? 0],
+                ["uniqueVisitors", "Unique visitors", data?.uniqueVisitors ?? 0],
+                ["sessions", "Sessions", data?.sessions ?? 0],
+                ["signups", "Signups", data?.signups ?? 0],
+              ] as const
+            ).map(([key, label, value]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setChartMetric(key)}
+                className={cn(
+                  "rounded-xl bg-gradient-to-br from-surface to-muted/20 p-3 text-left ring-1 transition",
+                  chartMetric === key
+                    ? "ring-2 ring-blue-500 shadow-sm shadow-blue-500/20"
+                    : "ring-border hover:ring-blue-300/50",
+                )}
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+                <p className="mt-1 text-[20px] font-bold tabular-nums text-foreground">{value}</p>
+              </button>
+            ))}
             <MetricCard label="Conversion" value={`${data?.conversionRate ?? 0}%`} />
             <MetricCard label="Bounce rate" value={`${data?.bounceRate ?? 0}%`} />
             <MetricCard
@@ -233,11 +327,32 @@ export function InsightsDashboardPanel({
           </div>
 
           {(data?.timeseries?.length ?? 0) > 0 ? (
-            <div className="rounded-xl bg-surface p-3 ring-1 ring-border">
-              <p className="mb-2 flex items-center gap-1 text-[11px] font-semibold">
-                <Sparkles className="size-3 text-accent" /> Traffic trend
-              </p>
-              <AnimatedLineChart data={data?.timeseries ?? []} />
+            <div
+              className={cn(
+                "rounded-xl bg-surface p-3 ring-1 transition-all duration-300",
+                chartExpanded ? "ring-2 ring-blue-500/40" : "ring-border",
+              )}
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1 text-[11px] font-semibold text-blue-600">
+                  <Sparkles className="size-3" />{" "}
+                  {chartMetric === "pageViews"
+                    ? "Traffic trend"
+                    : chartMetric === "sessions"
+                      ? "Sessions"
+                      : chartMetric === "signups"
+                        ? "Signups"
+                        : "Visitors"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setChartExpanded((v) => !v)}
+                  className="text-[10px] font-medium text-blue-600"
+                >
+                  {chartExpanded ? "Collapse" : "Expand"}
+                </button>
+              </div>
+              <TrafficLineChart data={data?.timeseries ?? []} expanded={chartExpanded} />
             </div>
           ) : null}
 
@@ -540,22 +655,45 @@ export function UsersDashboardPanel({
     empty: boolean;
   } | null>(null);
 
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
   const loadUsers = React.useCallback(() => {
+    setLoading(true);
+    setError(null);
     void fetchDedupe(`users:${projectId}`, (signal) =>
       fetch(`/api/projects/${projectId}/users`, { credentials: "include", signal }).then((r) => r.json()),
     )
-      .then(setData)
-      .catch(() => setData(null));
+      .then((json) => setData(json))
+      .catch(() => setError("Could not load users"))
+      .finally(() => setLoading(false));
   }, [projectId]);
 
   React.useEffect(() => {
     loadUsers();
-    const onFocus = () => loadUsers();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
   }, [loadUsers]);
 
-  if (!data) return <div className="h-20 animate-pulse rounded-xl bg-muted/40" />;
+  if (loading && !data) {
+    return (
+      <div className="space-y-2">
+        <div className="h-20 animate-pulse rounded-xl bg-muted/40" />
+        <p className="text-center text-[11px] text-muted-foreground">Loading users…</p>
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="rounded-xl bg-destructive/10 px-3 py-4 text-center">
+        <p className="text-[12px] text-destructive">{error}</p>
+        <button type="button" onClick={loadUsers} className="mt-2 text-[11px] font-semibold text-accent">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) return null;
 
   if (data.empty) {
     return (

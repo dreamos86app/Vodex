@@ -24,8 +24,18 @@ export async function callProviderWithBuildTimeout(
     });
   }
 
+  const timeoutMs = input.timeoutMs ?? 30_000;
   try {
-    const result = await callProviderStructured(input);
+    const raced = await withTimeout(
+      callProviderStructured(input),
+      timeoutMs + 5_000,
+      input.operationType,
+    );
+    if (!raced.ok) {
+      if (trace) traceModelCallEnded(trace, "timeout", input.operationType);
+      return { ok: false, timedOut: true, error: `timeout:${input.operationType}` };
+    }
+    const result = raced.value;
     if (trace) traceModelCallEnded(trace, "finished", input.operationType);
     return { ok: true, result };
   } catch (err) {

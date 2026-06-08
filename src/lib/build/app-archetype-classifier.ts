@@ -75,7 +75,14 @@ const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: 
       /subscription manager|box manager|curate.*box/i,
     ],
   },
-  { id: "restaurant_inventory", patterns: [/restaurant|food inventory|kitchen|pantry|supplier|waste|stock|ingredient/i] },
+  {
+    id: "restaurant_inventory",
+    patterns: [
+      /smart pantry|pantry app|barcode scan|expiry alert|shopping list sync|recipe suggestions? from/i,
+      /restaurant|food inventory|kitchen|pantry|supplier|waste|stock|ingredient/i,
+    ],
+    weight: 5,
+  },
   {
     id: "mediation_planner",
     patterns: [

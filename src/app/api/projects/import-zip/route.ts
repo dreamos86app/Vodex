@@ -233,7 +233,12 @@ export async function POST(req: Request) {
             has_tailwind: validation.dependencies.hasTailwind,
           },
           env_requirements: validation.envRequirements
-            .filter((e) => !e.key.startsWith("BASE44_") || validation.legacy.usesBase44Sdk)
+            .filter((e) => {
+              const key = e.key;
+              if (/^VITE_BASE44_/i.test(key)) return false;
+              if (key.startsWith("BASE44_") && !validation.legacy.usesBase44Sdk) return false;
+              return true;
+            })
             .map((e) => e.key),
           legacy_platform: validation.legacy.platform,
           legacy_base44_sdk: validation.legacy.usesBase44Sdk,

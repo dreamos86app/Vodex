@@ -30,6 +30,27 @@ type DomainRow = {
   last_checked_at?: string | null;
 };
 
+function DnsCopyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-background px-3 py-2 ring-1 ring-border/60">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600"
+          onClick={() => {
+            void navigator.clipboard.writeText(value);
+            toast.success(`${label} copied`);
+          }}
+        >
+          <Copy className="size-3" /> Copy
+        </button>
+      </div>
+      <code className="mt-1 block break-all font-mono text-[12px] text-foreground">{value}</code>
+    </div>
+  );
+}
+
 function StatusPill({ status }: { status: string }) {
   const active = status === "active";
   return (
@@ -77,6 +98,12 @@ export function CustomDomainsPanel({
     void load();
   }, [load]);
 
+  React.useEffect(() => {
+    if (!domains.length) return;
+    if (domains.some((d) => d.status === "active")) setWizardStep(2);
+    else setWizardStep(1);
+  }, [domains]);
+
   async function addDomain() {
     if (!hostname.includes(".")) return;
     setBusy(true);
@@ -94,7 +121,7 @@ export function CustomDomainsPanel({
       }
       toast.success("Domain added — configure DNS below");
       setHostname("");
-      setWizardStep(2);
+      setWizardStep(1);
       await load();
     } finally {
       setBusy(false);
@@ -285,31 +312,22 @@ export function CustomDomainsPanel({
                 <StatusPill status={d.status} />
               </div>
               {d.status !== "active" ? (
-                <div className="mt-3 space-y-2 rounded-xl bg-muted/30 p-3 text-[12px]">
-                  <p className="font-semibold text-foreground">DNS records</p>
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 ring-1 ring-border/50">
-                    <span>
-                      CNAME <code className="text-accent">{d.hostname}</code> → <code>cname.vodex.dev</code>
-                    </span>
-                    <button
-                      type="button"
-                      className="text-accent"
-                      onClick={() => copyText("cname.vodex.dev", "CNAME target")}
-                    >
-                      <Copy className="size-4" />
-                    </button>
+                <div className="mt-3 space-y-3 rounded-xl bg-muted/30 p-3 text-[12px]">
+                  <p className="font-semibold text-foreground">DNS records — add at your domain provider</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Step 2: Configure DNS. After both records propagate, click Verify DNS.
+                  </p>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">CNAME record</p>
+                    <DnsCopyField label="Type" value="CNAME" />
+                    <DnsCopyField label="Name" value={d.hostname} />
+                    <DnsCopyField label="Value" value="cname.vodex.dev" />
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 ring-1 ring-border/50">
-                    <span className="truncate">
-                      TXT <code>_vodex.{d.hostname}</code> → <code>vodex-verify={d.verification_token}</code>
-                    </span>
-                    <button
-                      type="button"
-                      className="shrink-0 text-accent"
-                      onClick={() => copyText(`vodex-verify=${d.verification_token ?? ""}`, "TXT value")}
-                    >
-                      <Copy className="size-4" />
-                    </button>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">TXT record</p>
+                    <DnsCopyField label="Type" value="TXT" />
+                    <DnsCopyField label="Name" value={`_vodex.${d.hostname}`} />
+                    <DnsCopyField label="Value" value={`vodex-verify=${d.verification_token ?? ""}`} />
                   </div>
                 </div>
               ) : null}

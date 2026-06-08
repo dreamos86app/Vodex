@@ -229,11 +229,16 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     heartbeatTick += 1;
     const snap = getBuildWorkerTrace(input.buildJobId);
     const stageLabel = snap?.lastStage ?? "working";
+    const modelPending = snap?.modelCall?.state === "pending";
+    const modelOp = snap?.modelCall?.operationType?.replace(/_/g, " ") ?? "model";
+    const heartbeatTitle = modelPending
+      ? `Still working — waiting on ${modelOp} (up to 90s)…`
+      : currentStepLabel;
     void persistBuildJobEvent(input.writer, {
       ...eventCtx,
       type: "planning_app",
-      title: currentStepLabel,
-      detail: currentStepLabel,
+      title: heartbeatTitle,
+      detail: heartbeatTitle,
       progressPercent: progressForStep(),
       metadata: {
         trace_stage: stageLabel,

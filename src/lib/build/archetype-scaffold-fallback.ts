@@ -250,8 +250,10 @@ export function applyArchetypeScaffoldFallback(
     return emptyFallbackMetrics(id, before, "not_needed");
   }
 
-  /** Production: never apply scaffold fallback — continuation + model retries handle gaps. */
-  if (!allowFullScaffold) {
+  /** Production: block weak-output scaffold replacement, but never leave zero files when we have a tree. */
+  const emergencyEmptyScaffold =
+    !allowFullScaffold && beforeCount === 0 && hasFullScaffoldTree(id);
+  if (!allowFullScaffold && !emergencyEmptyScaffold) {
     const reason: ScaffoldFallbackReason =
       beforeCount === 0 ? "llm_returned_no_files" : "llm_output_too_weak";
     return emptyFallbackMetrics(id, before, reason);

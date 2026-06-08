@@ -151,7 +151,7 @@ export function buildDeterministicBlueprint(input: DeterministicBlueprintInput):
     merged.pages = [...(merged.pages ?? []), { route: "/tickets", purpose: "Support ticket queue with SLA" }];
     merged.routeMap = [...(merged.routeMap ?? []), { route: "/tickets", purpose: "Ticket inbox" }];
   }
-  if (/\binventory|stock|supplier\b/i.test(input.prompt)) {
+  if (/\b(pantry|inventory|stock|supplier|barcode|expiry|shopping list)\b/i.test(input.prompt)) {
     merged.pages = [...(merged.pages ?? []), { route: "/inventory", purpose: "Stock levels and suppliers" }];
     merged.routeMap = [...(merged.routeMap ?? []), { route: "/inventory", purpose: "Inventory alerts" }];
     if (!(merged.dataModel ?? []).some((t) => t.name === "inventory_items")) {

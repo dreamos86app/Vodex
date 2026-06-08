@@ -79,7 +79,13 @@ export function analyzeLegacyAdapter(
     var env={};
     ${[...missingEnvs]
       .filter((k) => k.startsWith("VITE_") || k.startsWith("NEXT_PUBLIC_"))
-      .map((k) => `env["${k}"]="";`)
+      .map((k) => {
+        if (/^VITE_BASE44_APP_ID$/i.test(k)) return `env["${k}"]="vodex-preview-app";`;
+        if (/^VITE_BASE44_APP_BASE_URL$/i.test(k)) return `env["${k}"]=window.location.origin;`;
+        if (/^VITE_BASE44_FUNCTIONS_VERSION$/i.test(k)) return `env["${k}"]="preview";`;
+        if (/^VITE_BASE44_/i.test(k)) return `env["${k}"]="vodex-preview";`;
+        return `env["${k}"]="";`;
+      })
       .join("")}
     if(typeof import_meta!=="undefined"){}
   }catch(e){}

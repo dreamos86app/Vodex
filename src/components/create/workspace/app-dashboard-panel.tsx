@@ -532,7 +532,7 @@ export function AppDashboardPanel({
           </span>
         )}
         <Link
-          href={`/apps/${project.id}/builder?tab=build`}
+          href={`/apps/${project.id}/builder?tab=code`}
           className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold text-accent hover:underline"
         >
           Edit details

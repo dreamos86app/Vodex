@@ -15,7 +15,7 @@ const BLUEPRINT_TYPE_TO_ARCHETYPE: Array<{ re: RegExp; id: AppArchetypeId }> = [
   { re: /bootcamp|cohort|assignment|mentor|graduation|education\s*portal/i, id: "education" },
   { re: /marketplace|auction|bidding|seller|buyer/i, id: "marketplace" },
   { re: /booking|salon|studio|appointment/i, id: "booking" },
-  { re: /restaurant|kitchen|inventory/i, id: "restaurant_inventory" },
+  { re: /restaurant|kitchen|inventory|pantry|barcode|expiry alert|shopping list/i, id: "restaurant_inventory" },
   { re: /crm|sales\s*pipeline/i, id: "crm" },
   { re: /e-?commerce|storefront|cart/i, id: "ecommerce" },
 ];

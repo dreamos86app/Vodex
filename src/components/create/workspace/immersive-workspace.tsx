@@ -540,10 +540,13 @@ export function ImmersiveWorkspace({
     insertPromptConsumedRef.current = true;
     try {
       setComposerLiveText(decodeURIComponent(raw));
+      setMode("discuss");
       setMobilePanel("chat");
       toast.info("Prompt added to chat — review and press Submit");
     } catch {
       setComposerLiveText(raw);
+      setMode("discuss");
+      setMobilePanel("chat");
     }
     const next = new URLSearchParams(searchParams.toString());
     next.delete("insertPrompt");
@@ -2688,12 +2691,23 @@ export function ImmersiveWorkspace({
     };
   }, [effectiveProjectId, projectFiles.length, projectDataRefresh]);
 
+  const previewArtifactLockedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    previewArtifactLockedRef.current = null;
+  }, [effectiveProjectId]);
+  React.useEffect(() => {
+    if (previewRuntime?.previewRenderable && previewRuntime.jobId) {
+      if (!previewArtifactLockedRef.current) {
+        previewArtifactLockedRef.current = previewRuntime.jobId;
+      }
+    }
+  }, [previewRuntime?.previewRenderable, previewRuntime?.jobId]);
   const previewFrameUrl = effectiveProjectId
     ? projectPreviewFrameUrl(
         effectiveProjectId,
-        projectDataRefresh,
+        previewArtifactLockedRef.current ? undefined : projectDataRefresh,
         "/",
-        previewRuntime?.jobId ?? null,
+        previewArtifactLockedRef.current ?? previewRuntime?.jobId ?? null,
       )
     : null;
   const previewSrcRenderable = previewRuntime?.previewRenderable === true;

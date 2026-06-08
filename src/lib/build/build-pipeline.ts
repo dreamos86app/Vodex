@@ -1003,6 +1003,11 @@ export async function runStagedBuildPipeline(input: {
       : frontendPrompt(executionPrompt, planJson!, uiJson, effectiveMaxFiles, contextSlices, designBrief);
     heavyBudget.record([fePrompt, BUILD_SYSTEM]);
     heavyBudget.assertWithinBudget(true);
+    trackAssistant(
+      events,
+      "Generating source files with the model — this usually takes 30–90 seconds…",
+      emit,
+    );
     const feCall = await callProviderWithBuildTimeout(
       {
         writer: input.writer,
@@ -1795,12 +1800,12 @@ export async function runStagedBuildPipeline(input: {
 
   const renderableFinalCount = filterRenderableBuildFiles(allFiles).length;
   if (renderableFinalCount === 0) {
-    if (smokeBuild && hasFullScaffoldTree(archetype.id)) {
+    if (hasFullScaffoldTree(archetype.id)) {
       const lastResort = applyArchetypeScaffoldFallback(
         archetype.id,
         [],
         resolvedAppName,
-        scaffoldOpts,
+        { allowFullScaffold: true },
       );
       if (lastResort.afterCount > 0) {
         allFiles = lastResort.files;

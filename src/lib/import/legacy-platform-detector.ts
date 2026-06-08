@@ -53,6 +53,7 @@ export function detectLegacyPlatform(files: ZipImportFile[]): LegacyPlatformInfo
 
 /** Env keys we should not treat as publish blockers unless the SDK is present. */
 export function isIgnorableLegacyEnvKey(key: string, legacy: LegacyPlatformInfo): boolean {
+  if (/^VITE_BASE44_/i.test(key)) return legacy.platform === "base44";
   if (!key.startsWith("BASE44_")) return false;
   return legacy.platform === "base44" && !legacy.usesBase44Sdk;
 }
