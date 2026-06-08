@@ -6,6 +6,20 @@ import { cn } from "@/lib/utils";
 
 export type WorkflowStepCardStatus = "pending" | "active" | "completed" | "failed";
 
+function WorkingDots() {
+  const [dots, setDots] = React.useState(1);
+  React.useEffect(() => {
+    const id = setInterval(() => setDots((d) => (d >= 3 ? 1 : d + 1)), 420);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <p className="mt-1 text-[10px] text-muted-foreground">
+      Working{"".repeat(dots)}
+      <span className="inline-block w-2" />
+    </p>
+  );
+}
+
 export type WorkflowStepCardProps = {
   status: WorkflowStepCardStatus;
   label: string;
@@ -75,7 +89,7 @@ export function WorkflowStepCard({
           {typeof progress === "number" && active && progress > 0 && progress < 100 ? (
             <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">{progress}%</p>
           ) : active ? (
-            <p className="mt-1 text-[10px] text-muted-foreground">Working…</p>
+            <WorkingDots />
           ) : null}
           {fileDelta && (fileDelta.added != null || fileDelta.removed != null) ? (
             <p className="mt-1 font-mono text-[10px] tabular-nums text-muted-foreground">

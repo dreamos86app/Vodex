@@ -27,6 +27,7 @@ export type AppArchetypeId =
   | "mediation_planner"
   | "product_launch_pad"
   | "food_delivery_marketplace"
+  | "recipe_cookbook"
   | "generic_app";
 
 export type AppArchetype = {
@@ -47,6 +48,11 @@ const FINANCE_RE =
   /\b(finance|budget|expense|expenses|ledger|invoice|bank|savings|spending|personal\s*finance|money\s*tracker)\b/i;
 
 const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: number }> = [
+  {
+    id: "recipe_cookbook",
+    patterns: [/recipe app|cookbook|meal planner|full recipes|cooking app|ingredient/i],
+    weight: 4,
+  },
   {
     id: "food_delivery_marketplace",
     patterns: [
@@ -365,6 +371,21 @@ export const ARCHETYPE_DEFS: Record<AppArchetypeId, Omit<AppArchetype, "id" | "c
     visualTone: "calm, professional, trustworthy legal-tech",
     terminology: ["parties", "sessions", "caucus", "agreements", "mediator", "agenda"],
   },
+  recipe_cookbook: {
+    label: "Recipe cookbook",
+    navigationStyle: "top_nav",
+    coreRoutes: ["/", "/recipes", "/recipe/[id]", "/meal-plan", "/shopping-list", "/favorites", "/profile"],
+    primarySections: [
+      "recipe cards with photos",
+      "ingredient lists",
+      "step-by-step instructions",
+      "meal plan calendar",
+      "shopping list",
+      "search and filters",
+    ],
+    visualTone: "warm, food-forward, editorial",
+    terminology: ["recipes", "ingredients", "meal plan", "servings", "cook time"],
+  },
   food_delivery_marketplace: {
     label: "Food delivery marketplace",
     navigationStyle: "mobile_stack",
@@ -494,6 +515,7 @@ export function archetypeToLegacyAppType(id: AppArchetypeId): string {
     admin_panel: "admin_panel",
     health_wellness: "habit_tracker",
     food_delivery_marketplace: "ecommerce",
+    recipe_cookbook: "saas_dashboard",
     education: "saas_dashboard",
   };
   return map[id] ?? "saas_dashboard";

@@ -72,6 +72,14 @@ const PALETTES: Record<AppArchetypeId, GeneratedDesignSystem["palette"]> = {
     muted: "text-slate-600",
     border: "border-sky-100",
   },
+  recipe_cookbook: {
+    primary: "#ea580c",
+    accent: "#16a34a",
+    background: "bg-orange-50/40",
+    surface: "bg-white",
+    muted: "text-stone-600",
+    border: "border-orange-100",
+  },
   food_delivery_marketplace: {
     primary: "#00c2a8",
     accent: "#ff6b35",

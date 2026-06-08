@@ -75,6 +75,17 @@ const ARCHETYPE_MVP_FEATURES: Partial<Record<AppArchetypeId, string[]>> = {
     "Team/settings screen",
     "Sample data and polished empty states",
   ],
+  recipe_cookbook: [
+    "Home feed with featured recipe cards, cuisines, and quick filters",
+    "Recipe grid with photos, cook time, servings, and difficulty",
+    "Recipe detail with ingredients, steps, nutrition, and save button",
+    "Meal plan weekly calendar with drag-and-drop recipes",
+    "Shopping list generated from meal plan ingredients",
+    "Favorites collection with recipe cards",
+    "Search with cuisine, diet, and time filters",
+    "Realistic mock recipes with real dish names — no placeholder labels",
+    "Responsive mobile-first layout with warm food photography placeholders",
+  ],
   food_delivery_marketplace: [
     "Home / discover restaurants with cuisine category chips and search",
     "Restaurant cards with ratings, ETA, and promo badges",
@@ -118,6 +129,10 @@ const DOMAIN_PROMPTS: Array<{
   {
     pattern: /wolt|uber\s*eats|food\s*delivery|restaurant\s*menu|courier|delivery\s*tracking/i,
     archetypeId: "food_delivery_marketplace",
+  },
+  {
+    pattern: /recipe app|cookbook|meal planner|full recipes|cooking app/i,
+    archetypeId: "recipe_cookbook",
   },
   {
     pattern: /food inventory|ingredient stock|pantry|kitchen inventory/i,

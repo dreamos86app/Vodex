@@ -19,6 +19,7 @@ const KNOWN_FAST_PATH_ARCHETYPES = new Set<AppArchetypeId>([
   "finance_tracker",
   "ecommerce",
   "food_delivery_marketplace",
+  "recipe_cookbook",
   "marketplace",
   "customer_support",
 ]);

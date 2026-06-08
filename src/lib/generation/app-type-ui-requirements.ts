@@ -254,6 +254,10 @@ export function resolveAppTypeFromPrompt(prompt: string): AppTypeUiRequirement |
       id: "food_delivery_marketplace",
       hints: [/wolt|uber\s*eats|food\s*delivery|restaurant\s*menu|dishes?|courier|delivery\s*tracking/i],
     },
+    {
+      id: "recipe_cookbook",
+      hints: [/recipe app|cookbook|meal planner|full recipes|cooking app/i],
+    },
     { id: "restaurant_inventory", hints: [/food inventory|kitchen inventory|pantry|supplier|waste|stock/i] },
     { id: "marina_operations", hints: [/marina|slip|dock|boat|mooring|harbor/i] },
     { id: "ecommerce", hints: [/e-commerce|ecommerce|storefront|product grid|cart/i] },

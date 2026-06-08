@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { BuildJobPollState } from "@/hooks/use-build-job-progress";
 import {
   applySingleActiveWorkflowStep,
+  collapseDuplicateAssistantMessages,
   collapseHeartbeatAssistantMessages,
   collapseRedundantPhaseStarted,
   coalesceWorkflowStreamEvents,
@@ -79,7 +80,7 @@ function groupFileEvents(events: AgentWorkflowEvent[], working: boolean): AgentW
   return compressFileEventsForDisplay(events, working);
 }
 
-/** Golden-ring focus on the file currently being revealed. */
+/** Golden-ring focus on in-flight files (multiple simultaneous writes stay active). */
 function applyFileStreamFocus(
   events: AgentWorkflowEvent[],
   working: boolean,
@@ -89,12 +90,29 @@ function applyFileStreamFocus(
     .map((e, i) => (isFileEvent(e) ? i : -1))
     .filter((i) => i >= 0);
   if (!fileIndices.length) return events;
-  const focusIdx = fileIndices[fileIndices.length - 1]!;
+
+  const inProgress = new Set<number>();
+  for (const i of fileIndices) {
+    const ev = events[i]!;
+    if (ev.metadata?.file_in_progress === true || ev.status === "active") {
+      inProgress.add(i);
+    }
+  }
+  const recentWindow = fileIndices.slice(-4);
+  if (inProgress.size === 0) {
+    for (const i of recentWindow) inProgress.add(i);
+  } else {
+    for (const i of recentWindow) {
+      const ev = events[i]!;
+      if (ev.metadata?.file_in_progress === true) inProgress.add(i);
+    }
+  }
+
   return events.map((e, i) => {
     if (isFileEvent(e)) {
       return {
         ...e,
-        status: i === focusIdx ? ("active" as const) : ("done" as const),
+        status: inProgress.has(i) ? ("active" as const) : ("done" as const),
       };
     }
     if (e.status === "active") {
@@ -172,6 +190,10 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
           removed={removedLines}
           active={event.status === "active"}
         />
+      ) : event.status === "active" ? (
+        <span className="shrink-0 font-mono text-[10px] tabular-nums text-amber-400/90 animate-pulse">
+          …
+        </span>
       ) : null}
     </motion.div>
   );
@@ -414,7 +436,8 @@ export function AgentWorkflowStream({
     terminal: progress.done,
   });
   const serverNoHeartbeat = collapseHeartbeatAssistantMessages(serverRaw);
-  const serverCollapsed = collapseRedundantPhaseStarted(serverNoHeartbeat);
+  const serverDeduped = collapseDuplicateAssistantMessages(serverNoHeartbeat);
+  const serverCollapsed = collapseRedundantPhaseStarted(serverDeduped);
   const serverSequential = applySingleActiveWorkflowStep(serverCollapsed, working);
 
   const startedAt =
@@ -455,12 +478,7 @@ export function AgentWorkflowStream({
 
   const active = [...timeline].reverse().find((e) => e.status === "active");
   const completedTimeline = active
-    ? timeline.filter(
-        (ev) =>
-          ev.stableKey !== active.stableKey ||
-          isFileEvent(ev) ||
-          ev.category === "assistant_message",
-      )
+    ? timeline.filter((ev) => ev.stableKey !== active.stableKey || isFileEvent(ev))
     : timeline;
 
   const fileDiffSummary = React.useMemo(() => {

@@ -201,6 +201,7 @@ export async function persistWorkflowEvent(
   if (mapped.hidden) return;
 
   const filePath =
+    (typeof ev.meta?.filePath === "string" ? ev.meta.filePath : null) ??
     mapped.filePath ??
     extractFilePath(ev.detail, ev.label, ev.meta?.filePath ?? null);
   const jobType =
@@ -230,6 +231,7 @@ export async function persistWorkflowEvent(
   const isStreamedFile =
     mapped.isFileEvent &&
     (ev.meta?.extraction_stream === true || ev.meta?.stream_mode === "extraction_stream");
+  const fileInProgress = ev.meta?.file_in_progress === true;
 
   await persistBuildJobEvent(writer, {
     jobId: ctx.jobId,
@@ -257,7 +259,9 @@ export async function persistWorkflowEvent(
       stream_mode: ev.meta?.stream_mode,
       batch_persist: isStreamedFile ? true : undefined,
       real_progress: isStreamedFile ? true : undefined,
-      step_status: isStreamedFile ? "completed" : undefined,
+      file_in_progress: fileInProgress ? true : undefined,
+      step_status: fileInProgress ? "active" : isStreamedFile ? "completed" : undefined,
+      workflow_event_type: fileInProgress ? "step_progress" : isStreamedFile ? "file_created" : undefined,
     },
   });
 }

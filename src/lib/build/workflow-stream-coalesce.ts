@@ -84,7 +84,8 @@ function stableKeyForRow(
   title: string,
   filePath?: string,
 ): string {
-  return `${category}:${title.trim().toLowerCase()}:${filePath ?? ""}`;
+  if (filePath) return `file:${filePath.replace(/\\/g, "/").toLowerCase()}`;
+  return `${category}:${title.trim().toLowerCase()}:`;
 }
 
 function rowToStreamEvent(row: BuildJobEventRow, terminal: boolean): AgentWorkflowEvent | null {
@@ -132,7 +133,9 @@ function rowToStreamEvent(row: BuildJobEventRow, terminal: boolean): AgentWorkfl
     typeof meta.workflow_event_type === "string" ? meta.workflow_event_type : undefined;
 
   let status: AgentWorkflowEventStatus = "pending";
-  if (
+  if (meta.file_in_progress === true && !terminal) {
+    status = "active";
+  } else if (
     category === "failed_before_generation" ||
     category === "failed_after_generation" ||
     stepStatus === "failed" ||
@@ -294,6 +297,25 @@ export function collapseHeartbeatAssistantMessages(
   });
 }
 
+/** One narration line per unique assistant copy. */
+export function collapseDuplicateAssistantMessages(
+  events: AgentWorkflowEvent[],
+): AgentWorkflowEvent[] {
+  const seen = new Set<string>();
+  const out: AgentWorkflowEvent[] = [];
+  for (const ev of events) {
+    if (ev.category !== "assistant_message") {
+      out.push(ev);
+      continue;
+    }
+    const key = (ev.subtitle ?? ev.title).trim().toLowerCase().replace(/…+$/u, "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(ev);
+  }
+  return out;
+}
+
 /** Drop duplicate completed phase rows with the same title (keep latest). */
 export function collapseRedundantPhaseStarted(
   events: AgentWorkflowEvent[],
@@ -379,7 +401,8 @@ export function workflowTimelineForChat(
   const limit = options?.limit ?? 20;
   const coalesced = coalesceWorkflowStreamEvents(rows, { terminal });
   const noHeartbeat = collapseHeartbeatAssistantMessages(coalesced);
-  const collapsed = collapseRedundantPhaseStarted(noHeartbeat);
+  const dedupedAssistant = collapseDuplicateAssistantMessages(noHeartbeat);
+  const collapsed = collapseRedundantPhaseStarted(dedupedAssistant);
   const sequential = applySingleActiveWorkflowStep(collapsed, !terminal);
   return recentTimelineEvents(sequential, limit);
 }
