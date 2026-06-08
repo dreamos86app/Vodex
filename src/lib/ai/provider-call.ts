@@ -15,6 +15,7 @@ import {
   isProviderSelectable,
   recordProviderFailure,
   recordProviderSuccess,
+  recoverConfiguredProvidersFromAuthError,
 } from "@/lib/ai/provider-availability";
 import { routeOperation, downRouteOperation, type RouteOperationContext } from "@/lib/ai/model-router";
 import { routeMainModelSpec } from "@/lib/ai/model-mix-router";
@@ -91,6 +92,7 @@ function stripMarkdownFences(text: string): string {
  * All non-streaming model calls go through here — enforces caps and logging.
  */
 export async function callProviderStructured(input: ProviderCallInput): Promise<ProviderCallResult> {
+  recoverConfiguredProvidersFromAuthError();
   const spendGuard = await assertProviderSpendAllowed(input.userEmail);
   if (!spendGuard.allowed) {
     pushRuntimeDiagnostic("provider_call_blocked", {

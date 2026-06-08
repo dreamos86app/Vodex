@@ -23,6 +23,28 @@ export function shouldAttemptPreviewAutoRepair(
 export function buildPreviewAutoRepairPrompt(input: PreviewAutoRepairPromptInput): string {
   const { classification: c, files, attempt } = input;
 
+  if (c.failure_kind === "invalid_next_or_vite_config" && /static export|ssr preview/i.test(c.failure_message)) {
+    return [
+      "NEXT.JS PREVIEW REPAIR — enable static export so the preview worker can serve the app.",
+      `Attempt: preview_repair_attempt_${attempt + 1}`,
+      `Error: ${c.failure_message}`,
+      "",
+      "RULES:",
+      "- Add or update next.config.mjs (or .js/.ts) with: output: 'export' and images: { unoptimized: true }",
+      "- Do NOT remove routes, pages, or reduce file count.",
+      "- Do NOT replace the app with a generic scaffold.",
+      "- Keep package.json scripts intact unless adding export is required.",
+      "- If the app uses server-only features (API routes, SSR-only APIs), convert affected pages to client components where needed.",
+      "",
+      `Current file tree (${files.length} files):`,
+      files.map((f) => f.path).slice(0, 80).join("\n"),
+      "",
+      input.userPrompt ? `Original app prompt: ${input.userPrompt.slice(0, 500)}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   if (c.failure_kind === "preview_source_validation_failed" && c.failing_file) {
     const matchFile = files.find((f) => f.path === c.failing_file);
     if (matchFile) {

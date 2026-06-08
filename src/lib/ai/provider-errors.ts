@@ -135,6 +135,9 @@ export function sanitizeUserFacingAiError(raw: string): string {
   if (m.includes("charge_tokens") || m.includes("schema cache") || m.includes("could not find the function")) {
     return "AI requests are temporarily paused while billing sync finishes. Please try again shortly.";
   }
+  if (AUTH_RE.test(m) || m.includes("incorrect api key")) {
+    return "Platform AI key is invalid or outdated. Update OPENAI_API_KEY on the server, redeploy or restart, then retry.";
+  }
   if (QUOTA_RE.test(m) && /anthropic|claude/i.test(m)) {
     return "That model is temporarily unavailable. I switched to another available model and continued.";
   }

@@ -37,6 +37,15 @@ export function isProviderConfigured(p: ProviderName): boolean {
   return false;
 }
 
+export function recoverConfiguredProvidersFromAuthError(): void {
+  for (const provider of ["anthropic", "openai", "google"] as ProviderName[]) {
+    if (isProviderConfigured(provider) && state[provider].status === "auth_error") {
+      state[provider].status = "available";
+      state[provider].lastErrorClass = null;
+    }
+  }
+}
+
 export function recordProviderSuccess(provider: ProviderName): void {
   if (provider === "unknown" || provider === "xai") return;
   state[provider].lastSuccessAt = new Date().toISOString();

@@ -6,6 +6,7 @@ import {
   analysisToDiagnostics,
 } from "@/lib/imports/analyze-imported-project";
 import { uploadSourceSnapshot } from "@/lib/imports/preview-source-snapshot";
+import { ensureNextStaticExportInFiles } from "@/lib/imports/next-static-export-repair";
 import type { ImportPreviewDiagnostics } from "@/lib/imports/import-diagnostics";
 import type { ZipImportFile } from "@/lib/import/zip-file-validator";
 import type { DetectedFrameworkId } from "@/lib/imports/framework-detector";
@@ -38,6 +39,11 @@ export async function queuePreviewBuildJob(input: {
   previewBilling?: PreviewZipBillingDiagnostics;
 }): Promise<{ diagnostics: ImportPreviewDiagnostics; jobId: string }> {
   const analysis = analyzeImportedProjectFiles(input.files);
+  let queueFiles = input.files;
+  if (analysis.framework.isSsrNext) {
+    const patched = ensureNextStaticExportInFiles(queueFiles);
+    queueFiles = patched.files;
+  }
   const jobId = input.jobId ?? crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -91,7 +97,7 @@ export async function queuePreviewBuildJob(input: {
     admin: input.admin,
     projectId: input.projectId,
     jobId,
-    files: input.files,
+    files: queueFiles,
   });
 
   if (!snapshot.ok) {
@@ -136,7 +142,7 @@ export async function queuePreviewBuildJob(input: {
     framework: analysis.framework.id,
     build_strategy: "queued_worker",
     source_snapshot_path: snapshot.sourceSnapshotPath,
-    runtime_mode: analysis.framework.isSsrNext ? "ssr_blocked" : "static_or_spa",
+    runtime_mode: analysis.framework.isSsrNext ? "static_export_patched" : "static_or_spa",
     diagnostics: diagnosticsWithBilling,
     preview_renderable: false,
     source_integrity_ok: false,

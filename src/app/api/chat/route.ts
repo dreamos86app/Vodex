@@ -51,6 +51,7 @@ import {
   isProviderSelectable,
   recordProviderFailure,
   recordProviderSuccess,
+  recoverConfiguredProvidersFromAuthError,
 } from "@/lib/ai/provider-availability";
 import { executeStagedBuildJob } from "@/lib/build/execute-staged-build-job";
 import { shouldRunInlineAsyncBuild } from "@/lib/build/schedule-async-build";
@@ -235,6 +236,7 @@ function appendFileLinks(
 }
 
 export async function POST(request: Request) {
+  recoverConfiguredProvidersFromAuthError();
   if (process.env.NODE_ENV !== "production") {
     console.info("[api/chat] POST");
   }
@@ -1252,6 +1254,8 @@ export async function POST(request: Request) {
           }
           return;
         }
+
+        recordProviderSuccess(providerFromModelId(billedStreamModelId));
 
         let buildQualityOk = true;
         let outputSaved = true;

@@ -58,7 +58,11 @@ export function detectFramework(files: WorkspaceFile[]): FrameworkInfo {
   const isSsrNext =
     hasNext &&
     !scripts.export &&
-    !paths.some((p) => p === "next.config.js" && filtered.find((f) => f.path === p)?.content.includes("output: 'export'"));
+    !filtered.some((f) => {
+      const p = norm(f.path);
+      if (!/^next\.config\.(js|mjs|ts)$/i.test(p)) return false;
+      return /output\s*:\s*['"]export['"]/.test(f.content);
+    });
 
   let id: FrameworkId = "unknown";
   if (paths.some((p) => /index\.html$/i.test(p)) && !pkg) id = "static";

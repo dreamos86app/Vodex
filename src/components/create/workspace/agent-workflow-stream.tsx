@@ -220,6 +220,10 @@ function ProgressRow({
   );
 }
 
+function isInlineWorkflowStatus(title: string): boolean {
+  return /build saved.*preparing preview/i.test(title) || title === "Preparing preview";
+}
+
 function TimelineRow({
   event,
   reducedMotion,
@@ -234,7 +238,7 @@ function TimelineRow({
   workflowEvents: BuildJobPollState["events"];
 }) {
   if (isFileEvent(event)) return <FileChangeCard event={event} />;
-  if (event.category === "assistant_message") {
+  if (event.category === "assistant_message" || isInlineWorkflowStatus(event.title)) {
     return <AssistantBubble>{event.subtitle ?? event.title}</AssistantBubble>;
   }
   return (

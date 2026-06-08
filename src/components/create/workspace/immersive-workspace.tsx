@@ -39,6 +39,7 @@ import {
   type CreationMode,
 } from "@/lib/creation/models";
 import { toast } from "@/lib/toast";
+import { sanitizeUserFacingAiError } from "@/lib/ai/provider-errors";
 import { createDreamChatTransport } from "@/lib/chat/create-chat-transport";
 import { runAiPreflightDeduped } from "@/lib/ai/preflight-inflight";
 import { isAiPreflightSuccess, preflightBlockedLabel } from "@/lib/ai/preflight-types";
@@ -962,21 +963,21 @@ export function ImmersiveWorkspace({
     transport,
     onError: (err) => {
       unlockStream();
+      const userMsg = sanitizeUserFacingAiError(err.message ?? "Generation failed");
       pushRuntimeDiagnostic("stream_failed", {
-        message: err.message,
+        message: userMsg,
         projectId: projectIdRef.current,
         conversationId: conversationIdRef.current,
       });
       if (process.env.NODE_ENV !== "production") {
         console.error("[create-workspace] stream error", err);
       }
-      const msg = err.message ?? "Generation failed";
       toast.error(
-        msg.includes("network") || msg.includes("fetch")
-          ? `${msg} — check connection and retry. Credits are not charged until success.`
-          : `${msg} — try again.`,
+        userMsg.includes("network") || userMsg.includes("fetch") || userMsg.includes("Connection")
+          ? `${userMsg} — check connection and retry. Credits are not charged until success.`
+          : `${userMsg} — try again.`,
       );
-      setSubmitStatusLabel(`Failed: ${msg}`);
+      setSubmitStatusLabel(`Failed: ${userMsg}`);
       setTimeout(() => drainPromptQueueRef.current(), 300);
     },
     onFinish: () => {
@@ -3271,23 +3272,20 @@ export function ImmersiveWorkspace({
                 />
               )}
               {error && !creditError && (
-                <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive ring-1 ring-destructive/20">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
-                  <div className="flex-1">
-                    <p className="font-semibold">Generation failed</p>
-                    <p className="mt-0.5 opacity-90">{error.message ?? "Try again."}</p>
-                  </div>
+                <p className="px-1 text-[13px] leading-relaxed text-destructive">
+                  <span className="font-medium">Generation failed:</span>{" "}
+                  {sanitizeUserFacingAiError(error.message ?? "Try again.")}{" "}
                   <button
                     type="button"
                     onClick={() => {
                       clearError();
                       regenerate();
                     }}
-                    className="shrink-0 rounded bg-destructive/15 px-2 py-1 text-[10.5px] font-semibold"
+                    className="font-medium underline underline-offset-2"
                   >
                     Retry
                   </button>
-                </div>
+                </p>
               )}
             </div>
           </div>

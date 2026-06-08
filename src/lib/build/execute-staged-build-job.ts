@@ -260,7 +260,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     await persistStage("build_pipeline_entered");
     await persistStage("planning_app_started", "Organizing screens and features");
     await persistAssistantBuildMessage(input.writer, eventCtx, {
-      message: "I'll map your app structure and start generating files.",
+      message: input.userPrompt?.trim()
+        ? `I'll work through your request — "${input.userPrompt.trim().slice(0, 140)}${input.userPrompt.trim().length > 140 ? "…" : ""}" — mapping screens, then generating and saving files.`
+        : "I'll map your app structure, generate files, and save them to your project.",
       progressPercent: 10,
     }).catch(() => undefined);
 

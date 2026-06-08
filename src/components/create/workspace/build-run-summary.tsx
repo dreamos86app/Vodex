@@ -9,7 +9,11 @@ import {
   resolveBuildTerminalTruth,
 } from "@/lib/build/build-terminal-truth";
 
-export type BuildRunSummaryVariant = "completed" | "partial" | "failed";
+export type BuildRunSummaryVariant = "completed" | "partial" | "failed" | "inline";
+
+function isPendingPreviewHeadline(title: string): boolean {
+  return /build saved.*preparing preview/i.test(title);
+}
 
 export function BuildRunSummaryCard({
   variant,
@@ -80,6 +84,7 @@ export function BuildRunSummaryCard({
               : "Build complete"),
     truth.hasRecoverableFiles || count >= MIN_RENDERABLE_FILES,
   );
+  const inline = variant === "inline" || isPendingPreviewHeadline(title);
 
   const lines =
     bodyLines.length > 0
@@ -96,6 +101,25 @@ export function BuildRunSummaryCard({
           ...(failed && errorMessage ? [errorMessage] : []),
           ...(showRefundLine && refunded ? ["Credits were returned for this attempt."] : []),
         ].filter(Boolean);
+
+  if (inline) {
+    const detail = lines[0] ?? (typeof filesCount === "number" ? `${filesCount} files saved to your project` : null);
+    return (
+      <div className={cn("px-1 py-0.5", className)} data-testid="build-run-summary-inline">
+        <p className="text-[13px] leading-relaxed text-foreground">{title}</p>
+        {detail ? <p className="mt-0.5 text-[12px] text-muted-foreground">{detail}</p> : null}
+        {showPreviewActions ? (
+          <button
+            type="button"
+            className="mt-2 text-[12px] font-medium text-accent underline-offset-2 hover:underline"
+            data-testid="summary-open-preview"
+          >
+            Open preview
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div

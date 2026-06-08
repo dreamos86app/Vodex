@@ -3,6 +3,7 @@
  */
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { isSubstantialPreviewApp, type TodoStubMatch } from "@/lib/build/todo-stub-detector";
+import { isNextSsrStaticExportBlocker } from "@/lib/imports/next-static-export-repair";
 import {
   normalizePreviewBuildLogs,
   type NormalizedPreviewBuildLog,
@@ -311,6 +312,19 @@ export function classifyPreviewBuildFailure(input: {
     });
   }
 
+  if (isNextSsrStaticExportBlocker(reason)) {
+    return buildClassification("invalid_next_or_vite_config", "build", {
+      ...normalized,
+      failure_message:
+        input.blockedReason ??
+        input.userMessage ??
+        "Next.js preview needs static export configuration.",
+      suggested_repair:
+        "Add output: 'export' to next.config and rebuild preview. Auto-repair can patch next.config without removing routes.",
+      auto_repair: true,
+    });
+  }
+
   if (reason.includes("window.") || reason.includes("document.") || reason.includes("unsupported_browser")) {
     return buildClassification("unsupported_browser_api", "runtime", {
       ...normalized,
@@ -329,7 +343,10 @@ export function classifyPreviewBuildFailure(input: {
     });
   }
 
-  if (reason.includes("runtime") || input.errorCode === "runtime_exception") {
+  if (
+    (reason.includes("runtime") || input.errorCode === "runtime_exception") &&
+    !isNextSsrStaticExportBlocker(reason)
+  ) {
     return buildClassification("runtime_render_error", "runtime", {
       ...normalized,
       failure_message: input.userMessage ?? input.blockedReason ?? "Preview runtime error",
