@@ -83,39 +83,32 @@ function groupFileEvents(events: AgentWorkflowEvent[], working: boolean): AgentW
   return compressFileEventsForDisplay(events, working);
 }
 
-/** Golden-ring focus on in-flight files (multiple simultaneous writes stay active). */
+const MAX_ACTIVE_FILE_ROWS = 2;
+
+/** Golden-ring focus on 1–2 files actually being written; completed files lose the ring. */
 function applyFileStreamFocus(
   events: AgentWorkflowEvent[],
   working: boolean,
 ): AgentWorkflowEvent[] {
   if (!working) return events;
-  const fileIndices = events
-    .map((e, i) => (isFileEvent(e) ? i : -1))
-    .filter((i) => i >= 0);
-  if (!fileIndices.length) return events;
 
-  const inProgress = new Set<number>();
-  for (const i of fileIndices) {
-    const ev = events[i]!;
-    if (ev.metadata?.file_in_progress === true || ev.status === "active") {
-      inProgress.add(i);
+  const inProgressIndices: number[] = [];
+  events.forEach((e, i) => {
+    if (isFileEvent(e) && e.metadata?.file_in_progress === true) {
+      inProgressIndices.push(i);
     }
-  }
-  const recentWindow = fileIndices.slice(-4);
-  if (inProgress.size === 0) {
-    for (const i of recentWindow) inProgress.add(i);
-  } else {
-    for (const i of recentWindow) {
-      const ev = events[i]!;
-      if (ev.metadata?.file_in_progress === true) inProgress.add(i);
-    }
-  }
+  });
+  const activeSet = new Set(inProgressIndices.slice(-MAX_ACTIVE_FILE_ROWS));
 
   return events.map((e, i) => {
     if (isFileEvent(e)) {
+      const done =
+        e.metadata?.file_in_progress === false ||
+        e.metadata?.step_status === "completed" ||
+        !activeSet.has(i);
       return {
         ...e,
-        status: inProgress.has(i) ? ("active" as const) : ("done" as const),
+        status: done ? ("done" as const) : ("active" as const),
       };
     }
     if (e.status === "active") {
@@ -487,14 +480,6 @@ export function AgentWorkflowStream({
     return { files, added, removed };
   }, [timeline]);
 
-  const streamRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (!working || !active) return;
-    const el = streamRef.current;
-    if (!el) return;
-    el.scrollIntoView({ block: "end", behavior: reducedMotion ? "auto" : "smooth" });
-  }, [active?.stableKey, working, reducedMotion]);
-
   const narrationCopy = React.useMemo(() => {
     const lines = completedTimeline
       .filter((e) => e.category === "assistant_message")
@@ -517,7 +502,7 @@ export function AgentWorkflowStream({
       messageTextForCopy={[narrationCopy, fileSummaryLine].filter(Boolean).join("\n\n") || userPrompt}
       className={className}
     >
-    <div ref={streamRef} className="space-y-2.5" data-testid="agent-workflow-stream">
+    <div className="space-y-2.5" data-testid="agent-workflow-stream">
       {progress.reconnecting ? (
         <p className="px-1 text-[10px] text-muted-foreground">Reconnecting to build status…</p>
       ) : null}

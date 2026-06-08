@@ -171,7 +171,8 @@ export function scoreMeaningfulUiQuality(input: {
   const passes =
     final_quality_score >= min_required_score &&
     failures.length === 0 &&
-    meaningful_routes >= 3;
+    meaningful_routes >= 3 &&
+    placeholder_routes <= Math.max(1, Math.floor(pages.length * 0.1));
 
   return {
     total_files: renderable.length,

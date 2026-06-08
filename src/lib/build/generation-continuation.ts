@@ -34,12 +34,12 @@ export function shouldContinueGeneration(input: {
         "Model generation did not produce a complete app. I'm retrying with a stricter full-app prompt.",
     };
   }
-  if (input.meaningfulQualityPasses === false && passIndex < maxPasses && budgetRemainingRatio >= 0.06) {
+  if (input.meaningfulQualityPasses === false && passIndex < maxPasses && budgetRemainingRatio >= 0.04) {
     return {
       shouldContinue: true,
       passIndex: passIndex + 1,
       reason: "meaningful_quality_below_floor",
-      userMessage: `Quality below target (${budget.minQualityScore}+) — continuing full-app generation.`,
+      userMessage: `Quality below target (${budget.minQualityScore}/100) — continuing with premium UI passes.`,
     };
   }
   if (passIndex >= maxPasses) {

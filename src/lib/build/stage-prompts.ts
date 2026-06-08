@@ -139,8 +139,9 @@ export function frontendPrompt(
   return [
     FILE_PAYLOAD_RULE,
     buildStageObjective("frontend_implementation"),
-    "You are not generating a simple demo. Ship production-quality UI that looks like a premium SaaS product.",
+    "You are not generating a simple demo. Ship production-quality UI that looks like a premium SaaS product (target 95–100/100 quality).",
     "This is a FULL APP generation pass — minimum meaningful files, routes, components, and app-specific mock data.",
+    "Every page must feel hand-crafted: rich sections, real domain copy, interactive controls, polished spacing and typography.",
     "Include lib/mock-data.ts with exports every page imports. Include tsconfig.json with @/* path alias.",
     formatGenerationBudgetForPrompt(genPlan),
     productionUiBlock(designBrief, brief),
@@ -153,6 +154,29 @@ export function frontendPrompt(
     `UI plan: ${slices ? slices.uiSlice : sliceToTokenBudget(uiJson, 400)}`,
     "MOBILE/PWA: Include viewport export, touch-friendly controls (min 44px), overflow-x hidden, safe-area CSS, public/manifest.webmanifest, capacitor.config.ts stub.",
     "INTEGRATIONS: If email/payments/DB/AI are requested, gate features when env secrets missing — show honest disabled state, never fake API success.",
+  ].join("\n");
+}
+
+/** Focused retry when route files are missing — fewer routes, premium depth. */
+export function compactRouteRetryPrompt(
+  executionBrief: string,
+  planJson: string,
+  routes: string[],
+  designBrief?: DesignBrief | null,
+): string {
+  const brief = sliceToTokenBudget(executionBrief, 700);
+  const routeList = routes.slice(0, 6).join(", ");
+  return [
+    FILE_PAYLOAD_RULE,
+    buildStageObjective("frontend_implementation"),
+    "COMPACT HIGH-QUALITY RETRY: prior pass did not emit route files. Generate 4–6 premium pages only.",
+    "Each page MUST be 80+ lines: KPI cards, data tables with realistic mock rows, filters, charts, detail sections.",
+    "FORBIDDEN: welcome-only hero, Coming soon, TODO, generic violet gradient shell, thin placeholder tables.",
+    `Focus routes: ${routeList || "app/page.tsx, app/dashboard/page.tsx, and 3+ feature routes"}`,
+    productionUiBlock(designBrief, brief),
+    "Include lib/mock-data.ts, app/layout.tsx with AppShell, app/globals.css, tsconfig paths @/*.",
+    `Brief: ${brief}`,
+    `Plan: ${sliceToTokenBudget(planJson, 450)}`,
   ].join("\n");
 }
 

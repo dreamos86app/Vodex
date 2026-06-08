@@ -97,6 +97,7 @@ import { buildPremiumUiRepairPrompt } from "@/lib/build/generated-ui-repair-pass
 import {
   backendPrompt,
   buildPlanPrompt,
+  compactRouteRetryPrompt,
   frontendPrompt,
   minimalFrontendPrompt,
   schemaPrompt,
@@ -335,6 +336,12 @@ async function ingestModelFilesWithExtractionStream(
   maxFiles: number,
   onFileStreamStart?: (path: string) => void,
   onFileStreamDelta?: (path: string, added: number, removed: number, current?: number) => void,
+  onFileStreamComplete?: (
+    path: string,
+    added: number,
+    removed: number,
+    current: number,
+  ) => void,
   onExtractStart?: () => void,
 ): Promise<BuildFile[]> {
   onExtractStart?.();
@@ -348,6 +355,14 @@ async function ingestModelFilesWithExtractionStream(
         if (ev.type === "file_delta") {
           onFileStreamDelta?.(ev.path, ev.lines_added, ev.lines_removed, ev.current_line_count);
         }
+        if (ev.type === "file_completed") {
+          onFileStreamComplete?.(
+            ev.path,
+            ev.lines_added,
+            ev.lines_removed,
+            ev.current_line_count,
+          );
+        }
       },
       onFile: async (f) => {
         merged = mergeIncomingBuildFiles(merged, [f], events, trackFn, maxFiles, onFileStreamStart);
@@ -355,7 +370,7 @@ async function ingestModelFilesWithExtractionStream(
     },
     {
       existingByPath,
-      interFileDelayMs: isProductionBuildMode() ? 550 : 95,
+      interFileDelayMs: isProductionBuildMode() ? 720 : 140,
       liveDeltaTickMs: 1000,
     },
   );
@@ -504,6 +519,21 @@ export async function runStagedBuildPipeline(input: {
         removed_lines: removed,
         old_line_count: Math.max(0, (current ?? added) - added),
         new_line_count: current ?? added,
+      },
+      honest: true,
+    });
+  };
+  const onFileStreamComplete = (path: string, added: number, removed: number, current: number) => {
+    track(events, "writing", `Created ${path}`, `+${added} -${removed}`, {
+      filePath: path,
+      streamCategory: "file_created",
+      extraction_stream: true,
+      file_in_progress: false,
+      fileLineMeta: {
+        added_lines: added,
+        removed_lines: removed,
+        old_line_count: Math.max(0, current - added),
+        new_line_count: current,
       },
       honest: true,
     });
@@ -948,9 +978,6 @@ export async function runStagedBuildPipeline(input: {
 
   trackAssistant(events, thinkingForFrontendStart(appName), emit);
   track(events, "writing", "Generating frontend files");
-  for (const path of uniquePlannedFilePaths(designBrief.routes ?? archetype.coreRoutes, 10)) {
-    onFileStreamStart(path);
-  }
   if (input.buildTrace) traceBuildWorkerStage(input.buildTrace, "file_generation_started");
 
   const smokeBuild = isSmokeBuildMode();
@@ -1006,6 +1033,7 @@ export async function runStagedBuildPipeline(input: {
         effectiveMaxFiles,
         onFileStreamStart,
         onFileStreamDelta,
+        onFileStreamComplete,
         onExtractStart,
       );
       if (allFiles.length > beforeCount) {
@@ -1054,6 +1082,7 @@ export async function runStagedBuildPipeline(input: {
           effectiveMaxFiles,
           onFileStreamStart,
           onFileStreamDelta,
+          onFileStreamComplete,
           onExtractStart,
         );
       }
@@ -1073,12 +1102,11 @@ export async function runStagedBuildPipeline(input: {
       "Compact route retry — generating core pages with a smaller route set…",
       emit,
     );
-    for (const path of uniquePlannedFilePaths(designBrief.routes ?? archetype.coreRoutes, 6)) {
-      onFileStreamStart(path);
-    }
+    const compactRoutes = uniquePlannedFilePaths(designBrief.routes ?? archetype.coreRoutes, 6);
     const routeRetryPrompt = smokeBuild
       ? minimalFrontendPrompt(executionPrompt, planJson, contextSlices, designBrief)
-      : frontendPrompt(executionPrompt, planJson!, uiJson, effectiveMaxFiles, contextSlices, designBrief);
+      : compactRouteRetryPrompt(executionPrompt, planJson!, compactRoutes, designBrief);
+    track(events, "writing", "Requesting core pages from model");
     const miniCall = await callProviderWithBuildTimeout(
       {
         writer: input.writer,
@@ -1113,10 +1141,18 @@ export async function runStagedBuildPipeline(input: {
       effectiveMaxFiles,
       onFileStreamStart,
       onFileStreamDelta,
+      onFileStreamComplete,
       onExtractStart,
     );
     }
     clearStalePlannedPlaceholders(allFiles);
+    if (!miniCall.ok || allFiles.length === 0) {
+      trackAssistant(
+        events,
+        "Moving to full-app continuation passes to finish routes and polish UI…",
+        emit,
+      );
+    }
   }
 
   allFiles = filterRenderableBuildFiles(allFiles);
@@ -1215,6 +1251,7 @@ export async function runStagedBuildPipeline(input: {
         effectiveMaxFiles,
         onFileStreamStart,
         onFileStreamDelta,
+        onFileStreamComplete,
         onExtractStart,
       ),
     );
@@ -1311,6 +1348,7 @@ export async function runStagedBuildPipeline(input: {
         effectiveMaxFiles,
         onFileStreamStart,
         onFileStreamDelta,
+        onFileStreamComplete,
         onExtractStart,
       ),
     );

@@ -1609,10 +1609,16 @@ export function ImmersiveWorkspace({
     el.scrollTo({ top: el.scrollHeight, behavior });
   }, []);
 
+  const buildStreamTick =
+    buildJobProgress?.events?.length ??
+    frozenBuildWorkflow?.events?.length ??
+    0;
+  const buildProgressPct = buildJobProgress?.progressPercent ?? frozenBuildWorkflow?.progressPercent ?? 0;
+
   React.useEffect(() => {
     if (userPinnedScrollRef.current) return;
     scrollToBottom(isBusy ? "auto" : "smooth");
-  }, [messages, isBusy, scrollToBottom]);
+  }, [messages, isBusy, scrollToBottom, buildStreamTick, buildProgressPct]);
 
   const onChatScroll = React.useCallback(() => {
     const el = scrollRef.current;

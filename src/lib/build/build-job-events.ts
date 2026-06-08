@@ -259,7 +259,12 @@ export async function persistWorkflowEvent(
       stream_mode: ev.meta?.stream_mode,
       batch_persist: isStreamedFile ? true : undefined,
       real_progress: isStreamedFile ? true : undefined,
-      file_in_progress: fileInProgress ? true : undefined,
+      file_in_progress:
+        ev.meta?.file_in_progress === true
+          ? true
+          : ev.meta?.file_in_progress === false
+            ? false
+            : undefined,
       step_status: fileInProgress ? "active" : isStreamedFile ? "completed" : undefined,
       workflow_event_type: fileInProgress ? "step_progress" : isStreamedFile ? "file_created" : undefined,
     },
