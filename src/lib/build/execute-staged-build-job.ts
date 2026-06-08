@@ -67,6 +67,14 @@ import {
   type PreviewFailureCode,
 } from "@/lib/preview/preview-failure-codes";
 import { runDeterministicPreviewRepair, isPreviewRepairEligible } from "@/lib/build/preview-deterministic-repair";
+import { classifyPreviewBuildFailure } from "@/lib/preview/preview-failure-classifier";
+import { loadLatestPreviewDiagnostics } from "@/lib/imports/runtime-build-runner";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  buildLatestPreviewFailureRecord,
+  persistLatestPreviewFailure,
+} from "@/lib/preview/persist-preview-failure-metadata";
+import { countAppRoutes } from "@/lib/build/route-connectivity-check";
 import { persistGeneratedBuildFiles } from "@/lib/build/persist-generated-files";
 import {
   analyzePreviewHtml,
@@ -1106,10 +1114,58 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       }
 
       if (previewStillFailed) {
-      previewErr =
-        userMessageForPreviewFailure(previewCode) ||
-        (!previewResult.ok ? (previewResult.error ?? previewErr) : previewErr);
       const filesKept = Math.max(fileGate.fileCount, postPreview.visibleFileCount);
+      const previewDiag = await loadLatestPreviewDiagnostics(
+        createSupabaseAdmin(),
+        input.projectId,
+      );
+      const previewBuildLogs = previewDiag?.buildLogs ?? null;
+      const previewClassification = classifyPreviewBuildFailure({
+        appFilesCount: filesKept,
+        routesCount: countAppRoutes(workingFiles),
+        packageJsonExists: workingFiles.some((f) => f.path === "package.json"),
+        entrypointExists: workingFiles.some((f) => /^app\/(page|layout)\.(tsx|jsx)$/i.test(f.path)),
+        previewArtifactExists: Boolean(previewResult.ok && previewResult.sessionId),
+        buildLogs: previewBuildLogs,
+        errorCode: previewCode,
+        blockedReason: postPreview.sourceIntegrity.blockedReason,
+        userMessage: !previewResult.ok ? previewResult.error : previewErr,
+        jobStatus: previewResult.ok ? "succeeded" : "failed",
+        previewStatus: previewResult.ok ? "ready" : "failed",
+        previewBuildJobId: previewDiag?.jobId ?? null,
+        sourceIntegrityOk: postPreview.sourceIntegrity.sourceIntegrityOk,
+        meaningfulSourceFileCount: postPreview.sourceIntegrity.meaningfulSourceFileCount,
+      });
+      previewErr = previewClassification.human_summary;
+      previewCode = isPreviewFailureCode(previewCode)
+        ? previewCode
+        : previewClassification.failure_kind === "missing_import"
+          ? "invalid_import"
+          : previewClassification.failure_kind === "typescript_compile_failed"
+            ? "compile_error"
+            : previewCode;
+
+      await persistLatestPreviewFailure({
+        writer: input.writer,
+        projectId: input.projectId,
+        ownerId: input.userId,
+        buildJobId: input.buildJobId,
+        previewSessionId: "sessionId" in previewResult ? previewResult.sessionId : undefined,
+        record: buildLatestPreviewFailureRecord({
+          classification: previewClassification,
+          previewSessionId: "sessionId" in previewResult ? previewResult.sessionId : null,
+          previewBuildJobId: previewDiag?.jobId ?? null,
+          appFilesCount: filesKept,
+          routesCount: countAppRoutes(workingFiles),
+          packageJsonExists: workingFiles.some((f) => f.path === "package.json"),
+          entrypointExists: workingFiles.some((f) => /^app\/(page|layout)\.(tsx|jsx)$/i.test(f.path)),
+          previewArtifactExists: false,
+          generationQualityScore:
+            ("generationQualityReport" in pr ? pr.generationQualityReport?.score : undefined) ??
+            pr.uiQualityScore,
+          sourceIntegrityScore: postPreview.sourceIntegrity.meaningfulSourceFileCount,
+        }),
+      });
 
       const { data: cur } = await input.writer
         .from("projects")
@@ -1137,6 +1193,11 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
             }),
             file_count: filesKept,
             ui_quality_score: pr.uiQualityScore,
+            generation_quality_score:
+              ("generationQualityReport" in pr ? pr.generationQualityReport?.score : undefined) ??
+              pr.uiQualityScore,
+            source_integrity_score: postPreview.sourceIntegrity.meaningfulSourceFileCount,
+            preview_build_status: "failed",
           } as Json,
         } as never)
         .eq("id", input.projectId)
@@ -1157,8 +1218,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         metadata: {
           preview_failed: true,
           files_kept: filesKept,
-          failure_kind: "preview_failed",
+          failure_kind: previewClassification.failure_kind,
           preview_failure_code: previewCode,
+          preview_failure_stage: previewClassification.failure_stage,
           source_integrity_ok: postPreview.sourceIntegrity.sourceIntegrityOk,
           preview_renderable: postPreview.sourceIntegrity.previewRenderable,
           blocked_reason: postPreview.sourceIntegrity.blockedReason,

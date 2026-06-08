@@ -161,6 +161,29 @@ export function scoreGeneratedAppQuality(input: {
   };
 }
 
+/** Separate generation quality from preview compile status (P1.3.15). */
+export function splitGenerationAndPreviewScores(input: {
+  generationReport: GeneratedAppQualityReport;
+  previewBuildStatus?: "ready" | "failed" | "pending" | null;
+  sourceIntegrityScore?: number | null;
+}): {
+  generation_quality_score: number;
+  source_integrity_score: number;
+  preview_build_status: string;
+} {
+  return {
+    generation_quality_score: input.generationReport.score,
+    source_integrity_score:
+      input.sourceIntegrityScore ??
+      Math.round(
+        (input.generationReport.dimensions.routeCoverage +
+          input.generationReport.dimensions.componentRichness) /
+          2,
+      ),
+    preview_build_status: input.previewBuildStatus ?? "pending",
+  };
+}
+
 export function formatQualitySummaryForStream(report: GeneratedAppQualityReport): string {
   const rc = report.routeConnectivity;
   return [

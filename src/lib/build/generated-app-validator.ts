@@ -1,10 +1,19 @@
 import { rejectBannedRefs } from "@/lib/ai/file-fingerprint";
 import { UI_QUALITY_BANNED } from "@/lib/generation/ui-quality-spec";
+import {
+  applyTodoStubGate,
+  detectTodoStubMatches,
+  type TodoStubMatch,
+} from "@/lib/build/todo-stub-detector";
+import { normalizeBuildFilePath } from "@/lib/build/generated-file-utils";
+import { findPrimaryAppPage } from "@/lib/build/source-integrity-validator";
 
 export type GeneratedAppValidation = {
   ok: boolean;
   reasons: string[];
+  warnings: string[];
   placeholderDetected: boolean;
+  todoStubMatches: TodoStubMatch[];
 };
 
 const PLACEHOLDER_PATTERNS = [
@@ -49,13 +58,23 @@ export function validateGeneratedApp(input: {
   if (!hasPackage) reasons.push("missing_package_json");
 
   let placeholderDetected = false;
+  const warnings: string[] = [];
   const uiFiles = input.files.filter((f) => /\.(tsx|jsx|html)$/i.test(f.path));
   const combined = uiFiles.map((f) => f.content).join("\n") || input.files.map((f) => f.content).join("\n");
+  const primary = findPrimaryAppPage(input.files);
+  const primaryContent = primary?.content ?? "";
 
-  for (const p of [...PLACEHOLDER_PATTERNS, ...UI_QUALITY_BANNED]) {
-    if (p.test(combined)) {
+  const globalPlaceholderPatterns = [...PLACEHOLDER_PATTERNS, ...UI_QUALITY_BANNED].filter(
+    (p) => !/\bTODO\b/i.test(p.source) && !/FIXME/i.test(p.source),
+  );
+
+  for (const p of globalPlaceholderPatterns) {
+    const inPrimary = primaryContent ? p.test(primaryContent) : p.test(combined);
+    if (inPrimary) {
       placeholderDetected = true;
       reasons.push(`placeholder_content:${p.source}`);
+    } else if (p.test(combined)) {
+      warnings.push(`placeholder_content_warning:${p.source}`);
     }
   }
 
@@ -76,15 +95,19 @@ export function validateGeneratedApp(input: {
     reasons.push("todo_only_content");
   }
 
-  const todoPage = uiFiles.some(
-    (f) =>
-      /page\.(tsx|jsx)$/i.test(f.path) &&
-      (/coming soon|TODO|FIXME|placeholder only/i.test(f.content) || f.content.trim().length < 120),
-  );
-  if (todoPage) {
+  const routeCount = uiFiles.filter((f) =>
+    /(^|\/)page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)),
+  ).length;
+  const stubGate = applyTodoStubGate({
+    files: input.files,
+    fileCount: input.files.length,
+    routeCount,
+  });
+  for (const r of stubGate.blockingReasons) {
     placeholderDetected = true;
-    reasons.push("todo_or_stub_page");
+    reasons.push(r);
   }
+  warnings.push(...stubGate.warnings);
 
   if (UNSTYLED_HTML.test(combined) && !/className=/.test(combined)) {
     reasons.push("unstyled_html");
@@ -120,6 +143,10 @@ export function validateGeneratedApp(input: {
   return {
     ok: reasons.length === 0,
     reasons,
+    warnings,
     placeholderDetected,
+    todoStubMatches: stubGate.todoStubMatches.length
+      ? stubGate.todoStubMatches
+      : detectTodoStubMatches(input.files).matches,
   };
 }

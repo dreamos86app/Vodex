@@ -11,6 +11,8 @@ import { isServerlessHost } from "@/lib/imports/preview-build-queue";
 import { WORKER_CONNECTED_THRESHOLD_MS } from "@/lib/preview/preview-worker-status";
 import { loadZipPreviewBillingForProject } from "@/lib/imports/zip-preview-billing";
 import { derivePreviewFailure } from "@/lib/preview/derive-preview-failure";
+import { classifyPreviewBuildFailure } from "@/lib/preview/preview-failure-classifier";
+import { detectPreviewRoutesFromFiles } from "@/lib/preview/detect-preview-routes";
 
 const WORKER_STALE_MS = 5 * 60 * 1000;
 const WORKER_QUEUE_GRACE_MS = 8_000;
@@ -343,9 +345,71 @@ export async function loadPreviewRuntimeStatus(
   const failure = derivePreviewFailure(payload, meta);
   payload.previewFailureKind = failure.kind;
   payload.previewFailureDetail = failure.detail;
+  payload.generationQualityScore =
+    typeof meta.generation_quality_score === "number" ? meta.generation_quality_score : null;
+  payload.sourceIntegrityScore =
+    typeof meta.source_integrity_score === "number" ? meta.source_integrity_score : null;
+  payload.previewBuildStatus =
+    typeof meta.preview_build_status === "string"
+      ? meta.preview_build_status
+      : payload.previewRenderable
+        ? "ready"
+        : payload.jobStatus === "failed" || payload.previewStatus === "failed"
+          ? "failed"
+          : null;
 
   if (sessionRow?.error && !payload.userMessage) {
     payload.userMessage = sessionRow.error;
+  }
+
+  const storedFailure = meta.latest_preview_failure;
+  if (
+    storedFailure &&
+    typeof storedFailure === "object" &&
+    typeof (storedFailure as { failure_kind?: string }).failure_kind === "string"
+  ) {
+    payload.previewFailureClassification =
+      storedFailure as PreviewRuntimeStatusPayload["previewFailureClassification"];
+    payload.previewFailureKind = (storedFailure as { failure_kind: string }).failure_kind;
+    payload.previewFailureDetail =
+      typeof (storedFailure as { failure_message?: string }).failure_message === "string"
+        ? (storedFailure as { failure_message: string }).failure_message
+        : payload.previewFailureDetail;
+  } else if (!payload.previewRenderable) {
+    const { count: fileCount } = await supabase
+      .from("app_files")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId);
+    const { data: fileSample } = await supabase
+      .from("app_files")
+      .select("path")
+      .eq("project_id", projectId)
+      .limit(300);
+    const paths = (fileSample ?? []).map((r) => r.path ?? "");
+    const routes = detectPreviewRoutesFromFiles(
+      paths.map((path) => ({ path, content: "" })),
+    );
+    payload.previewFailureClassification = classifyPreviewBuildFailure({
+      appFilesCount: fileCount ?? paths.length,
+      routesCount: routes.length,
+      packageJsonExists: paths.includes("package.json"),
+      entrypointExists: paths.some((p) => /^app\/(page|layout)\.(tsx|jsx)$/i.test(p)),
+      previewArtifactExists: Boolean(payload.artifactPath),
+      buildLogs: payload.buildLogs,
+      errorCode: payload.errorCode,
+      blockedReason: payload.blockedReason,
+      userMessage: payload.userMessage ?? sessionRow?.error,
+      jobStatus: payload.jobStatus,
+      previewStatus: payload.previewStatus,
+      previewBuildJobId: payload.jobId,
+      sourceIntegrityOk: meta.source_integrity_ok === true,
+      meaningfulSourceFileCount:
+        typeof meta.meaningful_source_file_count === "number"
+          ? meta.meaningful_source_file_count
+          : undefined,
+    });
+    payload.previewFailureKind = payload.previewFailureClassification.failure_kind;
+    payload.previewFailureDetail = payload.previewFailureClassification.failure_message;
   }
 
   return payload;

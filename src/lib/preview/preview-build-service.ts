@@ -17,6 +17,11 @@ import { resolvePreviewProvider } from "@/lib/preview/preview-provider-registry"
 import { pollVercelPreviewUrl } from "@/lib/preview/vercel-preview-provider";
 import { getVercelServerConfig } from "@/lib/deploy/vercel-config";
 import type { PreviewProviderLevel } from "@/lib/preview/preview-provider-types";
+import { isSubstantialPreviewApp } from "@/lib/build/todo-stub-detector";
+import { detectPreviewRoutesFromFiles } from "@/lib/preview/detect-preview-routes";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { runProjectPreviewBuild } from "@/lib/imports/run-project-preview-build";
+import { parseTodoStubFilePath } from "@/lib/build/todo-stub-detector";
 
 type Writer = SupabaseClient;
 
@@ -241,10 +246,28 @@ export async function startPreviewSession(input: {
   let externalUrl: string | null = null;
   let deploymentId: string | null = null;
 
-  if (!validation.ok) {
+  const routes = detectPreviewRoutesFromFiles(safeFiles);
+  const entrypointExists = safeFiles.some(
+    (f) => /^app\/(page|layout)\.(tsx|jsx)$/i.test(f.path) || f.path === "index.html",
+  );
+  const substantial = isSubstantialPreviewApp({
+    fileCount: safeFiles.length,
+    packageJsonExists: safeFiles.some((f) => f.path === "package.json"),
+    entrypointExists,
+    routeCount: routes.length,
+  });
+
+  const blockingReasons = validation.reasons.filter(
+    (r) => !r.startsWith("placeholder_content_warning") && !r.startsWith("todo_stub_warning"),
+  );
+
+  if (!validation.ok && blockingReasons.length > 0) {
     status = "failed";
-    error = validation.reasons.slice(0, 3).join("; ");
-    logs = appendPreviewLog(logs, `Validation failed: ${error}`);
+    const stubPath = blockingReasons.map(parseTodoStubFilePath).find(Boolean);
+    error = stubPath
+      ? `todo_or_stub_page:${stubPath}`
+      : blockingReasons.slice(0, 3).join("; ");
+    logs = appendPreviewLog(logs, `Source validation failed: ${error}`);
   } else if (
     uiQualityBlocksGenerated(uiReview) &&
     safeFiles.length < MIN_RENDERABLE_FILES
@@ -317,11 +340,24 @@ export async function startPreviewSession(input: {
     };
   }
 
+  const todoStubMeta =
+    validation.todoStubMatches.length > 0
+      ? {
+          todo_stub_matches: validation.todoStubMatches,
+          todo_stub_detector: validation.todoStubMatches[0]?.detector ?? null,
+          todo_stub_file_path: validation.todoStubMatches.find((m) => m.blocking)?.file_path ?? null,
+        }
+      : {};
+
   const lifecycleStatus = await updateProjectPreviewState({
     writer: input.writer,
     projectId: input.projectId,
     userId: input.userId,
-    prevMeta,
+    prevMeta: {
+      ...prevMeta,
+      ...todoStubMeta,
+      validation_warnings: validation.warnings.slice(0, 20),
+    },
     sessionId,
     status,
     previewUrl: status === "ready" ? previewUrl : null,
@@ -332,12 +368,69 @@ export async function startPreviewSession(input: {
   });
 
   if (status === "failed") {
+    const stubPath = error ? parseTodoStubFilePath(error) : null;
+    await input.writer
+      .from("projects")
+      .update({
+        build_status: "preview_failed",
+        metadata: {
+          ...prevMeta,
+          ...todoStubMeta,
+          preview_failure_kind: "preview_source_validation_failed",
+          preview_failure_detail: error,
+          preview_error: stubPath
+            ? `Stub/TODO content in ${stubPath}`
+            : (error ?? "Preview blocked by source validation"),
+          preview_build_status: "failed",
+          files_ready_preview_failed: true,
+        },
+      } as never)
+      .eq("id", input.projectId)
+      .eq("owner_id", input.userId);
+
     return {
       ok: false,
       error: error ?? "Preview validation failed",
-      code: "validation_failed",
+      code: "source_validation_failed",
       sessionId,
     };
+  }
+
+  if (substantial && safeFiles.some((f) => f.path === "package.json")) {
+    const admin = createSupabaseAdmin();
+    if (admin) {
+      try {
+        const worker = await runProjectPreviewBuild({
+          admin,
+          writer: input.writer,
+          userId: input.userId,
+          projectId: input.projectId,
+        });
+        logs = appendPreviewLog(
+          logs,
+          worker.jobId
+            ? `Preview worker job queued: ${worker.jobId}`
+            : "Preview worker job not queued",
+        );
+        await input.writer
+          .from("projects")
+          .update({
+            metadata: {
+              ...prevMeta,
+              ...todoStubMeta,
+              preview_job_id: worker.jobId,
+              last_preview_build_job_id: worker.jobId,
+            },
+          } as never)
+          .eq("id", input.projectId)
+          .eq("owner_id", input.userId);
+      } catch (workerErr) {
+        logs = appendPreviewLog(
+          logs,
+          `Worker preview queue skipped: ${workerErr instanceof Error ? workerErr.message : "error"}`,
+        );
+      }
+    }
   }
 
   return {

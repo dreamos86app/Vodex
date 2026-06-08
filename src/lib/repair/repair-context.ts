@@ -8,6 +8,10 @@ import {
 } from "@/lib/projects/project-lifecycle";
 import { loadPreviewRuntimeStatus } from "@/lib/preview/load-preview-runtime-status";
 import { shouldSuppressThinFileBlocker } from "@/lib/preview/preview-blocker-priority";
+import {
+  isTrueIncompleteFiles,
+  SUBSTANTIAL_APP_FILE_THRESHOLD,
+} from "@/lib/preview/preview-failure-classifier";
 
 type Writer = SupabaseClient<Database>;
 
@@ -94,12 +98,33 @@ export async function loadRepairContext(
   });
 
   const sourceIntegrityOk = metaRaw.source_integrity_ok === true;
+  const fileCount = count ?? 0;
+  const previewBuildFailed =
+    previewRuntime.jobStatus === "failed" ||
+    previewRuntime.previewStatus === "failed" ||
+    metaRaw.preview_build_status === "failed" ||
+    metaRaw.files_ready_preview_failed === true;
+  const packageJsonExists =
+    metaRaw.package_json_exists === true ||
+    fileCount >= SUBSTANTIAL_APP_FILE_THRESHOLD;
+  const entrypointExists = metaRaw.entrypoint_exists !== false;
   const sourceIncomplete =
     !suppressThinFiles &&
-    (count ?? 0) > 0 &&
-    (sourceIntegrityOk === false ||
-      metaRaw.blocked_reason === "technical_generation_incomplete" ||
-      String(metaRaw.blocked_reason ?? "").startsWith("technical_generation_incomplete:"));
+    !previewBuildFailed &&
+    fileCount > 0 &&
+    isTrueIncompleteFiles({
+      appFilesCount: fileCount,
+      packageJsonExists,
+      entrypointExists,
+      sourceIntegrityOk,
+      meaningfulSourceFileCount:
+        typeof metaRaw.meaningful_source_file_count === "number"
+          ? metaRaw.meaningful_source_file_count
+          : undefined,
+    }) &&
+    (metaRaw.blocked_reason === "technical_generation_incomplete" ||
+      String(metaRaw.blocked_reason ?? "").startsWith("technical_generation_incomplete:") ||
+      sourceIntegrityOk === false);
 
   const previewError =
     previewRuntime.blockedReason ??

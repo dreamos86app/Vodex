@@ -166,25 +166,44 @@ export async function reconcilePostPersistBuildStatus(
 
   const unresolvedBlueprintRoutes = parseMissingBlueprintRoutes(failures);
   const uiQualityOnlyFailures = isUiQualityOnlyFailure(failures);
+
+  const visibleFileCount = rows?.length ?? renderableCount;
+  const persistedFileCount = visibleFileCount;
+
+  const hasSubstantialApp =
+    visibleFileCount >= 25 &&
+    hasPackageJson &&
+    hasRootPage &&
+    sourceIntegrity.meaningfulSourceFileCount >= 8;
+
+  const stubOnlyForSubstantial =
+    hasSubstantialApp &&
+    failures.length > 0 &&
+    failures.every(
+      (f) =>
+        f.startsWith("todo_or_stub_page") ||
+        f.startsWith("todo_stub_warning") ||
+        f.startsWith("placeholder_content_warning"),
+    );
+
   const technicalOnlyFailures =
     failures.length > 0 &&
+    !stubOnlyForSubstantial &&
     failures.some(
       (f) =>
         f.startsWith("missing_import") ||
         f === "no_page_route" ||
-        f.startsWith("placeholder_") ||
-        f === "todo_only_content",
+        (f.startsWith("placeholder_") && !f.includes("warning")) ||
+        f === "todo_only_content" ||
+        (f.startsWith("todo_or_stub_page") && !hasSubstantialApp),
     ) &&
     !uiQualityOnlyFailures;
-
-  const visibleFileCount = rows?.length ?? renderableCount;
-  const persistedFileCount = visibleFileCount;
 
   const persistenceFailure =
     visibleFileCount > 0 && sourceIntegrity.meaningfulSourceFileCount === 0;
 
   const technicalGenerationIncomplete =
-    !sourceIntegrity.sourceIntegrityOk && visibleFileCount > 0;
+    !sourceIntegrity.sourceIntegrityOk && visibleFileCount > 0 && !hasSubstantialApp;
 
   const previewCanRender = sourceIntegrity.previewRenderable;
 

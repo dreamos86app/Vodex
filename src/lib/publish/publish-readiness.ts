@@ -125,7 +125,19 @@ export function checkPublishReadiness(input: {
     (input.metadata.preview_ready === true && input.metadata.preview_honest === true) ||
     importPreviewValidated;
   if (previewFailedWithFiles && !previewReady) {
-    blockers.push("Preview must be repaired before publishing.");
+    const previewFailureKind =
+      typeof input.metadata.preview_failure_kind === "string"
+        ? input.metadata.preview_failure_kind
+        : null;
+    const previewErr =
+      typeof input.metadata.preview_error === "string" ? input.metadata.preview_error : null;
+    blockers.push(
+      previewFailureKind && previewFailureKind !== "true_incomplete_files"
+        ? `Preview build failed — ${previewErr ?? previewFailureKind.replace(/_/g, " ")}`
+        : previewFailureKind === "true_incomplete_files"
+          ? "Generated files are incomplete — repair source before publishing."
+          : "Preview build failed — repair before publishing.",
+    );
   } else if (!previewReady && !isImport) {
     blockers.push("Start a successful preview before publishing");
   } else if (!previewReady && isImport) {

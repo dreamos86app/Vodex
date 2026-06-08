@@ -108,12 +108,20 @@ export function resolveAuthoritativePreviewBlocker(
   }
 
   if (reason && input.jobStatus === "failed") {
+    const title =
+      code === "compile_error" || reason.includes("typescript")
+        ? "Preview build failed — TypeScript"
+        : code === "invalid_import" || reason.includes("import")
+          ? "Preview build failed — missing import"
+          : reason === "Vite build failed" || reason.toLowerCase().includes("vite")
+            ? "Preview build failed — Vite"
+            : "Preview build failed";
     return {
       priority: 3,
       code: code || "PREVIEW_BUILD_FAILED",
-      title: reason === "Vite build failed" ? "Vite build failed" : "Preview build failed",
+      title,
       summary: input.userMessage ?? reason,
-      fixHint: "Open build logs in the preview runtime panel and fix the reported build error.",
+      fixHint: "Run automatic repair or open build logs and fix the reported compile error.",
       details: reason,
     };
   }

@@ -217,7 +217,9 @@ export function RepairCenter({
       </div>
       {compact ? (
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-          The files were saved, but some source content is incomplete or one route cannot render yet.
+          {data.issues.some((i) => i.type === "preview_failed")
+            ? "Files were saved, but the preview build failed. See the exact compile error below."
+            : "The files were saved, but some source content is incomplete or one route cannot render yet."}
         </p>
       ) : null}
 

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronUp, Loader2, RefreshCw, Server } from "lucide-react";
+import { ChevronDown, ChevronUp, Copy, Loader2, RefreshCw, Server, Wrench } from "lucide-react";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
 import {
@@ -16,19 +17,38 @@ export function PreviewRuntimeStatusPanel({
   className,
   onRebuild,
   onStartPreview,
+  onRunRepair,
+  onOpenCode,
   rebuilding,
   startingPreview,
+  repairing,
 }: {
   status: PreviewRuntimeStatusPayload;
   compact?: boolean;
   className?: string;
   onRebuild?: () => void;
   onStartPreview?: () => void;
+  onRunRepair?: () => void;
+  onOpenCode?: () => void;
   rebuilding?: boolean;
   startingPreview?: boolean;
+  repairing?: boolean;
 }) {
   const [logsOpen, setLogsOpen] = React.useState(false);
-  const label = previewRuntimeStateLabel(status);
+  const classification = status.previewFailureClassification;
+  const sourceValidationFailed =
+    classification?.failure_kind === "preview_source_validation_failed" ||
+    status.previewFailureKind === "preview_source_validation_failed" ||
+    (status.previewFailureKind === "build_failed" &&
+      !status.jobId &&
+      status.previewSource !== "worker_job");
+  const label =
+    classification?.human_title ??
+    (sourceValidationFailed
+      ? "Preview blocked by source validation"
+      : status.previewFailureKind === "true_incomplete_files"
+        ? "Generated files are incomplete"
+        : previewRuntimeStateLabel(status));
   const pending =
     status.jobStatus === "queued" ||
     status.jobStatus === "running" ||
@@ -51,7 +71,8 @@ export function PreviewRuntimeStatusPanel({
         : status.previewFailureKind === "no_preview_job"
           ? (status.previewFailureDetail ??
             "No preview session was created after source files were saved.")
-          : status.previewFailureDetail ??
+          : classification?.human_summary ??
+            status.previewFailureDetail ??
             status.blockedReason ??
             (status.previewStatus === "not_started"
               ? "Start preview to render your generated app."
@@ -80,7 +101,26 @@ export function PreviewRuntimeStatusPanel({
         )}
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground">{label}</p>
-          {!compact && <p className="mt-0.5 text-muted-foreground">{subline}</p>}
+          {!compact && classification && status.previewFailureKind !== "true_incomplete_files" ? (
+            <div className="mt-1 space-y-1">
+              <p className="text-[10px] font-medium text-foreground">
+                Reason: {classification.failure_kind.replace(/_/g, " ")}
+              </p>
+              {classification.failing_file ? (
+                <p className="text-[10px] font-mono text-foreground/90">
+                  File: {classification.failing_file}
+                </p>
+              ) : null}
+              <p className="text-muted-foreground">{subline}</p>
+              {classification.suggested_repair_action ? (
+                <p className="text-[10px] text-muted-foreground/90">
+                  {classification.suggested_repair_action}
+                </p>
+              ) : null}
+            </div>
+          ) : !compact ? (
+            <p className="mt-0.5 text-muted-foreground">{subline}</p>
+          ) : null}
           {!compact && status.jobAgeLabel && status.jobStatus === "queued" && (
             <p className="mt-0.5 text-[10px] text-muted-foreground/80">
               Queued {status.jobAgeLabel}
@@ -88,14 +128,34 @@ export function PreviewRuntimeStatusPanel({
             </p>
           )}
         </div>
-        {!compact && (onStartPreview || onRebuild) ? (
+        {!compact && (onStartPreview || onRebuild || onRunRepair || onOpenCode) ? (
           <div className="flex shrink-0 flex-col gap-1">
+            {onRunRepair &&
+            classification?.auto_repair_eligible &&
+            status.previewFailureKind !== "true_incomplete_files" ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="h-7 gap-1 px-2 text-[10px]"
+                disabled={repairing || pending}
+                onClick={onRunRepair}
+                data-testid="preview-run-repair-button"
+              >
+                {repairing ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Wrench className="size-3" />
+                )}
+                Run repair
+              </Button>
+            ) : null}
             {onStartPreview &&
             status.previewSource !== "worker_job" &&
             !status.previewRenderable ? (
               <Button
                 type="button"
-                variant="primary"
+                variant={onRunRepair && classification?.auto_repair_eligible ? "secondary" : "primary"}
                 size="sm"
                 className="h-7 gap-1 px-2 text-[10px]"
                 disabled={startingPreview || rebuilding || pending}
@@ -127,6 +187,38 @@ export function PreviewRuntimeStatusPanel({
                 Rebuild
               </Button>
             ) : null}
+            {onOpenCode ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[10px]"
+                onClick={onOpenCode}
+              >
+                Open code
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-[10px]"
+              onClick={() => {
+                const bundle = {
+                  failure_kind: classification?.failure_kind ?? status.previewFailureKind,
+                  failure_message: classification?.failure_message ?? status.previewFailureDetail,
+                  error_code: status.errorCode,
+                  build_logs_tail: classification?.build_logs_tail ?? [],
+                  build_logs: status.buildLogs?.slice(-8000) ?? null,
+                };
+                void navigator.clipboard.writeText(JSON.stringify(bundle, null, 2)).then(() => {
+                  toast.success("Technical details copied");
+                });
+              }}
+            >
+              <Copy className="size-3" />
+              Copy details
+            </Button>
           </div>
         ) : null}
       </div>

@@ -125,7 +125,10 @@ export function classifyRepairIssues(input: {
         { fileCount: input.fileCount ?? 0 },
       ),
     );
-  } else if (input.sourceIncomplete === true) {
+  } else if (
+    input.sourceIncomplete === true &&
+    !(input.previewError && (input.fileCount ?? 0) >= 25)
+  ) {
     issues.push(
       aiIssue(
         "incomplete_source",
@@ -187,9 +190,14 @@ export function classifyRepairIssues(input: {
   if (input.previewError) {
     const code = input.previewErrorCode ?? "";
     const oom = code === "VITE_BUILD_OOM" || /out of memory/i.test(input.previewError);
+    const substantial = (input.fileCount ?? 0) >= 25;
     issues.push({
       type: "preview_failed",
-      title: oom ? "Preview build out of memory" : "Preview build failed",
+      title: oom
+        ? "Preview build out of memory"
+        : substantial
+          ? "Preview build failed"
+          : "Preview build failed",
       summary: input.previewUserMessage ?? input.previewError,
       whatHappened: input.previewUserMessage ?? input.previewError,
       whyItMatters: "ZIP and framework previews require a successful worker build.",

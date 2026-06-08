@@ -332,6 +332,7 @@ export function PreviewPanel({
                 status={runtimeStatus}
                 onRebuild={onRebuildPreview}
                 onStartPreview={onStartPreview}
+                onRunRepair={onRepairPreview}
                 rebuilding={previewRebuilding}
                 startingPreview={previewStarting}
                 className="max-w-lg w-full shadow-lg"

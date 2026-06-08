@@ -33,7 +33,11 @@ export type PreviewRuntimeStatusPayload = {
   chargeStatus: "pending" | "charged" | "refunded" | "cancelled" | "none" | null;
   previewFailureKind: string | null;
   previewFailureDetail: string | null;
+  previewFailureClassification?: import("@/lib/preview/preview-failure-classifier").PreviewFailureClassification | null;
   previewSource: "worker_job" | "preview_session" | "metadata" | "none";
+  generationQualityScore?: number | null;
+  sourceIntegrityScore?: number | null;
+  previewBuildStatus?: string | null;
 };
 
 export type PackageRepairDiagnosticsPayload = {
