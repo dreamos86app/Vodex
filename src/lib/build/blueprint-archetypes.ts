@@ -4,6 +4,7 @@
 import type { AppBlueprint } from "@/lib/build/blueprint-schema";
 
 export type BlueprintArchetypeKey =
+  | "food_delivery"
   | "crm"
   | "booking"
   | "finance"
@@ -24,18 +25,31 @@ export type BlueprintArchetypeKey =
 export function detectArchetype(prompt: string, templateId?: string | null): BlueprintArchetypeKey {
   const p = prompt.toLowerCase();
   const t = (templateId ?? "").toLowerCase();
+  if (
+    t.includes("food") ||
+    /\b(wolt|uber\s*eats|doordash|food\s*delivery|restaurant\s*menu|dishes?|courier|delivery\s*tracking)\b/.test(p)
+  ) {
+    return "food_delivery";
+  }
   if (t.includes("crm") || /\b(crm|sales pipeline|contacts|deals)\b/.test(p)) return "crm";
-  if (t.includes("booking") || /\b(booking|salon|clinic|appointment|calendar)\b/.test(p)) return "booking";
-  if (t.includes("finance") || /\b(finance|budget|transaction|expense|ledger)\b/.test(p)) return "finance";
+  if (t.includes("booking") || /\b(booking|salon|clinic|appointment|calendar|dance\s*studio)\b/.test(p))
+    return "booking";
+  if (t.includes("finance") || /\b(finance|budget|expense|expenses|ledger|savings|spending|bank)\b/.test(p))
+    return "finance";
   if (t.includes("ai") || /\b(ai|chatbot|assistant|llm|prompt)\b/.test(p)) return "ai_tool";
   if (t.includes("marketplace") || /\b(marketplace|seller|buyer|listing)\b/.test(p)) return "marketplace";
   if (t.includes("admin") || /\b(admin panel|audit log|roles)\b/.test(p)) return "admin";
-  if (t.includes("ecommerce") || /\b(ecommerce|storefront|cart|checkout)\b/.test(p)) return "ecommerce";
+  if (t.includes("ecommerce") || /\b(ecommerce|storefront|online\s*store)\b/.test(p)) return "ecommerce";
   if (t.includes("social") || t.includes("community") || /\b(social|forum|feed|community)\b/.test(p))
     return "social";
   if (t.includes("habit") || t.includes("mobile") || /\b(habit|streak|mobile-first)\b/.test(p)) return "habit";
   if (t.includes("portfolio") || /\b(portfolio|creator)\b/.test(p)) return "portfolio";
-  if (t.includes("learning") || t.includes("course") || /\b(course|lesson|learning)\b/.test(p)) return "learning";
+  if (
+    t.includes("learning") ||
+    t.includes("course") ||
+    /\b(bootcamp|cohort|course|lesson|learning|education\s*portal)\b/.test(p)
+  )
+    return "learning";
   if (t.includes("support") || t.includes("helpdesk") || /\b(support|helpdesk|ticket)\b/.test(p)) return "support";
   if (t.includes("analytics") || t.includes("dashboard") || /\b(analytics|metrics|kpi)\b/.test(p))
     return "analytics";
@@ -53,6 +67,96 @@ type ArchetypePartial = Partial<AppBlueprint> & {
 };
 
 const ARCHETYPES: Record<BlueprintArchetypeKey, ArchetypePartial> = {
+  food_delivery: {
+    appType: "Food delivery marketplace",
+    category: "Marketplace · On-demand delivery",
+    oneSentencePitch:
+      "Discover restaurants, order real dishes with photos, track delivery live, and manage restaurant or courier ops.",
+    targetUsers: "Customers, restaurant owners, couriers, and platform admins",
+    primaryUserJobs: [
+      "Discover restaurants by cuisine and rating",
+      "Browse menus with real dish cards and add to cart",
+      "Checkout with delivery address and payment",
+      "Track live order status on a map timeline",
+      "Manage restaurant menu and incoming orders",
+      "Accept and complete courier delivery tasks",
+      "Moderate restaurants, promos, and reviews",
+    ],
+    pages: [
+      { route: "/", purpose: "Home — discover restaurants" },
+      { route: "/restaurants", purpose: "Restaurant grid with cuisine filters" },
+      { route: "/restaurants/[id]", purpose: "Restaurant detail and menu" },
+      { route: "/menu", purpose: "Food item detail" },
+      { route: "/cart", purpose: "Cart with quantity controls" },
+      { route: "/checkout", purpose: "Checkout and delivery details" },
+      { route: "/tracking", purpose: "Live order tracking map/status" },
+      { route: "/orders", purpose: "Order history" },
+      { route: "/favorites", purpose: "Saved restaurants and dishes" },
+      { route: "/profile", purpose: "Customer profile" },
+      { route: "/restaurant-admin", purpose: "Restaurant owner dashboard" },
+      { route: "/courier", purpose: "Courier task dashboard" },
+      { route: "/admin", purpose: "Admin moderation dashboard" },
+    ],
+    routeMap: [
+      { route: "/", purpose: "Discover restaurants" },
+      { route: "/restaurants", purpose: "Browse by cuisine" },
+      { route: "/restaurants/[id]", purpose: "Restaurant + menu" },
+      { route: "/cart", purpose: "Sticky cart" },
+      { route: "/checkout", purpose: "Checkout flow" },
+      { route: "/tracking", purpose: "Delivery tracking" },
+      { route: "/orders", purpose: "Orders" },
+      { route: "/restaurant-admin", purpose: "Restaurant ops" },
+      { route: "/courier", purpose: "Courier ops" },
+      { route: "/admin", purpose: "Admin" },
+    ],
+    componentMap: [
+      "Restaurant cards",
+      "Food item cards",
+      "Category/cuisine chips",
+      "Search and filter bar",
+      "Cart sidebar/sheet",
+      "Checkout steps",
+      "Delivery progress timeline",
+      "Restaurant owner dashboard",
+      "Courier dashboard",
+      "Admin moderation panel",
+    ],
+    dataModel: [
+      { name: "restaurants", columns: ["id", "name", "cuisine", "rating", "delivery_eta"] },
+      { name: "menu_items", columns: ["id", "restaurant_id", "name", "price", "image_url", "category"] },
+      { name: "categories", columns: ["id", "name", "slug"] },
+      { name: "carts", columns: ["id", "user_id", "restaurant_id"] },
+      { name: "orders", columns: ["id", "user_id", "status", "total", "delivery_address"] },
+      { name: "order_items", columns: ["id", "order_id", "menu_item_id", "qty", "price"] },
+      { name: "couriers", columns: ["id", "name", "status", "current_order_id"] },
+      { name: "delivery_status", columns: ["id", "order_id", "stage", "eta_minutes"] },
+      { name: "reviews", columns: ["id", "restaurant_id", "rating", "body"] },
+      { name: "coupons", columns: ["id", "code", "discount_pct", "expires_at"] },
+      { name: "users", columns: ["id", "role", "name", "email"] },
+    ],
+    authModel: "Customers, restaurant owners, couriers, and admins — role-based access",
+    permissionsModel: "Customer vs restaurant-admin vs courier vs admin roles",
+    adminModel: "Admin moderates restaurants, promos, and disputes",
+    designDirection: "Wolt-inspired marketplace — real food imagery placeholders, clean cards, sticky cart, mobile-first",
+    designSystem: "Warm food photography accents, rounded cards, category chips, delivery timeline",
+    responsiveStrategy: "Mobile-first ordering flow; desktop expands restaurant grid and cart sheet",
+    uiRequirements: [
+      "Restaurant cards with cuisine and ETA",
+      "Food item cards with photos and add-to-cart",
+      "Category/cuisine filter chips",
+      "Search bar with filters",
+      "Sticky cart sheet",
+      "Checkout with address and payment steps",
+      "Live delivery tracking timeline",
+      "Realistic mock food data — no Loading… placeholders",
+    ],
+    apiActionsPlan: ["List restaurants", "Get menu", "Update cart", "Place order", "Track delivery"],
+    backendRequirements: ["RLS by role", "Order status workflow", "Courier assignment"],
+    mobileStrategy: "Bottom nav for customer flow; role switcher for admin dashboards",
+    qualityChecklist: ["8+ routes with real UI", "Mock dishes on every menu", "No finance dashboard routes"],
+    estimatedComplexity: 8,
+    estimatedUserCredits: 18,
+  },
   crm: {
     appType: "CRM",
     oneSentencePitch: "Manage contacts, deals, and follow-ups in one workspace.",

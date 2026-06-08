@@ -75,6 +75,23 @@ const ARCHETYPE_MVP_FEATURES: Partial<Record<AppArchetypeId, string[]>> = {
     "Team/settings screen",
     "Sample data and polished empty states",
   ],
+  food_delivery_marketplace: [
+    "Home / discover restaurants with cuisine category chips and search",
+    "Restaurant cards with ratings, ETA, and promo badges",
+    "Restaurant detail with menu categories and real dish cards (photos, price, add to cart)",
+    "Food item detail with modifiers and quantity stepper",
+    "Sticky cart sheet with line items, fees, and checkout CTA",
+    "Checkout flow: address, delivery time, payment method (mock UI)",
+    "Live order tracking with delivery progress timeline and map placeholder",
+    "Orders history with status badges (preparing, on the way, delivered)",
+    "Favorites for restaurants and dishes",
+    "Customer profile with addresses and payment methods",
+    "Restaurant owner dashboard: incoming orders, menu editor, availability",
+    "Courier dashboard: active delivery tasks, pickup/dropoff, status updates",
+    "Admin dashboard: restaurant moderation, promos, reviews",
+    "Realistic mock food data across all screens — no generic finance routes",
+    "Mobile-first responsive layout with Wolt-inspired visual polish",
+  ],
   generic_app: [
     "Primary dashboard with KPI summary cards and recent activity",
     "Core entity list screen with search, filters, and sample rows",
@@ -97,6 +114,10 @@ const DOMAIN_PROMPTS: Array<{
   {
     pattern: /mediation|mediator|caucus|party profiles|agreement drafting|agenda templates/i,
     archetypeId: "mediation_planner",
+  },
+  {
+    pattern: /wolt|uber\s*eats|food\s*delivery|restaurant\s*menu|courier|delivery\s*tracking/i,
+    archetypeId: "food_delivery_marketplace",
   },
   {
     pattern: /food inventory|ingredient stock|pantry|kitchen inventory/i,

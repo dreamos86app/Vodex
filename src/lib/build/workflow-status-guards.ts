@@ -34,6 +34,7 @@ export type BuildStatusFacts = {
   failureKind:
     | "failed_before_generation"
     | "failed_after_generation"
+    | "quality_below_floor"
     | "preview_failed"
     | "repair_needed"
     | "repair_failed"
@@ -52,6 +53,7 @@ export type WorkflowRunStatus =
   | "insufficient_credits_before_start"
   | "failed_before_generation"
   | "failed_after_generation"
+  | "quality_below_floor"
   | "preview_failed"
   | "repair_needed"
   | "repair_failed"
@@ -244,6 +246,7 @@ export function resolveWorkflowRunStatus(facts: BuildStatusFacts): WorkflowRunSt
   if (facts.failureKind === "failed_before_generation" && (facts.generationStarted || facts.generationCompleted)) {
     return facts.hasFiles ? "repair_needed" : "failed_before_generation";
   }
+  if (facts.failureKind === "quality_below_floor") return "quality_below_floor";
   if (facts.failureKind === "failed_before_generation") return "failed_before_generation";
   if (facts.failureKind === "preview_failed" && facts.hasFiles) return "preview_failed";
   if (facts.failureKind === "repair_failed") return "repair_failed";
@@ -319,6 +322,14 @@ export function resolveBuildRunSummary(input: {
     insufficient_credits_before_start: {
       headline: "You're out of Build Credits",
       bodyLines: ["Add credits or upgrade to keep building."],
+    },
+    quality_below_floor: {
+      headline: "Build paused — quality is below the production floor.",
+      bodyLines: [
+        input.errorDetail ?? "The model did not produce enough high-quality UI yet.",
+        "Next action: Continue generation",
+        input.facts.creditsRefunded ? "No credits were charged." : "",
+      ].filter(Boolean),
     },
     failed_before_generation: {
       headline: input.facts.hasFiles ? "App files were created, but preview needs attention" : "Couldn't start the build",
@@ -555,6 +566,8 @@ export function userSafeFailureTitle(
     return "Build saved — preparing preview…";
   }
   switch (kind) {
+    case "quality_below_floor":
+      return "Build paused — quality is below the production floor.";
     case "failed_before_generation":
       return guardCatastrophicHeadline("Couldn't start the build", hasFiles);
     case "failed_after_generation":

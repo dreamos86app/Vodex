@@ -31,9 +31,9 @@ export function AppPlanInlineCard({
       <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
         <ClipboardList className="size-4 text-accent" strokeWidth={1.75} />
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-foreground">App Plan</p>
+          <p className="text-[13px] font-semibold text-foreground">App Blueprint</p>
           <p className="text-[11px] text-muted-foreground">
-            Review the plan below, then build when you are ready.
+            Product blueprint only — no files are generated until you build.
           </p>
         </div>
       </div>
@@ -45,7 +45,7 @@ export function AppPlanInlineCard({
             Preparing plan…
           </div>
         ) : blueprint ? (
-          <AppBlueprintPanel blueprint={blueprint} compact showCreditReserve={false} />
+          <AppBlueprintPanel blueprint={blueprint} compact showCreditReserve />
         ) : (
           <p className="text-[12px] text-muted-foreground">Could not load plan — try again.</p>
         )}
@@ -63,7 +63,7 @@ export function AppPlanInlineCard({
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-accent to-violet-500 px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-95"
           >
             <Rocket className="size-4" strokeWidth={1.75} />
-            Build this app
+            Build full app
           </button>
         </div>
       ) : null}

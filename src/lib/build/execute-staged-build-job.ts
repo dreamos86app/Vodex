@@ -381,6 +381,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     }
 
     const saveableFileCount = filterRenderableBuildFiles(pr.files).length;
+    const totalRawFiles = pr.files.length;
     const allContractFailures = [
       ...new Set([...pr.buildContract.failures, ...(pr.postBuildFailures ?? [])]),
     ];
@@ -390,9 +391,15 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     const generationBudget =
       "generationBudget" in pr ? pr.generationBudget : undefined;
     const minMeaningfulFiles = generationBudget?.minFiles ?? 35;
+    const modelUnderproduced =
+      isProductionBuildMode() &&
+      totalRawFiles > 0 &&
+      totalRawFiles < 12 &&
+      saveableFileCount < minMeaningfulFiles;
     const qualityBlocked =
       isProductionBuildMode() &&
       (genericScaffold.isGeneric ||
+        modelUnderproduced ||
         (meaningfulReport != null && !meaningfulReport.passes) ||
         saveableFileCount < minMeaningfulFiles);
     if (genericScaffold.isGeneric) {
@@ -526,12 +533,29 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       return;
     }
 
-    if (!buildSucceeded && qualityBlocked && saveableFileCount > 0) {
+    if (!buildSucceeded && qualityBlocked && (saveableFileCount > 0 || totalRawFiles > 0)) {
+      const blockReason = genericScaffold.isGeneric
+        ? "generic_scaffold_detected"
+        : modelUnderproduced
+          ? "model_underproduced"
+          : "quality_below_floor";
       const draftSummary =
         ("buildFinalSummary" in pr && typeof pr.buildFinalSummary === "string"
           ? pr.buildFinalSummary
           : null) ??
-        "Build blocked — generic scaffold or quality floor. Full model generation required before preview.";
+        (blockReason === "quality_below_floor" || blockReason === "model_underproduced"
+          ? [
+              "Build paused — quality is below the production floor.",
+              `Quality: ${meaningfulReport?.final_quality_score ?? pr.uiQualityScore ?? "—"}/${meaningfulReport?.min_required_score ?? generationBudget?.minQualityScore ?? 84}`,
+              `Model: ${pr.primaryModelId}`,
+              `Files generated: ${totalRawFiles} (${saveableFileCount} renderable)`,
+              modelUnderproduced
+                ? "Why blocked: model underproduced — full app needs 35+ meaningful files."
+                : "Why blocked: output did not meet the production quality floor.",
+              "Next action: Continue generation",
+              "No credits were charged for this incomplete pass.",
+            ].join("\n")
+          : "Build blocked — generic scaffold or quality floor. Full model generation required before preview.");
 
       await clearGeneratedBuildFiles({
         writer: input.writer,
@@ -574,9 +598,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         jobId: input.buildJobId,
         ctx: workerCtx,
         toStatus: "failed",
-        reason: genericScaffold.isGeneric
-          ? "generic_scaffold_detected"
-          : "quality_below_floor",
+        reason: blockReason,
       });
       await persistAssistantBuildMessage(input.writer, eventCtx, {
         message: draftSummary,
@@ -592,12 +614,20 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         detail: draftSummary,
         progressPercent: 100,
         metadata: {
-          failure_kind: "failed_after_generation",
+          failure_kind:
+            blockReason === "quality_below_floor" || blockReason === "model_underproduced"
+              ? "quality_below_floor"
+              : "failed_after_generation",
+          block_reason: blockReason,
           generic_scaffold: genericScaffold.isGeneric,
+          model_underproduced: modelUnderproduced,
           file_count: 0,
           files_persisted: 0,
           failed_draft: true,
           memory_file_count: saveableFileCount,
+          raw_file_count: totalRawFiles,
+          quality_score: meaningfulReport?.final_quality_score ?? pr.uiQualityScore,
+          model_id: pr.primaryModelId,
         },
       });
       buildFinishedSuccess = true;

@@ -71,6 +71,23 @@ export function formatBuildFinalSummary(input: BuildFinalSummaryInput): string {
       .join("\n");
   }
 
+  if (
+    input.blocker === "quality_below_floor" ||
+    input.blocker === "model_underproduced" ||
+    (!input.qualityPasses && input.filesGenerated > 0 && input.filesGenerated < 12)
+  ) {
+    return [
+      "Build paused — quality is below the production floor.",
+      `Quality score: ${input.qualityScore}/${input.qualityTarget}`,
+      `Model: ${model}`,
+      `Files generated: ${input.filesGenerated}`,
+      input.blocker === "model_underproduced"
+        ? "Why blocked: model underproduced — full app needs 35+ meaningful files."
+        : "Why blocked: output did not meet the production quality floor.",
+      input.nextAction ?? "Next action: Continue generation",
+    ].join("\n");
+  }
+
   if (input.blocker) {
     return [
       `Build blocked — ${input.blocker}`,

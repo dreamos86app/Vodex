@@ -26,6 +26,7 @@ export type AppArchetypeId =
   | "event_ticketing"
   | "mediation_planner"
   | "product_launch_pad"
+  | "food_delivery_marketplace"
   | "generic_app";
 
 export type AppArchetype = {
@@ -39,7 +40,21 @@ export type AppArchetype = {
   terminology: string[];
 };
 
+const FOOD_DELIVERY_RE =
+  /\b(wolt|uber\s*eats|doordash|deliveroo|grubhub|food\s*delivery|restaurant\s*menu|menu\s*items?|dishes?|courier|delivery\s*tracking|order\s*tracking|food\s*marketplace)\b/i;
+
+const FINANCE_RE =
+  /\b(finance|budget|expense|expenses|ledger|invoice|bank|savings|spending|personal\s*finance|money\s*tracker)\b/i;
+
 const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: number }> = [
+  {
+    id: "food_delivery_marketplace",
+    patterns: [
+      FOOD_DELIVERY_RE,
+      /\b(restaurant\s*discovery|cuisine|food\s*cart|checkout\s*flow|live\s*order)\b/i,
+    ],
+    weight: 4,
+  },
   {
     id: "mental_wellness_journal",
     patterns: [
@@ -84,8 +99,8 @@ const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: 
     ],
     weight: 2,
   },
-  { id: "ecommerce", patterns: [/e-?commerce|online store|shop|cart|product catalog/i] },
-  { id: "finance_tracker", patterns: [/finance|budget|expense|ledger|invoice|transaction/i] },
+  { id: "ecommerce", patterns: [/e-?commerce|online store|shop|product catalog/i] },
+  { id: "finance_tracker", patterns: [FINANCE_RE] },
   { id: "social_community", patterns: [/community|forum|social|feed|posts|members/i] },
   {
     id: "ai_tool",
@@ -93,7 +108,11 @@ const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: 
   },
   { id: "marketplace", patterns: [/marketplace|vendors|listings|buyers|sellers/i] },
   { id: "admin_panel", patterns: [/admin panel|backoffice|user management|audit log/i] },
-  { id: "education", patterns: [/education|course|lesson|student|learning platform/i] },
+  {
+    id: "education",
+    patterns: [/education|course|lesson|student|learning platform|bootcamp|cohort|assignment|mentor/i],
+    weight: 2,
+  },
   { id: "health_wellness", patterns: [/health|wellness|fitness|habit|workout|nutrition/i] },
   { id: "real_estate", patterns: [/real estate|property|listing|rental|tenant/i] },
   { id: "project_management", patterns: [/project management|kanban|tasks|sprint|roadmap/i] },
@@ -102,7 +121,7 @@ const ARCHETYPE_HINTS: Array<{ id: AppArchetypeId; patterns: RegExp[]; weight?: 
   { id: "saas_dashboard", patterns: [/saas|dashboard|analytics|metrics|kpi/i] },
 ];
 
-const ARCHETYPE_DEFS: Record<AppArchetypeId, Omit<AppArchetype, "id" | "confidence">> = {
+export const ARCHETYPE_DEFS: Record<AppArchetypeId, Omit<AppArchetype, "id" | "confidence">> = {
   mental_wellness_journal: {
     label: "Mental wellness journal",
     navigationStyle: "sidebar",
@@ -346,6 +365,37 @@ const ARCHETYPE_DEFS: Record<AppArchetypeId, Omit<AppArchetype, "id" | "confiden
     visualTone: "calm, professional, trustworthy legal-tech",
     terminology: ["parties", "sessions", "caucus", "agreements", "mediator", "agenda"],
   },
+  food_delivery_marketplace: {
+    label: "Food delivery marketplace",
+    navigationStyle: "mobile_stack",
+    coreRoutes: [
+      "/",
+      "/restaurants",
+      "/restaurants/[id]",
+      "/menu",
+      "/cart",
+      "/checkout",
+      "/orders",
+      "/tracking",
+      "/favorites",
+      "/profile",
+      "/restaurant-admin",
+      "/courier",
+      "/admin",
+    ],
+    primarySections: [
+      "restaurant discovery grid with cuisine chips",
+      "food item cards with photos and prices",
+      "sticky cart sheet",
+      "checkout flow",
+      "live delivery tracking timeline",
+      "restaurant owner dashboard",
+      "courier task dashboard",
+      "admin moderation",
+    ],
+    visualTone: "Wolt-inspired marketplace — vivid food imagery, clean cards, mobile-first ordering",
+    terminology: ["restaurants", "menu items", "cart", "orders", "couriers", "delivery", "reviews"],
+  },
   event_ticketing: {
     label: "Event ticketing",
     navigationStyle: "sidebar",
@@ -388,10 +438,16 @@ export function classifyAppArchetype(buildIntent: string): AppArchetype {
 
   for (const hint of ARCHETYPE_HINTS) {
     const hits = hint.patterns.filter((p) => p.test(lower)).length;
-    if (hits > bestScore) {
-      bestScore = hits;
+    const weighted = hits * (hint.weight ?? 1);
+    if (weighted > bestScore) {
+      bestScore = weighted;
       best = hint.id;
     }
+  }
+
+  if (FOOD_DELIVERY_RE.test(lower) && best === "finance_tracker") {
+    best = "food_delivery_marketplace";
+    bestScore = Math.max(bestScore, 4);
   }
 
   if (bestScore === 0) {
@@ -437,6 +493,8 @@ export function archetypeToLegacyAppType(id: AppArchetypeId): string {
     social_community: "community",
     admin_panel: "admin_panel",
     health_wellness: "habit_tracker",
+    food_delivery_marketplace: "ecommerce",
+    education: "saas_dashboard",
   };
   return map[id] ?? "saas_dashboard";
 }

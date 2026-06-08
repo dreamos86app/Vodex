@@ -1784,14 +1784,26 @@ export function ImmersiveWorkspace({
       const lastUser = [...messages].reverse().find((m) => m.role === "user");
       if (lastUser) pendingBuildTextRef.current = messageText(lastUser);
     }
-    if (!effectiveProjectId) {
-      toast.error("Save your app first before building");
-      return;
+    let projectIdForBuild = effectiveProjectId;
+    if (!projectIdForBuild) {
+      const text = pendingBuildTextRef.current || blueprint.oneSentencePitch;
+      const created = await fetch("/api/projects/create-from-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text, source: "blueprint" }),
+      }).then((r) => r.json());
+      if (!created.ok || !created.projectId) {
+        toast.error(created.error ?? "Could not create project for build");
+        return;
+      }
+      projectIdForBuild = created.projectId as string;
+      setLocalProjectId(projectIdForBuild);
+      projectIdRef.current = projectIdForBuild;
     }
     const res = await fetch("/api/build/blueprint", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ blueprint, projectId: effectiveProjectId }),
+      body: JSON.stringify({ blueprint, projectId: projectIdForBuild }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -1990,9 +2002,9 @@ export function ImmersiveWorkspace({
         setBuildStarting(false);
       }
       const planFirstPlanning =
-        !activeProjectId &&
         buildStrategyRef.current === "plan_first" &&
-        !blueprintApprovedRef.current;
+        !blueprintApprovedRef.current &&
+        options?.forceBuild !== true;
 
       if (activeProjectId) {
         projectIdRef.current = activeProjectId;
@@ -2106,13 +2118,33 @@ export function ImmersiveWorkspace({
         conversationId: conversationIdRef.current,
       });
 
-      if (
-        submitMode === "build" &&
-        buildStrategyRef.current === "plan_first" &&
-        !blueprintApprovedRef.current
-      ) {
+      if (planFirstPlanning) {
         lastPlanPromptRef.current = text;
       }
+
+      const planOnlySubmit = submitMode === "build" && planFirstPlanning;
+      if (planOnlySubmit) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `user-${opId}`,
+            role: "user" as const,
+            parts: [{ type: "text" as const, text }],
+          },
+        ]);
+        applyComposerText("");
+        if (composerTextareaRef.current) composerTextareaRef.current.value = "";
+        setSubmitStatusLabel("Creating plan…");
+        setLastApiUrl("/api/build/blueprint");
+        setLastApiStatus("pending");
+        await loadBlueprint(text);
+        setLastApiStatus("ok");
+        setSubmitStatusLabel("Plan ready");
+        submitInFlightRef.current = false;
+        setBuildStarting(false);
+        return;
+      }
+
       setSendCooldownUntil(Date.now() + SEND_COOLDOWN_MS);
 
       const asyncProjectId = projectIdRef.current ?? effectiveProjectId;
@@ -2124,11 +2156,7 @@ export function ImmersiveWorkspace({
         (submitMode === "build" || (submitMode === "edit" && taskRoute.route === "project_repair")) &&
         Boolean(asyncProjectId) &&
         wantsBuildPipeline &&
-        !(
-          !activeProjectId &&
-          buildStrategyRef.current === "plan_first" &&
-          !blueprintApprovedRef.current
-        );
+        !planFirstPlanning;
 
       if (useAsyncBuild && asyncProjectId) {
         setSubmitStatusLabel("Build queued");

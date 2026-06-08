@@ -72,6 +72,14 @@ const PALETTES: Record<AppArchetypeId, GeneratedDesignSystem["palette"]> = {
     muted: "text-slate-600",
     border: "border-sky-100",
   },
+  food_delivery_marketplace: {
+    primary: "#00c2a8",
+    accent: "#ff6b35",
+    background: "bg-emerald-50/40",
+    surface: "bg-white",
+    muted: "text-slate-600",
+    border: "border-emerald-100",
+  },
   ecommerce: {
     primary: "#7c3aed",
     accent: "#f59e0b",

@@ -76,6 +76,24 @@ export const APP_TYPE_UI_REQUIREMENTS: AppTypeUiRequirement[] = [
       "CRM: contacts/patients list, deals/leads pipeline, tasks/follow-ups, dashboard summary cards, search/filter bar, at least one add/edit form or modal flow.",
   },
   {
+    id: "food_delivery_marketplace",
+    label: "Food delivery marketplace",
+    aliases: ["food_delivery", "wolt", "uber_eats", "delivery", "restaurant_ordering"],
+    templateIds: ["food-delivery", "wolt-clone"],
+    requiredSections: [
+      { id: "restaurants", label: "Restaurant cards", patterns: [/restaurant|cuisine|rating|eta|delivery/i] },
+      { id: "menu", label: "Food item cards", patterns: [/menu|dish|food item|add to cart|price/i] },
+      { id: "cart", label: "Cart", patterns: [/cart|quantity|subtotal|checkout/i] },
+      { id: "checkout", label: "Checkout", patterns: [/checkout|address|payment|delivery time/i] },
+      { id: "tracking", label: "Order tracking", patterns: [/track|delivery status|on the way|timeline|map/i] },
+      { id: "roles", label: "Role dashboards", patterns: [/courier|restaurant.admin|orders|kitchen/i] },
+    ],
+    routeHints: [/restaurant|menu|cart|checkout|tracking|courier|order/i],
+    minUiFiles: 8,
+    promptBlock:
+      "Food delivery marketplace (Wolt-style): restaurant discovery with cuisine chips, food item cards with photos, sticky cart, checkout flow, live delivery tracking timeline, restaurant owner dashboard, courier dashboard, admin moderation. Realistic mock food data. Reject generic finance dashboard routes.",
+  },
+  {
     id: "booking",
     label: "Booking app",
     aliases: ["booking", "appointment", "salon", "schedule"],
@@ -232,13 +250,17 @@ export function resolveAppTypeRequirement(appType: string | null | undefined): A
 export function resolveAppTypeFromPrompt(prompt: string): AppTypeUiRequirement | null {
   const lower = prompt.toLowerCase();
   const ordered = [
-    { id: "restaurant_inventory", hints: [/restaurant|food inventory|kitchen|pantry|supplier|waste|stock/i] },
+    {
+      id: "food_delivery_marketplace",
+      hints: [/wolt|uber\s*eats|food\s*delivery|restaurant\s*menu|dishes?|courier|delivery\s*tracking/i],
+    },
+    { id: "restaurant_inventory", hints: [/food inventory|kitchen inventory|pantry|supplier|waste|stock/i] },
     { id: "marina_operations", hints: [/marina|slip|dock|boat|mooring|harbor/i] },
     { id: "ecommerce", hints: [/e-commerce|ecommerce|storefront|product grid|cart/i] },
     { id: "admin_panel", hints: [/admin panel|audit log|user management|roles/i] },
     { id: "community", hints: [/community|forum|posts.*comments/i] },
     { id: "ai_tool", hints: [/ai writing|writing assistant|prompt history|streaming/i] },
-    { id: "finance_dashboard", hints: [/finance dashboard|budget|transaction categor/i] },
+    { id: "finance_dashboard", hints: [/finance|budget|expense|savings|spending|ledger|bank/i] },
     { id: "booking", hints: [/booking app|salon|stylist calendar|appointment/i] },
     { id: "crm", hints: [/crm|dentist|patient notes|sales pipeline/i] },
     { id: "saas_dashboard", hints: [/saas|analytics dashboard|team settings/i] },

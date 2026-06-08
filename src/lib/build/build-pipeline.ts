@@ -88,8 +88,10 @@ import { validateGeneratedBuild } from "@/lib/creation/validate-build-quality";
 import { assessBuildQuality, buildRepairPrompt } from "@/lib/build/quality-repair";
 import {
   classifyAppArchetype,
+  type AppArchetype,
   archetypeToLegacyAppType,
 } from "@/lib/build/app-archetype-classifier";
+import { resolveBuildArchetype } from "@/lib/build/resolve-build-archetype";
 import { buildDesignBrief, type DesignBrief } from "@/lib/build/design-brief-generator";
 import { checkGeneratedUiQuality, previewReadyMinScore } from "@/lib/build/generated-ui-quality-checker";
 import { buildPremiumUiRepairPrompt } from "@/lib/build/generated-ui-repair-pass";
@@ -498,7 +500,10 @@ export async function runStagedBuildPipeline(input: {
     });
   }
 
-  const archetypeEarly = classifyAppArchetype(pipelinePrompt);
+  const archetypeEarly: AppArchetype = resolveBuildArchetype({
+    buildIntent: pipelinePrompt,
+    blueprintBlock: input.blueprintBlock,
+  });
   const knownArchetypeFastPath = hasDeterministicArchetypePlan(archetypeEarly.id);
 
   const tracePersist = async (stage: BuildWorkerTraceStage, detail?: string) => {

@@ -435,6 +435,9 @@ export async function POST(request: Request) {
     raw.strategy === "build_now" || raw.strategy === "plan_first" ? raw.strategy : undefined;
   const forceBuildPipeline = raw.forceBuildPipeline === true;
   let planFirstOnly = raw.planFirstOnly === true;
+  if (!planFirstOnly && explicitStrategy === "plan_first" && !forceBuildPipeline) {
+    planFirstOnly = true;
+  }
   if (explicitStrategy === "build_now" && forceBuildPipeline) {
     planFirstOnly = false;
   }
@@ -499,11 +502,14 @@ export async function POST(request: Request) {
   });
 
   if (wantsAsyncBuild && mode === "build" && projectId && userTextEarly.trim().length >= 3) {
-    if (forceBuildPipeline && explicitStrategy === "build_now") {
+    if (planFirstOnly) {
+      startBuildPipeline = false;
+      chargeMode = "discuss";
+    } else if (forceBuildPipeline && explicitStrategy === "build_now") {
       startBuildPipeline = true;
       chargeMode = "build";
       planFirstOnly = false;
-    } else if (shouldStartBuildPipeline(mode, buildIntent)) {
+    } else if (shouldStartBuildPipeline(mode, buildIntent) && explicitStrategy !== "plan_first") {
       startBuildPipeline = true;
       chargeMode = "build";
       planFirstOnly = false;
