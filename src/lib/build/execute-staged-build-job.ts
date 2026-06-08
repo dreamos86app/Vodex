@@ -531,27 +531,41 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         ("buildFinalSummary" in pr && typeof pr.buildFinalSummary === "string"
           ? pr.buildFinalSummary
           : null) ??
-        "Build saved — continuing full model generation required (generic scaffold blocked).";
-      await persistStage("persist_started", `${saveableFileCount} draft files`);
-      const { result: draftPersist } = await tracePersistGeneratedFiles({
+        "Build blocked — generic scaffold or quality floor. Full model generation required before preview.";
+
+      await clearGeneratedBuildFiles({
         writer: input.writer,
         projectId: input.projectId,
         ownerId: input.userId,
-        files: pr.files,
-        operationId: input.operationId,
+        buildJobId: input.buildJobId,
         executionInstanceId: workerCtx.executionInstanceId,
-        workflowEmit: { writer: input.writer, ctx: eventCtx },
-      });
-      await persistStage("persist_completed", `${draftPersist.savedCount} draft files saved`);
+        context: "quality_blocked_failed_draft",
+      }).catch(() => undefined);
+
+      const { data: curProj } = await input.writer
+        .from("projects")
+        .select("metadata")
+        .eq("id", input.projectId)
+        .maybeSingle();
+      const prevProjMeta =
+        curProj?.metadata && typeof curProj.metadata === "object" && !Array.isArray(curProj.metadata)
+          ? (curProj.metadata as Record<string, unknown>)
+          : {};
+
       await input.writer
         .from("projects")
         .update({
           build_status: "needs_repair",
           metadata: {
+            ...prevProjMeta,
+            failed_draft: true,
+            fallback_only: genericScaffold.isGeneric,
             generic_scaffold_blocked: genericScaffold.isGeneric,
             quality_score: meaningfulReport?.final_quality_score ?? pr.uiQualityScore,
-            file_count: draftPersist.savedCount,
+            file_count: 0,
+            memory_file_count: saveableFileCount,
             continuing_generation_needed: true,
+            preview_blocked: true,
           } as Json,
         } as never)
         .eq("id", input.projectId)
@@ -580,8 +594,10 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         metadata: {
           failure_kind: "failed_after_generation",
           generic_scaffold: genericScaffold.isGeneric,
-          file_count: draftPersist.savedCount,
-          files_persisted: draftPersist.savedCount,
+          file_count: 0,
+          files_persisted: 0,
+          failed_draft: true,
+          memory_file_count: saveableFileCount,
         },
       });
       buildFinishedSuccess = true;
@@ -1088,6 +1104,27 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       buildFinishedSuccess = true;
       return;
     }
+    if (
+      isProductionBuildMode() &&
+      meaningfulQuality &&
+      !meaningfulQuality.passes
+    ) {
+      await persistAssistantBuildMessage(input.writer, eventCtx, {
+        message:
+          buildFinalSummary ??
+          `Build blocked — quality ${meaningfulQuality.final_quality_score}/${meaningfulQuality.min_required_score}. Preview not started.`,
+        metadata: { quality_blocked: true, preview_blocked: true },
+      });
+      await transitionBuildJobStatus(input.writer, {
+        jobId: input.buildJobId,
+        ctx: workerCtx,
+        toStatus: "failed",
+        reason: "quality_below_floor",
+      });
+      buildFinishedSuccess = true;
+      return;
+    }
+
     if (meaningfulQuality && !meaningfulQuality.passes) {
       await persistAssistantBuildMessage(input.writer, eventCtx, {
         message: `Preview starting with quality warning — score ${meaningfulQuality.final_quality_score}/${meaningfulQuality.min_required_score}.`,

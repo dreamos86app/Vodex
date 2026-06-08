@@ -116,10 +116,21 @@ import {
   type GeneratedAppQualityReport,
 } from "@/lib/build/generated-app-quality-score";
 import {
+  buildAntiScaffoldContinuationPrompt,
   buildContinuationFrontendPrompt,
   continuationUserMessage,
   shouldContinueGeneration,
 } from "@/lib/build/generation-continuation";
+import {
+  createBuildTraceCollector,
+  computeStreamHealthFromEvents,
+  finalizeBuildTraceArtifact,
+  persistBuildTraceArtifact,
+} from "@/lib/build/build-trace-artifact";
+import {
+  formatMissingImportsForSummary,
+  repairGeneratedImportGraph,
+} from "@/lib/build/generated-import-repair";
 import { checkRouteConnectivity } from "@/lib/build/route-connectivity-check";
 import { runBuildStage } from "@/lib/build/build-stage-orchestrator";
 import { streamExtractBuildFiles } from "@/lib/build/extraction-file-stream";
@@ -287,7 +298,7 @@ function mergeIncomingBuildFiles(
       trackFn(
         events,
         "editing",
-        rewritten ? `Rewrote ${path}` : `Modified ${path}`,
+        rewritten ? `file_rewritten ${path}` : `Modified ${path}`,
         countDetail,
         { ...meta, file_rewritten: rewritten || undefined },
       );
@@ -448,7 +459,13 @@ export async function runStagedBuildPipeline(input: {
 
   const events: WorkflowEvent[] = [];
   const pipelineStartedAt = Date.now();
-  let filesRewrittenCount = 0;
+  const traceCollector = input.buildJobId
+    ? createBuildTraceCollector({
+        buildJobId: input.buildJobId,
+        projectId: input.projectId,
+        prompt: input.userPrompt,
+      })
+    : null;
   const onFileThinking = (path: string) => trackAssistant(events, thinkingForFilePath(path), emit);
   const onExtractStart = () =>
     trackAssistant(events, "Model response received — extracting files…", emit);
@@ -1066,6 +1083,11 @@ export async function runStagedBuildPipeline(input: {
       continuationUserMessage(
         generationQualityReport,
         meaningfulQualityReport.weak_file_paths.length,
+        {
+          genericScaffold: genericCheck.isGeneric,
+          qualityScore: meaningfulQualityReport.final_quality_score,
+          qualityTarget: meaningfulQualityReport.min_required_score,
+        },
       ),
       emit,
     );
@@ -1101,6 +1123,14 @@ export async function runStagedBuildPipeline(input: {
     totalIn += contCall.result.inputTokens ?? 0;
     totalOut += contCall.result.outputTokens ?? 0;
     primaryModelId = contCall.result.spec.modelId;
+    traceCollector?.noteModelCall({
+      startedAt: new Date(Date.now() - 30_000).toISOString(),
+      completedAt: new Date().toISOString(),
+      responseChars: contCall.result.text.length,
+      maxOutputTokens: contCall.result.spec.maxOutputTokens,
+      modelId: contCall.result.spec.modelId,
+      provider: contCall.result.spec.provider ?? null,
+    });
     const beforeCont = allFiles.length;
     allFiles = filterRenderableBuildFiles(
       await ingestModelFilesWithExtractionStream(
@@ -1113,7 +1143,8 @@ export async function runStagedBuildPipeline(input: {
         onExtractStart,
       ),
     );
-    if (allFiles.length <= beforeCont && !genericCheck.isGeneric) break;
+    const genericMid = detectGenericScaffoldBuild(allFiles);
+    if (!genericMid.isGeneric && allFiles.length <= beforeCont) break;
     continuationPass += 1;
     generationQualityReport = scoreGeneratedAppQuality({
       files: allFiles,
@@ -1128,6 +1159,13 @@ export async function runStagedBuildPipeline(input: {
       userPrompt: executionPrompt,
       routeMap: designBrief.routes,
     });
+    traceCollector?.noteContinuation({
+      reason: continuationDecision.reason,
+      fileCount: allFiles.length,
+      qualityScore: meaningfulQualityReport.final_quality_score,
+      meaningfulRoutes: meaningfulQualityReport.meaningful_routes,
+      weakFiles: meaningfulQualityReport.weak_file_paths,
+    });
     const genericAfter = detectGenericScaffoldBuild(allFiles);
     if (
       meaningfulQualityReport.passes &&
@@ -1135,6 +1173,105 @@ export async function runStagedBuildPipeline(input: {
       !genericAfter.isGeneric
     ) {
       break;
+    }
+  }
+
+  let antiScaffoldPass = 0;
+  while (
+    isProductionBuildMode() &&
+    detectGenericScaffoldBuild(allFiles).isGeneric &&
+    antiScaffoldPass < 2 &&
+    continuationPass < generationBudget.maxContinuationPasses + 2 &&
+    accumulatedCost < FULL_BUILD_CAP_USD * 0.92
+  ) {
+    const antiPrompt = buildAntiScaffoldContinuationPrompt({
+      executionBrief: executionPrompt,
+      planJson,
+      existingFiles: allFiles,
+      budget: generationBudget,
+      weakFilePaths: meaningfulQualityReport.weak_file_paths,
+      qualityScore: meaningfulQualityReport.final_quality_score,
+      qualityTarget: meaningfulQualityReport.min_required_score,
+      passIndex: antiScaffoldPass,
+    });
+    trackAssistant(
+      events,
+      "Model generation did not produce a complete app. I'm retrying with a stricter full-app prompt.",
+      emit,
+    );
+    track(events, "writing", "Retrying full-app generation");
+    const antiCall = await callProviderWithBuildTimeout(
+      {
+        writer: input.writer,
+        userId: input.userId,
+        userEmail: input.userEmail,
+        operationId: `${input.operationId}:anti-scaffold-${antiScaffoldPass}`,
+        operationType: "frontend_implementation",
+        system: BUILD_SYSTEM,
+        prompt: antiPrompt,
+        complexity: Math.max(frontendComplexity, 8),
+        accumulatedCostUsd: accumulatedCost,
+        userSelectedModelId: input.userSelectedModelId,
+        timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
+      },
+      input.buildTrace,
+    );
+    if (!antiCall.ok) {
+      trackAssistant(
+        events,
+        "Continuation failed to improve the app — stopping before preview.",
+        emit,
+      );
+      break;
+    }
+    accumulatedCost += antiCall.result.providerCostUsd;
+    primaryModelId = antiCall.result.spec.modelId;
+    const beforeAnti = allFiles.length;
+    allFiles = filterRenderableBuildFiles(
+      await ingestModelFilesWithExtractionStream(
+        antiCall.result.text,
+        allFiles,
+        events,
+        track,
+        effectiveMaxFiles,
+        onFileThinking,
+        onExtractStart,
+      ),
+    );
+    generationQualityReport = scoreGeneratedAppQuality({
+      files: allFiles,
+      budget: generationBudget,
+      userPrompt: executionPrompt,
+      appType: archetypeToLegacyAppType(archetype.id),
+      routeMap: designBrief.routes,
+    });
+    meaningfulQualityReport = scoreMeaningfulUiQuality({
+      files: allFiles,
+      budget: generationBudget,
+      userPrompt: executionPrompt,
+      routeMap: designBrief.routes,
+    });
+    antiScaffoldPass += 1;
+    continuationPass += 1;
+    traceCollector?.noteContinuation({
+      reason: "anti_scaffold_retry",
+      fileCount: allFiles.length,
+      qualityScore: meaningfulQualityReport.final_quality_score,
+      meaningfulRoutes: meaningfulQualityReport.meaningful_routes,
+      weakFiles: meaningfulQualityReport.weak_file_paths,
+    });
+    if (
+      !detectGenericScaffoldBuild(allFiles).isGeneric &&
+      (allFiles.length > beforeAnti || meaningfulQualityReport.passes)
+    ) {
+      break;
+    }
+    if (antiScaffoldPass >= 2) {
+      trackAssistant(
+        events,
+        "Continuation failed to improve the app — stopping before preview.",
+        emit,
+      );
     }
   }
 
@@ -1459,6 +1596,9 @@ export async function runStagedBuildPipeline(input: {
     }
   }
 
+  const importRepair = repairGeneratedImportGraph(allFiles);
+  allFiles = importRepair.files;
+
   if (input.buildTrace) traceBuildWorkerStage(input.buildTrace, "contract_started");
   let enforced = enforcePostBuildContractWithRepair(
     {
@@ -1622,6 +1762,8 @@ export async function runStagedBuildPipeline(input: {
   const genericScaffoldDetection = detectGenericScaffoldBuild(allFiles);
   const filesRewritten = events.filter((e) => e.meta?.file_rewritten).length;
   const renderableCount = filterRenderableBuildFiles(allFiles).length;
+  const importGraphStatus = importRepair.status;
+  const missingImportSummary = formatMissingImportsForSummary(importRepair.missingAfter);
 
   const logoStatusLine =
     identityResult.logoGenerationStatus === "generated"
@@ -1642,14 +1784,32 @@ export async function runStagedBuildPipeline(input: {
     routes: meaningfulQualityReport.total_routes,
     components: meaningfulQualityReport.component_count,
     previewStatus: genericScaffoldDetection.isGeneric
-      ? "blocked"
-      : buildContract.previewReady
-        ? "ready"
-        : meaningfulQualityReport.passes
-          ? "preparing"
-          : "warning",
+      ? "not_started"
+      : importGraphStatus === "fail"
+        ? "blocked"
+        : buildContract.previewReady
+          ? "ready"
+          : meaningfulQualityReport.passes
+            ? "preparing"
+            : "warning",
     logoStatus: logoStatusLine,
     genericScaffold: genericScaffoldDetection,
+    importGraphStatus,
+    blocker:
+      genericScaffoldDetection.isGeneric
+        ? "generic scaffold detected"
+        : importGraphStatus === "fail"
+          ? `missing imports (${importRepair.missingAfter.length})`
+          : !meaningfulQualityReport.passes
+            ? `quality below floor (${meaningfulQualityReport.final_quality_score}/${meaningfulQualityReport.min_required_score})`
+            : null,
+    nextAction: genericScaffoldDetection.isGeneric
+      ? "retry full-app generation with stricter prompt"
+      : importGraphStatus === "fail"
+        ? "repair import graph before deploy"
+        : !meaningfulQualityReport.passes
+          ? "continue full-app generation"
+          : null,
   });
   trackAssistant(events, finalSummary, emit);
 
@@ -1659,6 +1819,7 @@ export async function runStagedBuildPipeline(input: {
     generationQualityReport.passes &&
     meaningfulQualityReport.passes &&
     !genericScaffoldDetection.isGeneric &&
+    importGraphStatus !== "fail" &&
     renderableCount >= generationBudget.minFiles;
   const summaryText = ok
     ? finalSummary
@@ -1793,6 +1954,31 @@ export async function runStagedBuildPipeline(input: {
         .update({ metadata: pipelineMeta } as never)
         .eq("id", input.buildJobId);
     }
+  }
+
+  if (traceCollector && input.buildJobId) {
+    const streamHealth = computeStreamHealthFromEvents(events, pipelineStartedAt);
+    const artifact = finalizeBuildTraceArtifact({
+      collector: traceCollector,
+      parsedFileCount: renderableCount,
+      parsedRouteCount: meaningfulQualityReport.total_routes,
+      parsedComponentCount: meaningfulQualityReport.component_count,
+      modelFileCount: modelFilesBeforeScaffold,
+      scaffoldFileCount: scaffoldFilesCount,
+      fallbackUsed: scaffoldFallback.usedFallback,
+      fallbackReason: scaffoldFallback.usedFallback ? scaffoldFallback.reason : null,
+      genericScaffold: genericScaffoldDetection,
+      meaningfulQuality: meaningfulQualityReport,
+      logoAttempted: identityResult.logoGenerationStatus !== "skipped",
+      logoStatus: identityResult.logoGenerationStatus,
+      logoFailureReason: identityResult.logoGenerationError,
+      importGraphStatus,
+      missingImports: missingImportSummary,
+      previewStartAttempted: false,
+      previewStatus: genericScaffoldDetection.isGeneric ? "not_started" : null,
+      streamHealth,
+    });
+    await persistBuildTraceArtifact(input.writer, input.buildJobId, artifact).catch(() => undefined);
   }
 
   await logServerOperation({

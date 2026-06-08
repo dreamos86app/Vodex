@@ -28,6 +28,7 @@ import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { resolveBuildTerminalTruth } from "@/lib/build/build-terminal-truth";
 import { AnimatedLineDelta } from "@/components/create/workspace/animated-line-delta";
 import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
+import { StreamingNarrationLine } from "@/components/create/workspace/streaming-narration-line";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
   return (
@@ -278,7 +279,14 @@ function TimelineRow({
 }) {
   if (isFileEvent(event)) return <FileChangeCard event={event} />;
   if (event.category === "assistant_message" || isInlineWorkflowStatus(event.title)) {
-    return <WorkflowNarrationLine>{event.subtitle ?? event.title}</WorkflowNarrationLine>;
+    const copy = event.subtitle ?? event.title;
+    return (
+      <StreamingNarrationLine
+        text={copy}
+        active={event.status === "active"}
+        className="mr-6 max-w-[min(100%,34rem)] px-1 text-[13px] leading-relaxed text-foreground sm:mr-10"
+      />
+    );
   }
   return (
     <ProgressRow

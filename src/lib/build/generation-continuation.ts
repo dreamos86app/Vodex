@@ -31,7 +31,7 @@ export function shouldContinueGeneration(input: {
       passIndex: passIndex + 1,
       reason: "generic_scaffold_detected",
       userMessage:
-        "Generic scaffold detected — expanding with full model generation instead of template output.",
+        "Model generation did not produce a complete app. I'm retrying with a stricter full-app prompt.",
     };
   }
   if (input.meaningfulQualityPasses === false && passIndex < maxPasses && budgetRemainingRatio >= 0.06) {
@@ -110,9 +110,52 @@ export function buildContinuationFrontendPrompt(input: {
 export function continuationUserMessage(
   report: GeneratedAppQualityReport,
   weakCount: number,
+  opts?: { genericScaffold?: boolean; qualityScore?: number; qualityTarget?: number },
 ): string {
+  if (opts?.genericScaffold) {
+    return "Model generation did not produce a complete app. I'm retrying with a stricter full-app prompt.";
+  }
   if (weakCount > 0) {
-    return `First pass is thin — expanding the real UI across ${weakCount} weak file${weakCount === 1 ? "" : "s"}, not replacing your app.`;
+    return `First pass is thin — rewriting ${weakCount} weak file${weakCount === 1 ? "" : "s"} and adding missing routes (not a template).`;
+  }
+  if (opts?.qualityScore != null && opts?.qualityTarget != null) {
+    return `Quality ${opts.qualityScore}/${opts.qualityTarget} — continuing full-app generation with missing routes and components.`;
   }
   return `Continuing generation: adding remaining pages (${report.counts.files} files so far)…`;
+}
+
+export const ANTI_GENERIC_SCAFFOLD_FORBID = [
+  "FORBIDDEN OUTPUT (instant fail):",
+  "- dashboard + records + settings ONLY routes",
+  "- MetricCard / PageHeader / EmptyState as the only components",
+  "- generic ITEM / STATUS / UPDATED table",
+  "- Welcome / Open dashboard copy",
+  "- metrics, workflows, team tools placeholder copy",
+  "- Loading... / Coming soon / TODO pages",
+  "- fewer than minimum files/routes/components",
+].join("\n");
+
+export function buildAntiScaffoldContinuationPrompt(input: {
+  executionBrief: string;
+  planJson: string;
+  existingFiles: BuildFile[];
+  budget: FullAppGenerationBudget;
+  weakFilePaths: string[];
+  qualityScore: number;
+  qualityTarget: number;
+  passIndex: number;
+}): string {
+  const weakPaths = input.weakFilePaths.slice(0, 16);
+  return [
+    FILE_PAYLOAD_RULE,
+    ANTI_GENERIC_SCAFFOLD_FORBID,
+    formatGenerationBudgetForPrompt(input.budget),
+    `ANTI-SCAFFOLD RETRY PASS ${input.passIndex + 1}: Previous output matched generic template patterns.`,
+    `Quality was ${input.qualityScore}/${input.qualityTarget} — must reach ${input.qualityTarget}+.`,
+    `REWRITE (do not keep template): ${weakPaths.join(", ") || "app/page.tsx, app/dashboard/page.tsx"}`,
+    "Add app-specific routes, mock data, charts, forms, filters, detail pages, settings.",
+    `Brief: ${sliceToTokenBudget(input.executionBrief, 800)}`,
+    `Plan: ${sliceToTokenBudget(input.planJson, 500)}`,
+    `Return ${input.budget.minFiles}+ meaningful files with ${input.budget.minRoutes}+ feature routes.`,
+  ].join("\n");
 }

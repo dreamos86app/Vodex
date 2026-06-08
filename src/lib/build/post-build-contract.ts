@@ -4,8 +4,10 @@
 import { validateGeneratedApp } from "@/lib/build/generated-app-validator";
 import {
   countComponentFiles,
+  findAllMissingImports,
   findMissingRelativeImports,
 } from "@/lib/build/import-graph";
+import { isProductionBuildMode } from "@/lib/build/build-production-mode";
 import {
   evaluateBuildSuccessContract,
   MIN_RENDERABLE_FILES,
@@ -111,6 +113,9 @@ export function canCompleteWithSavedFiles(
   if (opts?.minMeaningfulFiles != null && fileCount < opts.minMeaningfulFiles) return false;
   if (opts?.qualityPasses === false) return false;
   if (failures.some((f) => f.startsWith("generic_scaffold"))) return false;
+  if (isProductionBuildMode() && failures.some((f) => f.startsWith("missing_import"))) {
+    return false;
+  }
   if (fileCount < MIN_RENDERABLE_FILES) return false;
   if (failures.length === 0) return true;
   return failures.every(
@@ -143,7 +148,7 @@ export function evaluatePostBuildContract(input: PostBuildContractInput): PostBu
     hasIcon: input.hasIcon,
   });
 
-  const missingImports = findMissingRelativeImports(renderable);
+  const missingImports = findAllMissingImports(renderable);
   const failures = [...buildContract.failures];
 
   if (missingImports.length > 0) {
@@ -329,7 +334,11 @@ export function enforcePostBuildContractWithRepair(
       );
     if (!canRepair) break;
 
-    if (input.archetypeId && (input.scaffoldFallbackUsed || hasStubFailure)) {
+    if (
+      !isProductionBuildMode() &&
+      input.archetypeId &&
+      (input.scaffoldFallbackUsed || hasStubFailure)
+    ) {
       const stubRepair = replaceStubFilesWithArchetypeScaffold(
         input.archetypeId as AppArchetypeId,
         files,

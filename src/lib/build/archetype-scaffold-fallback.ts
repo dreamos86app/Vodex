@@ -24,6 +24,7 @@ import {
 } from "@/lib/build/source-integrity-validator";
 import { rootPageContentOk } from "@/lib/build/root-page-repair";
 import { mergeNonprofitCrmScaffold } from "@/lib/build/nonprofit-crm-scaffold";
+import { isProductionBuildMode } from "@/lib/build/build-production-mode";
 import {
   STANDARD_MIN_COMPONENTS,
   STANDARD_MIN_RENDERABLE_FILES,
@@ -124,6 +125,9 @@ export function gapFillScaffoldForArchetype(
   files: BuildFile[],
   appName = "Dream App",
 ): BuildFile[] {
+  /** Production never injects deterministic scaffold — model + continuation only. */
+  if (isProductionBuildMode()) return files;
+
   if (archetypeId === "mental_wellness_journal") {
     return mergeMentalWellnessScaffold(files, appName);
   }
@@ -147,6 +151,8 @@ export function mergeScaffoldForArchetype(
   files: BuildFile[],
   appName = "Dream App",
 ): BuildFile[] {
+  if (isProductionBuildMode()) return files;
+
   if (archetypeId === "mental_wellness_journal") {
     return mergeMentalWellnessScaffold(files, appName);
   }
@@ -244,6 +250,13 @@ export function applyArchetypeScaffoldFallback(
     return emptyFallbackMetrics(id, before, "not_needed");
   }
 
+  /** Production: never apply scaffold fallback — continuation + model retries handle gaps. */
+  if (!allowFullScaffold) {
+    const reason: ScaffoldFallbackReason =
+      beforeCount === 0 ? "llm_returned_no_files" : "llm_output_too_weak";
+    return emptyFallbackMetrics(id, before, reason);
+  }
+
   /** Model-first: rich model output — gap-fill only, never replace with generic scaffold. */
   const modelPages = countRenderablePages(before);
   const modelComponents = countComponentFiles(before);
@@ -296,15 +309,8 @@ export function applyArchetypeScaffoldFallback(
   else if (beforeCount < STANDARD_MIN_RENDERABLE_FILES) reason = "below_minimum_renderable";
   else reason = "llm_output_too_weak";
 
-  if (!allowFullScaffold && beforeCount === 0) {
-    return emptyFallbackMetrics(id, before, "llm_returned_no_files");
-  }
-
   const beforePaths = new Set(before.map((f) => normalizeBuildFilePath(f.path)));
-  const mergeFn =
-    beforeCount > 0 || !allowFullScaffold
-      ? gapFillScaffoldForArchetype
-      : mergeScaffoldForArchetype;
+  const mergeFn = beforeCount > 0 ? gapFillScaffoldForArchetype : mergeScaffoldForArchetype;
   let merged = filterRenderableBuildFiles(mergeFn(id, files, appName));
   const stubRepair = allowFullScaffold
     ? replaceStubFilesWithArchetypeScaffold(id, merged, appName)

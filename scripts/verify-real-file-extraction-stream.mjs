@@ -19,6 +19,9 @@ if (!pipeline.includes("interFileDelayMs: isProductionBuildMode() ? 550")) {
 if (!pipeline.includes("extraction_stream: true")) errors.push("extraction_stream metadata");
 if (!pipeline.includes("file_rewritten")) errors.push("file_rewritten tracking");
 
+const events = read("src/lib/build/build-job-events.ts");
+if (!events.includes("file_rewritten")) errors.push("job events file_rewritten");
+
 if (errors.length) {
   console.error("verify:real-file-extraction-stream FAILED\n", errors.join("\n"));
   process.exit(1);

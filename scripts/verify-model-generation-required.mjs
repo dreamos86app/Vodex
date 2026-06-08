@@ -18,6 +18,7 @@ if (pipeline.includes("minimalFrontendPrompt(executionPrompt") && !pipeline.incl
 
 const cont = read("src/lib/build/generation-continuation.ts");
 if (!cont.includes("generic_scaffold_detected")) errors.push("continuation generic scaffold");
+if (!cont.includes("buildAntiScaffoldContinuationPrompt")) errors.push("anti-scaffold continuation");
 
 if (!read("src/lib/build/build-production-mode.ts").includes("isProductionBuildMode")) {
   errors.push("production mode helper");

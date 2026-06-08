@@ -27,6 +27,8 @@ export const FILE_PAYLOAD_RULE = [
   "Never ship Welcome + 3 plain cards only. Include app shell, nav, rich sections, realistic data.",
   "Include 6–12 route files under app/ matching the design brief — each with real UI, not stubs.",
   "Never use generic copy like 'metrics, workflows, and team tools'.",
+  "FORBIDDEN: dashboard+records+settings-only apps, MetricCard/PageHeader/EmptyState-only UI, ITEM/STATUS/UPDATED tables, Welcome/Open dashboard heroes.",
+  "FORBIDDEN: Loading..., Coming soon, TODO, placeholder-only pages.",
 ].join("\n");
 
 function productionUiBlock(designBrief?: DesignBrief | null, executionBrief?: string): string {
@@ -138,6 +140,8 @@ export function frontendPrompt(
     FILE_PAYLOAD_RULE,
     buildStageObjective("frontend_implementation"),
     "You are not generating a simple demo. Ship production-quality UI that looks like a premium SaaS product.",
+    "This is a FULL APP generation pass — minimum meaningful files, routes, components, and app-specific mock data.",
+    "Include lib/mock-data.ts with exports every page imports. Include tsconfig.json with @/* path alias.",
     formatGenerationBudgetForPrompt(genPlan),
     productionUiBlock(designBrief, brief),
     `Use up to ${maxFiles} files. REQUIRED: app/layout.tsx shell, AppShell/Sidebar, app/page.tsx, app/dashboard/page.tsx, and ${genPlan.minRoutes}+ feature routes.`,

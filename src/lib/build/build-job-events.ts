@@ -248,6 +248,9 @@ export async function persistWorkflowEvent(
             new_line_count: lineMeta.new_line_count,
           }
         : {}),
+      extraction_stream: ev.meta?.extraction_stream === true ? true : undefined,
+      file_rewritten: ev.meta?.file_rewritten === true ? true : undefined,
+      stream_mode: ev.meta?.stream_mode,
     },
   });
 }

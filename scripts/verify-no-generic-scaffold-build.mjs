@@ -25,8 +25,12 @@ if (!pipeline.includes("allowFullScaffold: smokeBuild")) errors.push("scaffold o
 
 const fallback = read("src/lib/build/archetype-scaffold-fallback.ts");
 if (!fallback.includes("allowFullScaffold === true")) errors.push("full scaffold opt-in only");
+if (!fallback.includes("isProductionBuildMode()")) errors.push("production scaffold guard");
 
 const worker = read("src/lib/build/execute-staged-build-job.ts");
+if (!worker.includes("failed_draft")) errors.push("failed_draft not persisted as app");
+if (!worker.includes("quality_blocked_failed_draft")) errors.push("clears files on quality block");
+
 if (!worker.includes("generic_scaffold_detected")) errors.push("worker generic gate");
 
 if (errors.length) {

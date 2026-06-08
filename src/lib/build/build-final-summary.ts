@@ -14,9 +14,12 @@ export type BuildFinalSummaryInput = {
   qualityScore: number;
   qualityTarget: number;
   qualityPasses: boolean;
-  previewStatus: "ready" | "preparing" | "warning" | "blocked" | "failed";
+  previewStatus: "ready" | "preparing" | "warning" | "blocked" | "failed" | "not_started";
   logoStatus: string;
   genericScaffold?: GenericScaffoldDetection;
+  importGraphStatus?: "pass" | "repaired" | "fail";
+  blocker?: string | null;
+  nextAction?: string | null;
 };
 
 export function formatBuildFinalSummary(input: BuildFinalSummaryInput): string {
@@ -40,16 +43,45 @@ export function formatBuildFinalSummary(input: BuildFinalSummaryInput): string {
           ? "Preview with quality warning"
           : input.previewStatus === "blocked"
             ? "Preview blocked — quality too low"
-            : "Preview needs attention";
+            : input.previewStatus === "not_started"
+              ? "Preview not started"
+              : "Preview needs attention";
 
   const logo = input.logoStatus.trim() || "Logo status unknown";
+  const importLine = input.importGraphStatus
+    ? `Import graph: ${input.importGraphStatus}`
+    : "";
 
   if (input.genericScaffold?.isGeneric) {
+    const next =
+      input.nextAction ??
+      "Next action: retry full-app generation with stricter prompt";
     return [
-      "Build blocked — generic scaffold detected, not a real model UI.",
-      `${input.filesGenerated} files · ${input.meaningfulRoutes}/${input.routes} meaningful routes · Quality ${input.qualityScore}/${input.qualityTarget}`,
-      `Model: ${model} · ${duration} · ${logo}`,
-    ].join(" ");
+      "Build blocked — generic scaffold detected.",
+      `Model: ${model}`,
+      `Files: ${input.filesGenerated} draft files`,
+      `Meaningful routes: ${input.meaningfulRoutes}/${input.routes}`,
+      `Quality: ${input.qualityScore}/${input.qualityTarget}`,
+      `Logo: ${logo}`,
+      `Preview: not started`,
+      importLine,
+      next,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (input.blocker) {
+    return [
+      `Build blocked — ${input.blocker}`,
+      `Model: ${model} · ${duration}`,
+      `Files: ${input.filesGenerated} · Quality ${input.qualityScore}/${input.qualityTarget}`,
+      `Logo: ${logo} · Preview: ${preview}`,
+      importLine,
+      input.nextAction ?? "",
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 
   if (input.qualityPasses) {
