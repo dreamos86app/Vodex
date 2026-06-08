@@ -21,8 +21,27 @@ export function shouldContinueGeneration(input: {
   passIndex: number;
   maxPasses: number;
   budgetRemainingRatio: number;
+  genericScaffold?: boolean;
+  meaningfulQualityPasses?: boolean;
 }): ContinuationDecision {
   const { report, budget, passIndex, maxPasses, budgetRemainingRatio } = input;
+  if (input.genericScaffold) {
+    return {
+      shouldContinue: passIndex < maxPasses && budgetRemainingRatio >= 0.06,
+      passIndex: passIndex + 1,
+      reason: "generic_scaffold_detected",
+      userMessage:
+        "Generic scaffold detected — expanding with full model generation instead of template output.",
+    };
+  }
+  if (input.meaningfulQualityPasses === false && passIndex < maxPasses && budgetRemainingRatio >= 0.06) {
+    return {
+      shouldContinue: true,
+      passIndex: passIndex + 1,
+      reason: "meaningful_quality_below_floor",
+      userMessage: `Quality below target (${budget.minQualityScore}+) — continuing full-app generation.`,
+    };
+  }
   if (passIndex >= maxPasses) {
     return {
       shouldContinue: false,

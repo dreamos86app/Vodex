@@ -218,11 +218,18 @@ function emptyFallbackMetrics(
   };
 }
 
+export type ScaffoldFallbackOptions = {
+  /** When false (production), never install full generic scaffold — gap-fill only. */
+  allowFullScaffold?: boolean;
+};
+
 export function applyArchetypeScaffoldFallback(
   archetypeId: string,
   files: BuildFile[],
   appName = "Dream App",
+  options?: ScaffoldFallbackOptions,
 ): ScaffoldFallbackResult {
+  const allowFullScaffold = options?.allowFullScaffold === true;
   const id = archetypeId as AppArchetypeId;
   const before = filterRenderableBuildFiles(files);
   const beforeCount = before.length;
@@ -289,10 +296,19 @@ export function applyArchetypeScaffoldFallback(
   else if (beforeCount < STANDARD_MIN_RENDERABLE_FILES) reason = "below_minimum_renderable";
   else reason = "llm_output_too_weak";
 
+  if (!allowFullScaffold && beforeCount === 0) {
+    return emptyFallbackMetrics(id, before, "llm_returned_no_files");
+  }
+
   const beforePaths = new Set(before.map((f) => normalizeBuildFilePath(f.path)));
-  const mergeFn = beforeCount > 0 ? gapFillScaffoldForArchetype : mergeScaffoldForArchetype;
+  const mergeFn =
+    beforeCount > 0 || !allowFullScaffold
+      ? gapFillScaffoldForArchetype
+      : mergeScaffoldForArchetype;
   let merged = filterRenderableBuildFiles(mergeFn(id, files, appName));
-  const stubRepair = replaceStubFilesWithArchetypeScaffold(id, merged, appName);
+  const stubRepair = allowFullScaffold
+    ? replaceStubFilesWithArchetypeScaffold(id, merged, appName)
+    : { files: merged, replaced: 0 };
   if (stubRepair.replaced > 0) merged = filterRenderableBuildFiles(stubRepair.files);
 
   const rootBefore = before.find((f) => /^app\/page\.(tsx|jsx)$/i.test(normalizeBuildFilePath(f.path)));

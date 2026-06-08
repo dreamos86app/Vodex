@@ -127,6 +127,12 @@ import {
   formatMeaningfulQualityForStream,
   scoreMeaningfulUiQuality,
 } from "@/lib/build/meaningful-ui-quality";
+import { isSmokeBuildMode, isProductionBuildMode } from "@/lib/build/build-production-mode";
+import {
+  detectGenericScaffoldBuild,
+  genericScaffoldFailureCode,
+} from "@/lib/build/generic-scaffold-detector";
+import { buildSummaryFromQuality } from "@/lib/build/build-final-summary";
 
 export type WorkflowEventType =
   | "thinking"
@@ -164,6 +170,7 @@ export type WorkflowEventMeta = {
   heartbeat?: boolean;
   stream_mode?: "model_stream" | "extraction_stream";
   extraction_stream?: boolean;
+  file_rewritten?: boolean;
 };
 
 export type WorkflowEvent = {
@@ -203,7 +210,9 @@ export type StagedBuildResult = {
   partialCreditStop?: boolean;
   generationQualityReport?: GeneratedAppQualityReport;
   meaningfulQualityReport?: import("@/lib/build/meaningful-ui-quality").MeaningfulUiQualityReport;
+  genericScaffoldDetection?: import("@/lib/build/generic-scaffold-detector").GenericScaffoldDetection;
   generationBudget?: FullAppGenerationBudget;
+  buildFinalSummary?: string;
   modelFilesCount?: number;
   scaffoldFilesCount?: number;
 };
@@ -271,7 +280,17 @@ function mergeIncomingBuildFiles(
       ? `+${fileLineMeta.added_lines} -${fileLineMeta.removed_lines}`
       : path;
     if (prev) {
-      trackFn(events, "editing", `Modified ${path}`, countDetail, meta);
+      const rewritten =
+        fileLineMeta &&
+        (fileLineMeta.added_lines + fileLineMeta.removed_lines >= 8 ||
+          fileLineMeta.added_lines >= 40);
+      trackFn(
+        events,
+        "editing",
+        rewritten ? `Rewrote ${path}` : `Modified ${path}`,
+        countDetail,
+        { ...meta, file_rewritten: rewritten || undefined },
+      );
     } else {
       onFileThinking?.(path);
       trackFn(events, "writing", `Created ${path}`, countDetail, meta);
@@ -298,7 +317,9 @@ async function ingestModelFilesWithExtractionStream(
   ) => void,
   maxFiles: number,
   onFileThinking?: (path: string) => void,
+  onExtractStart?: () => void,
 ): Promise<BuildFile[]> {
+  onExtractStart?.();
   const existingByPath = new Map(allFiles.map((f) => [f.path, f.content]));
   let merged = [...allFiles];
   await streamExtractBuildFiles(
@@ -311,7 +332,7 @@ async function ingestModelFilesWithExtractionStream(
         merged = mergeIncomingBuildFiles(merged, [f], events, trackFn, maxFiles, onFileThinking);
       },
     },
-    { existingByPath, interFileDelayMs: 95 },
+    { existingByPath, interFileDelayMs: isProductionBuildMode() ? 550 : 95 },
   );
   return merged;
 }
@@ -426,7 +447,11 @@ export async function runStagedBuildPipeline(input: {
   }
 
   const events: WorkflowEvent[] = [];
+  const pipelineStartedAt = Date.now();
+  let filesRewrittenCount = 0;
   const onFileThinking = (path: string) => trackAssistant(events, thinkingForFilePath(path), emit);
+  const onExtractStart = () =>
+    trackAssistant(events, "Model response received — extracting files…", emit);
   let accumulatedCost = 0;
   let totalIn = 0;
   let totalOut = 0;
@@ -856,7 +881,8 @@ export async function runStagedBuildPipeline(input: {
   track(events, "writing", "Generating frontend files");
   if (input.buildTrace) traceBuildWorkerStage(input.buildTrace, "file_generation_started");
 
-  const smokeBuild = process.env.DREAMOS_SMOKE_BUILD === "1";
+  const smokeBuild = isSmokeBuildMode();
+  const scaffoldOpts = { allowFullScaffold: smokeBuild };
   const MIN_FULL_SCAFFOLD_FILES = 14;
   let allFiles: BuildFile[] = [];
 
@@ -907,6 +933,7 @@ export async function runStagedBuildPipeline(input: {
         track,
         effectiveMaxFiles,
         onFileThinking,
+        onExtractStart,
       );
       if (allFiles.length > beforeCount) {
         trackAssistant(
@@ -953,6 +980,7 @@ export async function runStagedBuildPipeline(input: {
           track,
           effectiveMaxFiles,
           onFileThinking,
+          onExtractStart,
         );
       }
     }
@@ -996,6 +1024,7 @@ export async function runStagedBuildPipeline(input: {
       track,
       effectiveMaxFiles,
       onFileThinking,
+      onExtractStart,
     );
     }
   }
@@ -1020,16 +1049,17 @@ export async function runStagedBuildPipeline(input: {
 
   let continuationPass = 0;
   while (accumulatedCost < FULL_BUILD_CAP_USD * 0.92) {
+    const genericCheck = detectGenericScaffoldBuild(allFiles);
     const continuationDecision = shouldContinueGeneration({
       report: generationQualityReport,
       budget: generationBudget,
       passIndex: continuationPass,
       maxPasses: generationBudget.maxContinuationPasses,
       budgetRemainingRatio: 1 - accumulatedCost / FULL_BUILD_CAP_USD,
+      genericScaffold: genericCheck.isGeneric,
+      meaningfulQualityPasses: meaningfulQualityReport.passes,
     });
-    const needsMeaningfulRepair =
-      !meaningfulQualityReport.passes && meaningfulQualityReport.weak_file_paths.length > 0;
-    if (!continuationDecision.shouldContinue && !needsMeaningfulRepair) break;
+    if (!continuationDecision.shouldContinue) break;
 
     trackAssistant(
       events,
@@ -1080,9 +1110,10 @@ export async function runStagedBuildPipeline(input: {
         track,
         effectiveMaxFiles,
         onFileThinking,
+        onExtractStart,
       ),
     );
-    if (allFiles.length <= beforeCont) break;
+    if (allFiles.length <= beforeCont && !genericCheck.isGeneric) break;
     continuationPass += 1;
     generationQualityReport = scoreGeneratedAppQuality({
       files: allFiles,
@@ -1097,7 +1128,14 @@ export async function runStagedBuildPipeline(input: {
       userPrompt: executionPrompt,
       routeMap: designBrief.routes,
     });
-    if (meaningfulQualityReport.passes && !generationQualityReport.needsContinuation) break;
+    const genericAfter = detectGenericScaffoldBuild(allFiles);
+    if (
+      meaningfulQualityReport.passes &&
+      !generationQualityReport.needsContinuation &&
+      !genericAfter.isGeneric
+    ) {
+      break;
+    }
   }
 
   if (generationQualityReport.score > 0 || meaningfulQualityReport.final_quality_score > 0) {
@@ -1181,23 +1219,39 @@ export async function runStagedBuildPipeline(input: {
     }
   }
 
-  let scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, allFiles, appName);
+  let scaffoldFallback = applyArchetypeScaffoldFallback(
+    archetype.id,
+    allFiles,
+    appName,
+    scaffoldOpts,
+  );
   if (scaffoldFallback.usedFallback) {
-    trackAssistant(
-      events,
-      scaffoldFallback.beforeCount > 0
-        ? thinkingForFrontendFailed()
-        : "Model didn't return files — applying a minimal starter structure.",
-      emit,
-    );
-    track(events, "validating", "Strengthening the app structure…");
-    allFiles = scaffoldFallback.files;
+    const genericCandidate = detectGenericScaffoldBuild(scaffoldFallback.files);
+    const blockGeneric = isProductionBuildMode() && genericCandidate.isGeneric;
+    if (blockGeneric) {
+      trackAssistant(
+        events,
+        "Blocked generic scaffold template — continuing with full model generation instead.",
+        emit,
+      );
+    } else {
+      trackAssistant(
+        events,
+        scaffoldFallback.beforeCount > 0
+          ? thinkingForFrontendFailed()
+          : "Model didn't return files — applying a minimal starter structure.",
+        emit,
+      );
+      track(events, "validating", "Strengthening the app structure…");
+      allFiles = scaffoldFallback.files;
+    }
     if (process.env.NODE_ENV !== "production") {
       console.info("[build] scaffold_fallback_used", {
         archetype: archetype.id,
         reason: scaffoldFallback.reason,
         before: scaffoldFallback.beforeCount,
         after: scaffoldFallback.afterCount,
+        blocked_generic: blockGeneric,
       });
     }
   }
@@ -1343,10 +1397,18 @@ export async function runStagedBuildPipeline(input: {
 
   track(events, "validating", "Checking the interface…");
 
-  scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, allFiles, appName);
+  scaffoldFallback = applyArchetypeScaffoldFallback(
+    archetype.id,
+    allFiles,
+    appName,
+    scaffoldOpts,
+  );
   if (scaffoldFallback.usedFallback && !isModelOutputSufficient(allFiles)) {
-    trackAssistant(events, thinkingForQualityCheck(), emit);
-    allFiles = scaffoldFallback.files;
+    const genericRepair = detectGenericScaffoldBuild(scaffoldFallback.files);
+    if (!isProductionBuildMode() || !genericRepair.isGeneric) {
+      trackAssistant(events, thinkingForQualityCheck(), emit);
+      allFiles = scaffoldFallback.files;
+    }
   }
 
   const fileQuality = validateGeneratedBuild(allFiles);
@@ -1371,11 +1433,17 @@ export async function runStagedBuildPipeline(input: {
     complexity <= 2 ? "small" : complexity >= 7 ? "advanced" : "standard";
 
   if (
+    smokeBuild &&
     hasFullScaffoldTree(archetype.id) &&
     !isModelOutputSufficient(allFiles) &&
     filterRenderableBuildFiles(allFiles).length < MIN_FULL_SCAFFOLD_FILES
   ) {
-    const forcedScaffold = applyArchetypeScaffoldFallback(archetype.id, allFiles, resolvedAppName);
+    const forcedScaffold = applyArchetypeScaffoldFallback(
+      archetype.id,
+      allFiles,
+      resolvedAppName,
+      scaffoldOpts,
+    );
     if (forcedScaffold.afterCount >= MIN_FULL_SCAFFOLD_FILES) {
       allFiles = forcedScaffold.files;
       scaffoldFallback = forcedScaffold;
@@ -1383,7 +1451,7 @@ export async function runStagedBuildPipeline(input: {
     }
   }
 
-  if (hasFullScaffoldTree(archetype.id)) {
+  if (smokeBuild && hasFullScaffoldTree(archetype.id)) {
     const preContractStub = replaceStubFilesWithArchetypeScaffold(archetype.id, allFiles, resolvedAppName);
     if (preContractStub.replaced > 0) {
       allFiles = preContractStub.files;
@@ -1410,11 +1478,17 @@ export async function runStagedBuildPipeline(input: {
   );
 
   if (
+    smokeBuild &&
     !enforced.contract.passed &&
     hasFullScaffoldTree(archetype.id) &&
     !isModelOutputSufficient(enforced.files)
   ) {
-    scaffoldFallback = applyArchetypeScaffoldFallback(archetype.id, enforced.files, resolvedAppName);
+    scaffoldFallback = applyArchetypeScaffoldFallback(
+      archetype.id,
+      enforced.files,
+      resolvedAppName,
+      scaffoldOpts,
+    );
     if (scaffoldFallback.usedFallback) {
       track(events, "repairing", "Strengthening the app structure…");
       const retry = enforcePostBuildContractWithRepair(
@@ -1467,8 +1541,13 @@ export async function runStagedBuildPipeline(input: {
 
   const renderableFinalCount = filterRenderableBuildFiles(allFiles).length;
   if (renderableFinalCount === 0) {
-    if (hasFullScaffoldTree(archetype.id)) {
-      const lastResort = applyArchetypeScaffoldFallback(archetype.id, [], resolvedAppName);
+    if (smokeBuild && hasFullScaffoldTree(archetype.id)) {
+      const lastResort = applyArchetypeScaffoldFallback(
+        archetype.id,
+        [],
+        resolvedAppName,
+        scaffoldOpts,
+      );
       if (lastResort.afterCount > 0) {
         allFiles = lastResort.files;
         scaffoldFallback = lastResort;
@@ -1540,19 +1619,56 @@ export async function runStagedBuildPipeline(input: {
   });
   const routeCheck = checkRouteConnectivity(allFiles);
   const scaffoldFilesCount = Math.max(0, allFiles.length - modelFilesBeforeScaffold);
+  const genericScaffoldDetection = detectGenericScaffoldBuild(allFiles);
+  const filesRewritten = events.filter((e) => e.meta?.file_rewritten).length;
+  const renderableCount = filterRenderableBuildFiles(allFiles).length;
+
+  const logoStatusLine =
+    identityResult.logoGenerationStatus === "generated"
+      ? "Logo generated"
+      : identityResult.logoGenerationStatus === "insufficient_credits"
+        ? "Temporary fallback icon — image generation skipped: not enough Action Credits"
+        : identityResult.logoGenerationStatus === "failed"
+          ? `Temporary fallback icon — image generation failed${identityResult.logoGenerationError ? `: ${identityResult.logoGenerationError}` : ""}`
+          : identityResult.iconGenerationMode === "skipped_no_openai_key" ||
+              identityResult.iconGenerationMode === "skipped_provider_disabled"
+            ? "Temporary fallback icon — image provider is not configured"
+            : "Temporary fallback icon — not AI-generated";
+
+  const finalSummary = buildSummaryFromQuality(primaryModelId, meaningfulQualityReport, {
+    durationMs: Date.now() - pipelineStartedAt,
+    filesGenerated: renderableCount,
+    filesRewritten,
+    routes: meaningfulQualityReport.total_routes,
+    components: meaningfulQualityReport.component_count,
+    previewStatus: genericScaffoldDetection.isGeneric
+      ? "blocked"
+      : buildContract.previewReady
+        ? "ready"
+        : meaningfulQualityReport.passes
+          ? "preparing"
+          : "warning",
+    logoStatus: logoStatusLine,
+    genericScaffold: genericScaffoldDetection,
+  });
+  trackAssistant(events, finalSummary, emit);
 
   const ok =
     postContract.passed &&
     sourceIntegrity.sourceIntegrityOk &&
     generationQualityReport.passes &&
-    meaningfulQualityReport.passes;
-  const summaryText = generationQualityReport.passes
-    ? postContract.userMessage
-    : generationQualityReport.needsContinuation
-      ? "Build saved — continuing generation needed to reach full app quality."
-      : routeCheck.orphanRoutes.length > 0
-        ? `Preview ready with route issues — ${routeCheck.verifiedCount}/${routeCheck.totalCount} routes linked.`
-        : `Build saved — quality repair needed (score ${generationQualityReport.score}/${generationBudget.minQualityScore}).`;
+    meaningfulQualityReport.passes &&
+    !genericScaffoldDetection.isGeneric &&
+    renderableCount >= generationBudget.minFiles;
+  const summaryText = ok
+    ? finalSummary
+    : genericScaffoldDetection.isGeneric
+      ? `Build blocked — generic scaffold detected (${genericScaffoldFailureCode(genericScaffoldDetection)}). Continuing full model generation is required.`
+      : generationQualityReport.needsContinuation || !meaningfulQualityReport.passes
+        ? finalSummary
+        : routeCheck.orphanRoutes.length > 0
+          ? `Preview ready with route issues — ${routeCheck.verifiedCount}/${routeCheck.totalCount} routes linked.`
+          : finalSummary;
 
   const modelRuntime = resolveModelRuntime(primaryModelId);
 
@@ -1736,6 +1852,8 @@ export async function runStagedBuildPipeline(input: {
     filesAfterScaffoldFallback: scaffoldFallback.afterCount,
     generationQualityReport,
     meaningfulQualityReport,
+    genericScaffoldDetection,
+    buildFinalSummary: finalSummary,
     generationBudget,
     modelFilesCount: modelFilesBeforeScaffold,
     scaffoldFilesCount,

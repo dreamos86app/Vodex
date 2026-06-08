@@ -317,6 +317,28 @@ export async function createAppIdentityForBuild(input: CreateAppIdentityInput): 
     const mediaRoute = routeDreamOSMedia("logo");
     const providerDisabled = isDreamOSMediaProviderDisabled("logo");
     const aiAvailable = isAiLogoGenerationAvailable();
+    const openaiKeyConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
+
+    await logServerOperation({
+      writer: input.writer,
+      userId: input.userId,
+      userEmail: input.userEmail ?? null,
+      stage: "build",
+      event: "logo_generation_debug",
+      status: "ok",
+      mode: "build",
+      modelId: mediaRoute.internal.modelId,
+      projectId: input.projectId,
+      operationId: logoOperationId,
+      metadata: {
+        provider_configured: !providerDisabled,
+        openai_api_key_configured: openaiKeyConfigured,
+        ai_logo_available: aiAvailable,
+        model_id: mediaRoute.internal.modelId,
+        provider: mediaRoute.internal.provider,
+        estimated_provider_cost_usd: mediaRoute.estimatedProviderCostUsd,
+      },
+    });
 
     const applyDeterministicFallback = async (notice?: string) => {
       const brand = await generateBrandIconFromSvg({

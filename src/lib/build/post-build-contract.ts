@@ -95,8 +95,22 @@ export function isCosmeticOnlyBuildFailure(failures: string[]): boolean {
 const NON_BLOCKING_WITH_SAVED_FILES_RE =
   /^(app_icon_missing|app_name_untitled|ui_too_basic|missing_app_layout|missing_app_page)$|^ui_quality_|^ui_richness_|^dashboard_quality_|^route_pages_|^components_|^renderable_files_|^required_pages_missing|^missing_blueprint_routes/;
 
+export type SavedFilesGateOptions = {
+  genericScaffold?: boolean;
+  minMeaningfulFiles?: number;
+  qualityPasses?: boolean;
+};
+
 /** Enough files saved — preview is useful even if quality/icon checks did not pass. */
-export function canCompleteWithSavedFiles(fileCount: number, failures: string[]): boolean {
+export function canCompleteWithSavedFiles(
+  fileCount: number,
+  failures: string[],
+  opts?: SavedFilesGateOptions,
+): boolean {
+  if (opts?.genericScaffold) return false;
+  if (opts?.minMeaningfulFiles != null && fileCount < opts.minMeaningfulFiles) return false;
+  if (opts?.qualityPasses === false) return false;
+  if (failures.some((f) => f.startsWith("generic_scaffold"))) return false;
   if (fileCount < MIN_RENDERABLE_FILES) return false;
   if (failures.length === 0) return true;
   return failures.every(

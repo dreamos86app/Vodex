@@ -20,9 +20,17 @@ for (const phrase of [
   if (!thinking.includes(phrase)) errors.push(`icon copy: ${phrase}`);
 }
 
+const pipeline = read("src/lib/build/build-pipeline.ts");
+if (!pipeline.includes("Temporary fallback icon")) errors.push("pipeline fallback copy");
+
 const identity = read("src/lib/projects/app-identity-service.ts");
 if (!identity.includes("logoGenerationStatus")) errors.push("logo status stored");
 if (!identity.includes("iconGenerationMode")) errors.push("icon generation mode");
+if (!identity.includes("logo_generation_debug")) errors.push("logo debug event");
+
+if (!fs.existsSync(path.join(root, "scripts/debug-logo-generation.ts"))) {
+  errors.push("missing debug-logo-generation.ts");
+}
 
 if (errors.length) {
   console.error("verify:logo-generation-honesty FAILED\n", errors.join("\n"));

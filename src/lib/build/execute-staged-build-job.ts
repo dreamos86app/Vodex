@@ -75,6 +75,8 @@ import {
   persistLatestPreviewFailure,
 } from "@/lib/preview/persist-preview-failure-metadata";
 import { countAppRoutes } from "@/lib/build/route-connectivity-check";
+import { detectGenericScaffoldBuild } from "@/lib/build/generic-scaffold-detector";
+import { isProductionBuildMode } from "@/lib/build/build-production-mode";
 import { persistGeneratedBuildFiles } from "@/lib/build/persist-generated-files";
 import {
   analyzePreviewHtml,
@@ -382,9 +384,28 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     const allContractFailures = [
       ...new Set([...pr.buildContract.failures, ...(pr.postBuildFailures ?? [])]),
     ];
+    const genericScaffold = detectGenericScaffoldBuild(pr.files);
+    const meaningfulReport =
+      "meaningfulQualityReport" in pr ? pr.meaningfulQualityReport : undefined;
+    const generationBudget =
+      "generationBudget" in pr ? pr.generationBudget : undefined;
+    const minMeaningfulFiles = generationBudget?.minFiles ?? 35;
+    const qualityBlocked =
+      isProductionBuildMode() &&
+      (genericScaffold.isGeneric ||
+        (meaningfulReport != null && !meaningfulReport.passes) ||
+        saveableFileCount < minMeaningfulFiles);
+    if (genericScaffold.isGeneric) {
+      allContractFailures.push(`generic_scaffold_detected:${genericScaffold.reasons.join(",")}`);
+    }
     let buildSucceeded =
-      (pr.ok && pr.buildContract.passed) ||
-      canCompleteWithSavedFiles(saveableFileCount, allContractFailures);
+      !qualityBlocked &&
+      ((pr.ok && pr.buildContract.passed) ||
+        canCompleteWithSavedFiles(saveableFileCount, allContractFailures, {
+          genericScaffold: genericScaffold.isGeneric,
+          minMeaningfulFiles: isProductionBuildMode() ? minMeaningfulFiles : undefined,
+          qualityPasses: meaningfulReport?.passes,
+        }));
 
     const partialCreditStop =
       ("partialCreditStop" in pr && pr.partialCreditStop === true) ||
@@ -499,6 +520,68 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         metadata: {
           files: persist.savedCount,
           credits_used: Math.floor(creditsUsed),
+        },
+      });
+      buildFinishedSuccess = true;
+      return;
+    }
+
+    if (!buildSucceeded && qualityBlocked && saveableFileCount > 0) {
+      const draftSummary =
+        ("buildFinalSummary" in pr && typeof pr.buildFinalSummary === "string"
+          ? pr.buildFinalSummary
+          : null) ??
+        "Build saved — continuing full model generation required (generic scaffold blocked).";
+      await persistStage("persist_started", `${saveableFileCount} draft files`);
+      const { result: draftPersist } = await tracePersistGeneratedFiles({
+        writer: input.writer,
+        projectId: input.projectId,
+        ownerId: input.userId,
+        files: pr.files,
+        operationId: input.operationId,
+        executionInstanceId: workerCtx.executionInstanceId,
+        workflowEmit: { writer: input.writer, ctx: eventCtx },
+      });
+      await persistStage("persist_completed", `${draftPersist.savedCount} draft files saved`);
+      await input.writer
+        .from("projects")
+        .update({
+          build_status: "needs_repair",
+          metadata: {
+            generic_scaffold_blocked: genericScaffold.isGeneric,
+            quality_score: meaningfulReport?.final_quality_score ?? pr.uiQualityScore,
+            file_count: draftPersist.savedCount,
+            continuing_generation_needed: true,
+          } as Json,
+        } as never)
+        .eq("id", input.projectId)
+        .eq("owner_id", input.userId);
+      await transitionBuildJobStatus(input.writer, {
+        jobId: input.buildJobId,
+        ctx: workerCtx,
+        toStatus: "failed",
+        reason: genericScaffold.isGeneric
+          ? "generic_scaffold_detected"
+          : "quality_below_floor",
+      });
+      await persistAssistantBuildMessage(input.writer, eventCtx, {
+        message: draftSummary,
+        metadata: {
+          generic_scaffold: genericScaffold.isGeneric,
+          continuing_generation_needed: true,
+        },
+      });
+      await persistBuildJobEvent(input.writer, {
+        ...eventCtx,
+        type: "fixing_error",
+        title: "Continuing generation needed",
+        detail: draftSummary,
+        progressPercent: 100,
+        metadata: {
+          failure_kind: "failed_after_generation",
+          generic_scaffold: genericScaffold.isGeneric,
+          file_count: draftPersist.savedCount,
+          files_persisted: draftPersist.savedCount,
         },
       });
       buildFinishedSuccess = true;
@@ -985,6 +1068,26 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
 
     const meaningfulQuality =
       "meaningfulQualityReport" in pr ? pr.meaningfulQualityReport : undefined;
+    const buildFinalSummary =
+      "buildFinalSummary" in pr && typeof pr.buildFinalSummary === "string"
+        ? pr.buildFinalSummary
+        : null;
+    if (genericScaffold.isGeneric) {
+      await persistAssistantBuildMessage(input.writer, eventCtx, {
+        message:
+          buildFinalSummary ??
+          "Build blocked — generic scaffold detected. Full model generation is required before preview.",
+        metadata: { generic_scaffold: true, confidence: genericScaffold.confidence },
+      });
+      await transitionBuildJobStatus(input.writer, {
+        jobId: input.buildJobId,
+        ctx: workerCtx,
+        toStatus: "failed",
+        reason: "generic_scaffold_detected",
+      });
+      buildFinishedSuccess = true;
+      return;
+    }
     if (meaningfulQuality && !meaningfulQuality.passes) {
       await persistAssistantBuildMessage(input.writer, eventCtx, {
         message: `Preview starting with quality warning — score ${meaningfulQuality.final_quality_score}/${meaningfulQuality.min_required_score}.`,
@@ -1388,14 +1491,16 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     const canShowDone =
       previewLive && richnessOk && pr.buildContract.previewReady && generationQualityPasses;
     const routeVerified = generationQualityReport?.routeConnectivity;
-    const doneSummary = canShowDone
-      ? pr.meta?.summary?.trim() ||
-        `Build complete — ${pr.appName} (${fileGate.fileCount} files, quality ${generationScore}/100).`
-      : generationQualityReport?.needsContinuation
-        ? `Continuing generation needed — ${fileGate.fileCount} files saved (quality ${generationScore}/100).`
-        : richnessOk
-          ? `Build saved — quality repair needed (${fileGate.fileCount} files, score ${generationScore}/100).`
-          : `Draft saved — additional generation needed (${fileGate.fileCount} files).`;
+    const doneSummary =
+      buildFinalSummary ??
+      (canShowDone
+        ? pr.meta?.summary?.trim() ||
+          `Build complete — ${pr.appName} (${fileGate.fileCount} files, quality ${generationScore}/100).`
+        : generationQualityReport?.needsContinuation
+          ? `Continuing generation needed — ${fileGate.fileCount} files saved (quality ${generationScore}/100).`
+          : richnessOk
+            ? `Build saved — quality repair needed (${fileGate.fileCount} files, score ${generationScore}/100).`
+            : `Draft saved — additional generation needed (${fileGate.fileCount} files).`);
     await persistAssistantBuildMessage(input.writer, eventCtx, {
       message: doneSummary.slice(0, 280),
       progressPercent: 98,
