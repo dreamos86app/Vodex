@@ -74,7 +74,8 @@ const suites = {
     const errors = [];
     must(read("src/lib/build/persist-generated-files.ts"), "setTimeout", "persist pacing delay", errors);
     must(read("src/components/create/workspace/animated-line-delta.tsx"), "STEP_MS = 120", "120ms step deltas", errors);
-    must(read("src/components/create/workspace/agent-workflow-stream.tsx"), "batchPersistStagger", "batch stagger", errors);
+    must(read("src/components/create/workspace/agent-workflow-stream.tsx"), "shouldStaggerFiles", "file stream stagger", errors);
+    must(read("src/components/create/workspace/agent-workflow-stream.tsx"), "applyFileStreamFocus", "golden file focus", errors);
     return errors;
   },
   "icon-brand-quality": () => {

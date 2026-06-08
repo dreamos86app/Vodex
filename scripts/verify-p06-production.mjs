@@ -82,7 +82,7 @@ const suites = {
     const errors = [];
     const stream = read("src/components/create/workspace/agent-workflow-stream.tsx");
     must(stream, "workflow-active-step", "active step marker", errors);
-    must(stream, "useStaggeredWorkflowEvents(timelineRaw, false)", "no stagger delay during build", errors);
+    must(stream, "shouldStaggerFiles", "stagger file rows during extraction", errors);
     if (stream.indexOf("workflow-active-step") > stream.indexOf("completedTimeline.map")) {
       /* active li should be after completed map in return */
     }

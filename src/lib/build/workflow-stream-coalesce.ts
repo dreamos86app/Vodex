@@ -281,6 +281,19 @@ export function extractAssistantMessages(events: AgentWorkflowEvent[]): AgentWor
   return events.filter((e) => e.category === "assistant_message");
 }
 
+/** Hide duplicate heartbeat narration that repeats an existing assistant line. */
+export function collapseHeartbeatAssistantMessages(
+  events: AgentWorkflowEvent[],
+): AgentWorkflowEvent[] {
+  return events.filter((ev) => {
+    if (ev.category !== "assistant_message") return true;
+    const copy = (ev.subtitle ?? ev.title).trim();
+    if (/^still working on\b/i.test(copy)) return false;
+    if (ev.metadata?.heartbeat === true) return false;
+    return true;
+  });
+}
+
 /** Drop duplicate completed phase rows with the same title (keep latest). */
 export function collapseRedundantPhaseStarted(
   events: AgentWorkflowEvent[],
@@ -365,7 +378,8 @@ export function workflowTimelineForChat(
   const terminal = options?.terminal ?? false;
   const limit = options?.limit ?? 20;
   const coalesced = coalesceWorkflowStreamEvents(rows, { terminal });
-  const collapsed = collapseRedundantPhaseStarted(coalesced);
+  const noHeartbeat = collapseHeartbeatAssistantMessages(coalesced);
+  const collapsed = collapseRedundantPhaseStarted(noHeartbeat);
   const sequential = applySingleActiveWorkflowStep(collapsed, !terminal);
   return recentTimelineEvents(sequential, limit);
 }

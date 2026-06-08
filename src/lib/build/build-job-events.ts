@@ -227,6 +227,10 @@ export async function persistWorkflowEvent(
               ? "file_edited"
               : undefined);
 
+  const isStreamedFile =
+    mapped.isFileEvent &&
+    (ev.meta?.extraction_stream === true || ev.meta?.stream_mode === "extraction_stream");
+
   await persistBuildJobEvent(writer, {
     jobId: ctx.jobId,
     projectId: ctx.projectId,
@@ -251,6 +255,9 @@ export async function persistWorkflowEvent(
       extraction_stream: ev.meta?.extraction_stream === true ? true : undefined,
       file_rewritten: ev.meta?.file_rewritten === true ? true : undefined,
       stream_mode: ev.meta?.stream_mode,
+      batch_persist: isStreamedFile ? true : undefined,
+      real_progress: isStreamedFile ? true : undefined,
+      step_status: isStreamedFile ? "completed" : undefined,
     },
   });
 }

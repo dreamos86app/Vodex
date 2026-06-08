@@ -146,7 +146,10 @@ export function mapUserFacingWorkflowEvent(input: UserFacingWorkflowInput): User
 
   const hidden =
     meta.hidden === true ||
-    (meta.heartbeat === true && meta.stream_category !== "assistant_message") ||
+    meta.heartbeat === true ||
+    meta.stream_category === "phase_progress" ||
+    /^still working on\b/i.test(rawTitle) ||
+    /^still working on\b/i.test(rawDetail) ||
     (rawTitle === "Still working" && meta.stream_category !== "assistant_message") ||
     rawTitle === "worker_claim_attempt" ||
     traceStage === "worker_claim_attempt" ||

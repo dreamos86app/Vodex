@@ -3,10 +3,9 @@
 import * as React from "react";
 import type { AgentWorkflowEvent } from "@/lib/build/workflow-stream-types";
 
-const STAGGER_MS = 140;
-const BATCH_WINDOW_MS = 80;
+const STAGGER_MS = 160;
 
-/** Smooth same-poll batch arrivals without inventing backend events. */
+/** Reveal workflow rows one-by-one during file extraction / batch persist. */
 export function useStaggeredWorkflowEvents(
   events: AgentWorkflowEvent[],
   enabled: boolean,
@@ -16,35 +15,18 @@ export function useStaggeredWorkflowEvents(
   React.useEffect(() => {
     if (!enabled) {
       setVisibleCount(events.length);
-      return;
     }
-    if (events.length <= visibleCount) {
-      setVisibleCount(events.length);
-      return;
-    }
-    const added = events.length - visibleCount;
-    const lastAt = events[events.length - 1]?.at;
-    const prevAt = events[visibleCount - 1]?.at;
-    const sameBatch =
-      lastAt &&
-      prevAt &&
-      Math.abs(Date.parse(lastAt) - Date.parse(prevAt)) < BATCH_WINDOW_MS;
+  }, [enabled, events.length]);
 
-    if (!sameBatch || added === 1) {
-      setVisibleCount(events.length);
-      return;
-    }
-
-    let i = visibleCount;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const tick = () => {
-      i += 1;
-      setVisibleCount(i);
-      if (i < events.length) timers.push(setTimeout(tick, STAGGER_MS));
-    };
-    timers.push(setTimeout(tick, STAGGER_MS));
-    return () => timers.forEach(clearTimeout);
-  }, [events, enabled, visibleCount]);
+  React.useEffect(() => {
+    if (!enabled) return;
+    if (visibleCount >= events.length) return;
+    const id = setTimeout(
+      () => setVisibleCount((v) => Math.min(v + 1, events.length)),
+      STAGGER_MS,
+    );
+    return () => clearTimeout(id);
+  }, [enabled, events.length, visibleCount]);
 
   return events.slice(0, enabled ? visibleCount : events.length);
 }

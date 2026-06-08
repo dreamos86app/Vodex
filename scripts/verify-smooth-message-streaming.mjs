@@ -16,6 +16,10 @@ const stream = read("src/components/create/workspace/agent-workflow-stream.tsx")
 if (!stream.includes("StreamingNarrationLine")) errors.push("workflow uses StreamingNarrationLine");
 const narration = read("src/components/create/workspace/streaming-narration-line.tsx");
 if (!narration.includes("data-streaming")) errors.push("typewriter streaming marker");
+if (!stream.includes("collapseHeartbeatAssistantMessages")) errors.push("heartbeat narration collapse");
+if (!read("src/lib/workflow/user-facing-workflow-events.ts").includes("meta.heartbeat === true")) {
+  errors.push("hide heartbeat duplicates");
+}
 
 if (errors.length) {
   console.error("verify:smooth-message-streaming FAILED\n", errors.join("\n"));

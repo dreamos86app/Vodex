@@ -194,7 +194,13 @@ export function useBuildJobProgress(
           return next;
         });
 
-        if (!isTerminal) schedule(600);
+        const recentFileStream = incoming.some(
+          (e) =>
+            e.type === "writing_file" ||
+            e.type === "editing_file" ||
+            e.metadata?.extraction_stream === true,
+        );
+        if (!isTerminal) schedule(recentFileStream ? 320 : 600);
       } catch (err) {
         if (cancelled) return;
         setState((prev) =>

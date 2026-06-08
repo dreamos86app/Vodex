@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { BuildJobPollState } from "@/hooks/use-build-job-progress";
 import {
   applySingleActiveWorkflowStep,
+  collapseHeartbeatAssistantMessages,
   collapseRedundantPhaseStarted,
   coalesceWorkflowStreamEvents,
 } from "@/lib/build/workflow-stream-coalesce";
@@ -44,7 +45,7 @@ function compressFileEventsForDisplay(
 ): AgentWorkflowEvent[] {
   if (!working) return events;
   const fileEvents = events.filter(isFileEvent);
-  if (fileEvents.length <= 2) return events;
+  if (fileEvents.length <= 8) return events;
   const nonFile = events.filter((e) => !isFileEvent(e));
   const activeFile =
     [...fileEvents].reverse().find((e) => e.status === "active") ?? fileEvents[fileEvents.length - 1];
@@ -76,6 +77,31 @@ function compressFileEventsForDisplay(
 
 function groupFileEvents(events: AgentWorkflowEvent[], working: boolean): AgentWorkflowEvent[] {
   return compressFileEventsForDisplay(events, working);
+}
+
+/** Golden-ring focus on the file currently being revealed. */
+function applyFileStreamFocus(
+  events: AgentWorkflowEvent[],
+  working: boolean,
+): AgentWorkflowEvent[] {
+  if (!working) return events;
+  const fileIndices = events
+    .map((e, i) => (isFileEvent(e) ? i : -1))
+    .filter((i) => i >= 0);
+  if (!fileIndices.length) return events;
+  const focusIdx = fileIndices[fileIndices.length - 1]!;
+  return events.map((e, i) => {
+    if (isFileEvent(e)) {
+      return {
+        ...e,
+        status: i === focusIdx ? ("active" as const) : ("done" as const),
+      };
+    }
+    if (e.status === "active") {
+      return { ...e, status: "done" as const };
+    }
+    return e;
+  });
 }
 
 function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
@@ -387,7 +413,8 @@ export function AgentWorkflowStream({
   const serverRaw = coalesceWorkflowStreamEvents(progress.events ?? [], {
     terminal: progress.done,
   });
-  const serverCollapsed = collapseRedundantPhaseStarted(serverRaw);
+  const serverNoHeartbeat = collapseHeartbeatAssistantMessages(serverRaw);
+  const serverCollapsed = collapseRedundantPhaseStarted(serverNoHeartbeat);
   const serverSequential = applySingleActiveWorkflowStep(serverCollapsed, working);
 
   const startedAt =
@@ -415,12 +442,25 @@ export function AgentWorkflowStream({
     (progress.events ?? []).filter((e) => e.type === "writing_file").length,
   );
   const timelineRaw = applySingleActiveWorkflowStep(grouped, working);
-  const batchPersistStagger = timelineRaw.some((e) => e.metadata?.batch_persist === true);
-  const timeline = useStaggeredWorkflowEvents(timelineRaw, batchPersistStagger);
+  const shouldStaggerFiles =
+    working &&
+    timelineRaw.some(
+      (e) =>
+        e.metadata?.batch_persist === true ||
+        e.metadata?.extraction_stream === true ||
+        isFileEvent(e),
+    );
+  const timelineStaggered = useStaggeredWorkflowEvents(timelineRaw, shouldStaggerFiles);
+  const timeline = applyFileStreamFocus(timelineStaggered, working);
 
   const active = [...timeline].reverse().find((e) => e.status === "active");
   const completedTimeline = active
-    ? timeline.filter((ev) => ev.stableKey !== active.stableKey || isFileEvent(ev))
+    ? timeline.filter(
+        (ev) =>
+          ev.stableKey !== active.stableKey ||
+          isFileEvent(ev) ||
+          ev.category === "assistant_message",
+      )
     : timeline;
 
   const fileDiffSummary = React.useMemo(() => {

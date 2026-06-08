@@ -223,27 +223,30 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
 
   setTraceHeartbeatRunning(trace, true);
   const heartbeat = setInterval(() => {
-    if (Date.now() - lastActivityAt < 1800) return;
-    if (Date.now() - lastHeartbeatPersist < 1800) return;
+    if (Date.now() - lastActivityAt < 4500) return;
+    if (Date.now() - lastHeartbeatPersist < 4500) return;
     lastHeartbeatPersist = Date.now();
     heartbeatTick += 1;
     const snap = getBuildWorkerTrace(input.buildJobId);
     const stageLabel = snap?.lastStage ?? "working";
-    const detail = `Still working on ${currentStepLabel}…`;
-    void persistAssistantBuildMessage(input.writer, eventCtx, {
-      message: detail,
+    void persistBuildJobEvent(input.writer, {
+      ...eventCtx,
+      type: "planning_app",
+      title: currentStepLabel,
+      detail: currentStepLabel,
+      progressPercent: progressForStep(),
       metadata: {
         trace_stage: stageLabel,
         heartbeat: true,
-        honest: true,
-        stream_category: "assistant_message",
+        hidden: true,
+        stream_category: "phase_progress",
         build_stage: stageLabel,
         operation_id: input.operationId,
         execution_instance_id: workerCtx.executionInstanceId,
         heartbeat_tick: heartbeatTick,
       },
     }).catch(() => {});
-  }, 2000);
+  }, 4000);
 
   const PIPELINE_HARD_CAP_MS = 5 * 60 * 1000;
 
