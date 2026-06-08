@@ -13,9 +13,11 @@ function must(rel, needle, label) {
   else ok.push(label);
 }
 
-must("src/components/create/workspace/animated-line-delta.tsx", "AnimatedLineDelta", "component");
-must("src/components/create/workspace/animated-line-delta.tsx", "requestAnimationFrame", "rAF animation");
-must("src/components/create/workspace/agent-workflow-stream.tsx", "AnimatedLineDelta", "used in file rows");
+must("src/components/create/workspace/live-file-line-delta.tsx", "LiveFileLineDelta", "component");
+must("src/components/create/workspace/live-file-line-delta.tsx", "TICK_MS = 1000", "1s tick");
+must("src/components/create/workspace/live-file-line-delta.tsx", "text-blue-500", "blue plus");
+must("src/components/create/workspace/live-file-line-delta.tsx", "text-red-500", "red minus");
+must("src/components/create/workspace/agent-workflow-stream.tsx", "LiveFileLineDelta", "used in file rows");
 
 console.log("\n=== verify:animated-file-deltas ===\n");
 ok.forEach((m) => console.log("✓", m));

@@ -30,6 +30,8 @@ export type ExtractionFileEvent =
 
 export type ExtractionStreamOptions = {
   interFileDelayMs?: number;
+  /** Live delta tick interval while a file is being written (ms). */
+  liveDeltaTickMs?: number;
   existingByPath?: Map<string, string>;
 };
 
@@ -51,6 +53,7 @@ export async function streamExtractBuildFiles(
   const parsed = parseBuildFilesFromModel(text);
   const existing = opts?.existingByPath ?? new Map<string, string>();
   const delay = opts?.interFileDelayMs ?? 90;
+  const liveTick = opts?.liveDeltaTickMs ?? 1000;
   const files: BuildFile[] = [];
 
   for (let i = 0; i < parsed.files.length; i++) {
@@ -63,6 +66,18 @@ export async function streamExtractBuildFiles(
     const added = lineMeta?.added_lines ?? lineCount(f.content);
     const removed = lineMeta?.removed_lines ?? 0;
     const current = lineCount(f.content);
+
+    const progressSteps = Math.max(1, Math.min(8, Math.ceil(added / 12) || 1));
+    for (let step = 1; step < progressSteps; step++) {
+      await new Promise((r) => setTimeout(r, liveTick));
+      await handlers.onEvent?.({
+        type: "file_delta",
+        path: f.path,
+        lines_added: Math.max(1, Math.round((added * step) / progressSteps)),
+        lines_removed: Math.round((removed * step) / progressSteps),
+        current_line_count: Math.max(1, Math.round((current * step) / progressSteps)),
+      });
+    }
 
     await handlers.onEvent?.({
       type: "file_delta",

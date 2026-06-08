@@ -242,14 +242,17 @@ export function coalesceWorkflowStreamEvents(
       byKey.set(ev.stableKey, ev);
       continue;
     }
+    const inProgress = ev.metadata?.file_in_progress === true && !terminal;
     byKey.set(ev.stableKey, {
       ...ev,
       status:
         ev.status === "failed"
           ? "failed"
-          : terminal || prev.status === "done"
-            ? "done"
-            : ev.status,
+          : inProgress
+            ? "active"
+            : terminal || prev.status === "done"
+              ? "done"
+              : ev.status,
     });
   }
 

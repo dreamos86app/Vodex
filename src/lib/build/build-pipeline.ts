@@ -135,7 +135,7 @@ import {
 import { checkRouteConnectivity } from "@/lib/build/route-connectivity-check";
 import { runBuildStage } from "@/lib/build/build-stage-orchestrator";
 import { streamExtractBuildFiles } from "@/lib/build/extraction-file-stream";
-import { routeToPlannedFilePath } from "@/lib/build/planned-route-file-path";
+import { routeToPlannedFilePath, uniquePlannedFilePaths } from "@/lib/build/planned-route-file-path";
 import {
   formatMeaningfulQualityForStream,
   scoreMeaningfulUiQuality,
@@ -334,6 +334,7 @@ async function ingestModelFilesWithExtractionStream(
   ) => void,
   maxFiles: number,
   onFileStreamStart?: (path: string) => void,
+  onFileStreamDelta?: (path: string, added: number, removed: number, current?: number) => void,
   onExtractStart?: () => void,
 ): Promise<BuildFile[]> {
   onExtractStart?.();
@@ -344,12 +345,19 @@ async function ingestModelFilesWithExtractionStream(
     {
       onEvent: async (ev) => {
         if (ev.type === "file_started") onFileStreamStart?.(ev.path);
+        if (ev.type === "file_delta") {
+          onFileStreamDelta?.(ev.path, ev.lines_added, ev.lines_removed, ev.current_line_count);
+        }
       },
       onFile: async (f) => {
         merged = mergeIncomingBuildFiles(merged, [f], events, trackFn, maxFiles, onFileStreamStart);
       },
     },
-    { existingByPath, interFileDelayMs: isProductionBuildMode() ? 550 : 95 },
+    {
+      existingByPath,
+      interFileDelayMs: isProductionBuildMode() ? 550 : 95,
+      liveDeltaTickMs: 1000,
+    },
   );
   return merged;
 }
@@ -472,7 +480,11 @@ export async function runStagedBuildPipeline(input: {
         prompt: input.userPrompt,
       })
     : null;
+  const startedFilePaths = new Map<string, string>();
   const onFileStreamStart = (path: string) => {
+    const key = path.replace(/\\/g, "/").toLowerCase();
+    if (startedFilePaths.has(key)) return;
+    startedFilePaths.set(key, path);
     track(events, "writing", path, `Writing ${path}`, {
       filePath: path,
       streamCategory: "file_created",
@@ -480,6 +492,34 @@ export async function runStagedBuildPipeline(input: {
       file_in_progress: true,
       honest: true,
     });
+  };
+  const onFileStreamDelta = (path: string, added: number, removed: number, current?: number) => {
+    track(events, "writing", path, `+${added} -${removed}`, {
+      filePath: path,
+      streamCategory: "file_created",
+      extraction_stream: true,
+      file_in_progress: true,
+      fileLineMeta: {
+        added_lines: added,
+        removed_lines: removed,
+        old_line_count: Math.max(0, (current ?? added) - added),
+        new_line_count: current ?? added,
+      },
+      honest: true,
+    });
+  };
+  const clearStalePlannedPlaceholders = (savedFiles: BuildFile[]) => {
+    const saved = new Set(savedFiles.map((f) => f.path.replace(/\\/g, "/").toLowerCase()));
+    for (const [key, path] of startedFilePaths) {
+      if (saved.has(key)) continue;
+      track(events, "writing", path, path, {
+        filePath: path,
+        streamCategory: "file_created",
+        extraction_stream: true,
+        file_in_progress: false,
+        honest: true,
+      });
+    }
   };
   const onExtractStart = () =>
     trackAssistant(events, "Model response received — extracting files…", emit);
@@ -908,8 +948,8 @@ export async function runStagedBuildPipeline(input: {
 
   trackAssistant(events, thinkingForFrontendStart(appName), emit);
   track(events, "writing", "Generating frontend files");
-  for (const route of (designBrief.routes ?? archetype.coreRoutes).slice(0, 10)) {
-    onFileStreamStart(routeToPlannedFilePath(route));
+  for (const path of uniquePlannedFilePaths(designBrief.routes ?? archetype.coreRoutes, 10)) {
+    onFileStreamStart(path);
   }
   if (input.buildTrace) traceBuildWorkerStage(input.buildTrace, "file_generation_started");
 
@@ -965,6 +1005,7 @@ export async function runStagedBuildPipeline(input: {
         track,
         effectiveMaxFiles,
         onFileStreamStart,
+        onFileStreamDelta,
         onExtractStart,
       );
       if (allFiles.length > beforeCount) {
@@ -1012,6 +1053,7 @@ export async function runStagedBuildPipeline(input: {
           track,
           effectiveMaxFiles,
           onFileStreamStart,
+          onFileStreamDelta,
           onExtractStart,
         );
       }
@@ -1031,8 +1073,8 @@ export async function runStagedBuildPipeline(input: {
       "Compact route retry — generating core pages with a smaller route set…",
       emit,
     );
-    for (const route of (designBrief.routes ?? archetype.coreRoutes).slice(0, 6)) {
-      onFileStreamStart(routeToPlannedFilePath(route));
+    for (const path of uniquePlannedFilePaths(designBrief.routes ?? archetype.coreRoutes, 6)) {
+      onFileStreamStart(path);
     }
     const routeRetryPrompt = smokeBuild
       ? minimalFrontendPrompt(executionPrompt, planJson, contextSlices, designBrief)
@@ -1070,12 +1112,15 @@ export async function runStagedBuildPipeline(input: {
       track,
       effectiveMaxFiles,
       onFileStreamStart,
+      onFileStreamDelta,
       onExtractStart,
     );
     }
+    clearStalePlannedPlaceholders(allFiles);
   }
 
   allFiles = filterRenderableBuildFiles(allFiles);
+  clearStalePlannedPlaceholders(allFiles);
 
   const modelFilesBeforeScaffold = allFiles.length;
   let generationQualityReport = scoreGeneratedAppQuality({
@@ -1169,6 +1214,7 @@ export async function runStagedBuildPipeline(input: {
         track,
         effectiveMaxFiles,
         onFileStreamStart,
+        onFileStreamDelta,
         onExtractStart,
       ),
     );
@@ -1264,6 +1310,7 @@ export async function runStagedBuildPipeline(input: {
         track,
         effectiveMaxFiles,
         onFileStreamStart,
+        onFileStreamDelta,
         onExtractStart,
       ),
     );

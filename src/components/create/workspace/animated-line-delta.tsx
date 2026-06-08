@@ -4,9 +4,9 @@ import * as React from "react";
 import { useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-const STEP_MS = 120;
+const STEP_MS = 1000;
 
-/** Animate count in ~120ms steps (Cursor-style live deltas). */
+/** Animate count in ~1s steps (smooth live deltas). */
 function useAnimatedCountStep(target: number | undefined): number | undefined {
   const reduced = useReducedMotion();
   const fromRef = React.useRef(target ?? 0);
@@ -79,7 +79,7 @@ export function AnimatedLineDelta({
       {addedN != null ? (
         <span
           className={cn(
-            "inline-block text-emerald-500/90 transition-transform",
+            "inline-block text-blue-500 transition-all duration-500 ease-out",
             active && "animate-[pulse_1.2s_ease-in-out_infinite]",
             bump > 0 && "animate-[delta-bump_0.35s_ease-out]",
           )}
@@ -90,7 +90,7 @@ export function AnimatedLineDelta({
       {removedN != null ? (
         <span
           className={cn(
-            "text-red-400/90 transition-transform",
+            "text-red-500 transition-all duration-500 ease-out",
             active && "animate-[pulse_1.2s_ease-in-out_infinite]",
             addedN != null && "ml-1",
           )}

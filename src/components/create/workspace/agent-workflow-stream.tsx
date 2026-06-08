@@ -28,7 +28,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { userMessageForPreviewFailure, isPreviewFailureCode } from "@/lib/preview/preview-failure-codes";
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { resolveBuildTerminalTruth } from "@/lib/build/build-terminal-truth";
-import { AnimatedLineDelta } from "@/components/create/workspace/animated-line-delta";
+import { LiveFileLineDelta } from "@/components/create/workspace/live-file-line-delta";
 import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
 import { StreamingNarrationLine } from "@/components/create/workspace/streaming-narration-line";
 
@@ -46,6 +46,9 @@ function compressFileEventsForDisplay(
 ): AgentWorkflowEvent[] {
   if (!working) return events;
   const fileEvents = events.filter(isFileEvent);
+  if (fileEvents.some((e) => e.metadata?.file_in_progress === true || e.status === "active")) {
+    return events;
+  }
   if (fileEvents.length <= 8) return events;
   const nonFile = events.filter((e) => !isFileEvent(e));
   const activeFile =
@@ -156,44 +159,38 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
   const isCreate = event.category === "file_created";
   const isDelete = event.category === "file_deleted";
   const Icon = isDelete ? FileMinus : isCreate ? FilePlus : FilePen;
-  const prefix = isDelete ? "−" : isCreate ? "+" : "~";
   const path = event.filePath!;
   const parsedFromSubtitle = (() => {
     const d = event.subtitle ?? "";
-    const m = d.match(/\+(\d+)\s*-\s*(\d+)/);
+    const m = d.match(/\+(\d+)\s*[-−](\d+)/);
     if (!m) return {};
     return { added: Number(m[1]), removed: Number(m[2]) };
   })();
   const addedLines = event.addedLines ?? parsedFromSubtitle.added;
   const removedLines = event.removedLines ?? parsedFromSubtitle.removed;
-  const hasCounts = typeof addedLines === "number" || typeof removedLines === "number";
+  const fileActive = event.status === "active" && event.metadata?.file_in_progress !== false;
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
         "mr-6 flex max-w-md items-center gap-2 rounded-2xl bg-surface/90 px-3 py-2 sm:mr-10",
-        event.status === "active"
+        fileActive
           ? "workflow-gold-border-active file-active-ring ring-1 ring-amber-400/55"
           : "ring-1 ring-border/60",
       )}
       data-testid="workflow-file-card"
     >
       <Icon className="size-3.5 shrink-0 text-accent/85" strokeWidth={1.75} />
-      <span className="shrink-0 font-mono text-[10.5px] font-semibold text-muted-foreground">{prefix}</span>
       <code className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground">{path}</code>
-      {hasCounts && !isDelete ? (
-        <AnimatedLineDelta
+      {!isDelete ? (
+        <LiveFileLineDelta
+          path={path}
+          active={fileActive}
           added={addedLines}
           removed={removedLines}
-          active={event.status === "active"}
         />
-      ) : event.status === "active" ? (
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-amber-400/90 animate-pulse">
-          …
-        </span>
       ) : null}
     </motion.div>
   );
@@ -465,20 +462,15 @@ export function AgentWorkflowStream({
     (progress.events ?? []).filter((e) => e.type === "writing_file").length,
   );
   const timelineRaw = applySingleActiveWorkflowStep(grouped, working);
-  const shouldStaggerFiles =
-    working &&
-    timelineRaw.some(
-      (e) =>
-        e.metadata?.batch_persist === true ||
-        e.metadata?.extraction_stream === true ||
-        isFileEvent(e),
-    );
+  const shouldStaggerFiles = false;
   const timelineStaggered = useStaggeredWorkflowEvents(timelineRaw, shouldStaggerFiles);
   const timeline = applyFileStreamFocus(timelineStaggered, working);
 
-  const active = [...timeline].reverse().find((e) => e.status === "active");
+  const active = [...timeline]
+    .reverse()
+    .find((e) => e.status === "active" && !isFileEvent(e));
   const completedTimeline = active
-    ? timeline.filter((ev) => ev.stableKey !== active.stableKey || isFileEvent(ev))
+    ? timeline.filter((ev) => ev.stableKey !== active.stableKey)
     : timeline;
 
   const fileDiffSummary = React.useMemo(() => {
