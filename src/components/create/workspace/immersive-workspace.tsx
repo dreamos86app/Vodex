@@ -124,6 +124,7 @@ import { IntegrationSecretsPanel } from "@/components/create/workspace/integrati
 import { detectRequiredSecretNames } from "@/lib/integrations/detect-required-secrets";
 import { WorkspaceLauncher, type WorkspaceRightTab } from "@/components/create/workspace/workspace-launcher";
 import { AppDashboardPanel, type DashSection } from "@/components/create/workspace/app-dashboard-panel";
+import { SecretSetupPanel } from "@/components/chat/secret-setup-panel";
 import type { CodeExplorerFile } from "@/components/create/workspace/code-explorer-panel";
 import { AppBuilderWorkspace } from "@/components/builder/app-builder-workspace";
 import { MobileWrapperStudio } from "@/components/mobile/mobile-wrapper-studio";
@@ -486,6 +487,7 @@ export function ImmersiveWorkspace({
   const [versionDrawerOpen, setVersionDrawerOpen] = React.useState(false);
   const insertPromptConsumedRef = React.useRef(false);
   const [pendingInsertAutoSubmit, setPendingInsertAutoSubmit] = React.useState<string | null>(null);
+  const [secretsChatPanelOpen, setSecretsChatPanelOpen] = React.useState(false);
   const [lastSubmitAt, setLastSubmitAt] = React.useState<number | null>(null);
 
   React.useEffect(() => {
@@ -550,6 +552,7 @@ export function ImmersiveWorkspace({
     setMobilePanel("chat");
     const autoSubmit = searchParams.get("autostart") === "1" || searchParams.get("autostart") === "true";
     if (autoSubmit) {
+      if (text.includes("required secrets")) setSecretsChatPanelOpen(true);
       setPendingInsertAutoSubmit(text);
     } else {
       setComposerLiveText(text);
@@ -2304,11 +2307,13 @@ export function ImmersiveWorkspace({
       autostartConsumedRef.current = false;
       return;
     }
-    void fn(source, text).catch(() => {
+    void fn(source, text).catch((err) => {
       autoStartedRef.current = false;
       autostartConsumedRef.current = false;
       pushRuntimeDiagnostic("handoff_failed", { reason: "autostart_submit_failed" });
+      const msg = err instanceof Error ? err.message : "Could not start chat automatically.";
       setAutoStartFailed("Could not start automatically. Tap retry below.");
+      toast.error(msg);
     });
   }, []);
 
@@ -2725,7 +2730,7 @@ export function ImmersiveWorkspace({
     ? projectPreviewFrameUrl(
         effectiveProjectId,
         previewArtifactLockedRef.current ? undefined : projectDataRefresh,
-        "/",
+        previewRoute,
         previewArtifactLockedRef.current ?? previewRuntime?.jobId ?? null,
       )
     : null;
@@ -3239,6 +3244,16 @@ export function ImmersiveWorkspace({
                 })}
               </AnimatePresence>
 
+              {secretsChatPanelOpen && effectiveProjectId && zipImportMeta ? (
+                <SecretSetupPanel
+                  projectId={effectiveProjectId}
+                  envRequirements={zipImportMeta.env_requirements}
+                  onClose={() => setSecretsChatPanelOpen(false)}
+                  onSkipOptional={() => setSecretsChatPanelOpen(false)}
+                  onSaved={() => setProjectDataRefresh((n) => n + 1)}
+                />
+              ) : null}
+
               {showOptimisticAssistant &&
                 !(activeMode === "build" && (buildJobActive || buildStarting || buildJobProgress || frozenBuildWorkflow)) &&
                 (pendingUserBubble ||
@@ -3717,9 +3732,11 @@ export function ImmersiveWorkspace({
                 onSectionChange={setDashboardSection}
                 onOpenPublish={() => setPublishOpen(true)}
                 onInsertChatPrompt={(prompt) => {
-                  setComposerLiveText(prompt);
+                  setMode("discuss");
+                  setChatEngaged(true);
                   setMobilePanel("chat");
-                  toast.info("Prompt added to chat — review and press Submit");
+                  if (prompt.includes("required secrets")) setSecretsChatPanelOpen(true);
+                  setPendingInsertAutoSubmit(prompt);
                 }}
               />
               </div>

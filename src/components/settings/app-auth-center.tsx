@@ -7,6 +7,7 @@ import { AuthProviderRow } from "@/components/settings/auth-provider-row";
 import { CustomOAuthWizard, type OAuthWizardProvider } from "@/components/settings/custom-oauth-wizard";
 import { AuthFallbackPanel } from "@/components/settings/auth-fallback-panel";
 import { toast } from "@/lib/toast";
+import { AUTH_PROVIDER_CAPABILITIES, connectionModeLabel } from "@/lib/integrations/provider-capabilities";
 
 type AuthSettings = {
   email_password_enabled: boolean;
@@ -195,33 +196,56 @@ export function AppAuthCenter({
             { id: "facebook" as const, label: "Facebook" },
           ] as const
         ).map((p) => {
+          const cap = AUTH_PROVIDER_CAPABILITIES[p.id];
+          const comingSoon = cap?.connectionMode === "coming_soon";
+          const managed = cap?.managedByVodex === true;
           const enabled = "key" in p && p.key ? Boolean(settings[p.key]) : false;
           const configured =
             "customKey" in p && p.customKey
               ? settings.customOAuth?.[p.customKey]?.configured
               : undefined;
+          const statusBadge = comingSoon
+            ? "Setup required"
+            : managed
+              ? "Managed by Vodex"
+              : configured
+                ? "Configured"
+                : cap
+                  ? connectionModeLabel(cap.connectionMode)
+                  : undefined;
           return (
             <AuthProviderRow
               key={p.id}
               id={p.id}
               icon={<AuthProviderIcon provider={p.id} />}
               title={p.label}
-              description={`Let users sign in with ${p.label}.`}
-              enabled={enabled}
-              health={healthFor(enabled)}
-              statusBadge={configured ? "Configured" : undefined}
-              onToggle={
-                "key" in p && p.key
-                  ? (on) => void patchSettings({ [p.key]: on } as Partial<AuthSettings>)
-                  : undefined
+              description={
+                comingSoon
+                  ? `${p.label} sign-in is not fully wired yet. Configure your own OAuth client when available, or use email/Google in the meantime.`
+                  : managed
+                    ? `Vodex-managed ${p.label} sign-in — enable when ready for your published app.`
+                    : `Let users sign in with ${p.label}.`
               }
-              showToggle={"key" in p && Boolean(p.key)}
+              enabled={enabled}
+              health={comingSoon ? "off" : healthFor(enabled)}
+              statusBadge={statusBadge}
+              onToggle={
+                comingSoon || !("key" in p && p.key)
+                  ? undefined
+                  : (on) => void patchSettings({ [p.key]: on } as Partial<AuthSettings>)
+              }
+              showToggle={!comingSoon && "key" in p && Boolean(p.key)}
+              toggleDisabled={comingSoon}
               onConfigure={() => {
+                if (comingSoon) {
+                  toast.info(`${p.label} OAuth setup is coming soon — use Custom OAuth for now.`);
+                  return;
+                }
                 if (p.id === "github") setWizardProvider("github");
                 else if (p.id === "apple") setWizardProvider("apple");
-                else toast.info(`${p.label} uses Vodex-managed OAuth`);
+                else toast.info(`${p.label} configuration`);
               }}
-              docsHref={`https://vodex.dev/docs/auth/${p.id}`}
+              docsHref={cap?.docsUrl ?? `https://vodex.dev/docs/auth/${p.id}`}
             />
           );
         })}

@@ -902,6 +902,14 @@ export function AppDashboardPanel({
                   onSaved={() => {
                     readinessFetchedRef.current = null;
                   }}
+                  onAskAi={
+                    onInsertChatPrompt
+                      ? () =>
+                          onInsertChatPrompt(
+                            "Help me connect the required secrets for this imported app. Explain what each missing key is for, where to get it, and whether it is required.",
+                          )
+                      : undefined
+                  }
                 />
               </div>
             ) : null}

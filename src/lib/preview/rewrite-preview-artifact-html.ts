@@ -1,3 +1,4 @@
+import { injectPreviewNavigationGuard } from "@/lib/preview/inject-preview-navigation-guard";
 import { injectPreviewRouterShim } from "@/lib/preview/inject-preview-router-shim";
 import { injectPreviewRouteListener } from "@/lib/preview/inject-preview-route-listener";
 
@@ -39,8 +40,28 @@ export function rewritePreviewArtifactHtml(
     return ` ${attr}="${assetUrl(p)}"`;
   });
 
+  out = injectPreviewNavigationGuard(out);
   out = injectPreviewRouterShim(out, routePath);
   return injectPreviewRouteListener(out);
+}
+
+/** True when URL is safe for iframe embed (internal preview proxy only). */
+export function isInternalPreviewProxyUrl(url: string | null | undefined): boolean {
+  if (!url?.trim()) return false;
+  if (url.startsWith("/api/projects/") && url.includes("/preview-html")) return true;
+  try {
+    const u = new URL(url, "https://localhost");
+    return u.pathname.includes("/preview-html") || u.pathname.includes("/preview-assets");
+  } catch {
+    return false;
+  }
+}
+
+/** Block raw vodex.dev /p/ URLs — they refuse iframe embed. */
+export function isBlockedRawAppPreviewUrl(url: string | null | undefined): boolean {
+  if (!url?.trim()) return false;
+  if (isInternalPreviewProxyUrl(url)) return false;
+  return /vodex\.dev\/p\//i.test(url) || /vodex\.app\/p\//i.test(url) || /^https?:\/\/[^/]*vodex\.dev\//i.test(url);
 }
 
 export function previewFrameUrlWithRoute(

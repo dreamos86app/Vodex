@@ -5,7 +5,7 @@
  */
 export function injectPreviewRouterShim(html: string, routePath: string): string {
   const route = routePath.startsWith("/") ? routePath : `/${routePath}`;
-  const script = `<script id="vodex-preview-router-shim">(function(){try{var p=${JSON.stringify(route)};if(window.history&&window.history.replaceState){window.history.replaceState(null,"",p);}}catch(e){}})();</script>`;
+  const script = `<script id="vodex-preview-router-shim">(function(){try{var p=${JSON.stringify(route)};if(window.history&&window.history.replaceState){window.history.replaceState(null,"",p);window.dispatchEvent(new PopStateEvent("popstate"));}}catch(e){}})();</script>`;
 
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (m) => `${m}${script}`);

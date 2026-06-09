@@ -33,7 +33,8 @@ export type IntegrationProvider =
   | "paypal"
   | "lemonsqueezy"
   | "discord"
-  | "firebase";
+  | "firebase"
+  | "revenuecat";
 
 const PROVIDER_ALIASES: Record<string, IntegrationProvider> = {
   supabase: "supabase",
@@ -54,6 +55,9 @@ const PROVIDER_ALIASES: Record<string, IntegrationProvider> = {
   discord_webhook: "discord",
   "discord-webhook": "discord",
   firebase: "firebase",
+  revenuecat: "revenuecat",
+  revenue_cat: "revenuecat",
+  "revenue-cat": "revenuecat",
   lemon: "lemonsqueezy",
   "lemon-squeezy": "lemonsqueezy",
 };
@@ -140,6 +144,10 @@ export const INTEGRATION_BRANDS: Record<
     wellClassName: "bg-[#FFCA28]/15 ring-[#FFCA28]/25",
     simpleIcon: siFirebase,
   },
+  revenuecat: {
+    title: "RevenueCat",
+    wellClassName: "bg-[#5747E6]/15 ring-[#5747E6]/28",
+  },
 };
 
 const SIZE_PX = { sm: 20, md: 26, lg: 34 } as const;
@@ -154,6 +162,25 @@ function resolvePx(size: IntegrationIconProps["size"], pixelSize?: number): numb
   if (typeof size === "number") return size;
   if (size === "sm" || size === "md" || size === "lg") return SIZE_PX[size];
   return SIZE_PX.md;
+}
+
+/** RevenueCat cat mark — not in simple-icons. */
+function RevenueCatMark({ size, className }: { size: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={cn("shrink-0", className)}
+      aria-hidden
+    >
+      <rect width="24" height="24" rx="6" fill="#5747E6" />
+      <path
+        fill="#fff"
+        d="M7.2 16.4c0-2.4 1.9-4.3 4.3-4.3h1.2v-1.1c0-1.5-1.2-2.7-2.7-2.7S7.3 7.5 7.3 9h-2.1C5.2 6.2 7.6 3.8 10.8 3.8s5.6 2.4 5.6 5.6v7h-2.1v-1.5h-.1c-.7 1-1.9 1.6-3.3 1.6-2.4 0-4.3-1.9-4.3-4.3zm4.3-2.5c-1.4 0-2.5 1.1-2.5 2.5s1.1 2.5 2.5 2.5 2.5-1.1 2.5-2.5V13.9h-1.2c-1.4 0-2.5-1.1-2.5-2.5 0-1.4 1.1-2.5 2.5-2.5h1.2V9c0-1.4-1.1-2.5-2.5-2.5S9 7.6 9 9h2.1c0 1.4 1.1 2.5 2.5 2.5h1.2v2.4h-1.2z"
+      />
+    </svg>
+  );
 }
 
 function SlackMark({ size, className }: { size: number; className?: string }) {
@@ -305,6 +332,10 @@ export function IntegrationIcon({
 
   if (provider === "slack") {
     return <SlackMark size={px} className={className} />;
+  }
+
+  if (provider === "revenuecat") {
+    return <RevenueCatMark size={px} className={className} />;
   }
 
   if (provider === "openai") {

@@ -57,12 +57,17 @@ export function ImportedSecretsSetupPanel({
   envRequirements,
   className,
   onSaved,
+  onAskAi,
 }: {
   projectId: string;
   envRequirements: unknown;
   className?: string;
   onSaved?: () => void;
+  /** When set, uses in-builder chat autostart instead of navigation link. */
+  onAskAi?: () => void;
 }) {
+  const secretsPrompt =
+    "Help me connect the required secrets for this imported app. Explain what each missing key is for, where to get it, and whether it is required.";
   const reqs = React.useMemo(() => {
     return normalizeEnvReqs(envRequirements).filter(
       (r) => !/^VITE_BASE44_/i.test(r.key) && !/^BASE44_/i.test(r.key),
@@ -226,16 +231,25 @@ export function ImportedSecretsSetupPanel({
         <Button type="button" variant="accent" disabled={submittingAll} onClick={() => void submitAll()}>
           {submittingAll ? <Loader2 className="size-3.5 animate-spin" /> : "Submit all"}
         </Button>
-        <Link
-          href={`/apps/${projectId}/builder?mode=discuss&autostart=1&insertPrompt=${encodeURIComponent(
-            "Help me connect the required secrets for this imported app. Explain what each missing key is for, where to get it, and whether it is required.",
-          )}`}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface px-3 py-2 text-[11px] font-semibold text-foreground ring-1 ring-border hover:bg-surface-raised"
-        >
-          <Sparkles className="size-3.5 text-accent" />
-          Ask AI to help connect secrets
-          <ExternalLink className="size-3 opacity-60" />
-        </Link>
+        {onAskAi ? (
+          <button
+            type="button"
+            onClick={onAskAi}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface px-3 py-2 text-[11px] font-semibold text-foreground ring-1 ring-border hover:bg-surface-raised"
+          >
+            <Sparkles className="size-3.5 text-accent" />
+            Ask AI to help connect secrets
+          </button>
+        ) : (
+          <Link
+            href={`/apps/${projectId}/builder?mode=discuss&autostart=1&insertPrompt=${encodeURIComponent(secretsPrompt)}`}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface px-3 py-2 text-[11px] font-semibold text-foreground ring-1 ring-border hover:bg-surface-raised"
+          >
+            <Sparkles className="size-3.5 text-accent" />
+            Ask AI to help connect secrets
+            <ExternalLink className="size-3 opacity-60" />
+          </Link>
+        )}
       </div>
     </div>
   );

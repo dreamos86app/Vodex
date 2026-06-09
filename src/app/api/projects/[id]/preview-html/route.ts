@@ -180,6 +180,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         "X-Frame-Options": "SAMEORIGIN",
         "X-Preview-Renderable": "true",
         "X-Preview-Artifact": servedFromArtifact ? "1" : "0",
+        "X-Preview-Source": servedFromArtifact ? "artifact_proxy" : "generated",
+        "X-Preview-Route": previewRoute,
+        "X-Preview-Spa-Fallback": previewRoute !== "/" && servedFromArtifact ? "1" : "0",
       },
     });
   }

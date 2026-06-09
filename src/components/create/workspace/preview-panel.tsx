@@ -25,6 +25,10 @@ import type { PreviewRouteEntry } from "@/lib/preview/detect-preview-routes";
 import { navigatePreviewIframe } from "@/lib/preview/preview-route-navigation";
 import type { ImportedPreviewStateResult } from "@/lib/preview/imported-preview-state";
 import { ImportedPreviewEmptyState } from "@/components/preview/imported-preview-empty-state";
+import {
+  isBlockedRawAppPreviewUrl,
+  isInternalPreviewProxyUrl,
+} from "@/lib/preview/rewrite-preview-artifact-html";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 
@@ -72,20 +76,7 @@ function isUnrenderableSrcDoc(doc: string | null | undefined): boolean {
 }
 
 function isArtifactPreviewUrl(url: string | null): boolean {
-  if (!url?.trim()) return false;
-  if (url.startsWith("/api/projects/") || url.includes("/preview-html") || url.includes("/preview-assets")) {
-    return true;
-  }
-  try {
-    const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "https://localhost");
-    return (
-      u.pathname.includes("/preview-html") ||
-      u.pathname.includes("/preview-assets") ||
-      u.pathname.includes("/api/projects/")
-    );
-  } catch {
-    return false;
-  }
+  return isInternalPreviewProxyUrl(url);
 }
 
 export function PreviewPanel({
@@ -150,9 +141,29 @@ export function PreviewPanel({
     return () => window.clearTimeout(t);
   }, [iframeLoading, reloadKey, url, srcDoc, previewPreparing, isArtifactUrl]);
 
+  const rawBlocked = Boolean(url && isBlockedRawAppPreviewUrl(url));
+  const previewDiagnostics = React.useMemo(() => {
+    if (!url || hasInline) return null;
+    const source = rawBlocked ? "raw_blocked" : isArtifactUrl ? "artifact_proxy" : "unknown";
+    let artifactPath: string | null = null;
+    try {
+      const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "https://localhost");
+      artifactPath = u.pathname;
+    } catch {
+      artifactPath = url;
+    }
+    const fallbackApplied = previewRoute !== "/" && isArtifactUrl;
+    return {
+      source,
+      selected_route: previewRoute,
+      artifact_path: artifactPath,
+      fallback_applied: fallbackApplied,
+    };
+  }, [url, hasInline, rawBlocked, isArtifactUrl, previewRoute]);
+
   const hasPreviewArtifact = !!url || hasInline;
-  const artifactUrlOk = hasInline || !url || isArtifactUrl;
-  const embedBlocked = Boolean(url && !hasInline && !artifactUrlOk);
+  const artifactUrlOk = hasInline || !url || (isArtifactUrl && !rawBlocked);
+  const embedBlocked = Boolean(url && !hasInline && (!artifactUrlOk || rawBlocked));
   const showBuildShell = buildActive || thinking;
   const showArtifact = hasPreviewArtifact && !showBuildShell;
   const awaitingRuntimeStatus = Boolean(url && isArtifactUrl && !hasInline && !runtimeStatus);
@@ -402,9 +413,13 @@ export function PreviewPanel({
               <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10 ring-1 ring-destructive/20">
                 <ShieldAlert className="size-5 text-destructive" strokeWidth={1.7} />
               </div>
-              <p className="text-[13px] font-semibold text-foreground">Preview embed blocked</p>
+              <p className="text-[13px] font-semibold text-foreground">
+                {rawBlocked ? "External preview URL blocked" : "Preview embed blocked"}
+              </p>
               <p className="text-[11.5px] leading-relaxed text-muted-foreground">
-                This route blocks iframe embedding. Open the preview in a new tab or run embed repair.
+                {rawBlocked
+                  ? "Imported apps must load through the internal preview proxy — never raw vodex.dev URLs in the iframe."
+                  : "This route blocks iframe embedding. Open the preview in a new tab or run embed repair."}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {url ? (
@@ -457,7 +472,7 @@ export function PreviewPanel({
           >
             <AnimatePresence mode="wait">
               <motion.div
-                key={reloadKey}
+                key={`${reloadKey}-${url ?? "inline"}`}
                 initial={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.97 }}
@@ -495,7 +510,7 @@ export function PreviewPanel({
 
                 <iframe
                     ref={iframeRef}
-                    key={reloadKey}
+                    key={`${reloadKey}-${url ?? "inline"}`}
                     src={hasInline ? undefined : url ?? undefined}
                     srcDoc={hasInline ? (srcDoc ?? undefined) : undefined}
                     title={appName ?? "App preview"}
@@ -532,6 +547,19 @@ export function PreviewPanel({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {previewDiagnostics && showIframe ? (
+          <div
+            data-testid="preview-diagnostics"
+            data-preview-source={previewDiagnostics.source}
+            data-preview-route={previewDiagnostics.selected_route}
+            className="pointer-events-none absolute bottom-1 right-2 z-30 max-w-[min(100%,420px)] truncate rounded-md bg-background/85 px-2 py-0.5 text-[9px] font-mono text-muted-foreground/80 ring-1 ring-border/50 backdrop-blur-sm"
+            title={`source=${previewDiagnostics.source} route=${previewDiagnostics.selected_route} path=${previewDiagnostics.artifact_path} fallback=${previewDiagnostics.fallback_applied}`}
+          >
+            {previewDiagnostics.source} · {previewDiagnostics.selected_route}
+            {previewDiagnostics.fallback_applied ? " · spa_fallback" : ""}
+          </div>
+        ) : null}
       </div>
     </div>
   );

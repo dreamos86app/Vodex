@@ -9,6 +9,10 @@ import { parseJsonResponse } from "@/lib/api/safe-json";
 import { MobileBillingWizard } from "@/components/payments/mobile-billing-wizard";
 import { ContextualHelp } from "@/components/help/contextual-help";
 import { IntegrationIconWell } from "@/components/brand/integration-icons";
+import {
+  PAYMENT_PROVIDER_CAPABILITIES,
+  connectionModeLabel,
+} from "@/lib/integrations/provider-capabilities";
 
 type ProviderCard = {
   provider: string;
@@ -28,6 +32,7 @@ const PAYMENT_ICON: Record<string, string> = {
   paddle: "paddle",
   paypal: "paypal",
   lemon_squeezy: "lemonsqueezy",
+  revenuecat: "revenuecat",
 };
 
 function apiErrorMessage(data: { error?: string | { message?: string } } | null): string {
@@ -239,23 +244,16 @@ export function ProjectPaymentsPanel({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2.5">
-                    {PAYMENT_ICON[p.provider] ? (
-                      <IntegrationIconWell
-                        provider={PAYMENT_ICON[p.provider]}
-                        size="md"
-                        className="shrink-0"
-                      />
-                    ) : (
-                      <div
-                        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#2D2D2D] text-[10px] font-bold text-white"
-                        aria-hidden
-                      >
-                        RC
-                      </div>
-                    )}
+                    <IntegrationIconWell
+                      provider={PAYMENT_ICON[p.provider] ?? p.provider}
+                      size="md"
+                      className="shrink-0"
+                    />
                     <div>
                       <p className="text-[14px] font-semibold">{p.label}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">{p.tagline}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {PAYMENT_PROVIDER_CAPABILITIES[p.provider]?.bestFor ?? p.tagline}
+                      </p>
                     </div>
                   </div>
                   {p.is_mobile ? (
@@ -265,6 +263,11 @@ export function ProjectPaymentsPanel({
                   )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {PAYMENT_PROVIDER_CAPABILITIES[p.provider] ? (
+                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                      {connectionModeLabel(PAYMENT_PROVIDER_CAPABILITIES[p.provider].connectionMode)}
+                    </span>
+                  ) : null}
                   <StatusPill status={p.status} />
                   {readiness[p.provider] ? (
                     <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
