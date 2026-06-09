@@ -20,6 +20,8 @@ import { uploadArtifacts } from "./upload-artifacts.js";
 import { checkPreviewHealth } from "./health-check.js";
 import { detectLegacy } from "./adapters/base44-adapter.js";
 import { captureZipPreviewCredits, cancelZipPreviewHold } from "./zip-credits.js";
+import { runWorkerZipAutoRepair } from "./repair/zip-auto-repair.js";
+import { loadPreviewBuildEnv } from "./project-secrets.js";
 
 async function downloadSourceZip(snapshotPath: string): Promise<WorkspaceFile[]> {
   const { data, error } = await supabase.storage.from(config.sourceBucket).download(snapshotPath);
@@ -97,7 +99,23 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
   let logs = "";
   try {
     log("info", "job started", { jobId: job.id, projectId: job.project_id });
-    const files = await loadSourceFiles(job);
+    let files = await loadSourceFiles(job);
+    const repair = runWorkerZipAutoRepair(files);
+    if (repair.actions.length) {
+      log("info", "zip auto-repair applied", {
+        jobId: job.id,
+        actions: repair.actions.length,
+        blockers: repair.blockers,
+      });
+      files = repair.files;
+    }
+    if (repair.blockers.length) {
+      log("warn", "zip auto-repair blockers", { blockers: repair.blockers });
+    }
+    const { env: secretEnv, injectedNames } = await loadPreviewBuildEnv(job.project_id);
+    if (injectedNames.length) {
+      Object.assign(process.env, secretEnv);
+    }
     await writeWorkspaceFiles(workspace, files);
     const framework = detectFramework(files);
     const legacy = detectLegacy(files);
@@ -161,6 +179,8 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
               ? buildMeta.packageRepair
               : null,
           warnings,
+          zipAutoRepair: repair.actions.length ? { actions: repair.actions, blockers: repair.blockers } : null,
+          injected_secret_names: injectedNames,
           lastPreviewBuildAt: new Date().toISOString(),
           jobId: job.id,
         },
@@ -211,6 +231,8 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
       buildLogs: redactSecrets(logs).slice(0, 50000),
       previewBuildMeta,
       warnings,
+      zipAutoRepair: repair.actions.length ? { actions: repair.actions, blockers: repair.blockers } : null,
+      injected_secret_names: injectedNames,
       lastPreviewBuildAt: new Date().toISOString(),
       jobId: job.id,
     };

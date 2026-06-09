@@ -126,7 +126,9 @@ export function PreviewPanel({
 
   const hasInline = !!srcDoc?.trim() && !isUnrenderableSrcDoc(srcDoc);
   const iframeRenderable = runtimeStatus?.previewRenderable === true;
-  const previewPreparing = Boolean(runtimeStatus && !iframeRenderable);
+  const previewBuildFailed =
+    runtimeStatus?.jobStatus === "failed" || runtimeStatus?.previewStatus === "failed";
+  const previewPreparing = Boolean(runtimeStatus && !iframeRenderable && !previewBuildFailed);
   const isArtifactUrl = Boolean(url && isArtifactPreviewUrl(url));
 
   React.useEffect(() => {
@@ -186,6 +188,7 @@ export function PreviewPanel({
     iframeError &&
     !embedBlocked &&
     !previewPreparing &&
+    !previewBuildFailed &&
     !hasInline;
   const shellState =
     buildActive || thinking

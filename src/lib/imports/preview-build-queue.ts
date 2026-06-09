@@ -47,6 +47,35 @@ export async function queuePreviewBuildJob(input: {
   const jobId = input.jobId ?? crypto.randomUUID();
   const now = new Date().toISOString();
 
+  // Mark prior failed preview jobs as superseded when a new build is queued after auto-repair.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const adminJobs = input.admin as any;
+  const { data: priorFailed } = await adminJobs
+    .from("preview_build_jobs")
+    .select("id, diagnostics")
+    .eq("project_id", input.projectId)
+    .eq("status", "failed")
+    .order("created_at", { ascending: false })
+    .limit(5);
+  for (const prior of priorFailed ?? []) {
+    const prevDiag =
+      prior.diagnostics && typeof prior.diagnostics === "object"
+        ? (prior.diagnostics as Record<string, unknown>)
+        : {};
+    await adminJobs
+      .from("preview_build_jobs")
+      .update({
+        diagnostics: {
+          ...prevDiag,
+          superseded_by: jobId,
+          superseded_at: now,
+          superseded_reason: "auto_repair_rebuild",
+        },
+        updated_at: now,
+      })
+      .eq("id", prior.id);
+  }
+
   let diagnostics = analysisToDiagnostics(analysis, {
     previewStatus: "queued",
     lastPreviewBuildAt: now,

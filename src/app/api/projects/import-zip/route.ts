@@ -438,6 +438,17 @@ export async function POST(req: Request) {
     diagnostics,
     jobId: previewBuild?.jobId ?? null,
     previewBilling: billing,
+    zipAutoRepair: previewBuild?.autoRepair
+      ? {
+          actions: previewBuild.autoRepair.repairActions,
+          warnings: previewBuild.autoRepair.warnings,
+          blockers: previewBuild.autoRepair.blockers,
+          canBuild: previewBuild.autoRepair.canBuild,
+          framework: previewBuild.autoRepair.framework,
+          confidence: previewBuild.autoRepair.confidence,
+          persisted: previewBuild.autoRepair.persisted,
+        }
+      : null,
     routes: validation.routes,
     warnings: [...validation.warnings, ...(diagnostics?.warnings ?? [])],
     rejectedSecrets,

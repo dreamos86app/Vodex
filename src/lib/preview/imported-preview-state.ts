@@ -48,6 +48,31 @@ export function classifyImportedPreviewState(
     };
   }
 
+  const buildFailed =
+    runtime?.jobStatus === "failed" ||
+    runtime?.previewStatus === "failed" ||
+    runtime?.previewFailureKind === "build_failed" ||
+    runtime?.previewFailureKind === "runtime_error" ||
+    runtime?.previewFailureKind === "unsupported_framework";
+
+  if (buildFailed) {
+    return {
+      state: "preview_runtime_failed",
+      title: "Preview build failed",
+      summary:
+        runtime?.userMessage ??
+        runtime?.previewFailureDetail ??
+        runtime?.blockedReason ??
+        "Check build logs and run auto-repair to fix the issue.",
+      showScaryBlocked: false,
+      showPrepareButton: true,
+      showOpenNewTab: false,
+      showEmbedRepair: false,
+      showRepairCta: true,
+      failureKind: (runtime?.previewFailureKind as PreviewFailureKind) ?? "build_failed",
+    };
+  }
+
   if (runtime?.previewRenderable) {
     return {
       state: "preview_ready",

@@ -239,16 +239,28 @@ export function classifyPreviewBuildFailure(input: {
   }
 
   if (normalized.missing_imports.length || reason.includes("invalid_import") || reason.includes("cannot find module")) {
-    return buildClassification("missing_import", "compile", {
+    const aliasImport = normalized.missing_imports.some(
+      (m) => m.startsWith("@/") || m.startsWith("~/") || m.startsWith("src/"),
+    );
+    const classification = buildClassification("missing_import", "compile", {
       ...normalized,
       failure_message:
         normalized.typescript_error ??
         `Missing import: ${normalized.missing_imports.slice(0, 3).join(", ")}`,
-      suggested_repair:
-        normalized.suggested_repair_action ??
-        "Add or fix imports in the failing file only — keep full app scope.",
+      suggested_repair: aliasImport
+        ? "Add or repair tsconfig path aliases (@/*) — auto-repair can normalize imports before rebuild."
+        : (normalized.suggested_repair_action ??
+          "Add or fix imports in the failing file only — keep full app scope."),
       auto_repair: true,
     });
+    if (aliasImport) {
+      classification.human_title = "Preview build failed — missing tsconfig / path aliases";
+      classification.human_summary =
+        normalized.missing_imports[0] != null
+          ? `Could not resolve path alias import: ${normalized.missing_imports[0]}`
+          : classification.human_summary;
+    }
+    return classification;
   }
 
   if (normalized.invalid_exports.length || reason.includes("missing_export")) {

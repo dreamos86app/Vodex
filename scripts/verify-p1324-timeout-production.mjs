@@ -39,7 +39,7 @@ const suites = {
   "no-quality-debug-user-chat": () => {
     const errors = [];
     must(read("src/lib/build/build-user-copy.ts"), "sanitizeUserBuildChatText", "sanitize helper", errors);
-    must(read("src/lib/build/workflow-stream-coalesce.ts"), "quality\\s*score", "filter quality in coalesce", errors);
+    must(read("src/lib/build/workflow-stream-coalesce.ts"), "containsUserFacingBuildDebug", "filter quality in coalesce", errors);
     mustNot(read("src/lib/build/execute-staged-build-job.ts"), "Quality score:", "no quality in worker", errors);
     mustNot(read("src/lib/build/live-build-activity.ts"), "Retry ${n}/${maxAttempts}", "no retry quality in activity", errors);
     must(read("src/lib/build/live-build-activity.ts"), "Checking screens and navigation", "user-friendly quality phase", errors);

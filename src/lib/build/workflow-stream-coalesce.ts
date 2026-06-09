@@ -12,6 +12,7 @@ import {
   hasRecoverableBuildFiles,
   resolveBuildTerminalTruth,
 } from "@/lib/build/build-terminal-truth";
+import { containsUserFacingBuildDebug } from "@/lib/build/user-build-copy-sanitizer";
 
 const GENERIC_TITLES = new Set([
   "Understanding your app",
@@ -312,10 +313,7 @@ export function collapseDuplicateAssistantMessages(
       continue;
     }
     const copy = (ev.subtitle ?? ev.title).trim();
-    if (/quality\s*score|meaningful routes|wired\s*\d+|retry\s*\d+\s*\/\s*\d+/i.test(copy)) {
-      continue;
-    }
-    if (/continuation pass\s+\d+\s+timed out|timed out at\s+\d+s/i.test(copy)) {
+    if (containsUserFacingBuildDebug(copy)) {
       continue;
     }
     const key = `${ev.stableKey}:${copy.toLowerCase().replace(/…+$/u, "").slice(0, 120)}`;

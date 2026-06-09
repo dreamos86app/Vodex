@@ -45,15 +45,19 @@ export function PreviewRuntimeStatusPanel({
   const qualityWarnings = status.warnings.filter((w) =>
     w.includes("secondary pages are still simple placeholders"),
   );
+  const buildFailed =
+    status.jobStatus === "failed" || status.previewStatus === "failed";
   const label =
-    classification?.human_title ??
-    (sourceValidationFailed
-      ? "Preview blocked by source validation"
-      : gateBugRetry
-        ? "Preview not started — retry"
-        : status.previewFailureKind === "true_incomplete_files"
-          ? "Generated files are incomplete"
-          : previewRuntimeStateLabel(status));
+    buildFailed
+      ? (classification?.human_title ?? "Preview build failed")
+      : classification?.human_title ??
+        (sourceValidationFailed
+          ? "Preview blocked by source validation"
+          : gateBugRetry
+            ? "Preview not started — retry"
+            : status.previewFailureKind === "true_incomplete_files"
+              ? "Generated files are incomplete"
+              : previewRuntimeStateLabel(status));
   const pending =
     status.jobStatus === "queued" ||
     status.jobStatus === "running" ||
@@ -157,7 +161,7 @@ export function PreviewRuntimeStatusPanel({
                 ) : (
                   <Wrench className="size-3" />
                 )}
-                Run repair
+                Auto-repair and rebuild
               </Button>
             ) : null}
             {onStartPreview &&
@@ -227,7 +231,7 @@ export function PreviewRuntimeStatusPanel({
               }}
             >
               <Copy className="size-3" />
-              Copy details
+              Copy technical details
             </Button>
           </div>
         ) : null}
