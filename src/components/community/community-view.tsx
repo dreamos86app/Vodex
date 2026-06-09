@@ -16,6 +16,9 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import type { Discussion } from "@/lib/supabase/types";
 import { DiscussionDetailDrawer } from "@/components/community/discussion-detail-drawer";
+import { CommunityHeartButton } from "@/components/community/community-heart-button";
+import { GroupCategoryBadges, parseGroupCategories } from "@/components/community/group-category-badges";
+import { GroupCategoryPicker } from "@/components/community/group-category-picker";
 import { sortByTrending } from "@/lib/community/trending-score";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,6 +35,7 @@ interface Group {
   slug: string;
   description: string | null;
   category: string;
+  categories?: string[] | null;
   icon_url: string | null;
   banner_color: string;
   is_public: boolean;
@@ -43,8 +47,6 @@ interface Group {
 
 const CATEGORIES = ["General", "Tips", "Guide", "Feedback", "Showcase", "Question", "Announcement"] as const;
 type Category = (typeof CATEGORIES)[number];
-
-const GROUP_CATEGORIES = ["General", "SaaS", "Mobile", "Backend", "Frontend", "AI", "Open Source", "Indie", "Design", "Web3", "Other"];
 
 const BANNER_COLORS = [
   "#4f7cff", "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e",
@@ -271,11 +273,10 @@ function CreateGroupModal({
   onClose: () => void;
   onCreated: (g: Group) => void;
 }) {
-  const supabase = createClient();
   const { user } = useAuthStore();
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [category, setCategory] = React.useState("General");
+  const [categories, setCategories] = React.useState<string[]>(["General"]);
   const [bannerColor, setBannerColor] = React.useState("#4f7cff");
   const [iconFile, setIconFile] = React.useState<File | null>(null);
   const [iconPreview, setIconPreview] = React.useState<string | null>(null);
@@ -322,39 +323,27 @@ function CreateGroupModal({
       setUploading(false);
     }
 
-    const slug = generateSlug(name);
-
-    const { data, error: err } = await supabase
-      .from("groups")
-      .insert({
-        creator_id: user.id,
+    const res = await fetch("/api/community/groups", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         name: name.trim(),
-        slug,
         description: description.trim() || null,
-        category,
-        banner_color: bannerColor,
-        icon_url: iconUrl,
-        is_public: true,
-        is_featured: false,
-        member_count: 1,
-      })
-      .select()
-      .single();
+        categories,
+        bannerColor,
+        iconUrl,
+      }),
+    });
+    const payload = (await res.json()) as { group?: Group; error?: string };
 
-    if (err || !data) {
-      setError(err?.message ?? "Failed to create group.");
+    if (!res.ok || !payload.group) {
+      setError(payload.error ?? "Failed to create group.");
       setLoading(false);
       return;
     }
 
-    // Auto-join as admin
-    await supabase.from("group_members").insert({
-      group_id: data.id,
-      user_id: user.id,
-      role: "admin",
-    });
-
-    onCreated(data as Group);
+    onCreated(payload.group);
     onClose();
   }
 
@@ -377,45 +366,46 @@ function CreateGroupModal({
 
         {/* Banner preview */}
         <div
-          className="relative h-24 w-full transition-colors"
+          className="h-24 w-full transition-colors"
           style={{ background: bannerColor }}
-        >
-          {/* Icon overlay */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute bottom-0 left-5 translate-y-1/2 flex size-16 items-center justify-center overflow-hidden rounded-xl ring-4 ring-background transition hover:opacity-90"
-            style={{ background: iconPreview ? undefined : "rgba(255,255,255,0.2)" }}
-          >
-            {iconPreview ? (
-              <img src={iconPreview} alt="Group icon" className="size-full object-cover" />
-            ) : (
-              <ImageIcon className="size-6 text-white/70" strokeWidth={1.5} />
-            )}
-          </button>
-        </div>
+        />
 
-        <form onSubmit={handleSubmit} className="p-5 pt-10 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-5">
+          <div className="flex items-end gap-4 -mt-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl ring-4 ring-accent transition hover:opacity-90"
+              style={{ background: iconPreview ? undefined : "rgba(79,124,255,0.12)" }}
+            >
+              {iconPreview ? (
+                <img src={iconPreview} alt="Group icon" className="size-full object-cover" />
+              ) : (
+                <ImageIcon className="size-6 text-accent/70" strokeWidth={1.5} />
+              )}
+            </button>
+            <div className="min-w-0 flex-1 pb-1">
           {error && (
             <div className="rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive ring-1 ring-destructive/20">{error}</div>
           )}
 
-          {/* Icon upload */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="sr-only"
-            onChange={handleIconChange}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 text-[12px] text-accent hover:underline underline-offset-2"
-          >
-            <Upload className="size-3.5" strokeWidth={1.75} />
-            {iconPreview ? "Change group icon" : "Upload group icon (optional)"}
-          </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                onChange={handleIconChange}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 text-[12px] font-medium text-accent hover:underline underline-offset-2"
+              >
+                <Upload className="size-3.5" strokeWidth={1.75} />
+                {iconPreview ? "Change group icon" : "Upload group icon (optional)"}
+              </button>
+            </div>
+          </div>
 
           {/* Banner color picker */}
           <div className="space-y-1.5">
@@ -463,16 +453,10 @@ function CreateGroupModal({
             />
           </div>
 
-          {/* Category */}
+          {/* Categories */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-foreground">Category</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="h-10 w-full rounded-[var(--radius-md)] bg-surface px-3 text-[13px] text-foreground ring-1 ring-border outline-none focus:ring-accent/50 transition"
-            >
-              {GROUP_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <label className="text-[12px] font-medium text-foreground">Categories</label>
+            <GroupCategoryPicker value={categories} onChange={setCategories} />
           </div>
 
           {/* Description */}
@@ -553,24 +537,14 @@ function DiscussionCard({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onLike(disc.id); }}
-          className={cn(
-            "flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 transition hover:bg-surface",
-            disc.liked && "text-red-500",
-          )}
-        >
-          <motion.span
-            key={disc.liked ? "liked" : "plain"}
-            initial={{ scale: 0.85 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 500, damping: 18 }}
-          >
-            <Heart className={cn("size-3.5 transition-colors", disc.liked && "fill-red-500 text-red-500")} strokeWidth={disc.liked ? 0 : 1.55} />
-          </motion.span>
-          {disc.like_count}
-        </button>
+        <div onClick={(e) => e.stopPropagation()} role="presentation">
+          <CommunityHeartButton
+            liked={!!disc.liked}
+            count={disc.like_count}
+            onToggle={() => onLike(disc.id)}
+            size="sm"
+          />
+        </div>
         <span className="flex items-center gap-1">
           <MessageCircle className="size-3.5" strokeWidth={1.55} />
           {disc.reply_count}
@@ -669,7 +643,7 @@ function EmptyDiscussions({ onStart }: { onStart: () => void }) {
 
 // ─── Groups tab ───────────────────────────────────────────────────────────────
 
-function GroupsTab({ onCreateGroup }: { onCreateGroup: () => void }) {
+function GroupsTab({ onCreateGroup, refreshKey }: { onCreateGroup: () => void; refreshKey?: number }) {
   const supabase = createClient();
   const { user } = useAuthStore();
   const [groups, setGroups] = React.useState<Group[]>([]);
@@ -719,7 +693,7 @@ function GroupsTab({ onCreateGroup }: { onCreateGroup: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, retryKey]);
+  }, [user?.id, retryKey, refreshKey]);
 
   async function handleJoin(groupId: string) {
     if (!user) { router.push("/auth/login"); return; }
@@ -806,7 +780,7 @@ function GroupsTab({ onCreateGroup }: { onCreateGroup: () => void }) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5">
                       <div
-                        className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl ring-2 ring-background -mt-7"
+                        className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl ring-2 ring-accent -mt-7"
                         style={{ background: g.icon_url ? undefined : `${g.banner_color}33` }}
                       >
                         {g.icon_url ? (
@@ -817,10 +791,15 @@ function GroupsTab({ onCreateGroup }: { onCreateGroup: () => void }) {
                       </div>
                       <div className="mt-0">
                         <p className="text-[13.5px] font-semibold text-foreground">{g.name}</p>
-                        <p className="text-[11px] text-muted-foreground">{g.member_count.toLocaleString()} members · {g.category}</p>
+                        <p className="text-[11px] text-muted-foreground">{g.member_count.toLocaleString()} members</p>
                       </div>
                     </div>
                   </div>
+                  <GroupCategoryBadges
+                    categories={parseGroupCategories(g)}
+                    className="mt-2"
+                    compact
+                  />
                   {g.description && (
                     <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground line-clamp-2">{g.description}</p>
                   )}
@@ -886,6 +865,7 @@ export function CommunityView() {
   const [discussionsRetryKey, setDiscussionsRetryKey] = React.useState(0);
   const [showCreate, setShowCreate] = React.useState(false);
   const [showCreateGroup, setShowCreateGroup] = React.useState(false);
+  const [groupsRefreshKey, setGroupsRefreshKey] = React.useState(0);
   const [likedIds, setLikedIds] = React.useState<Set<string>>(new Set());
   const [openDiscussion, setOpenDiscussion] = React.useState<DiscussionWithAuthor | null>(null);
 
@@ -954,6 +934,11 @@ export function CommunityView() {
           : d,
       ),
     );
+    setOpenDiscussion((prev) =>
+      prev && prev.id === discussionId
+        ? { ...prev, liked: !isLiked, like_count: prev.like_count + (isLiked ? -1 : 1) }
+        : prev,
+    );
     setLikedIds((prev) => {
       const next = new Set(prev);
       if (isLiked) next.delete(discussionId);
@@ -971,6 +956,9 @@ export function CommunityView() {
         setDiscussions((prev) =>
           prev.map((d) => (d.id === discussionId ? { ...d, like_count: j.likeCount! } : d)),
         );
+        setOpenDiscussion((prev) =>
+          prev && prev.id === discussionId ? { ...prev, like_count: j.likeCount! } : prev,
+        );
       }
     } catch {
       setDiscussions((prev) =>
@@ -979,6 +967,11 @@ export function CommunityView() {
             ? { ...d, liked: isLiked, like_count: d.like_count + (isLiked ? 1 : -1) }
             : d,
         ),
+      );
+      setOpenDiscussion((prev) =>
+        prev && prev.id === discussionId
+          ? { ...prev, liked: isLiked, like_count: prev.like_count + (isLiked ? 1 : -1) }
+          : prev,
       );
       setLikedIds((prev) => {
         const next = new Set(prev);
@@ -1088,7 +1081,7 @@ export function CommunityView() {
       {/* Groups tab */}
       {tab === "Groups" && (
         <motion.div variants={variants.fadeUp} initial="hidden" animate="show" transition={{ delay: 0.1 }} className="mt-6">
-          <GroupsTab onCreateGroup={() => setShowCreateGroup(true)} />
+          <GroupsTab onCreateGroup={() => setShowCreateGroup(true)} refreshKey={groupsRefreshKey} />
         </motion.div>
       )}
 
@@ -1149,6 +1142,7 @@ export function CommunityView() {
             onCreated={() => {
               setTab("Groups");
               setShowCreateGroup(false);
+              setGroupsRefreshKey((k) => k + 1);
             }}
           />
         )}

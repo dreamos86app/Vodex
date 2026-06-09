@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { downloadPreviewArtifactFile } from "@/lib/imports/preview-artifact-writer";
 import { requireProjectId, jsonMissingId } from "@/lib/ids/required-ids";
+import { stripPreviewPlatformPathsFromText } from "@/lib/preview/strip-preview-platform-paths";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,23 @@ export async function GET(
 
   if (!file) return new NextResponse("Not found", { status: 404 });
 
-  return new NextResponse(new Uint8Array(file.data), {
+  const lower = rel.toLowerCase();
+  const isTextBundle =
+    lower.endsWith(".js") ||
+    lower.endsWith(".mjs") ||
+    lower.endsWith(".html") ||
+    lower.endsWith(".json") ||
+    file.contentType.includes("javascript") ||
+    file.contentType.includes("json");
+
+  const body = isTextBundle
+    ? Buffer.from(
+        stripPreviewPlatformPathsFromText(file.data.toString("utf8"), projectId, { rewriteAssetUrls: false }),
+        "utf8",
+      )
+    : file.data;
+
+  return new NextResponse(new Uint8Array(body), {
     status: 200,
     headers: {
       "Content-Type": file.contentType,

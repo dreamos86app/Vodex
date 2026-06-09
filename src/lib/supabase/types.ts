@@ -113,13 +113,19 @@ export interface Database {
           slug: string;
           description: string | null;
           category: string;
+          categories: string[];
           icon_url: string | null;
           banner_color: string;
           is_public: boolean;
           is_featured: boolean;
           member_count: number;
         };
-        Insert: Omit<Database["public"]["Tables"]["groups"]["Row"], "id" | "created_at" | "updated_at">;
+        Insert: Omit<
+          Database["public"]["Tables"]["groups"]["Row"],
+          "id" | "created_at" | "updated_at" | "categories"
+        > & {
+          categories?: string[];
+        };
         Update: Partial<Database["public"]["Tables"]["groups"]["Row"]>;
         Relationships: [];
       };
@@ -1238,10 +1244,15 @@ export interface Database {
           body: string;
           like_count: number;
           is_deleted: boolean;
+          parent_reply_id: string | null;
         };
-        Insert: Omit<Database["public"]["Tables"]["discussion_replies"]["Row"], "id" | "created_at" | "updated_at" | "like_count" | "is_deleted"> & {
+        Insert: Omit<
+          Database["public"]["Tables"]["discussion_replies"]["Row"],
+          "id" | "created_at" | "updated_at" | "like_count" | "is_deleted" | "parent_reply_id"
+        > & {
           like_count?: number;
           is_deleted?: boolean;
+          parent_reply_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["discussion_replies"]["Row"]>;
         Relationships: [];
@@ -1254,6 +1265,17 @@ export interface Database {
           created_at: string;
         };
         Insert: Omit<Database["public"]["Tables"]["discussion_likes"]["Row"], "created_at">;
+        Update: never;
+        Relationships: [];
+      };
+
+      discussion_reply_likes: {
+        Row: {
+          user_id: string;
+          reply_id: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["discussion_reply_likes"]["Row"], "created_at">;
         Update: never;
         Relationships: [];
       };

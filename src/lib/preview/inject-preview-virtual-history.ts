@@ -143,5 +143,8 @@ export function injectPreviewVirtualHistory(html: string, routePath: string): st
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (m) => `${m}${script}`);
   }
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/<html[^>]*>/i, (m) => `${m}<head>${script}</head>`);
+  }
   return script + html;
 }

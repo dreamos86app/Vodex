@@ -1,5 +1,6 @@
 import { injectPreviewRouterShim } from "@/lib/preview/inject-preview-router-shim";
 import { buildInternalPreviewHtmlUrl } from "@/lib/preview/internal-preview-url";
+import { stripPreviewPlatformPathsFromText } from "@/lib/preview/strip-preview-platform-paths";
 
 export {
   assertInternalPreviewUrl,
@@ -40,7 +41,7 @@ export function rewritePreviewArtifactHtml(
     return `${base}/${clean}?${q}`;
   };
 
-  let out = html;
+  let out = stripPreviewPlatformPathsFromText(html, projectId);
 
   if (!/<base\s/i.test(out)) {
     const baseTag = `<base href="${base}/?${q}" />`;

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { GroupChatPanel } from "@/components/community/group-chat-panel";
+import { GroupCategoryBadges, parseGroupCategories } from "@/components/community/group-category-badges";
 
 interface Group {
   id: string;
@@ -22,6 +23,7 @@ interface Group {
   slug: string;
   description: string | null;
   category: string;
+  categories?: string[] | null;
   icon_url: string | null;
   banner_color: string;
   is_public: boolean;
@@ -137,7 +139,7 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
           {/* Icon overlapping banner */}
           <div className="relative -mt-10 mb-4 flex items-end justify-between gap-4">
             <div
-              className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-4 ring-background"
+              className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-4 ring-accent"
               style={{ background: group.icon_url ? undefined : "rgba(255,255,255,0.15)" }}
             >
               {group.icon_url ? (
@@ -184,9 +186,11 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
                 {group.is_public ? "Public" : "Private"}
               </span>
             </div>
-            <div className="mt-1 flex items-center gap-2 text-[12px] text-muted-foreground">
-              <span className="rounded-full bg-muted/60 px-2 py-0.5 font-medium">{group.category}</span>
-              <span>{group.member_count.toLocaleString()} member{group.member_count !== 1 ? "s" : ""}</span>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <GroupCategoryBadges categories={parseGroupCategories(group)} />
+              <span className="text-[12px] text-muted-foreground">
+                {group.member_count.toLocaleString()} member{group.member_count !== 1 ? "s" : ""}
+              </span>
             </div>
             {group.description && (
               <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{group.description}</p>
