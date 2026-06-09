@@ -557,17 +557,13 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
           : null) ??
         (blockReason === "quality_below_floor" || blockReason === "model_underproduced"
           ? [
-              "Build paused — quality is below the production floor.",
-              `Quality: ${meaningfulReport?.final_quality_score ?? pr.uiQualityScore ?? "—"}/${meaningfulReport?.min_required_score ?? generationBudget?.minQualityScore ?? 84}`,
-              `Model: ${pr.primaryModelId}`,
-              `Files generated: ${totalRawFiles} (${saveableFileCount} renderable)`,
-              modelUnderproduced
-                ? "Why blocked: model underproduced — full app needs 35+ meaningful files."
-                : "Why blocked: output did not meet the production quality floor.",
-              "Next action: Continue generation",
+              "Build paused — app is not ready yet",
+              "Build needs another generation pass before preview.",
+              "Some screens are still incomplete, so I'm continuing the build instead of showing a broken preview.",
+              "Continue generation",
               "No credits were charged for this incomplete pass.",
             ].join("\n")
-          : "Build blocked — generic scaffold or quality floor. Full model generation required before preview.");
+          : "Build paused — app is not ready yet. Continue generation to finish the app before preview.");
 
       await clearGeneratedBuildFiles({
         writer: input.writer,
@@ -622,7 +618,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       await persistBuildJobEvent(input.writer, {
         ...eventCtx,
         type: "fixing_error",
-        title: "Continuing generation needed",
+        title: "Build paused — app is not ready yet",
         detail: draftSummary,
         progressPercent: 100,
         metadata: {
@@ -1574,12 +1570,12 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       buildFinalSummary ??
       (canShowDone
         ? pr.meta?.summary?.trim() ||
-          `Build complete — ${pr.appName} (${fileGate.fileCount} files, quality ${generationScore}/100).`
+          `Build complete — ${pr.appName} (${fileGate.fileCount} files).`
         : generationQualityReport?.needsContinuation
-          ? `Continuing generation needed — ${fileGate.fileCount} files saved (quality ${generationScore}/100).`
+          ? `Build needs another generation pass — ${fileGate.fileCount} files saved so far.`
           : richnessOk
-            ? `Build saved — quality repair needed (${fileGate.fileCount} files, score ${generationScore}/100).`
-            : `Draft saved — additional generation needed (${fileGate.fileCount} files).`);
+            ? `Build saved — continue generation to finish remaining screens (${fileGate.fileCount} files).`
+            : `Build paused — continue generation to finish the app (${fileGate.fileCount} files so far).`);
     await persistAssistantBuildMessage(input.writer, eventCtx, {
       message: doneSummary.slice(0, 280),
       progressPercent: 98,
@@ -1596,13 +1592,13 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
             : "Draft saved",
       detail: canShowDone
         ? routeVerified
-          ? `Preview live · routes ${routeVerified.verifiedCount}/${routeVerified.totalCount} · quality ${generationScore}/100`
+          ? `Preview live · routes ${routeVerified.verifiedCount}/${routeVerified.totalCount}`
           : "Preview is live with rich dashboard UI."
         : generationQualityReport?.needsContinuation
           ? "More pages are needed before this app is complete."
           : richnessOk
-            ? `Quality score ${generationScore}/100 — repair pass recommended.`
-            : "Draft saved — additional generation needed.",
+            ? "Continue generation to finish remaining screens before preview."
+            : "Build needs another generation pass before preview.",
       progressPercent: 100,
       metadata: {
         credits_charged: creditsCharged,

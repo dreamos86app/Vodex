@@ -8,6 +8,7 @@ import {
   guardCatastrophicHeadline,
   resolveBuildTerminalTruth,
 } from "@/lib/build/build-terminal-truth";
+import { CONTINUE_GENERATION_LABEL } from "@/lib/build/build-user-copy";
 
 export type BuildRunSummaryVariant = "completed" | "partial" | "failed" | "inline";
 
@@ -32,6 +33,7 @@ export function BuildRunSummaryCard({
   showRefundLine = false,
   showRepairActions = false,
   showPreviewActions = false,
+  showContinueGeneration = false,
   onContinue,
   onRepair,
   className,
@@ -54,6 +56,7 @@ export function BuildRunSummaryCard({
   showRefundLine?: boolean;
   showRepairActions?: boolean;
   showPreviewActions?: boolean;
+  showContinueGeneration?: boolean;
   onContinue?: () => void;
   onRepair?: () => void;
   className?: string;
@@ -70,19 +73,22 @@ export function BuildRunSummaryCard({
     persistenceConfirmed: count >= MIN_RENDERABLE_FILES,
   });
   const title = guardCatastrophicHeadline(
-    truth.hasRecoverableFiles
+    truth.hasRecoverableFiles && count >= MIN_RENDERABLE_FILES
       ? truth.headline
       : headline ??
           (failed
-            ? status === "preview_failed"
-              ? "Build saved — preview needs repair"
-              : status === "failed_before_generation"
-                ? "Couldn't start the build"
-                : "Build needs attention"
+            ? status === "quality_below_floor"
+              ? "Build paused — app is not ready yet"
+              : status === "preview_failed"
+                ? "Build saved — preview needs repair"
+                : status === "failed_before_generation"
+                  ? "Couldn't start the build"
+                  : "Build needs attention"
             : partial
               ? "Build saved — next steps queued"
               : "Build complete"),
-    truth.hasRecoverableFiles || count >= MIN_RENDERABLE_FILES,
+    (truth.hasRecoverableFiles || count >= MIN_RENDERABLE_FILES) && count >= MIN_RENDERABLE_FILES,
+    count,
   );
   const inline = variant === "inline" || isPendingPreviewHeadline(title);
 
@@ -108,13 +114,23 @@ export function BuildRunSummaryCard({
       <div className={cn("px-1 py-0.5", className)} data-testid="build-run-summary-inline">
         <p className="text-[13px] leading-relaxed text-foreground">{title}</p>
         {detail ? <p className="mt-0.5 text-[12px] text-muted-foreground">{detail}</p> : null}
-        {showPreviewActions ? (
+        {showPreviewActions && count >= MIN_RENDERABLE_FILES ? (
           <button
             type="button"
             className="mt-2 text-[12px] font-medium text-accent underline-offset-2 hover:underline"
             data-testid="summary-open-preview"
           >
             Open preview
+          </button>
+        ) : null}
+        {showContinueGeneration && onContinue ? (
+          <button
+            type="button"
+            onClick={onContinue}
+            className="mt-2 rounded-xl bg-accent px-3 py-2 text-[12px] font-semibold text-white"
+            data-testid="summary-continue-generation"
+          >
+            {CONTINUE_GENERATION_LABEL}
           </button>
         ) : null}
       </div>
@@ -166,7 +182,7 @@ export function BuildRunSummaryCard({
         ) : null}
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {showPreviewActions && (
+          {showPreviewActions && count >= MIN_RENDERABLE_FILES && (
             <button
               type="button"
               className="rounded-xl bg-accent px-3 py-2 text-[11.5px] font-semibold text-white shadow-sm"
@@ -175,13 +191,14 @@ export function BuildRunSummaryCard({
               Open preview
             </button>
           )}
-          {partial && onContinue ? (
+          {(showContinueGeneration || partial) && onContinue ? (
             <button
               type="button"
               onClick={onContinue}
               className="rounded-xl bg-accent px-3 py-2 text-[11.5px] font-semibold text-white shadow-sm"
+              data-testid="summary-continue-generation"
             >
-              Continue build
+              {showContinueGeneration ? CONTINUE_GENERATION_LABEL : "Continue build"}
             </button>
           ) : null}
           {showRepairActions && onRepair ? (

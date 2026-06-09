@@ -1,6 +1,12 @@
 import type { MeaningfulUiQualityReport } from "@/lib/build/meaningful-ui-quality";
 import type { GenericScaffoldDetection } from "@/lib/build/generic-scaffold-detector";
 import { getHonestModelDisplayName } from "@/lib/ai/model-catalog";
+import {
+  BUILD_INCOMPLETE_NO_BROKEN_PREVIEW,
+  BUILD_NEEDS_ANOTHER_PASS,
+  BUILD_PAUSED_HEADLINE,
+  CONTINUE_GENERATION_LABEL,
+} from "@/lib/build/build-user-copy";
 
 export type BuildFinalSummaryInput = {
   modelId: string;
@@ -78,14 +84,10 @@ export function formatBuildFinalSummary(input: BuildFinalSummaryInput): string {
     (!input.qualityPasses && input.filesGenerated > 0 && input.filesGenerated < 12)
   ) {
     return [
-      "Build paused — quality is below the production floor.",
-      `Quality score: ${input.qualityScore}/${input.qualityTarget}`,
-      `Model: ${model}`,
-      `Files generated: ${input.filesGenerated}`,
-      input.blocker === "model_underproduced"
-        ? "Why blocked: model underproduced — full app needs 35+ meaningful files."
-        : "Why blocked: output did not meet the production quality floor.",
-      input.nextAction ?? "Next action: Continue generation",
+      BUILD_PAUSED_HEADLINE,
+      BUILD_NEEDS_ANOTHER_PASS,
+      BUILD_INCOMPLETE_NO_BROKEN_PREVIEW,
+      input.nextAction ?? CONTINUE_GENERATION_LABEL,
     ].join("\n");
   }
 
@@ -108,10 +110,14 @@ export function formatBuildFinalSummary(input: BuildFinalSummaryInput): string {
       : "";
 
   if (input.qualityPasses) {
-    return `Build complete — ${attemptsLine}${input.filesGenerated} files · ${input.routes} routes · ${input.components} components · Quality ${input.qualityScore}/${input.qualityTarget} · ${preview} · ${logo}${rewrite}${warnings}`;
+    return `Build complete — ${attemptsLine}${input.filesGenerated} files · ${input.routes} routes · ${input.components} components · ${preview} · ${logo}${rewrite}${warnings}`;
   }
 
-  return `Build saved — ${attemptsLine}${input.filesGenerated} files · ${input.meaningfulRoutes} meaningful routes · Quality ${input.qualityScore}/${input.qualityTarget} · Model ${model} · ${duration} · ${preview} · ${logo}${warnings} · Next: ${input.nextAction ?? "continue generation"}`;
+  if (!input.qualityPasses && input.previewStatus === "blocked") {
+    return [BUILD_PAUSED_HEADLINE, BUILD_NEEDS_ANOTHER_PASS, CONTINUE_GENERATION_LABEL].join("\n");
+  }
+
+  return `Build saved — ${attemptsLine}${input.filesGenerated} files · ${preview} · ${logo}${warnings} · Next: ${input.nextAction ?? "continue generation"}`;
 }
 
 export function buildSummaryFromQuality(

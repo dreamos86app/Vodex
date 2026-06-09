@@ -4,6 +4,10 @@
  */
 import type { BuildJobEventRow } from "@/lib/build/build-job-events";
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
+import {
+  BUILD_NEEDS_ANOTHER_PASS,
+  BUILD_PAUSED_HEADLINE,
+} from "@/lib/build/build-user-copy";
 
 export type BuildTerminalTruthState =
   | "build_failed_no_files"
@@ -161,8 +165,18 @@ export function hasRecoverableBuildFiles(input: {
 }
 
 /** Never surface catastrophic copy when recoverable files exist. */
-export function guardCatastrophicHeadline(headline: string, hasRecoverableFiles: boolean): string {
+export function guardCatastrophicHeadline(
+  headline: string,
+  hasRecoverableFiles: boolean,
+  persistedFileCount = 0,
+): string {
   if (!hasRecoverableFiles) return headline;
+  if (persistedFileCount < MIN_RENDERABLE_FILES) {
+    if (/couldn'?t start|build saved|preparing preview/i.test(headline)) {
+      return BUILD_PAUSED_HEADLINE;
+    }
+    return headline;
+  }
   if (/couldn'?t start the build/i.test(headline)) {
     return "Build saved — preparing preview…";
   }
@@ -329,6 +343,12 @@ function copyForTerminalTruthState(
         ].filter(Boolean) as string[],
       };
     case "files_generated_preview_pending":
+      if (opts.persistedFileCount < MIN_RENDERABLE_FILES) {
+        return {
+          headline: BUILD_PAUSED_HEADLINE,
+          bodyLines: [BUILD_NEEDS_ANOTHER_PASS],
+        };
+      }
       return {
         headline: "Build saved — preparing preview…",
         bodyLines: [savedLine, "Preview will open when the session is ready."].filter(Boolean) as string[],

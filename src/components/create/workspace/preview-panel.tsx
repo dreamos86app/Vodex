@@ -67,6 +67,8 @@ export interface PreviewPanelProps {
   onPrepareImportedPreview?: () => void;
   onRepairPreview?: () => void;
   prepareImportBusy?: boolean;
+  /** When false, never show preview loading — generation has not produced a previewable app yet. */
+  canPreview?: boolean;
 }
 
 function isUnrenderableSrcDoc(doc: string | null | undefined): boolean {
@@ -105,6 +107,7 @@ export function PreviewPanel({
   onPrepareImportedPreview,
   onRepairPreview,
   prepareImportBusy = false,
+  canPreview = true,
 }: PreviewPanelProps) {
   const [viewport, setViewport] = React.useState<Viewport>("desktop");
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -176,8 +179,14 @@ export function PreviewPanel({
     !showEmbedFallback &&
     !showRuntimeOverlay &&
     (hasInline || iframeRenderable);
+  const generationContinuing = canPreview === false && !buildActive;
   const showSlowLoadHint =
-    showArtifact && iframeError && !embedBlocked && !previewPreparing && !hasInline;
+    canPreview !== false &&
+    showArtifact &&
+    iframeError &&
+    !embedBlocked &&
+    !previewPreparing &&
+    !hasInline;
   const shellState =
     buildActive || thinking
       ? previewState === "compiling"
@@ -329,7 +338,11 @@ export function PreviewPanel({
           <BuildPreviewSurface
             state={shellState}
             appName={appName}
-            currentStep={buildStepLabel}
+            currentStep={
+              generationContinuing
+                ? "Preview not available yet — generation is still continuing."
+                : buildStepLabel
+            }
             stepIndex={buildStepIndex}
           />
         ) : null}
@@ -355,6 +368,20 @@ export function PreviewPanel({
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {generationContinuing && !showBuildShell && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-atmosphere p-6">
+            <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl bg-background p-8 text-center shadow-lg ring-1 ring-border">
+              <Loader2 className="size-6 animate-spin text-accent" strokeWidth={1.75} />
+              <p className="text-[13px] font-semibold text-foreground">
+                Preview not available yet — generation is still continuing.
+              </p>
+              <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+                Continue generation from chat when the build pauses — preview opens once real app files are saved.
+              </p>
+            </div>
           </div>
         )}
 

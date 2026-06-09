@@ -80,6 +80,7 @@ import {
   resolveBuildRunSummary,
   type WorkflowRunStatus,
 } from "@/lib/build/workflow-status-guards";
+import { resolveAppBuildTruthFromFacts } from "@/lib/build/app-build-truth";
 import { BuildRunSummaryCard } from "@/components/create/workspace/build-run-summary";
 import { classifyAppArchetype } from "@/lib/build/app-archetype-classifier";
 import { userFacingArchetypeLabel } from "@/lib/workflow/user-facing-workflow-events";
@@ -430,6 +431,7 @@ export function ImmersiveWorkspace({
     showRefundLine?: boolean;
     showRepairActions?: boolean;
     showPreviewActions?: boolean;
+    showContinueGeneration?: boolean;
   } | null>(null);
   const safeInitialConversationId =
     initialConversationId && isUuid(initialConversationId)
@@ -1070,6 +1072,7 @@ export function ImmersiveWorkspace({
               showRefundLine: resolved.showRefundLine,
               showRepairActions: resolved.showRepairActions,
               showPreviewActions: resolved.showPreviewActions,
+              showContinueGeneration: resolved.showContinueGeneration,
               refunded: resolved.showRefundLine,
             });
             setSubmitStatusLabel(resolved.headline);
@@ -1165,6 +1168,7 @@ export function ImmersiveWorkspace({
         showRefundLine: summary.showRefundLine,
         showRepairActions: summary.showRepairActions,
         showPreviewActions: summary.showPreviewActions,
+        showContinueGeneration: summary.showContinueGeneration,
       });
       setSubmitStatusLabel(
         summary.status === "partial_credit_stop"
@@ -2760,6 +2764,57 @@ export function ImmersiveWorkspace({
     : null;
   const previewSrcRenderable = previewRuntime?.previewRenderable === true;
 
+  const appBuildTruth = React.useMemo(() => {
+    const meta =
+      effectiveProject?.metadata &&
+      typeof effectiveProject.metadata === "object" &&
+      !Array.isArray(effectiveProject.metadata)
+        ? (effectiveProject.metadata as Record<string, unknown>)
+        : {};
+    const latestMeta = (buildJobProgress?.latest?.metadata ?? {}) as Record<string, unknown>;
+    return resolveAppBuildTruthFromFacts({
+      dbAppFilesCount: projectFiles.length,
+      workflowEvents: buildJobProgress?.events,
+      previewSessionId:
+        typeof meta.preview_session_id === "string" ? meta.preview_session_id : null,
+      previewBuildJobId: previewRuntime?.jobId ?? null,
+      previewArtifactExists:
+        Boolean(previewRuntime?.jobId) ||
+        meta.preview_renderable === true ||
+        meta.preview_ready === true,
+      previewRenderable: previewSrcRenderable,
+      sourceIntegrityOk: meta.source_integrity_ok !== false,
+      previewStatus:
+        typeof meta.preview_status === "string"
+          ? meta.preview_status
+          : typeof latestMeta.preview_status === "string"
+            ? latestMeta.preview_status
+            : null,
+      continuingGenerationNeeded:
+        meta.continuing_generation_needed === true ||
+        latestMeta.continuing_generation_needed === true,
+      failedDraft: meta.failed_draft === true || latestMeta.failed_draft === true,
+      failureKind:
+        typeof latestMeta.failure_kind === "string"
+          ? latestMeta.failure_kind
+          : typeof meta.failure_kind === "string"
+            ? meta.failure_kind
+            : null,
+      isImportedApp: isImportedZipProject,
+      buildActive: buildJobActive || buildStarting,
+    });
+  }, [
+    effectiveProject?.metadata,
+    projectFiles.length,
+    buildJobProgress?.events,
+    buildJobProgress?.latest?.metadata,
+    previewRuntime?.jobId,
+    previewSrcRenderable,
+    isImportedZipProject,
+    buildJobActive,
+    buildStarting,
+  ]);
+
   const previewAutoStartRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     previewAutoStartRef.current = null;
@@ -2802,6 +2857,7 @@ export function ImmersiveWorkspace({
 
   React.useEffect(() => {
     if (!effectiveProjectId || !persistenceConfirmed) return;
+    if (appBuildTruth.isBlocked || appBuildTruth.isIncompleteNewBuild) return;
     if (buildJobActive || buildStarting || previewStarting) return;
     if (previewSrcRenderable) return;
     if (!previewRuntime) return;
@@ -2827,6 +2883,8 @@ export function ImmersiveWorkspace({
     previewSrcRenderable,
     previewRuntime,
     startPreviewSession,
+    appBuildTruth.isBlocked,
+    appBuildTruth.isIncompleteNewBuild,
   ]);
 
   const importedPreviewClassification = React.useMemo(
@@ -3330,8 +3388,8 @@ export function ImmersiveWorkspace({
                 <BuildRunSummaryCard
                   variant={buildRunSummary.variant}
                   status={buildRunSummary.status}
-                  headline={buildRunSummary.headline}
-                  bodyLines={buildRunSummary.bodyLines}
+                  headline={buildRunSummary.headline ?? appBuildTruth.headline}
+                  bodyLines={buildRunSummary.bodyLines ?? [appBuildTruth.bodyLine].filter(Boolean)}
                   appName={project?.name ?? undefined}
                   filesCount={projectFiles.length}
                   previewReady={previewSrcRenderable}
@@ -3341,18 +3399,24 @@ export function ImmersiveWorkspace({
                   failureCode={buildRunSummary.failureCode}
                   refunded={buildRunSummary.refunded}
                   showRefundLine={buildRunSummary.showRefundLine}
-                  showRepairActions={buildRunSummary.showRepairActions}
-                  showPreviewActions={buildRunSummary.showPreviewActions}
+                  showRepairActions={buildRunSummary.showRepairActions && appBuildTruth.showRepair}
+                  showPreviewActions={buildRunSummary.showPreviewActions && appBuildTruth.canPreview}
+                  showContinueGeneration={
+                    buildRunSummary.showContinueGeneration ?? appBuildTruth.showContinueGeneration
+                  }
                   onContinue={
-                    buildRunSummary.variant === "partial"
+                    buildRunSummary.showContinueGeneration ||
+                    buildRunSummary.variant === "partial" ||
+                    appBuildTruth.showContinueGeneration
                       ? () => {
                           setBuildRunSummary(null);
+                          applyComposerText(appBuildTruth.continueGenerationPrompt);
                           composerTextareaRef.current?.focus();
                         }
                       : undefined
                   }
                   onRepair={
-                    buildRunSummary.showRepairActions
+                    buildRunSummary.showRepairActions && appBuildTruth.showRepair
                       ? () => {
                           setRightTab("preview");
                           setMobilePanel("chat");
@@ -3673,9 +3737,10 @@ export function ImmersiveWorkspace({
                 editMode={mode === "edit"}
                 hasGenerated={
                   previewSrcRenderable ||
-                  codeFiles.length > 0 ||
-                  Boolean(previewRuntime?.jobId)
+                  (appBuildTruth.canPreview && projectFiles.length > 0) ||
+                  (isImportedZipProject && codeFiles.length > 0)
                 }
+                canPreview={appBuildTruth.canPreview}
                 previewState={previewShellState}
                 buildStepIndex={buildStepIndex}
                 buildStepLabel={buildStepLabel}
@@ -3699,7 +3764,7 @@ export function ImmersiveWorkspace({
                   isImportedZipProject ? () => void prepareImportedApp() : undefined
                 }
                 onRepairPreview={
-                  effectiveProjectId
+                  effectiveProjectId && appBuildTruth.showRepair
                     ? () => sendPreviewRepairToChat(true)
                     : undefined
                 }

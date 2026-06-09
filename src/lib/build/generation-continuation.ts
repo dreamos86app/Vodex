@@ -39,7 +39,8 @@ export function shouldContinueGeneration(input: {
       shouldContinue: true,
       passIndex: passIndex + 1,
       reason: "meaningful_quality_below_floor",
-      userMessage: `Quality below target (${budget.minQualityScore}/100) — continuing with premium UI passes.`,
+      userMessage:
+        "Some screens are still incomplete — continuing generation to finish pages and components before preview.",
     };
   }
   if (passIndex >= maxPasses) {
@@ -47,7 +48,7 @@ export function shouldContinueGeneration(input: {
       shouldContinue: false,
       passIndex,
       reason: "max_passes",
-      userMessage: "Build saved — quality repair needed",
+      userMessage: "Build needs another generation pass before preview.",
     };
   }
   if (budgetRemainingRatio < 0.06) {
@@ -63,7 +64,7 @@ export function shouldContinueGeneration(input: {
       shouldContinue: false,
       passIndex,
       reason: "minimums_met",
-      userMessage: report.passes ? "Build complete" : "Build saved — quality repair needed",
+      userMessage: report.passes ? "Build complete" : "Build needs another generation pass before preview.",
     };
   }
   return {

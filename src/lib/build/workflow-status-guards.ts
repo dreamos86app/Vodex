@@ -66,6 +66,7 @@ export type BuildRunSummaryResolved = {
   showRefundLine: boolean;
   showRepairActions: boolean;
   showPreviewActions: boolean;
+  showContinueGeneration: boolean;
   variant: "completed" | "partial" | "failed";
 };
 
@@ -135,23 +136,31 @@ export function deriveBuildStatusFacts(input: {
         ? terminal.latest.metadata.files_persisted
         : null;
   const fromProject = input.projectFileCount ?? 0;
-  let fileCount = fromProject;
-  if (terminal?.done && terminalMetaCount != null) {
-    fileCount = Math.max(fromProject, terminalMetaCount);
-  } else if (!terminal?.done) {
-    fileCount = Math.max(fromProject, metaFileCount);
-  }
-  if (failureKindMeta === "failed_before_generation") {
-    fileCount = Math.max(fromProject, metaFileCount, terminalMetaCount ?? 0);
-  }
+  const failedDraft =
+    terminal?.latest?.metadata?.failed_draft === true ||
+    terminal?.latest?.metadata?.continuing_generation_needed === true;
+  const qualityBlockedTerminal = failureKindMeta === "quality_below_floor";
   const signals = extractWorkflowFileSignals(events);
-  fileCount = Math.max(fileCount, signals.workflowFileCount, signals.memoryFileCount);
+  let fileCount = fromProject;
+  if (terminal?.done) {
+    fileCount = fromProject;
+    if (!failedDraft && !qualityBlockedTerminal && terminalMetaCount != null) {
+      fileCount = Math.max(fromProject, terminalMetaCount);
+    }
+    if ((failedDraft || qualityBlockedTerminal) && fromProject === 0) {
+      fileCount = 0;
+    }
+  } else {
+    fileCount = Math.max(fromProject, metaFileCount, signals.workflowFileCount);
+  }
   const hasFiles =
-    hasRecoverableBuildFiles({
-      persistedFileCount: fileCount,
-      memoryFileCount: signals.memoryFileCount,
-      signals,
-    }) || fileCount >= MIN_RENDERABLE_FILES;
+    fileCount >= MIN_RENDERABLE_FILES ||
+    (!terminal?.done &&
+      hasRecoverableBuildFiles({
+        persistedFileCount: fileCount,
+        memoryFileCount: signals.memoryFileCount,
+        signals,
+      }));
   const partialBuild =
     terminal?.latest?.type === "partial_credit_stop" ||
     events.some((e) => e.type === "partial_credit_stop");
@@ -324,10 +333,10 @@ export function resolveBuildRunSummary(input: {
       bodyLines: ["Add credits or upgrade to keep building."],
     },
     quality_below_floor: {
-      headline: "Build paused — quality is below the production floor.",
+      headline: "Build paused — app is not ready yet",
       bodyLines: [
-        input.errorDetail ?? "The model did not produce enough high-quality UI yet.",
-        "Next action: Continue generation",
+        "Build needs another generation pass before preview.",
+        "Some screens are still incomplete, so I'm continuing the build instead of showing a broken preview.",
         input.facts.creditsRefunded ? "No credits were charged." : "",
       ].filter(Boolean),
     },
@@ -442,12 +451,14 @@ export function resolveBuildRunSummary(input: {
     status = "preview_failed";
   }
   let showRefundLine = input.facts.creditsRefunded;
+  let showContinueGeneration = status === "quality_below_floor";
   let showRepairActions =
     status === "repair_failed" ||
-    status === "preview_failed" ||
-    (status === "repair_needed" && input.facts.repairAttemptCount > 1);
+    (status === "preview_failed" && filesCount >= MIN_RENDERABLE_FILES) ||
+    (status === "repair_needed" && input.facts.repairAttemptCount > 1 && filesCount >= MIN_RENDERABLE_FILES);
   let showPreviewActions =
-    status === "completed" || status === "preview_ready" || status === "preview_failed";
+    filesCount >= MIN_RENDERABLE_FILES &&
+    (status === "completed" || status === "preview_ready" || status === "preview_failed");
 
   if (savedFilesOk && firstPass && status === "completed") {
     showRepairActions = false;
@@ -484,6 +495,7 @@ export function resolveBuildRunSummary(input: {
   let headline = guardCatastrophicHeadline(
     mustNotShowBuildFailedHeadline(savedFilesOk, block.headline),
     terminalTruth.hasRecoverableFiles,
+    filesCount,
   );
   let bodyLines = block.bodyLines;
 
@@ -511,6 +523,28 @@ export function resolveBuildRunSummary(input: {
     bodyLines = canonicalCopy.bodyLines;
   }
 
+  if (status === "quality_below_floor" || input.facts.failureKind === "quality_below_floor") {
+    headline = "Build paused — app is not ready yet";
+    bodyLines = [
+      "Build needs another generation pass before preview.",
+      "Some screens are still incomplete, so I'm continuing the build instead of showing a broken preview.",
+    ];
+    showPreviewActions = false;
+    showRepairActions = false;
+    showContinueGeneration = true;
+  }
+  if (filesCount < MIN_RENDERABLE_FILES) {
+    showPreviewActions = false;
+    if (!input.facts.hasRepairAttempt) {
+      showRepairActions = false;
+    }
+    if (/build saved|preparing preview|files saved/i.test(headline)) {
+      headline = "Build paused — app is not ready yet";
+      bodyLines = ["Build needs another generation pass before preview."];
+      showContinueGeneration = true;
+    }
+  }
+
   const variant: BuildRunSummaryResolved["variant"] =
     status === "completed" || status === "preview_ready"
       ? "completed"
@@ -527,6 +561,7 @@ export function resolveBuildRunSummary(input: {
     showRefundLine,
     showRepairActions,
     showPreviewActions,
+    showContinueGeneration,
     variant: status === "partial_credit_stop" ? "partial" : variant === "completed" ? "completed" : "failed",
   };
 }
@@ -567,7 +602,7 @@ export function userSafeFailureTitle(
   }
   switch (kind) {
     case "quality_below_floor":
-      return "Build paused — quality is below the production floor.";
+      return "Build paused — app is not ready yet";
     case "failed_before_generation":
       return guardCatastrophicHeadline("Couldn't start the build", hasFiles);
     case "failed_after_generation":

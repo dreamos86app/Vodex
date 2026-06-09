@@ -41,6 +41,7 @@ import {
   MAX_SAFE_CONTINUATION_ATTEMPTS,
 } from "@/lib/build/build-terminal-state-machine";
 import { deriveBuildActivityPresentation } from "@/lib/build/live-build-activity";
+import { sanitizeUserBuildChatText } from "@/lib/build/build-user-copy";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
   return (
@@ -477,11 +478,21 @@ export function AgentWorkflowStream({
       : [];
   const merged = mergeEphemeralWithServerEvents(ephemeral, serverSequential);
   const grouped = groupFileEvents(merged, working);
-  const streamFileCount = Math.max(
-    savedFileCount,
-    grouped.filter((e) => isFileEvent(e)).length,
-    (progress.events ?? []).filter((e) => e.type === "writing_file").length,
-  );
+  const terminalMeta = (progress.latest?.metadata ?? {}) as Record<string, unknown>;
+  const failedDraft =
+    terminalMeta.failed_draft === true || terminalMeta.continuing_generation_needed === true;
+  const qualityBlocked = terminalMeta.failure_kind === "quality_below_floor";
+  const persistedMeta =
+    typeof terminalMeta.files_persisted === "number" ? terminalMeta.files_persisted : undefined;
+  const streamFileCount =
+    progress.done && (failedDraft || qualityBlocked || persistedMeta === 0)
+      ? savedFileCount
+      : Math.max(
+          savedFileCount,
+          persistedMeta ?? 0,
+          grouped.filter((e) => isFileEvent(e)).length,
+          (progress.events ?? []).filter((e) => e.type === "writing_file").length,
+        );
   const timelineRaw = applySingleActiveWorkflowStep(grouped, working);
   const shouldStaggerFiles = false;
   const timelineStaggered = useStaggeredWorkflowEvents(timelineRaw, shouldStaggerFiles);
@@ -511,11 +522,11 @@ export function AgentWorkflowStream({
   const narrationCopy = React.useMemo(() => {
     const lines = completedTimeline
       .filter((e) => e.category === "assistant_message")
-      .map((e) => e.subtitle ?? e.title);
+      .map((e) => sanitizeUserBuildChatText(e.subtitle ?? e.title));
     if (active?.category === "assistant_message") {
-      lines.push(active.subtitle ?? active.title);
+      lines.push(sanitizeUserBuildChatText(active.subtitle ?? active.title));
     }
-    return lines.join("\n");
+    return lines.filter(Boolean).join("\n");
   }, [completedTimeline, active]);
 
   const fileSummaryLine = fileDiffSummary

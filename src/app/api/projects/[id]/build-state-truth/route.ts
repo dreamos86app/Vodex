@@ -5,6 +5,7 @@ import {
   inspectBuildStateTruth,
   repairBuildStateTruth,
 } from "@/lib/build/build-state-truth-repair";
+import { resolveAppBuildTruth } from "@/lib/build/app-build-truth";
 import { requireProjectId, jsonMissingId } from "@/lib/ids/required-ids";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,8 @@ export async function GET(
 
   const writer = createServiceRoleClient() ?? supabase;
   const debug = await inspectBuildStateTruth(writer, projectId, user.id);
-  return NextResponse.json({ ok: true, debug });
+  const truth = await resolveAppBuildTruth(writer, projectId, debug.build_job_id);
+  return NextResponse.json({ ok: true, debug, truth });
 }
 
 export async function POST(
