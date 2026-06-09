@@ -58,6 +58,8 @@ import {
   callProviderWithModelHeartbeat,
   emitBuildHeartbeat,
 } from "@/lib/build/model-call-heartbeat";
+import { runChunkedFrontendGeneration } from "@/lib/build/chunked-generation-pipeline";
+import { CHUNK_MODEL_TIMEOUT_MS } from "@/lib/ai/provider-timeouts";
 import {
   MAX_SAFE_CONTINUATION_ATTEMPTS,
   type BuildTerminalPhase,
@@ -197,6 +199,14 @@ export type WorkflowEventMeta = {
   extraction_stream?: boolean;
   file_rewritten?: boolean;
   file_in_progress?: boolean;
+  generation_chunk_id?: string;
+  generation_chunk_index?: number;
+  generation_chunk_total?: number;
+  generation_chunk_label?: string;
+  chunk_progress_line?: string;
+  chunk_complete?: boolean;
+  files_from_chunk?: number;
+  active_work?: boolean;
 };
 
 export type WorkflowEvent = {
@@ -1031,43 +1041,10 @@ export async function runStagedBuildPipeline(input: {
 
   if (!scaffoldSufficient) {
     setBuildPhase("model_generating", "writing", "Generating source files");
-    const fePrompt = smokeBuild
-      ? minimalFrontendPrompt(executionPrompt, planJson!, contextSlices, designBrief)
-      : frontendPrompt(executionPrompt, planJson!, uiJson, effectiveMaxFiles, contextSlices, designBrief);
-    heavyBudget.record([fePrompt, BUILD_SYSTEM]);
-    heavyBudget.assertWithinBudget(true);
-    trackAssistant(
-      events,
-      "Generating source files with the model — this usually takes 30–90 seconds…",
-      emit,
-    );
-    continuationAttemptsTotal += 1;
-    const feCall = await modelHeartbeat(
-      {
-        writer: input.writer,
-        userId: input.userId,
-        userEmail: input.userEmail,
-        operationId: `${input.operationId}:frontend`,
-        operationType: "frontend_implementation",
-        system: BUILD_SYSTEM,
-        prompt: fePrompt,
-        complexity: frontendComplexity,
-        accumulatedCostUsd: accumulatedCost,
-        userSelectedModelId: input.userSelectedModelId,
-        timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
-      },
-      "core pages and components",
-      continuationAttemptsTotal,
-    );
-    if (feCall.ok) {
-      accumulatedCost += feCall.result.providerCostUsd;
-      totalIn += feCall.result.inputTokens ?? 0;
-      totalOut += feCall.result.outputTokens ?? 0;
-      primaryModelId = feCall.result.spec.modelId;
-      const beforeCount = allFiles.length;
-      allFiles = await ingestModelFilesWithExtractionStream(
-        feCall.result.text,
-        allFiles,
+    const ingestChunk = async (text: string, files: BuildFile[]) =>
+      ingestModelFilesWithExtractionStream(
+        text,
+        files,
         events,
         track,
         effectiveMaxFiles,
@@ -1076,56 +1053,102 @@ export async function runStagedBuildPipeline(input: {
         onFileStreamComplete,
         onExtractStart,
       );
-      if (allFiles.length > beforeCount) {
-        trackAssistant(
-          events,
-          `Generated ${allFiles.length - beforeCount} file${allFiles.length - beforeCount === 1 ? "" : "s"} — checking quality next.`,
-          emit,
-        );
-      } else {
-        trackAssistant(events, thinkingForFrontendRetry(), emit);
-      }
-    } else {
-      trackAssistant(events, thinkingForFrontendRetry(), emit);
-    }
 
-    if (!isModelOutputSufficient(allFiles) && accumulatedCost < FULL_BUILD_CAP_USD * 0.92) {
-      const retryPrompt = smokeBuild
-        ? minimalFrontendPrompt(executionPrompt, planJson, contextSlices, designBrief)
-        : frontendPrompt(executionPrompt, planJson!, uiJson, effectiveMaxFiles, contextSlices, designBrief);
-      const retryCall = await callProviderWithBuildTimeout(
+    if (smokeBuild) {
+      const fePrompt = minimalFrontendPrompt(executionPrompt, planJson!, contextSlices, designBrief);
+      heavyBudget.record([fePrompt, BUILD_SYSTEM]);
+      heavyBudget.assertWithinBudget(true);
+      continuationAttemptsTotal += 1;
+      const feCall = await modelHeartbeat(
         {
           writer: input.writer,
           userId: input.userId,
           userEmail: input.userEmail,
-          operationId: `${input.operationId}:frontend-retry`,
+          operationId: `${input.operationId}:frontend`,
           operationType: "frontend_implementation",
           system: BUILD_SYSTEM,
-          prompt: retryPrompt,
-          complexity: Math.max(frontendComplexity, 6),
+          prompt: fePrompt,
+          complexity: frontendComplexity,
           accumulatedCostUsd: accumulatedCost,
           userSelectedModelId: input.userSelectedModelId,
-          timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
+          timeoutMs: CHUNK_MODEL_TIMEOUT_MS,
         },
-        input.buildTrace,
+        "app shell and core routes",
+        continuationAttemptsTotal,
       );
-      if (retryCall.ok) {
-        accumulatedCost += retryCall.result.providerCostUsd;
-        totalIn += retryCall.result.inputTokens ?? 0;
-        totalOut += retryCall.result.outputTokens ?? 0;
-        primaryModelId = retryCall.result.spec.modelId;
-        allFiles = await ingestModelFilesWithExtractionStream(
-          retryCall.result.text,
-          allFiles,
-          events,
-          track,
-          effectiveMaxFiles,
-          onFileStreamStart,
-          onFileStreamDelta,
-          onFileStreamComplete,
-          onExtractStart,
-        );
+      if (feCall.ok) {
+        accumulatedCost += feCall.result.providerCostUsd;
+        totalIn += feCall.result.inputTokens ?? 0;
+        totalOut += feCall.result.outputTokens ?? 0;
+        primaryModelId = feCall.result.spec.modelId;
+        allFiles = await ingestChunk(feCall.result.text, allFiles);
       }
+    } else {
+      trackAssistant(
+        events,
+        "Generating your app in focused chunks — shell, data, pages, components, then polish.",
+        emit,
+      );
+      const chunked = await runChunkedFrontendGeneration({
+        writer: input.writer,
+        userId: input.userId,
+        userEmail: input.userEmail,
+        operationId: input.operationId,
+        system: BUILD_SYSTEM,
+        complexity: frontendComplexity,
+        accumulatedCostUsd: accumulatedCost,
+        userSelectedModelId: input.userSelectedModelId,
+        buildTrace: input.buildTrace,
+        executionPrompt,
+        planJson: planJson!,
+        designBrief,
+        appName,
+        routes: designBrief.routes ?? archetype.coreRoutes,
+        initialFiles: allFiles,
+        maxFiles: effectiveMaxFiles,
+        ingestChunk,
+        onChunkStart: (index, total, chunk, progressLine) => {
+          setBuildPhase("model_generating", "writing", `Generation plan: ${progressLine}`, undefined, {
+            generation_chunk_id: chunk.id,
+            generation_chunk_index: index,
+            generation_chunk_total: total,
+            generation_chunk_label: chunk.label,
+            chunk_progress_line: progressLine,
+          });
+          trackAssistant(events, chunk.activeWork, emit);
+        },
+        onChunkActiveWork: (line, meta) => {
+          emitBuildHeartbeat(events as Parameters<typeof emitBuildHeartbeat>[0], line, emit as never, {
+            build_terminal_phase: currentBuildPhase,
+            active_work: true,
+            ...meta,
+          });
+        },
+        onChunkComplete: (index, total, chunk, fileCount) => {
+          track(
+            events,
+            "writing",
+            fileCount > 0 ? `${index}/${total} ${chunk.label} — ${fileCount} file${fileCount === 1 ? "" : "s"}` : `${index}/${total} ${chunk.label} complete`,
+            undefined,
+            {
+              chunk_complete: true,
+              generation_chunk_id: chunk.id,
+              generation_chunk_index: index,
+              generation_chunk_total: total,
+              files_from_chunk: fileCount,
+            },
+          );
+        },
+        onChunkSkipped: (chunk, reason) => {
+          trackAssistant(events, `Continuing after ${chunk.label} (${reason})…`, emit);
+        },
+      });
+      accumulatedCost += chunked.costUsd;
+      totalIn += chunked.inputTokens;
+      totalOut += chunked.outputTokens;
+      primaryModelId = chunked.modelId;
+      allFiles = chunked.files;
+      continuationAttemptsTotal += chunked.chunksRun;
     }
   } else if (input.buildTrace) {
     traceBuildWorkerStage(
@@ -1163,7 +1186,7 @@ export async function runStagedBuildPipeline(input: {
         complexity: Math.max(frontendComplexity, 5),
         accumulatedCostUsd: accumulatedCost,
         userSelectedModelId: input.userSelectedModelId,
-        timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
+        timeoutMs: CHUNK_MODEL_TIMEOUT_MS,
       },
       "core pages from compact route set",
       continuationAttemptsTotal,
@@ -1287,7 +1310,7 @@ export async function runStagedBuildPipeline(input: {
         complexity,
         accumulatedCostUsd: accumulatedCost,
         userSelectedModelId: input.userSelectedModelId,
-        timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
+        timeoutMs: CHUNK_MODEL_TIMEOUT_MS,
       },
       "full continuation pass",
       continuationAttemptsTotal,
@@ -1411,7 +1434,7 @@ export async function runStagedBuildPipeline(input: {
         complexity: Math.max(frontendComplexity, 7),
         accumulatedCostUsd: accumulatedCost,
         userSelectedModelId: input.userSelectedModelId,
-        timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
+        timeoutMs: CHUNK_MODEL_TIMEOUT_MS,
       },
       "targeted page rewrite",
       continuationAttemptsTotal,
@@ -1488,7 +1511,7 @@ export async function runStagedBuildPipeline(input: {
         complexity: Math.max(frontendComplexity, 8),
         accumulatedCostUsd: accumulatedCost,
         userSelectedModelId: input.userSelectedModelId,
-        timeoutMs: PROVIDER_TIMEOUT_MS.frontend_implementation,
+        timeoutMs: CHUNK_MODEL_TIMEOUT_MS,
       },
       input.buildTrace,
     );

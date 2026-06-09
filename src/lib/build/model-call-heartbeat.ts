@@ -3,9 +3,9 @@ import type { TimedProviderResult } from "@/lib/build/timed-build-operations";
 import { callProviderWithBuildTimeout } from "@/lib/build/timed-build-operations";
 import type { ProviderCallInput } from "@/lib/ai/provider-call";
 import type { BuildWorkerTraceSnapshot } from "@/lib/build/build-worker-trace";
-import { formatWatchdogHeartbeat } from "@/lib/build/live-build-activity";
+import { activeWorkDuringChunk, domainActiveWorkLines } from "@/lib/build/live-build-activity";
 
-const HEARTBEAT_MS = 10_000;
+const HEARTBEAT_MS = 3_500;
 
 export async function callProviderWithModelHeartbeat(
   input: ProviderCallInput & { operationType: string },
@@ -24,17 +24,13 @@ export async function callProviderWithModelHeartbeat(
   const timer = setInterval(() => {
     tick += 1;
     const elapsedMs = Date.now() - started;
-    ctx.onHeartbeat(
-      formatWatchdogHeartbeat({
-        modelLabel: ctx.modelLabel,
-        elapsedSec: Math.floor(elapsedMs / 1000),
-        attempt: ctx.attempt,
-        maxAttempts: ctx.maxAttempts,
-        waitingOn: ctx.waitingOn,
-        tick,
-      }),
-      elapsedMs,
+    const domain = domainActiveWorkLines(ctx.waitingOn);
+    const line = activeWorkDuringChunk(
+      { activeWork: ctx.waitingOn.endsWith("…") ? ctx.waitingOn : `${ctx.waitingOn}…`, label: ctx.waitingOn },
+      tick,
+      domain,
     );
+    ctx.onHeartbeat(line, elapsedMs);
   }, HEARTBEAT_MS);
 
   try {

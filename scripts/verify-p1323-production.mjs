@@ -44,7 +44,7 @@ const suites = {
   },
   "build-watchdog-heartbeats": () => {
     const errors = [];
-    must(read("src/lib/build/model-call-heartbeat.ts"), "HEARTBEAT_MS = 10_000", "10s heartbeat", errors);
+    must(read("src/lib/build/model-call-heartbeat.ts"), "activeWorkDuringChunk", "active work heartbeat", errors);
     must(read("src/lib/build/execute-staged-build-job.ts"), "10_000", "worker 10s watchdog", errors);
     must(read("src/lib/build/live-build-activity.ts"), "formatWatchdogHeartbeat", "heartbeat formatter", errors);
     return errors;

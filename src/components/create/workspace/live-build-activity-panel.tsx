@@ -6,6 +6,27 @@ import { cn } from "@/lib/utils";
 import type { BuildTerminalPhase } from "@/lib/build/build-terminal-state-machine";
 import { deriveBuildActivityPresentation } from "@/lib/build/live-build-activity";
 
+export function ChunkProgressPanel({
+  progressLine,
+  className,
+}: {
+  progressLine: string;
+  className?: string;
+}) {
+  if (!progressLine.trim()) return null;
+  return (
+    <p
+      className={cn(
+        "mr-6 px-1 text-[10px] font-medium uppercase tracking-wide text-sky-700/90 sm:mr-10",
+        className,
+      )}
+      data-testid="chunk-progress-panel"
+    >
+      Generation plan: {progressLine}
+    </p>
+  );
+}
+
 export function CompactLiveActivityLine({
   line,
   className,
@@ -42,6 +63,7 @@ export function LiveBuildActivityPanel({
   qualityTarget,
   fileCount,
   line,
+  chunkProgress,
   className,
 }: {
   active: boolean;
@@ -58,6 +80,7 @@ export function LiveBuildActivityPanel({
   qualityTarget?: number;
   fileCount?: number;
   line?: string;
+  chunkProgress?: string;
   className?: string;
 }) {
   const [now, setNow] = React.useState(Date.now());
@@ -83,12 +106,20 @@ export function LiveBuildActivityPanel({
     qualityTarget,
     fileCount,
     modelLabel: modelLabel ?? undefined,
+    chunkProgress,
+    activeWork: line,
   });
   const statusLine = line ?? presentation.line;
   const mode = variant ?? presentation.mode;
+  const progressLine = chunkProgress ?? presentation.chunkProgress;
 
   if (mode === "compact") {
-    return <CompactLiveActivityLine line={statusLine} className={className} />;
+    return (
+      <>
+        {progressLine ? <ChunkProgressPanel progressLine={progressLine} /> : null}
+        <CompactLiveActivityLine line={statusLine} className={className} />
+      </>
+    );
   }
 
   const elapsedSec = Math.max(0, Math.floor(elapsedMs / 1000));
@@ -111,6 +142,7 @@ export function LiveBuildActivityPanel({
         ) : null}
         <span className="ml-auto tabular-nums text-[10px] font-medium text-muted-foreground">{elapsedSec}s</span>
       </div>
+      {progressLine ? <ChunkProgressPanel progressLine={progressLine} className="mt-2 px-0" /> : null}
       <p className="mt-2 text-[12px] leading-relaxed text-foreground" data-testid="live-build-status-line">
         {statusLine}
       </p>

@@ -1,5 +1,8 @@
 import type { RouteOperationContext } from "@/lib/ai/model-router";
 
+/** No single chunked model call may wait longer than 25s without failover. */
+export const CHUNK_MODEL_TIMEOUT_MS = 25_000;
+
 /** Hard caps for build pipeline provider calls (ms). */
 export const PROVIDER_TIMEOUT_MS: Partial<
   Record<RouteOperationContext["operationType"] | string, number>
@@ -8,7 +11,9 @@ export const PROVIDER_TIMEOUT_MS: Partial<
   build_plan: 30_000,
   schema_design: 30_000,
   ui_design_plan: 30_000,
-  frontend_implementation: 90_000,
+  /** Chunked generation uses 25s per chunk; legacy single-pass cap kept for smoke paths. */
+  frontend_implementation: CHUNK_MODEL_TIMEOUT_MS,
+  frontend_implementation_legacy: 90_000,
   backend_implementation: 60_000,
   code_repair_small: 60_000,
   code_repair_hard: 60_000,

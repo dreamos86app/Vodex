@@ -233,7 +233,7 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     const modelOp = snap?.modelCall?.operationType?.replace(/_/g, " ") ?? "model response";
     const elapsedSec = Math.max(1, Math.floor((Date.now() - lastActivityAt) / 1000));
     const heartbeatTitle = modelPending
-      ? `Still waiting for ${modelOp}… ${elapsedSec}s`
+      ? `Generating ${modelOp}… ${elapsedSec}s`
       : `${currentStepLabel}… ${elapsedSec}s`;
     void persistBuildJobEvent(input.writer, {
       ...eventCtx,

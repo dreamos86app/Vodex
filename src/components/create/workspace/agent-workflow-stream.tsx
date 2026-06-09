@@ -33,6 +33,7 @@ import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-messa
 import { StreamingNarrationLine } from "@/components/create/workspace/streaming-narration-line";
 import {
   BuildFinalSummaryBlock,
+  ChunkProgressPanel,
   LiveBuildActivityPanel,
 } from "@/components/create/workspace/live-build-activity-panel";
 import {
@@ -529,6 +530,17 @@ export function AgentWorkflowStream({
   const staleMs = now - (Number.isFinite(lastEventAt) ? lastEventAt : startedAt);
   const isStale = working && staleMs > 10_000;
   const lastMeta = progress.latest?.metadata ?? {};
+  const chunkProgressLine = React.useMemo(() => {
+    for (let i = (progress.events ?? []).length - 1; i >= 0; i--) {
+      const m = progress.events![i]!.metadata as Record<string, unknown> | undefined;
+      if (typeof m?.chunk_progress_line === "string") return m.chunk_progress_line;
+    }
+    return typeof lastMeta.chunk_progress_line === "string" ? lastMeta.chunk_progress_line : undefined;
+  }, [progress.events, lastMeta.chunk_progress_line]);
+  const activeWorkLine =
+    typeof lastMeta.active_work === "string" && lastMeta.heartbeat === true
+      ? (progress.latest?.title ?? progress.latest?.detail ?? undefined)
+      : undefined;
   const continuationAttempt =
     typeof lastMeta.continuation_attempt === "number" ? lastMeta.continuation_attempt : undefined;
   const isHeartbeat = lastMeta.heartbeat === true || isStale;
@@ -549,6 +561,8 @@ export function AgentWorkflowStream({
         attempt: continuationAttempt,
         maxAttempts: MAX_SAFE_CONTINUATION_ATTEMPTS,
         modelLabel: modelLabel ?? undefined,
+        chunkProgress: chunkProgressLine,
+        activeWork: activeWorkLine,
       })
     : null;
 
@@ -569,6 +583,10 @@ export function AgentWorkflowStream({
 
       {showAnalyzing ? <AnalyzingRequestBubble /> : null}
 
+      {working && chunkProgressLine && activityPresentation?.mode !== "card" ? (
+        <ChunkProgressPanel progressLine={chunkProgressLine} />
+      ) : null}
+
       {showLiveModelActivity && activityPresentation?.mode === "card" ? (
         <LiveBuildActivityPanel
           active
@@ -582,6 +600,7 @@ export function AgentWorkflowStream({
           isHeartbeat={isHeartbeat}
           modelLabel={modelLabel}
           line={activityPresentation.line}
+          chunkProgress={chunkProgressLine}
         />
       ) : null}
 
@@ -625,6 +644,7 @@ export function AgentWorkflowStream({
           isHeartbeat={isHeartbeat}
           modelLabel={modelLabel}
           line={activityPresentation.line}
+          chunkProgress={chunkProgressLine}
         />
       ) : null}
 
