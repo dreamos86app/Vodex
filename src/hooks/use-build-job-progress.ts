@@ -19,6 +19,15 @@ const MAX_404_ATTEMPTS = 5;
 /** Cap client-side event buffer to avoid React freeze during long builds. */
 const MAX_CLIENT_EVENTS = 600;
 
+function isPausedContinuationTerminal(e: BuildJobEventRow): boolean {
+  const meta = e.metadata ?? {};
+  return (
+    e.type === "fixing_error" &&
+    meta.continuing_generation_needed === true &&
+    (e.progress_percent === 100 || meta.files_persisted === 0)
+  );
+}
+
 export function useBuildJobProgress(
   job: { jobId: string; eventsUrl: string } | null,
   onTerminal?: (state: BuildJobPollState) => void,
@@ -164,7 +173,9 @@ export function useBuildJobProgress(
         const isTerminal =
           jobStatus === "completed" ||
           jobStatus === "failed" ||
-          incoming.some((e) => e.type === "completed" || e.type === "failed");
+          incoming.some(
+            (e) => e.type === "completed" || e.type === "failed" || isPausedContinuationTerminal(e),
+          );
 
         setState((prev) => {
           const merged = [...(prev?.events ?? []), ...incoming];

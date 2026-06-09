@@ -256,9 +256,17 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         heartbeat_elapsed_sec: elapsedSec,
       },
     }).catch(() => {});
+    void input.writer
+      .from("build_jobs")
+      .update({ updated_at: new Date().toISOString() } as never)
+      .eq("id", input.buildJobId)
+      .then(() => undefined, () => undefined);
   }, 10_000);
 
-  const PIPELINE_HARD_CAP_MS = 5 * 60 * 1000;
+  const PIPELINE_HARD_CAP_MS = Number(process.env.DREAMOS_PIPELINE_HARD_CAP_MS ?? 360_000);
+  const BUILD_NO_FILE_STALL_MS = Number(process.env.DREAMOS_BUILD_NO_FILE_STALL_MS ?? 120_000);
+  const pipelineStartedAt = Date.now();
+  let filesSeenInPipeline = false;
 
   try {
     await persistStage("worker_claim_attempt");
@@ -287,6 +295,12 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       progressPercent: 10,
     }).catch(() => undefined);
 
+    const creditTracker = {
+      used: 0,
+      budget: input.partialCreditBuild ? Math.max(1, input.reservedCredits ?? 0) : Infinity,
+      stop: false,
+    };
+
     const pipelinePromise = runStagedBuildPipeline({
       writer: input.writer,
       userId: input.userId,
@@ -305,6 +319,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       routeByRouteOnly: input.resumeContinuation === true,
       onWorkflowEvent: async (ev) => {
         lastActivityAt = Date.now();
+        if (ev.type === "writing" || ev.meta?.filePath || ev.meta?.streamCategory === "file_created") {
+          filesSeenInPipeline = true;
+        }
         currentStepLabel = ev.label;
         if (ev.type !== "thinking" && ev.type !== "writing" && ev.type !== "editing") {
           stepIndex += 1;
@@ -319,12 +336,6 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       },
     });
 
-    const creditTracker = {
-      used: 0,
-      budget: input.partialCreditBuild ? Math.max(1, input.reservedCredits ?? 0) : Infinity,
-      stop: false,
-    };
-
     const pr = await Promise.race([
       pipelinePromise,
       new Promise<Awaited<typeof pipelinePromise>>((_, reject) => {
@@ -333,12 +344,56 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
           PIPELINE_HARD_CAP_MS,
         );
       }),
+      new Promise<Awaited<typeof pipelinePromise>>((_, reject) => {
+        const tick = setInterval(() => {
+          const elapsed = Date.now() - pipelineStartedAt;
+          if (!filesSeenInPipeline && elapsed >= BUILD_NO_FILE_STALL_MS) {
+            clearInterval(tick);
+            reject(new Error("build_no_files_stall"));
+          }
+        }, 5_000);
+        pipelinePromise.finally(() => clearInterval(tick)).catch(() => clearInterval(tick));
+      }),
     ]).catch((err) => {
       const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("no_files_stall")) {
+        return {
+          ok: false,
+          visibleText:
+            "Build paused — no files were generated in time. Use Continue generation to resume route-by-route.",
+          meta: null,
+          iconSvg: null,
+          iconUrl: null,
+          appName: "Dream App",
+          files: [] as never[],
+          events: [],
+          totalProviderCostUsd: 0,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          primaryModelId: input.modelId,
+          complexity: 1,
+          uiQualityScore: 0,
+          dashboardQualityScore: 0,
+          uiRichnessPasses: false,
+          buildContract: {
+            passed: false,
+            allowed: false,
+            failures: ["build_no_files_stall"],
+            renderableCount: 0,
+            pageCount: 0,
+            uiQualityScore: 0,
+            previewReady: false,
+            userMessage: "Build paused — no files generated yet.",
+          },
+          postBuildFailures: ["build_no_files_stall"],
+          appArchetype: "unknown",
+          errorMessage: msg,
+        } satisfies Awaited<typeof pipelinePromise>;
+      }
       if (msg.includes("hard_cap")) {
         return {
           ok: false,
-          visibleText: "Build timed out — try again or use a shorter prompt.",
+          visibleText: "Build timed out — use Continue generation or try Automatic model.",
           meta: null,
           iconSvg: null,
           iconUrl: null,
@@ -546,6 +601,93 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
           files: persist.savedCount,
           credits_used: Math.floor(creditsUsed),
         },
+      });
+      buildFinishedSuccess = true;
+      return;
+    }
+
+    const noFilesStall = pr.postBuildFailures?.includes("build_no_files_stall") === true;
+    if (!buildSucceeded && noFilesStall) {
+      const stallSummary =
+        pr.visibleText ??
+        "Build paused — no files were generated in time. Use Continue generation to resume route-by-route.";
+
+      await refundBuildReservation({
+        writer: input.writer,
+        userId: input.userId,
+        operationId: input.operationId,
+        reservedCredits: input.reservedCredits,
+        providerCostUsd: pr.totalProviderCostUsd,
+        projectId: input.projectId,
+        buildJobId: input.buildJobId,
+      });
+
+      const { data: stallProj } = await input.writer
+        .from("projects")
+        .select("metadata")
+        .eq("id", input.projectId)
+        .maybeSingle();
+      const stallMeta =
+        stallProj?.metadata && typeof stallProj.metadata === "object" && !Array.isArray(stallProj.metadata)
+          ? (stallProj.metadata as Record<string, unknown>)
+          : {};
+
+      await input.writer
+        .from("projects")
+        .update({
+          build_status: "needs_repair",
+          metadata: {
+            ...stallMeta,
+            continuing_generation_needed: true,
+            build_no_files_stall: true,
+            credits_refunded: true,
+            file_count: 0,
+          } as Json,
+        } as never)
+        .eq("id", input.projectId)
+        .eq("owner_id", input.userId);
+
+      await transitionBuildJobStatus(input.writer, {
+        jobId: input.buildJobId,
+        ctx: workerCtx,
+        toStatus: "failed",
+        reason: "build_no_files_stall",
+      });
+
+      await persistAssistantBuildMessage(input.writer, eventCtx, {
+        message: stallSummary,
+        metadata: { continuing_generation_needed: true, build_no_files_stall: true },
+      });
+
+      await persistBuildJobEvent(input.writer, {
+        ...eventCtx,
+        type: "fixing_error",
+        title: "Build paused — no files yet",
+        detail: stallSummary,
+        progressPercent: 100,
+        metadata: {
+          continuing_generation_needed: true,
+          failed_draft: true,
+          failure_kind: "build_no_files_stall",
+          files_persisted: 0,
+          file_count: 0,
+          credits_refunded: true,
+        },
+      });
+
+      await logServerOperation({
+        writer: input.writer,
+        userId: input.userId,
+        userEmail: input.userEmail,
+        stage: "build",
+        event: "async_build_no_files_stall",
+        status: "ok",
+        mode: "build",
+        modelId: pr.primaryModelId,
+        projectId: input.projectId,
+        buildJobId: input.buildJobId,
+        operationId: input.operationId,
+        metadata: { stall_ms: BUILD_NO_FILE_STALL_MS },
       });
       buildFinishedSuccess = true;
       return;

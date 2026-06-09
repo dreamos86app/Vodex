@@ -1,3 +1,5 @@
+import { isProviderSelectable } from "@/lib/ai/provider-availability";
+
 export type ProviderName = "anthropic" | "openai" | "google" | "xai" | "unknown";
 
 export type ProviderErrorClass =
@@ -75,16 +77,18 @@ export function pickFailoverCatalogModel(
   const preferAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
 
   const cheap = (): string | null => {
-    if (preferOpenAi) return "gpt-5.4-mini";
-    if (preferGoogle) return "gemini-flash";
-    if (preferAnthropic) return "claude-haiku-4.5";
+    if (preferOpenAi && isProviderSelectable("openai")) return "gpt-5.4-mini";
+    if (preferGoogle && isProviderSelectable("google")) return "gemini-flash";
+    if (preferAnthropic && isProviderSelectable("anthropic")) return "claude-haiku-4.5";
     return null;
   };
 
   const medium = (): string | null => {
-    if (preferOpenAi) return "gpt-5.4-mini";
-    if (preferGoogle) return "gemini-flash";
-    if (preferAnthropic && failedProvider !== "anthropic") return "claude-sonnet-4.5";
+    if (preferOpenAi && isProviderSelectable("openai")) return "gpt-5.4-mini";
+    if (preferGoogle && isProviderSelectable("google")) return "gemini-flash";
+    if (preferAnthropic && failedProvider !== "anthropic" && isProviderSelectable("anthropic")) {
+      return "claude-sonnet-4.5";
+    }
     return cheap();
   };
 

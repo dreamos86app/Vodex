@@ -61,14 +61,13 @@ export function classifyBuildIntent(prompt: string): BuildIntentResult {
     return { intent: "discuss_question", confidence: 0.88, reason: "question_without_build_verb" };
   }
 
-  if (BUILD_VERBS.test(lower) || (APP_NOUNS.test(lower) && text.split(/\s+/).length >= 4)) {
-    const confidence =
-      BUILD_VERBS.test(lower) && APP_NOUNS.test(lower)
-        ? 0.92
-        : BUILD_VERBS.test(lower)
-          ? 0.88
-          : 0.72;
-    return { intent: "build_app", confidence, reason: "app_creation_signals" };
+  if (BUILD_VERBS.test(lower)) {
+    const confidence = APP_NOUNS.test(lower) ? 0.92 : 0.88;
+    return { intent: "build_app", confidence, reason: "build_verb" };
+  }
+
+  if (APP_NOUNS.test(lower) && text.split(/\s+/).length >= 6 && !/\?\s*$/.test(text)) {
+    return { intent: "build_app", confidence: 0.78, reason: "detailed_app_description" };
   }
 
   if (PUBLISH.test(lower) && !BUILD_VERBS.test(lower)) {

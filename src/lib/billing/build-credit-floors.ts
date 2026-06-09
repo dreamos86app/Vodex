@@ -2,6 +2,7 @@
  * Build Credit operation floors — never price full builds from raw provider cost alone.
  */
 import type { FirstPassTier } from "@/lib/build/first-pass-scope";
+import { applyPremiumModelCredits } from "@/lib/billing/premium-model-pricing";
 import {
   TARGET_REVENUE_MULTIPLIER,
   USER_CREDITS_PER_USD,
@@ -103,12 +104,16 @@ export function applyBuildCreditPricing(input: {
   providerCostUsd: number;
   complexity?: number;
   markupMultiplier?: number;
+  selectedModelId?: string | null;
 }): AppliedBuildCreditPricing {
   const markupMultiplier = input.markupMultiplier ?? TARGET_REVENUE_MULTIPLIER;
   const providerCostUsd = Math.max(0, input.providerCostUsd);
   const profitableCredits = minimumUserCreditsForProviderCost(providerCostUsd);
   const floor = operationMinimumCredits(input.operationType, input.complexity ?? 5);
-  const userCreditsRequired = Math.max(floor, profitableCredits);
+  let userCreditsRequired = Math.max(floor, profitableCredits);
+  if (input.selectedModelId) {
+    userCreditsRequired = applyPremiumModelCredits(userCreditsRequired, input.selectedModelId);
+  }
   const minimumFloorApplied = userCreditsRequired > profitableCredits + 1e-9;
 
   return {

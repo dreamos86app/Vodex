@@ -82,7 +82,13 @@ export function getProviderStatus(provider: ProviderName): ProviderState & {
 
 export function isProviderSelectable(provider: ProviderName): boolean {
   const s = getProviderStatus(provider);
-  return s.configured && !s.disabled && s.status !== "quota_exhausted" && s.status !== "auth_error";
+  return (
+    s.configured &&
+    !s.disabled &&
+    s.status !== "quota_exhausted" &&
+    s.status !== "auth_error" &&
+    s.status !== "degraded"
+  );
 }
 
 export function listProviderHealthSummary(): Array<{

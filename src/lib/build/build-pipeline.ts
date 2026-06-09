@@ -62,6 +62,7 @@ import { runChunkedFrontendGeneration } from "@/lib/build/chunked-generation-pip
 import { runRouteByRouteGeneration } from "@/lib/build/route-by-route-generation";
 import { CHUNK_MODEL_TIMEOUT_MS } from "@/lib/ai/provider-timeouts";
 import { buildDomainOpenerFromPrompt } from "@/lib/build/build-domain-narration";
+import { categoryForChunkId } from "@/lib/build/build-phase-categories";
 import {
   clearBuildContinuationStatePatch,
   readBuildContinuationState,
@@ -646,6 +647,16 @@ export async function runStagedBuildPipeline(input: {
   };
   const onExtractStart = () =>
     trackAssistant(events, "Model response received — extracting files…", emit);
+  let lastEmittedPhaseId: string | null = null;
+  const emitPhaseIntro = (chunkId: string) => {
+    const phase = categoryForChunkId(chunkId);
+    if (!phase || phase.id === lastEmittedPhaseId) return;
+    lastEmittedPhaseId = phase.id;
+    const line = phase.intro
+      ? `Next up — ${phase.label}: ${phase.intro}`
+      : `Next up — ${phase.label}.`;
+    trackAssistant(events, line, emit);
+  };
   let accumulatedCost = 0;
   let totalIn = 0;
   let totalOut = 0;
@@ -1174,7 +1185,10 @@ export async function runStagedBuildPipeline(input: {
         initialFiles: allFiles,
         startIndex: contState?.stageIndex ?? 0,
         ingestChunk,
-        onChunkStart: (_i, _t, chunk) => trackAssistant(events, chunk.activeWork, emit),
+        onChunkStart: (_i, _t, chunk) => {
+          emitPhaseIntro(chunk.id);
+          trackAssistant(events, chunk.activeWork, emit);
+        },
         onChunkActiveWork: (line, meta) => {
           emitBuildHeartbeat(events as Parameters<typeof emitBuildHeartbeat>[0], line, emit as never, {
             active_work: true,
@@ -1220,6 +1234,7 @@ export async function runStagedBuildPipeline(input: {
             generation_chunk_label: chunk.label,
             chunk_progress_line: progressLine,
           });
+          emitPhaseIntro(chunk.id);
           trackAssistant(events, chunk.activeWork, emit);
         },
         onChunkActiveWork: (line, meta) => {
@@ -1502,7 +1517,10 @@ export async function runStagedBuildPipeline(input: {
               onFileStreamComplete,
               onExtractStart,
             ),
-          onChunkStart: (_i, _t, chunk) => trackAssistant(events, chunk.activeWork, emit),
+          onChunkStart: (_i, _t, chunk) => {
+            emitPhaseIntro(chunk.id);
+            trackAssistant(events, chunk.activeWork, emit);
+          },
           onChunkActiveWork: (line, meta) => {
             emitBuildHeartbeat(events as Parameters<typeof emitBuildHeartbeat>[0], line, emit as never, {
               active_work: true,

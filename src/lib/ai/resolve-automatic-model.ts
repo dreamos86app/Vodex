@@ -29,14 +29,15 @@ export function pickAutomaticImplementationModelId(
   const anthropicOk = isProviderSelectable("anthropic");
   const openAiOk = isProviderSelectable("openai");
 
-  if (c <= 3) {
+  if (c <= 6) {
     if (openAiOk) return "gpt-5.4-mini";
+    if (isProviderSelectable("google")) return "gemini-flash";
     if (anthropicOk) return "claude-haiku-4.5";
     return pickCheapestDiscussModelId();
   }
 
   if (!anthropicOk) {
-    if (openAiOk && c >= 7) return "gpt-5.4";
+    if (openAiOk) return c >= 8 ? "gpt-5.4" : "gpt-5.4-mini";
     return pickCheapestDiscussModelId();
   }
 
@@ -44,9 +45,9 @@ export function pickAutomaticImplementationModelId(
     if (isDreamosOwnerEmail(ownerEmail)) return "claude-opus-4.7";
     return "claude-opus-4.6";
   }
-  if (c >= 7) return "claude-opus-4.6";
-  if (c >= 5) return "claude-sonnet-4-6";
-  return "claude-sonnet-4-6";
+  if (c >= 8) return "claude-opus-4.6";
+  if (c >= 7) return "claude-sonnet-4-6";
+  return "gpt-5.4-mini";
 }
 
 /** Legacy export — maps modes to tiered automatic picks (no longer forces Sonnet everywhere). */

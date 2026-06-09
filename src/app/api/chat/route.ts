@@ -1048,6 +1048,19 @@ export async function POST(request: Request) {
       continueIntent.kind === "continue_all" ||
       continueIntent.kind === "continue_category";
 
+    let asyncBuildModelId = billedModelId;
+    let asyncUserSelectedModel = requestedModel;
+    if (requestedModel && !isAutomaticModelId(requestedModel)) {
+      const buildProvider = providerFromModelId(requestedModel);
+      if (!isProviderSelectable(buildProvider)) {
+        const failoverId = pickFailoverCatalogModel(buildProvider, "frontend_implementation");
+        if (failoverId) {
+          asyncBuildModelId = failoverId;
+          asyncUserSelectedModel = failoverId;
+        }
+      }
+    }
+
     const jobInput = {
       writer,
       userId: user.id,
@@ -1058,12 +1071,12 @@ export async function POST(request: Request) {
       userPrompt: buildPrompt,
       memoryBlock,
       conversationId,
-      modelId: billedModelId,
+      modelId: asyncBuildModelId,
       reservedCredits: reserve.reserved,
       partialCreditBuild: buildAllowance?.partial ?? false,
       quotedCreditsRequired: buildAllowance?.quotedReserve ?? tokensNeeded,
       blueprintBlock: blueprintBlock || undefined,
-      userSelectedModelId: requestedModel,
+      userSelectedModelId: asyncUserSelectedModel,
       resumeContinuation,
     };
 
@@ -1167,16 +1180,6 @@ export async function POST(request: Request) {
 
   const primaryProvider = providerFromModelId(streamSpec.modelId);
   if (!isProviderSelectable(primaryProvider)) {
-    if (!isAutomaticModelId(requestedModel)) {
-      return NextResponse.json(
-        {
-          error:
-            "Selected model is temporarily unavailable. Use Automatic or choose another model.",
-          code: "selected_model_unavailable",
-        },
-        { status: 503 },
-      );
-    }
     const altId = pickFailoverCatalogModel(primaryProvider, streamOp);
     if (altId) {
       streamSpec = routeOperation({
@@ -1185,6 +1188,15 @@ export async function POST(request: Request) {
         requestedModelId: altId,
         complexity: buildComplexity,
       });
+    } else if (!isAutomaticModelId(requestedModel)) {
+      return NextResponse.json(
+        {
+          error:
+            "Selected model is temporarily unavailable and no fallback is configured. Try Automatic.",
+          code: "selected_model_unavailable",
+        },
+        { status: 503 },
+      );
     }
   }
 

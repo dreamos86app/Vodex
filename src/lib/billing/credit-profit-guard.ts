@@ -134,6 +134,7 @@ function quoteWithFloors(
     operationType,
     providerCostUsd: providerUsd,
     complexity,
+    selectedModelId: input.selectedModel,
   });
 
   const userCreditsRequired = applied.userCreditsRequired;

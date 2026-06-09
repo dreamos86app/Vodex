@@ -37,7 +37,7 @@ import {
 } from "@/lib/build/build-terminal-state-machine";
 import { sanitizeUserBuildChatText } from "@/lib/build/build-user-copy";
 import { BuildStepPhaseCard } from "@/components/create/workspace/build-step-phase-card";
-import { BuildFileStreamPanel } from "@/components/create/workspace/build-file-stream-panel";
+import { BuildPhasedFilePanel } from "@/components/create/workspace/build-phased-file-panel";
 import { BuildNoFilesYetCard } from "@/components/create/workspace/build-no-files-yet-card";
 import { BuildActiveWorkChip } from "@/components/create/workspace/build-active-work-chip";
 import { NO_FILES_YET_THRESHOLD_MS } from "@/lib/build/build-step-ui";
@@ -602,6 +602,20 @@ export function AgentWorkflowStream({
     activeWorkLine ??
     (chunkProgressLine ? undefined : currentNarrationLine?.split("\n")[0]);
 
+  const completedChunkIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const ev of progress.events ?? []) {
+      const m = ev.metadata as Record<string, unknown> | undefined;
+      if (m?.chunk_complete === true && typeof m.generation_chunk_id === "string") {
+        ids.add(m.generation_chunk_id);
+      }
+    }
+    return ids;
+  }, [progress.events]);
+
+  const buildHardTimeoutMs = 360_000;
+  const buildElapsedStalled = working && elapsedMs > buildHardTimeoutMs;
+
   return (
     <DreamOSMessageShell
       mode="build"
@@ -630,11 +644,14 @@ export function AgentWorkflowStream({
         />
       ) : null}
 
-      {showNoFilesYet ? <BuildNoFilesYetCard /> : null}
+      {showNoFilesYet && !buildElapsedStalled ? <BuildNoFilesYetCard /> : null}
 
-      <BuildFileStreamPanel
+      {buildElapsedStalled ? <BuildNoFilesYetCard variant="hard_timeout" /> : null}
+
+      <BuildPhasedFilePanel
         working={working}
-        events={rawFileStreamEvents}
+        fileEvents={rawFileStreamEvents}
+        completedChunkIds={completedChunkIds}
         renderFileCard={(ev) => <FileChangeCard event={ev} />}
       />
 

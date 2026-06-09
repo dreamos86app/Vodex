@@ -32,6 +32,7 @@ import { useCreditsStore } from "@/lib/stores/credits-store";
 import { toast } from "@/lib/toast";
 
 type ProviderAvailability = Record<string, "available" | "unavailable" | "coming_soon">;
+type ProviderUnavailableReasons = Record<string, string>;
 type ModelAvailability = "ok" | "unavailable" | "coming_soon";
 
 /** Fixed panel height — side detail + Use button must fit without scrolling. */
@@ -40,10 +41,12 @@ const PANEL_BODY_H = 348;
 function modelAvailability(
   model: CreationModel,
   providers: ProviderAvailability | null,
+  providerLoading = false,
 ): ModelAvailability {
+  if (model.id === "automatic") return "ok";
   if (model.comingSoon || COMING_SOON_MODEL_IDS.has(model.id)) return "coming_soon";
   if (model.provider === "deepseek") return "coming_soon";
-  if (!providers) return "ok";
+  if (!providers) return providerLoading ? "ok" : "unavailable";
   if (model.id === "grok-4" || model.provider === "xai") {
     return providers.xai === "coming_soon" ? "coming_soon" : providers.xai === "unavailable" ? "unavailable" : "ok";
   }
@@ -51,6 +54,14 @@ function modelAvailability(
   if (st === "coming_soon") return "coming_soon";
   if (st === "unavailable") return "unavailable";
   return "ok";
+}
+
+function unavailableReasonForModel(
+  model: CreationModel,
+  reasons: ProviderUnavailableReasons,
+): string | undefined {
+  if (model.id === "grok-4" || model.provider === "xai") return reasons.xai;
+  return reasons[model.provider];
 }
 
 const AUTOMATIC_MODEL = {
@@ -206,15 +217,18 @@ function ModelSidePanel({
   model,
   active,
   availability,
+  unavailableReason,
   onUse,
 }: {
   model: CreationModel;
   active: boolean;
   availability: ModelAvailability;
+  unavailableReason?: string;
   onUse: () => void;
 }) {
   const r = model.ratings;
   const comingSoon = availability === "coming_soon";
+  const unavailable = availability === "unavailable";
 
   return (
     <motion.div
@@ -248,6 +262,11 @@ function ModelSidePanel({
                     Coming soon
                   </span>
                 )}
+                {unavailable && !comingSoon && (
+                  <span className="rounded-full bg-muted px-1.5 py-px text-[8px] font-semibold text-muted-foreground ring-1 ring-border">
+                    Unavailable
+                  </span>
+                )}
                 {!comingSoon && model.id !== "automatic" ? (
                   <CostTierTag costScore={r.cost} />
                 ) : null}
@@ -255,6 +274,12 @@ function ModelSidePanel({
             </div>
           </div>
           <p className="mt-2 line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">{model.tagline}</p>
+          {unavailable && unavailableReason ? (
+            <p className="mt-2 rounded-lg bg-muted/60 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground ring-1 ring-border/60">
+              {unavailableReason} You can review stats below, but this model cannot be used until it is
+              available again.
+            </p>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2 scrollbar-thin">
@@ -305,12 +330,11 @@ function ModelRow({
   return (
     <button
       type="button"
-      disabled={unavailable}
       onClick={onPreview}
       className={cn(
         "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition",
-        unavailable && "cursor-not-allowed opacity-45",
-        preview ? "bg-accent/12 ring-1 ring-accent/25" : active ? "bg-accent/8 ring-1 ring-accent/15" : !unavailable && "hover:bg-surface",
+        unavailable && "opacity-50 grayscale-[0.35]",
+        preview ? "bg-accent/12 ring-1 ring-accent/25" : active ? "bg-accent/8 ring-1 ring-accent/15" : "hover:bg-surface",
       )}
     >
       <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: model.accent }} />
@@ -320,6 +344,11 @@ function ModelRow({
           {comingSoon && (
             <span className="shrink-0 rounded-full bg-violet-500/10 px-1.5 py-px text-[8px] font-semibold text-violet-700">
               Coming soon
+            </span>
+          )}
+          {unavailable && !comingSoon && (
+            <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[8px] font-semibold text-muted-foreground">
+              Unavailable
             </span>
           )}
           {!comingSoon && model.id !== "automatic" ? (
@@ -370,6 +399,27 @@ export function ModelPicker({
   const searchRef = React.useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = React.useState(false);
   const [providerStatus, setProviderStatus] = React.useState<ProviderAvailability | null>(null);
+  const [providerReasons, setProviderReasons] = React.useState<ProviderUnavailableReasons>({});
+  const [providerLoading, setProviderLoading] = React.useState(true);
+
+  const refreshProviderStatus = React.useCallback(() => {
+    setProviderLoading(true);
+    fetch("/api/ai/provider-status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (
+          json: {
+            providers?: ProviderAvailability;
+            unavailableReasons?: ProviderUnavailableReasons;
+          } | null,
+        ) => {
+          if (json?.providers) setProviderStatus(json.providers);
+          if (json?.unavailableReasons) setProviderReasons(json.unavailableReasons);
+        },
+      )
+      .catch(() => undefined)
+      .finally(() => setProviderLoading(false));
+  }, []);
   const current =
     value === "automatic"
       ? AUTOMATIC_MODEL
@@ -380,19 +430,21 @@ export function ModelPicker({
   }, []);
 
   React.useEffect(() => {
-    fetch("/api/ai/provider-status", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json: { providers?: ProviderAvailability } | null) => {
-        if (json?.providers) setProviderStatus(json.providers);
-      })
-      .catch(() => undefined);
-  }, []);
+    refreshProviderStatus();
+  }, [refreshProviderStatus]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    refreshProviderStatus();
+    const id = setInterval(refreshProviderStatus, 60_000);
+    return () => clearInterval(id);
+  }, [open, refreshProviderStatus]);
 
   React.useEffect(() => {
     if (!providerStatus || value === "automatic") return;
     const m = CREATION_MODELS.find((x) => x.id === value);
     if (!m) return;
-    if (modelAvailability(m, providerStatus) !== "ok") {
+    if (modelAvailability(m, providerStatus, providerLoading) !== "ok") {
       onChange("automatic");
       toast.info("Selected model is temporarily unavailable. Switched to Automatic.");
     }
@@ -477,7 +529,7 @@ export function ModelPicker({
         m.tagline.toLowerCase().includes(q)
       );
     }),
-    (m) => modelAvailability(m, providerStatus) === "coming_soon",
+    (m) => modelAvailability(m, providerStatus, providerLoading) === "coming_soon",
   );
 
   const showAutomatic = !query || "automatic".includes(query.toLowerCase()) || AUTOMATIC_MODEL.name.toLowerCase().includes(query.toLowerCase());
@@ -497,7 +549,7 @@ export function ModelPicker({
       return;
     }
     const m = CREATION_MODELS.find((x) => x.id === id);
-    if (!m || modelAvailability(m, providerStatus) !== "ok") return;
+    if (!m || modelAvailability(m, providerStatus, providerLoading) !== "ok") return;
     onChange(id);
     setOpen(false);
     setPreviewId(null);
@@ -568,7 +620,7 @@ export function ModelPicker({
                             model={m}
                             active={m.id === value}
                             preview={m.id === previewId}
-                            availability={modelAvailability(m, providerStatus)}
+                            availability={modelAvailability(m, providerStatus, providerLoading)}
                             onPreview={() => setPreviewId(m.id)}
                           />
                         ))}
@@ -581,7 +633,19 @@ export function ModelPicker({
                       <ModelSidePanel
                         model={previewModel as CreationModel}
                         active={previewModel.id === value}
-                        availability={previewModel.id === "automatic" ? "ok" : modelAvailability(previewModel as CreationModel, providerStatus)}
+                        availability={
+                          previewModel.id === "automatic"
+                            ? "ok"
+                            : modelAvailability(previewModel as CreationModel, providerStatus, providerLoading)
+                        }
+                        unavailableReason={
+                          previewModel.id === "automatic"
+                            ? undefined
+                            : unavailableReasonForModel(
+                                previewModel as CreationModel,
+                                providerReasons,
+                              )
+                        }
                         onUse={() => confirmModel(previewModel.id)}
                       />
                     )}

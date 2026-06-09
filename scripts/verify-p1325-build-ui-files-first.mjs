@@ -21,7 +21,7 @@ const stream = read("src/components/create/workspace/agent-workflow-stream.tsx")
 
 const errors = [];
 
-must(stream, "BuildFileStreamPanel", "file stream panel wired", errors);
+must(stream, "BuildPhasedFilePanel", "phased file panel wired", errors);
 must(stream, "BuildStepPhaseCard", "step phase card wired", errors);
 must(stream, "BuildNoFilesYetCard", "no files yet card", errors);
 must(stream, "BuildActiveWorkChip", "active work chip", errors);
