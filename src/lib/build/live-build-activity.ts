@@ -56,11 +56,11 @@ export function pickLiveActivityLine(messages: string[], elapsedMs: number): str
   return messages[idx]!;
 }
 
-export function continuationStatusLine(attempt: number, maxAttempts: number, reason?: string): string {
-  const n = Math.min(attempt, maxAttempts);
-  if (reason?.includes("quality")) return `Retry ${n}/${maxAttempts} · targeted rewrite for weak pages…`;
-  if (reason?.includes("compact")) return `Retry ${n}/${maxAttempts} · smaller route batch…`;
-  return `Retry ${n}/${maxAttempts} · next generation chunk…`;
+export function continuationStatusLine(attempt: number, _maxAttempts?: number, _reason?: string): string {
+  if (attempt <= 1) {
+    return "Some screens are still incomplete, so I'm continuing generation.";
+  }
+  return "Core layout is ready. I'm adding dashboard and feature screens next.";
 }
 
 /** @deprecated Use activeWorkDuringChunk — no passive model wait copy. */
@@ -146,15 +146,11 @@ export function deriveBuildActivityPresentation(input: {
     };
   }
 
-  if (
-    input.qualityScore != null &&
-    input.qualityTarget != null &&
-    input.phase === "validating_quality"
-  ) {
+  if (input.phase === "validating_quality") {
     return {
       mode: "compact",
       phase: input.phase,
-      line: formatCompactQualityLine(input.qualityScore, input.qualityTarget, input.fileCount ?? 0),
+      line: "Checking screens and navigation coverage…",
     };
   }
 

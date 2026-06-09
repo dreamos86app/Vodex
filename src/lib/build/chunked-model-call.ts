@@ -57,9 +57,7 @@ export async function callChunkWithFailover(
       const result = await callProviderWithBuildTimeout(callInput, options.trace);
       if (result.ok) return result;
       if (result.timedOut && attempt + 1 < maxAttempts) {
-        options.onActiveWork(
-          `${options.chunk.label} timed out at ${Math.floor((Date.now() - started) / 1000)}s — retrying smaller scope…`,
-        );
+        options.onActiveWork("Some screens are still incomplete, so I'm continuing generation with a smaller scope.");
         attempt += 1;
         continue;
       }

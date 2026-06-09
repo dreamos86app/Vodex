@@ -10,7 +10,7 @@ export const PREVIEW_NOT_AVAILABLE_YET =
 export const CONTINUE_GENERATION_LABEL = "Continue generation";
 
 const QUALITY_SCORE_RE =
-  /quality\s*(score)?\s*:?\s*\d+\s*\/\s*\d+|\d+\s*\/\s*100|production quality floor|meaningful routes|output did not meet|quality below the production floor|quality repair needed/gi;
+  /quality\s*(score)?\s*:?\s*\d+\s*\/\s*\d+|\d+\s*\/\s*100|production quality floor|meaningful routes|wired\s*\d+|\/\d+\s*meaningful|0\s*files\s*·|components\s*·\s*wired|retry\s*\d+\s*\/\s*\d+\s*·\s*quality|output did not meet|quality below the production floor|quality repair needed|continuation pass\s+\d+\s+timed out|timed out at\s+\d+s/gi;
 
 /** Strip technical quality gate copy from user-visible chat. */
 export function sanitizeUserBuildChatText(text: string): string {
@@ -32,4 +32,15 @@ export function sanitizeUserBuildChatText(text: string): string {
 
 export function userBlockedBuildSummary(): string {
   return [BUILD_PAUSED_HEADLINE, BUILD_NEEDS_ANOTHER_PASS, CONTINUE_GENERATION_LABEL].join("\n");
+}
+
+export function userContinuationProgressLine(pass: number): string {
+  if (pass <= 1) {
+    return "Some screens are still incomplete, so I'm continuing generation.";
+  }
+  return "Core layout is ready. I'm adding dashboard and feature screens next.";
+}
+
+export function isTechnicalBuildDebugText(text: string): boolean {
+  return QUALITY_SCORE_RE.test(text) || /retry\s*\d+\s*\/\s*\d+/i.test(text);
 }

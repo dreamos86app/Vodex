@@ -68,6 +68,7 @@ export async function enqueueAsyncBuild(input: {
       planFirstOnly:
         input.body.planFirstOnly ??
         (input.body.strategy === "plan_first" && input.body.forceBuildPipeline !== true),
+      resumeContinuation: input.body.resumeContinuation === true,
     }),
   });
 

@@ -3409,9 +3409,64 @@ export function ImmersiveWorkspace({
                     buildRunSummary.variant === "partial" ||
                     appBuildTruth.showContinueGeneration
                       ? () => {
-                          setBuildRunSummary(null);
-                          applyComposerText(appBuildTruth.continueGenerationPrompt);
-                          composerTextareaRef.current?.focus();
+                          void (async () => {
+                            const asyncProjectId = projectIdRef.current ?? effectiveProjectId;
+                            if (!asyncProjectId) return;
+                            const text = appBuildTruth.continueGenerationPrompt;
+                            const opId = crypto.randomUUID();
+                            setBuildRunSummary(null);
+                            setBuildStarting(true);
+                            buildStartedAtRef.current = Date.now();
+                            try {
+                              const enqueued = await enqueueAsyncBuild({
+                                messages: [
+                                  ...messages,
+                                  {
+                                    id: `pending-user-${opId}`,
+                                    role: "user" as const,
+                                    parts: [{ type: "text" as const, text }],
+                                  },
+                                ],
+                                body: {
+                                  modelId,
+                                  mode: "build",
+                                  mode_at_submit: "build",
+                                  strategy: "build_now",
+                                  forceBuildPipeline: true,
+                                  resumeContinuation: true,
+                                  planFirstOnly: false,
+                                  projectId: asyncProjectId,
+                                  conversationId: conversationIdRef.current ?? undefined,
+                                  operationId: opId,
+                                  idempotencyKey: opId,
+                                },
+                              });
+                              if (enqueued.conversationId) {
+                                conversationIdRef.current = enqueued.conversationId;
+                                setConversationId(enqueued.conversationId);
+                              }
+                              buildJobActiveRef.current = true;
+                              setActiveBuildJob({
+                                jobId: enqueued.buildJobId!,
+                                eventsUrl: enqueued.eventsUrl!,
+                                operationId: enqueued.operationId ?? opId,
+                              });
+                              persistWorkspaceTask({
+                                projectId: asyncProjectId,
+                                buildJobId: enqueued.buildJobId!,
+                                eventsUrl: enqueued.eventsUrl!,
+                                operationId: enqueued.operationId ?? opId,
+                                lockedMode: "build",
+                                buildStartedAtMs: buildStartedAtRef.current ?? Date.now(),
+                              });
+                            } catch (err) {
+                              toast.error(
+                                err instanceof Error ? err.message : "Could not resume generation",
+                              );
+                            } finally {
+                              setBuildStarting(false);
+                            }
+                          })();
                         }
                       : undefined
                   }

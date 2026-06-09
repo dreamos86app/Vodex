@@ -300,7 +300,7 @@ export function collapseHeartbeatAssistantMessages(
   });
 }
 
-/** One narration line per unique assistant copy. */
+/** One narration line per unique assistant copy — never replay the full build history. */
 export function collapseDuplicateAssistantMessages(
   events: AgentWorkflowEvent[],
 ): AgentWorkflowEvent[] {
@@ -311,12 +311,28 @@ export function collapseDuplicateAssistantMessages(
       out.push(ev);
       continue;
     }
-    const key = (ev.subtitle ?? ev.title).trim().toLowerCase().replace(/…+$/u, "");
-    if (!key || seen.has(key)) continue;
+    const copy = (ev.subtitle ?? ev.title).trim();
+    if (/quality\s*score|meaningful routes|wired\s*\d+|retry\s*\d+\s*\/\s*\d+/i.test(copy)) {
+      continue;
+    }
+    if (/continuation pass\s+\d+\s+timed out|timed out at\s+\d+s/i.test(copy)) {
+      continue;
+    }
+    const key = `${ev.stableKey}:${copy.toLowerCase().replace(/…+$/u, "").slice(0, 120)}`;
+    if (!copy || seen.has(key)) continue;
     seen.add(key);
     out.push(ev);
   }
   return out;
+}
+
+/** Terminal builds: keep only the last few unique narration lines. */
+export function limitTerminalNarration(events: AgentWorkflowEvent[], terminal: boolean): AgentWorkflowEvent[] {
+  if (!terminal) return events;
+  const assistant = events.filter((e) => e.category === "assistant_message");
+  if (assistant.length <= 3) return events;
+  const keep = new Set(assistant.slice(-3).map((e) => e.stableKey));
+  return events.filter((e) => e.category !== "assistant_message" || keep.has(e.stableKey));
 }
 
 /** Drop duplicate completed phase rows with the same title (keep latest). */
@@ -405,7 +421,8 @@ export function workflowTimelineForChat(
   const coalesced = coalesceWorkflowStreamEvents(rows, { terminal });
   const noHeartbeat = collapseHeartbeatAssistantMessages(coalesced);
   const dedupedAssistant = collapseDuplicateAssistantMessages(noHeartbeat);
-  const collapsed = collapseRedundantPhaseStarted(dedupedAssistant);
+  const limited = limitTerminalNarration(dedupedAssistant, terminal);
+  const collapsed = collapseRedundantPhaseStarted(limited);
   const sequential = applySingleActiveWorkflowStep(collapsed, !terminal);
   return recentTimelineEvents(sequential, limit);
 }

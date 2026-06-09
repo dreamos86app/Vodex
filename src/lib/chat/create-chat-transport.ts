@@ -27,6 +27,8 @@ export type ChatTransportBody = {
   /** Create-page question answer — flat 0.8 credit pricing, no project creation. */
   createQuestion?: boolean;
   planFirstOnly?: boolean;
+  /** Resume route-by-route continuation without replanning or identity. */
+  resumeContinuation?: boolean;
 };
 
 export function createDreamChatTransport({

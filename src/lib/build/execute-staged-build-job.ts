@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/types";
 import { runStagedBuildPipeline } from "@/lib/build/build-pipeline";
+import { buildDomainOpenerFromPrompt } from "@/lib/build/build-domain-narration";
 import {
   calculateCreditsForStagedBuild,
   resolveStagedBuildChargeCredits,
@@ -113,6 +114,7 @@ export type ExecuteStagedBuildJobInput = {
   quotedCreditsRequired?: number;
   blueprintBlock?: string;
   userSelectedModelId?: string | null;
+  resumeContinuation?: boolean;
 };
 
 async function chargeStagedBuildIfNeeded(input: {
@@ -275,9 +277,11 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
     await persistStage("worker_claimed");
     await persistStage("build_pipeline_entered");
     await persistStage("planning_app_started", "Organizing screens and features");
-    const opener = input.userPrompt?.trim()
-      ? `I'll turn this into a production app from your request — mapping systems and screens, generating files, wiring navigation, and preparing preview.`
-      : "I'll map your app architecture, generate screens, save files, and prepare preview.";
+    const opener = input.resumeContinuation
+      ? "Continuing generation from where we left off — route-by-route."
+      : input.userPrompt?.trim()
+        ? buildDomainOpenerFromPrompt(input.userPrompt)
+        : "I'll map your app architecture, generate screens, save files, and prepare preview.";
     await persistAssistantBuildMessage(input.writer, eventCtx, {
       message: opener,
       progressPercent: 10,
@@ -297,6 +301,8 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       userSelectedModelId: input.userSelectedModelId ?? input.modelId,
       buildTrace: trace,
       shouldStopForCredits: () => creditTracker.stop,
+      resumeContinuation: input.resumeContinuation === true,
+      routeByRouteOnly: input.resumeContinuation === true,
       onWorkflowEvent: async (ev) => {
         lastActivityAt = Date.now();
         currentStepLabel = ev.label;

@@ -11,6 +11,7 @@ import {
   collapseHeartbeatAssistantMessages,
   collapseRedundantPhaseStarted,
   coalesceWorkflowStreamEvents,
+  limitTerminalNarration,
 } from "@/lib/build/workflow-stream-coalesce";
 import type { AgentWorkflowEvent } from "@/lib/build/workflow-stream-types";
 import { isValidWorkflowFilePath } from "@/lib/workflow/workflow-file-path";
@@ -456,7 +457,8 @@ export function AgentWorkflowStream({
   });
   const serverNoHeartbeat = collapseHeartbeatAssistantMessages(serverRaw);
   const serverDeduped = collapseDuplicateAssistantMessages(serverNoHeartbeat);
-  const serverCollapsed = collapseRedundantPhaseStarted(serverDeduped);
+  const serverLimited = limitTerminalNarration(serverDeduped, progress.done);
+  const serverCollapsed = collapseRedundantPhaseStarted(serverLimited);
   const serverSequential = applySingleActiveWorkflowStep(serverCollapsed, working);
 
   const startedAt =
@@ -522,12 +524,15 @@ export function AgentWorkflowStream({
   const narrationCopy = React.useMemo(() => {
     const lines = completedTimeline
       .filter((e) => e.category === "assistant_message")
-      .map((e) => sanitizeUserBuildChatText(e.subtitle ?? e.title));
+      .map((e) => sanitizeUserBuildChatText(e.subtitle ?? e.title))
+      .filter(Boolean);
     if (active?.category === "assistant_message") {
       lines.push(sanitizeUserBuildChatText(active.subtitle ?? active.title));
     }
-    return lines.filter(Boolean).join("\n");
-  }, [completedTimeline, active]);
+    const unique = [...new Set(lines.filter(Boolean))];
+    const capped = working ? unique : unique.slice(-3);
+    return capped.join("\n");
+  }, [completedTimeline, active, working]);
 
   const fileSummaryLine = fileDiffSummary
     ? `Generated ${fileDiffSummary.files} files · +${fileDiffSummary.added} −${fileDiffSummary.removed}`

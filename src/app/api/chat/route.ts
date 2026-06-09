@@ -269,6 +269,7 @@ export async function POST(request: Request) {
     planFirstOnly?: boolean;
     strategy?: "build_now" | "plan_first";
     forceBuildPipeline?: boolean;
+    resumeContinuation?: boolean;
   };
 
   try {
@@ -1042,6 +1043,11 @@ export async function POST(request: Request) {
       promptHint: buildPrompt.trim().slice(0, 160) || undefined,
     });
 
+    const resumeContinuation =
+      raw.resumeContinuation === true ||
+      continueIntent.kind === "continue_all" ||
+      continueIntent.kind === "continue_category";
+
     const jobInput = {
       writer,
       userId: user.id,
@@ -1058,6 +1064,7 @@ export async function POST(request: Request) {
       quotedCreditsRequired: buildAllowance?.quotedReserve ?? tokensNeeded,
       blueprintBlock: blueprintBlock || undefined,
       userSelectedModelId: requestedModel,
+      resumeContinuation,
     };
 
     const runAsyncBuild = () =>

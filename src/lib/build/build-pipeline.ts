@@ -59,7 +59,16 @@ import {
   emitBuildHeartbeat,
 } from "@/lib/build/model-call-heartbeat";
 import { runChunkedFrontendGeneration } from "@/lib/build/chunked-generation-pipeline";
+import { runRouteByRouteGeneration } from "@/lib/build/route-by-route-generation";
 import { CHUNK_MODEL_TIMEOUT_MS } from "@/lib/ai/provider-timeouts";
+import { buildDomainOpenerFromPrompt } from "@/lib/build/build-domain-narration";
+import {
+  clearBuildContinuationStatePatch,
+  readBuildContinuationState,
+  writeBuildContinuationStatePatch,
+} from "@/lib/build/build-continuation-state";
+import { userContinuationProgressLine } from "@/lib/build/build-user-copy";
+import { userMessageForTimeoutStrategy as timeoutUserMessage } from "@/lib/build/model-timeout-strategy";
 import {
   MAX_SAFE_CONTINUATION_ATTEMPTS,
   type BuildTerminalPhase,
@@ -148,7 +157,6 @@ import { runBuildStage } from "@/lib/build/build-stage-orchestrator";
 import { streamExtractBuildFiles } from "@/lib/build/extraction-file-stream";
 import { routeToPlannedFilePath, uniquePlannedFilePaths } from "@/lib/build/planned-route-file-path";
 import {
-  formatMeaningfulQualityForStream,
   scoreMeaningfulUiQuality,
 } from "@/lib/build/meaningful-ui-quality";
 import { isSmokeBuildMode, isProductionBuildMode } from "@/lib/build/build-production-mode";
@@ -207,6 +215,7 @@ export type WorkflowEventMeta = {
   chunk_complete?: boolean;
   files_from_chunk?: number;
   active_work?: boolean;
+  diagnostics_only?: boolean;
 };
 
 export type WorkflowEvent = {
@@ -256,6 +265,30 @@ export type StagedBuildResult = {
 type Writer = SupabaseClient<Database>;
 
 const BUILD_SYSTEM = `You are Vodex build engine. Output strict JSON only when asked. Never exceed token limits.`;
+
+const MAX_USER_CONTINUATION_PASSES = 2;
+
+async function loadProjectMeta(writer: Writer, projectId: string): Promise<Record<string, unknown>> {
+  const { data } = await writer.from("projects").select("metadata").eq("id", projectId).maybeSingle();
+  const meta = data?.metadata;
+  return meta && typeof meta === "object" && !Array.isArray(meta)
+    ? (meta as Record<string, unknown>)
+    : {};
+}
+
+async function loadContinuationMeta(writer: Writer, projectId: string) {
+  return readBuildContinuationState(await loadProjectMeta(writer, projectId));
+}
+
+async function loadPersistedBuildFiles(writer: Writer, projectId: string): Promise<BuildFile[]> {
+  const { data } = await writer
+    .from("app_files")
+    .select("path, content")
+    .eq("project_id", projectId);
+  return (data ?? [])
+    .filter((row) => typeof row.path === "string")
+    .map((row) => ({ path: row.path as string, content: (row.content as string | null) ?? "" }));
+}
 
 function appendWorkflowEvent(
   events: WorkflowEvent[],
@@ -456,6 +489,9 @@ export async function runStagedBuildPipeline(input: {
   buildTrace?: BuildWorkerTraceSnapshot | null;
   /** When true, pipeline may return early with files saved for partial credit builds. */
   shouldStopForCredits?: () => boolean;
+  /** Resume route-by-route continuation without replanning or identity. */
+  resumeContinuation?: boolean;
+  routeByRouteOnly?: boolean;
 }): Promise<StagedBuildResult> {
   const emit = input.onWorkflowEvent;
   const track = (
@@ -623,7 +659,20 @@ export async function runStagedBuildPipeline(input: {
   });
   const pipelinePrompt = productIntel.executionPrompt;
   track(events, "planning", "Understanding product & workflows");
-  trackAssistant(events, productIntel.brief.headline, emit);
+  if (!input.resumeContinuation) {
+    trackAssistant(events, buildDomainOpenerFromPrompt(input.userPrompt), emit);
+  } else {
+    trackAssistant(events, "Continuing generation from where we left off — route-by-route.", emit);
+    await input.writer
+      .from("projects")
+      .update({
+        metadata: {
+          ...(await loadProjectMeta(input.writer, input.projectId)),
+          ...clearBuildContinuationStatePatch(),
+        } as Json,
+      } as never)
+      .eq("id", input.projectId);
+  }
   if (featureExpansion.expanded) {
     dreamosLog({
       source: "server",
@@ -663,7 +712,7 @@ export async function runStagedBuildPipeline(input: {
   }
 
   let intakeResult: HugePromptIntakeResult | null = null;
-  if (knownArchetypeFastPath) {
+  if (input.resumeContinuation || knownArchetypeFastPath) {
     intakeResult = buildIntakeFromPrompt(pipelinePrompt);
   } else {
     try {
@@ -740,11 +789,11 @@ export async function runStagedBuildPipeline(input: {
   let planJson = "";
   let planParsed = buildDeterministicPlanForArchetype(archetype, executionPrompt);
 
-  if (knownArchetypeFastPath) {
+  if (knownArchetypeFastPath || input.resumeContinuation) {
     const det = buildDeterministicPlanForArchetype(archetype, executionPrompt);
     planParsed = det;
     planJson = deterministicPlanToJson(det);
-    track(events, "planning", "Creating the app structure…");
+    track(events, "planning", input.resumeContinuation ? "Resuming build plan" : "Creating the app structure…");
     if (input.buildTrace) {
       traceBuildWorkerStage(input.buildTrace, "deterministic_plan_fallback_used", archetype.id);
       await tracePersist("deterministic_plan_fallback_used", archetype.id);
@@ -753,7 +802,7 @@ export async function runStagedBuildPipeline(input: {
     track(events, "planning", "Designing routes and screens");
   }
 
-  if (!knownArchetypeFastPath) {
+  if (!knownArchetypeFastPath && !input.resumeContinuation) {
     const planPrompt = buildPlanPrompt(executionPrompt, planContext, contextSlices);
     heavyBudget.record([planPrompt, BUILD_SYSTEM]);
     heavyBudget.assertWithinBudget();
@@ -819,35 +868,54 @@ export async function runStagedBuildPipeline(input: {
   };
 
   if (input.buildTrace) traceBuildWorkerStage(input.buildTrace, "identity_started");
-  const identityResult = await runBuildStage({
-    stage: "generate_app_name",
-    operationId: `${input.operationId}:identity`,
-    modelUsed: primaryModelId,
-    heartbeatMs: 2000,
-    emit: (type, label, detail, meta) =>
-      track(events, type as WorkflowEventType, label, detail, meta),
-    emitAssistant: (msg) => trackAssistant(events, msg, emit),
-    fn: async () => {
-      const identityTimed = await withTimeout(
-        createAppIdentityForBuild({
-          writer: input.writer,
-          userId: input.userId,
-          userEmail: input.userEmail,
-          projectId: input.projectId,
-          buildOperationId: input.operationId,
-          buildIntent: executionPrompt,
-          planSummary: planParsed?.summary ?? planJson.slice(0, 800),
-          categoryHint: planParsed?.entities?.[0] ? String(planParsed.entities[0]) : undefined,
-          userSelectedModelId: input.userSelectedModelId,
-          onProgress: (step) => track(events, "identity", step),
-          skipLogo: false,
-        }),
-        PROVIDER_TIMEOUT_MS.app_identity ?? 45_000,
-        "app_identity",
-      );
-      return identityTimed.ok ? identityTimed.value : identityFallback;
-    },
-  });
+  let identityResult: AppIdentityResult;
+  if (input.resumeContinuation) {
+    const { data: resumeProj } = await input.writer
+      .from("projects")
+      .select("name")
+      .eq("id", input.projectId)
+      .maybeSingle();
+    const resumedName = resumeProj?.name?.trim() || fallbackAppName;
+    identityResult = {
+      ...identityFallback,
+      appName: resumedName,
+      slug: slugifyAppName(resumedName),
+      reused: true,
+      logoGenerationStatus: "skipped",
+      namingSource: "fallback",
+    };
+    track(events, "identity", "Resuming without renaming or new icon");
+  } else {
+    identityResult = await runBuildStage({
+      stage: "generate_app_name",
+      operationId: `${input.operationId}:identity`,
+      modelUsed: primaryModelId,
+      heartbeatMs: 2000,
+      emit: (type, label, detail, meta) =>
+        track(events, type as WorkflowEventType, label, detail, meta),
+      emitAssistant: (msg) => trackAssistant(events, msg, emit),
+      fn: async () => {
+        const identityTimed = await withTimeout(
+          createAppIdentityForBuild({
+            writer: input.writer,
+            userId: input.userId,
+            userEmail: input.userEmail,
+            projectId: input.projectId,
+            buildOperationId: input.operationId,
+            buildIntent: executionPrompt,
+            planSummary: planParsed?.summary ?? planJson.slice(0, 800),
+            categoryHint: planParsed?.entities?.[0] ? String(planParsed.entities[0]) : undefined,
+            userSelectedModelId: input.userSelectedModelId,
+            onProgress: (step) => track(events, "identity", step),
+            skipLogo: false,
+          }),
+          PROVIDER_TIMEOUT_MS.app_identity ?? 45_000,
+          "app_identity",
+        );
+        return identityTimed.ok ? identityTimed.value : identityFallback;
+      },
+    });
+  }
   if (input.buildTrace) {
     traceBuildWorkerStage(
       input.buildTrace,
@@ -1026,7 +1094,9 @@ export async function runStagedBuildPipeline(input: {
   const smokeBuild = isSmokeBuildMode();
   const scaffoldOpts = { allowFullScaffold: smokeBuild };
   const MIN_FULL_SCAFFOLD_FILES = 14;
-  let allFiles: BuildFile[] = [];
+  let allFiles: BuildFile[] = input.resumeContinuation
+    ? await loadPersistedBuildFiles(input.writer, input.projectId)
+    : [];
 
   /** Smoke builds may skip the model; production always runs frontend_implementation for premium UI. */
   const scaffoldSufficient =
@@ -1083,10 +1153,45 @@ export async function runStagedBuildPipeline(input: {
         primaryModelId = feCall.result.spec.modelId;
         allFiles = await ingestChunk(feCall.result.text, allFiles);
       }
+    } else if (input.routeByRouteOnly || input.resumeContinuation) {
+      trackAssistant(events, timeoutUserMessage("route_by_route"), emit);
+      const contState = await loadContinuationMeta(input.writer, input.projectId);
+      const rbr = await runRouteByRouteGeneration({
+        writer: input.writer,
+        userId: input.userId,
+        userEmail: input.userEmail,
+        operationId: input.operationId,
+        system: BUILD_SYSTEM,
+        complexity: frontendComplexity,
+        accumulatedCostUsd: accumulatedCost,
+        userSelectedModelId: input.userSelectedModelId,
+        buildTrace: input.buildTrace,
+        executionPrompt,
+        planJson: planJson!,
+        designBrief,
+        appName,
+        routes: designBrief.routes ?? archetype.coreRoutes,
+        initialFiles: allFiles,
+        startIndex: contState?.stageIndex ?? 0,
+        ingestChunk,
+        onChunkStart: (_i, _t, chunk) => trackAssistant(events, chunk.activeWork, emit),
+        onChunkActiveWork: (line, meta) => {
+          emitBuildHeartbeat(events as Parameters<typeof emitBuildHeartbeat>[0], line, emit as never, {
+            active_work: true,
+            ...meta,
+          });
+        },
+        onChunkComplete: () => undefined,
+        onStrategyChange: (line) => trackAssistant(events, line, emit),
+        onPaused: (line) => trackAssistant(events, line, emit),
+      });
+      accumulatedCost += rbr.costUsd;
+      allFiles = rbr.files;
+      primaryModelId = rbr.modelId;
     } else {
       trackAssistant(
         events,
-        "Generating your app in focused chunks — shell, data, pages, components, then polish.",
+        buildDomainOpenerFromPrompt(input.userPrompt),
         emit,
       );
       const chunked = await runChunkedFrontendGeneration({
@@ -1140,7 +1245,9 @@ export async function runStagedBuildPipeline(input: {
           );
         },
         onChunkSkipped: (chunk, reason) => {
-          trackAssistant(events, `Continuing after ${chunk.label} (${reason})…`, emit);
+          if (reason === "chunk_timeout") {
+            trackAssistant(events, timeoutUserMessage("smaller_chunk"), emit);
+          }
         },
       });
       accumulatedCost += chunked.costUsd;
@@ -1149,6 +1256,71 @@ export async function runStagedBuildPipeline(input: {
       primaryModelId = chunked.modelId;
       allFiles = chunked.files;
       continuationAttemptsTotal += chunked.chunksRun;
+
+      const renderableAfterChunked = filterRenderableBuildFiles(allFiles).length;
+      if (
+        !input.routeByRouteOnly &&
+        renderableAfterChunked < generationBudget.minFiles * 0.5
+      ) {
+        trackAssistant(events, timeoutUserMessage("route_by_route"), emit);
+        const rbr = await runRouteByRouteGeneration({
+          writer: input.writer,
+          userId: input.userId,
+          userEmail: input.userEmail,
+          operationId: input.operationId,
+          system: BUILD_SYSTEM,
+          complexity: frontendComplexity,
+          accumulatedCostUsd: accumulatedCost,
+          userSelectedModelId: input.userSelectedModelId,
+          buildTrace: input.buildTrace,
+          executionPrompt,
+          planJson: planJson!,
+          designBrief,
+          appName,
+          routes: designBrief.routes ?? archetype.coreRoutes,
+          initialFiles: allFiles,
+          ingestChunk,
+          onChunkStart: (index, total, chunk, progressLine) => {
+            setBuildPhase("model_generating", "writing", `Route plan: ${progressLine}`);
+            trackAssistant(events, chunk.activeWork, emit);
+          },
+          onChunkActiveWork: (line, meta) => {
+            emitBuildHeartbeat(events as Parameters<typeof emitBuildHeartbeat>[0], line, emit as never, {
+              build_terminal_phase: currentBuildPhase,
+              active_work: true,
+              ...meta,
+            });
+          },
+          onChunkComplete: (index, total, chunk, fileCount) => {
+            track(events, "writing", `${index}/${total} ${chunk.label} — ${fileCount} files`);
+          },
+          onStrategyChange: (line) => trackAssistant(events, line, emit),
+          onPaused: (line) => trackAssistant(events, line, emit),
+        });
+        accumulatedCost += rbr.costUsd;
+        totalIn += rbr.inputTokens;
+        totalOut += rbr.outputTokens;
+        primaryModelId = rbr.modelId;
+        allFiles = rbr.files;
+        if (rbr.paused) {
+          await input.writer
+            .from("projects")
+            .update({
+              metadata: {
+                ...(await loadProjectMeta(input.writer, input.projectId)),
+                ...writeBuildContinuationStatePatch({
+                  parentBuildJobId: input.buildJobId,
+                  routeByRoute: true,
+                  stageIndex: rbr.chunksCompleted,
+                  routesRemaining: designBrief.routes ?? [],
+                  pausedAt: new Date().toISOString(),
+                  reason: "timeout_pause",
+                }),
+              } as never,
+            } as never)
+            .eq("id", input.projectId);
+        }
+      }
     }
   } else if (input.buildTrace) {
     traceBuildWorkerStage(
@@ -1164,11 +1336,7 @@ export async function runStagedBuildPipeline(input: {
       continuation_max: MAX_SAFE_CONTINUATION_ATTEMPTS,
     });
     continuationAttemptsTotal += 1;
-    trackAssistant(
-      events,
-      `Retry ${continuationAttemptsTotal}/${MAX_SAFE_CONTINUATION_ATTEMPTS} · compact route set, then full continuation…`,
-      emit,
-    );
+    trackAssistant(events, "Core layout is ready. I'm adding primary route pages next.", emit);
     const compactRoutes = uniquePlannedFilePaths(designBrief.routes ?? archetype.coreRoutes, 6);
     const routeRetryPrompt = smokeBuild
       ? minimalFrontendPrompt(executionPrompt, planJson, contextSlices, designBrief)
@@ -1194,9 +1362,7 @@ export async function runStagedBuildPipeline(input: {
     if (!miniCall.ok) {
       trackAssistant(
         events,
-        miniCall.timedOut
-          ? "Compact route generation timed out — continuing with recovery passes."
-          : "Compact route retry did not return files — continuing with recovery passes.",
+        timeoutUserMessage(miniCall.timedOut ? "smaller_chunk" : "route_by_route"),
         emit,
       );
     } else {
@@ -1215,11 +1381,7 @@ export async function runStagedBuildPipeline(input: {
     }
     clearStalePlannedPlaceholders(allFiles);
     if (!miniCall.ok || allFiles.length === 0) {
-      trackAssistant(
-        events,
-        "Moving to full-app continuation passes to finish routes and polish UI…",
-        emit,
-      );
+      trackAssistant(events, userContinuationProgressLine(1), emit);
     }
   }
 
@@ -1243,10 +1405,11 @@ export async function runStagedBuildPipeline(input: {
   });
 
   let continuationPass = 0;
+  let continuationTimeouts = 0;
   while (
     accumulatedCost < FULL_BUILD_CAP_USD * 0.92 &&
-    continuationPass < generationBudget.maxContinuationPasses + 2 &&
-    continuationAttemptsTotal < MAX_SAFE_CONTINUATION_ATTEMPTS
+    continuationPass < MAX_USER_CONTINUATION_PASSES &&
+    continuationAttemptsTotal < MAX_USER_CONTINUATION_PASSES + 1
   ) {
     const genericCheck = detectGenericScaffoldBuild(allFiles);
     const continuationDecision = shouldContinueGeneration({
@@ -1277,15 +1440,7 @@ export async function runStagedBuildPipeline(input: {
     });
     trackAssistant(
       events,
-      `Retry ${continuationAttemptsTotal}/${MAX_SAFE_CONTINUATION_ATTEMPTS} · ${continuationUserMessage(
-        generationQualityReport,
-        meaningfulQualityReport.weak_file_paths.length,
-        {
-          genericScaffold: genericCheck.isGeneric,
-          qualityScore: meaningfulQualityReport.final_quality_score,
-          qualityTarget: meaningfulQualityReport.min_required_score,
-        },
-      ).replace(/^Continuing generation: /i, "")}`,
+      userContinuationProgressLine(continuationAttemptsTotal),
       emit,
     );
     const contPrompt = buildContinuationFrontendPrompt({
@@ -1316,13 +1471,53 @@ export async function runStagedBuildPipeline(input: {
       continuationAttemptsTotal,
     );
     if (!contCall.ok) {
-      trackAssistant(
-        events,
-        contCall.timedOut
-          ? `Continuation pass ${continuationPass + 1} timed out — running targeted rewrite next…`
-          : `Continuation pass ${continuationPass + 1} returned no output — running targeted rewrite next…`,
-        emit,
-      );
+      continuationTimeouts += 1;
+      if (continuationTimeouts >= MAX_USER_CONTINUATION_PASSES) {
+        trackAssistant(events, timeoutUserMessage("route_by_route"), emit);
+        const rbr = await runRouteByRouteGeneration({
+          writer: input.writer,
+          userId: input.userId,
+          userEmail: input.userEmail,
+          operationId: `${input.operationId}:cont-rbr`,
+          system: BUILD_SYSTEM,
+          complexity: frontendComplexity,
+          accumulatedCostUsd: accumulatedCost,
+          userSelectedModelId: input.userSelectedModelId,
+          buildTrace: input.buildTrace,
+          executionPrompt,
+          planJson,
+          designBrief,
+          appName,
+          routes: designBrief.routes ?? archetype.coreRoutes,
+          initialFiles: allFiles,
+          ingestChunk: async (text, files) =>
+            ingestModelFilesWithExtractionStream(
+              text,
+              files,
+              events,
+              track,
+              effectiveMaxFiles,
+              onFileStreamStart,
+              onFileStreamDelta,
+              onFileStreamComplete,
+              onExtractStart,
+            ),
+          onChunkStart: (_i, _t, chunk) => trackAssistant(events, chunk.activeWork, emit),
+          onChunkActiveWork: (line, meta) => {
+            emitBuildHeartbeat(events as Parameters<typeof emitBuildHeartbeat>[0], line, emit as never, {
+              active_work: true,
+              ...meta,
+            });
+          },
+          onChunkComplete: () => undefined,
+          onStrategyChange: (line) => trackAssistant(events, line, emit),
+          onPaused: (line) => trackAssistant(events, line, emit),
+        });
+        accumulatedCost += rbr.costUsd;
+        allFiles = rbr.files;
+        break;
+      }
+      trackAssistant(events, timeoutUserMessage("smaller_chunk"), emit);
       continuationPass += 1;
       continue;
     }
@@ -1408,11 +1603,7 @@ export async function runStagedBuildPipeline(input: {
       continuation_attempt: continuationAttemptsTotal,
       continuation_max: MAX_SAFE_CONTINUATION_ATTEMPTS,
     });
-    trackAssistant(
-      events,
-      `Retry ${continuationAttemptsTotal}/${MAX_SAFE_CONTINUATION_ATTEMPTS} · rewriting ${meaningfulQualityReport.weak_file_paths.length || "weak"} pages and filling missing routes…`,
-      emit,
-    );
+    trackAssistant(events, "Strengthening thin pages and filling missing routes…", emit);
     const rewritePrompt = buildContinuationFrontendPrompt({
       executionBrief: executionPrompt,
       planJson,
@@ -1580,9 +1771,9 @@ export async function runStagedBuildPipeline(input: {
     setBuildPhase(
       "validating_quality",
       "validating",
-      `Quality score ${meaningfulQualityReport.final_quality_score}/${meaningfulQualityReport.min_required_score}`,
-      formatMeaningfulQualityForStream(meaningfulQualityReport),
-      { streamCategory: "quality_check" },
+      "Checking screens and navigation coverage…",
+      undefined,
+      { streamCategory: "quality_check", diagnostics_only: true },
     );
   }
 

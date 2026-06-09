@@ -119,10 +119,7 @@ export function continuationUserMessage(
   if (weakCount > 0) {
     return `First pass is thin — rewriting ${weakCount} weak file${weakCount === 1 ? "" : "s"} and adding missing routes (not a template).`;
   }
-  if (opts?.qualityScore != null && opts?.qualityTarget != null) {
-    return `Quality ${opts.qualityScore}/${opts.qualityTarget} — continuing full-app generation with missing routes and components.`;
-  }
-  return `Continuing generation: adding remaining pages (${report.counts.files} files so far)…`;
+  return "Some screens are still incomplete, so I'm continuing generation.";
 }
 
 export const ANTI_GENERIC_SCAFFOLD_FORBID = [
