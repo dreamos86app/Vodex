@@ -1,4 +1,13 @@
 import { injectPreviewRouterShim } from "@/lib/preview/inject-preview-router-shim";
+import { buildInternalPreviewHtmlUrl } from "@/lib/preview/internal-preview-url";
+
+export {
+  assertInternalPreviewUrl,
+  buildInternalPreviewHtmlUrl,
+  normalizeInternalPreviewUrl,
+  toPreviewIframeSrc,
+  tryNormalizeInternalPreviewUrl,
+} from "@/lib/preview/internal-preview-url";
 
 /** Rewrite hardcoded vodex.dev /p/ links to in-app paths before the bundle boots. */
 export function rewriteAbsoluteVodexLinksInHtml(html: string): string {
@@ -61,6 +70,7 @@ export function rewritePreviewArtifactHtml(
 export function isInternalPreviewProxyUrl(url: string | null | undefined): boolean {
   if (!url?.trim()) return false;
   if (url.startsWith("/api/projects/") && url.includes("/preview-html")) return true;
+  if (url.startsWith("api/projects/") && url.includes("/preview-html")) return true;
   try {
     const u = new URL(url, "https://localhost");
     return u.pathname.includes("/preview-html") || u.pathname.includes("/preview-assets");
@@ -82,10 +92,10 @@ export function previewFrameUrlWithRoute(
   route?: string | null,
   artifactBuildId?: string | null,
 ): string {
-  const params = new URLSearchParams();
-  params.set("format", "frame");
-  if (cacheBust != null && cacheBust !== "") params.set("v", String(cacheBust));
-  if (artifactBuildId) params.set("artifact", artifactBuildId);
-  if (route && route !== "/") params.set("route", route.startsWith("/") ? route : `/${route}`);
-  return `/api/projects/${encodeURIComponent(projectId)}/preview-html?${params.toString()}`;
+  return buildInternalPreviewHtmlUrl({
+    projectId,
+    route,
+    cacheBust,
+    artifactBuildId,
+  });
 }

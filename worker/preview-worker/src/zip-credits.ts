@@ -5,6 +5,14 @@ function operationId(projectId: string): string {
   return `zip-preview:${projectId}`;
 }
 
+type CreditJobPatch = {
+  credit_reservation_id: string;
+  estimated_action_credits: number;
+  captured_action_credits: number | null;
+  credit_status: "reserved" | "captured" | "released" | "not_charged";
+  credit_capture_error?: string;
+};
+
 export async function captureZipPreviewCredits(projectId: string, ownerId: string): Promise<void> {
   const op = operationId(projectId);
   const { data: hold } = await supabase
@@ -41,11 +49,28 @@ export async function captureZipPreviewCredits(projectId: string, ownerId: strin
       .update({ status: "charged", updated_at: new Date().toISOString() })
       .eq("operation_id", op);
     await patchJobBilling(projectId, {
+      credit_reservation_id: op,
       estimated_action_credits: credits,
+      captured_action_credits: credits,
+      credit_status: "captured",
+      estimated_action_credits_legacy: credits,
       charged_action_credits: credits,
       charge_status: "charged",
     });
     log("info", "zip preview credits captured", { projectId, credits });
+  } else {
+    const err = row?.error ?? error?.message ?? "charge failed";
+    log("error", "zip preview charge rejected", { projectId, error: err });
+    await patchJobBilling(projectId, {
+      credit_reservation_id: op,
+      estimated_action_credits: credits,
+      captured_action_credits: null,
+      credit_status: "reserved",
+      credit_capture_error: `Worker capture failed: ${err}`,
+      estimated_action_credits_legacy: credits,
+      charged_action_credits: null,
+      charge_status: "pending",
+    });
   }
 }
 
@@ -63,7 +88,11 @@ export async function cancelZipPreviewHold(projectId: string): Promise<void> {
     .eq("status", "reserved");
   const credits = Number(hold?.credits) || 0;
   await patchJobBilling(projectId, {
+    credit_reservation_id: op,
     estimated_action_credits: credits,
+    captured_action_credits: null,
+    credit_status: "released",
+    estimated_action_credits_legacy: credits,
     charged_action_credits: null,
     charge_status: "cancelled",
   });
@@ -71,8 +100,8 @@ export async function cancelZipPreviewHold(projectId: string): Promise<void> {
 
 async function patchJobBilling(
   projectId: string,
-  billing: {
-    estimated_action_credits: number;
+  billing: CreditJobPatch & {
+    estimated_action_credits_legacy?: number;
     charged_action_credits: number | null;
     charge_status: string;
   },

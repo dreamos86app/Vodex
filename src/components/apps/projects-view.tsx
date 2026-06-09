@@ -28,6 +28,7 @@ import {
   resolveProjectCardStatus,
 } from "@/lib/projects/user-safe-project-badges";
 import { projectIconSrc } from "@/lib/projects/ensure-project-icon";
+import { tryNormalizeInternalPreviewUrl } from "@/lib/preview/internal-preview-url";
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { subscribeProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
 import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
@@ -130,9 +131,7 @@ function ProjectCard({
   const cardFramePreviewUrl = `/api/projects/${project.id}/preview-html?format=frame&route=${encodeURIComponent("/")}`;
   const resolvedBannerPreviewUrl =
     canPreview && !importedPending
-      ? project.preview_url?.includes("/preview-html")
-        ? project.preview_url
-        : cardFramePreviewUrl
+      ? tryNormalizeInternalPreviewUrl(project.preview_url) ?? cardFramePreviewUrl
       : null;
   const canPublish =
     cardStatus === "ready" &&

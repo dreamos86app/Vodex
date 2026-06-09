@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { toPreviewIframeSrc, tryNormalizeInternalPreviewUrl } from "@/lib/preview/internal-preview-url";
 
 type Props = {
   projectId: string;
@@ -87,11 +88,12 @@ export function ProjectBanner({
   importedPendingSetup = false,
   iconSrc = null,
 }: Props) {
-  if (previewUrl) {
+  const iframeSrc = previewUrl ? tryNormalizeInternalPreviewUrl(previewUrl) : null;
+  if (iframeSrc) {
     return (
       <div className={cn("relative w-full overflow-hidden bg-muted/20", heightClass, className)}>
         <iframe
-          src={previewUrl}
+          src={toPreviewIframeSrc(iframeSrc)}
           title={title ? `${title} preview` : "App preview"}
           tabIndex={-1}
           loading="lazy"

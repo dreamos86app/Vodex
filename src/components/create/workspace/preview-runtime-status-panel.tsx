@@ -130,6 +130,11 @@ export function PreviewRuntimeStatusPanel({
           ) : !compact ? (
             <p className="mt-0.5 text-muted-foreground">{subline}</p>
           ) : null}
+          {!compact && status.creditCaptureWarning ? (
+            <p className="mt-1 text-[10px] font-medium text-amber-600/90 dark:text-amber-400/90">
+              {status.creditCaptureWarning}
+            </p>
+          ) : null}
           {!compact && qualityWarnings.length > 0 && !sourceValidationFailed ? (
             <p className="mt-1 text-[10px] text-amber-600/90 dark:text-amber-400/90">
               {qualityWarnings[0]}

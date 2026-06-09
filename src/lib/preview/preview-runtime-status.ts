@@ -31,6 +31,8 @@ export type PreviewRuntimeStatusPayload = {
   chargedActionCredits: number | null;
   creditsCharged: boolean;
   chargeStatus: "pending" | "charged" | "refunded" | "cancelled" | "none" | null;
+  /** Set when preview succeeded but billing capture failed */
+  creditCaptureWarning?: string | null;
   previewFailureKind: string | null;
   previewFailureDetail: string | null;
   previewFailureClassification?: import("@/lib/preview/preview-failure-classifier").PreviewFailureClassification | null;

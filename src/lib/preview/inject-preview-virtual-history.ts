@@ -24,8 +24,10 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
     }catch(e){}
   }
   function internalize(url){
+    if(typeof url==="string"&&(url.startsWith("api/projects/")||url.startsWith("/api/projects/")))return null;
     try{
       var u=new URL(url,location.href);
+      if(u.pathname.startsWith("/api/projects/")||u.pathname.startsWith("api/projects/"))return null;
       if(u.origin===location.origin)return normPath(u.pathname);
       if(/vodex\\.dev$/i.test(u.hostname)||/\\.vodex\\.app$/i.test(u.hostname))return normPath(u.pathname);
     }catch(e){}

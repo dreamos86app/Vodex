@@ -10,6 +10,7 @@ import {
 import { isServerlessHost } from "@/lib/imports/preview-build-queue";
 import { WORKER_CONNECTED_THRESHOLD_MS } from "@/lib/preview/preview-worker-status";
 import { loadZipPreviewBillingForProject } from "@/lib/imports/zip-preview-billing";
+import { reconcileZipPreviewCreditCapture } from "@/lib/imports/zip-preview-credit-reconcile";
 import { derivePreviewFailure } from "@/lib/preview/derive-preview-failure";
 import { classifyPreviewBuildFailure } from "@/lib/preview/preview-failure-classifier";
 import { detectPreviewRoutesFromFiles } from "@/lib/preview/detect-preview-routes";
@@ -232,9 +233,31 @@ export async function loadPreviewRuntimeStatus(
           charge_status: String(diagRecord.charge_status ?? "none"),
         }
       : null);
-  const billing =
+  let billing =
     billingFromDiag ??
     (await loadZipPreviewBillingForProject(projectId).catch(() => null));
+
+  let creditCaptureWarning: string | null = null;
+  if (admin && jobRow) {
+    const { data: ownerRow } = await supabase
+      .from("projects")
+      .select("owner_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (ownerRow?.owner_id) {
+      const reconcile = await reconcileZipPreviewCreditCapture({
+        projectId,
+        ownerId: ownerRow.owner_id,
+        jobStatus: jobRow.status,
+        previewRenderable,
+        admin,
+      });
+      creditCaptureWarning = reconcile.warning;
+      if (reconcile.action === "captured" || reconcile.action === "released") {
+        billing = await loadZipPreviewBillingForProject(projectId).catch(() => billing);
+      }
+    }
+  }
 
   const chargeStatus =
     billing?.charge_status === "pending" ||
@@ -355,6 +378,7 @@ export async function loadPreviewRuntimeStatus(
     chargedActionCredits: billing?.charged_action_credits ?? null,
     creditsCharged: billing?.charge_status === "charged",
     chargeStatus,
+    creditCaptureWarning,
     previewFailureKind: null,
     previewFailureDetail: null,
   };

@@ -13,8 +13,10 @@ import type { DetectedFrameworkId } from "@/lib/imports/framework-detector";
 import { loadPreviewWorkerStatus } from "@/lib/preview/preview-worker-status";
 import {
   mergeBillingIntoDiagnostics,
+  previewZipBillingDiagnostics,
   type PreviewZipBillingDiagnostics,
 } from "@/lib/imports/zip-preview-billing";
+import { zipPreviewOperationId } from "@/lib/imports/zip-preview-action-credits";
 
 export function isServerlessHost(): boolean {
   return process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME != null;
@@ -155,12 +157,29 @@ export async function queuePreviewBuildJob(input: {
     ],
   };
 
-  const diagnosticsWithBilling = input.previewBilling
-    ? (mergeBillingIntoDiagnostics(
-        diagnostics as unknown as Record<string, unknown>,
-        input.previewBilling,
-      ) as typeof diagnostics)
-    : diagnostics;
+  const operationId = zipPreviewOperationId(input.projectId);
+  const creditMeta = input.previewBilling
+    ? {
+        credit_reservation_id: operationId,
+        estimated_action_credits: input.previewBilling.estimated_action_credits,
+        captured_action_credits: null,
+        credit_status: "reserved" as const,
+      }
+    : {
+        credit_reservation_id: operationId,
+        estimated_action_credits: 0,
+        captured_action_credits: null,
+        credit_status: "not_charged" as const,
+      };
+
+  const billingPayload =
+    input.previewBilling ??
+    previewZipBillingDiagnostics({ estimatedActionCredits: 0 }, "none");
+
+  const diagnosticsWithBilling = mergeBillingIntoDiagnostics(
+    { ...(diagnostics as unknown as Record<string, unknown>), ...creditMeta },
+    billingPayload,
+  ) as typeof diagnostics;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (input.admin as any).from("preview_build_jobs").insert({

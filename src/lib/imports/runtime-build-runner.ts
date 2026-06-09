@@ -370,7 +370,7 @@ export async function runImportPreviewBuild(input: {
 
   const health = checkPreviewHealth(htmlForHealth, sourceFiles);
   const previewUrl = health.previewRenderable
-    ? `${projectPreviewFrameUrl(input.projectId)}&artifact=${encodeURIComponent(buildId)}`
+    ? projectPreviewFrameUrl(input.projectId, undefined, undefined, buildId)
     : null;
 
   diagnostics = {

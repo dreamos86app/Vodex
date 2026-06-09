@@ -27,6 +27,8 @@ import { ImportedPreviewEmptyState } from "@/components/preview/imported-preview
 import {
   isBlockedRawAppPreviewUrl,
   isInternalPreviewProxyUrl,
+  toPreviewIframeSrc,
+  tryNormalizeInternalPreviewUrl,
 } from "@/lib/preview/rewrite-preview-artifact-html";
 
 type Viewport = "desktop" | "tablet" | "mobile";
@@ -125,6 +127,17 @@ export function PreviewPanel({
   }, [url, srcDoc, reloadKey]);
 
   const hasInline = !!srcDoc?.trim() && !isUnrenderableSrcDoc(srcDoc);
+  const resolvedPreviewUrl = React.useMemo(() => {
+    if (!url || hasInline) return null;
+    const normalized = tryNormalizeInternalPreviewUrl(url);
+    if (!normalized) return null;
+    try {
+      return toPreviewIframeSrc(normalized);
+    } catch {
+      return null;
+    }
+  }, [url, hasInline]);
+  const previewUrlInvalid = Boolean(url && !hasInline && !resolvedPreviewUrl);
   const iframeRenderable = runtimeStatus?.previewRenderable === true;
   const previewBuildFailed =
     runtimeStatus?.jobStatus === "failed" || runtimeStatus?.previewStatus === "failed";
@@ -142,10 +155,16 @@ export function PreviewPanel({
     return () => window.clearTimeout(t);
   }, [iframeLoading, reloadKey, url, srcDoc, previewPreparing, isArtifactUrl]);
 
-  const rawBlocked = Boolean(url && isBlockedRawAppPreviewUrl(url));
+  const rawBlocked = Boolean(url && isBlockedRawAppPreviewUrl(url)) || previewUrlInvalid;
   const previewDiagnostics = React.useMemo(() => {
     if (!url || hasInline) return null;
-    const source = rawBlocked ? "raw_blocked" : isArtifactUrl ? "artifact_proxy" : "unknown";
+    const source = previewUrlInvalid
+      ? "invalid_preview_url"
+      : rawBlocked
+        ? "raw_blocked"
+        : isArtifactUrl
+          ? "artifact_proxy"
+          : "unknown";
     let artifactPath: string | null = null;
     try {
       const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "https://localhost");
@@ -162,7 +181,7 @@ export function PreviewPanel({
       rawUrlBlocked: rawBlocked,
       fallback_applied: fallbackApplied,
     };
-  }, [url, hasInline, rawBlocked, isArtifactUrl, previewRoute]);
+  }, [url, hasInline, rawBlocked, isArtifactUrl, previewRoute, previewUrlInvalid]);
 
   const hasPreviewArtifact = !!url || hasInline;
   const artifactUrlOk = hasInline || !url || (isArtifactUrl && !rawBlocked);
@@ -442,12 +461,18 @@ export function PreviewPanel({
                 <ShieldAlert className="size-5 text-destructive" strokeWidth={1.7} />
               </div>
               <p className="text-[13px] font-semibold text-foreground">
-                {rawBlocked ? "External preview URL blocked" : "Preview embed blocked"}
+                {previewUrlInvalid
+                  ? "Preview route URL invalid"
+                  : rawBlocked
+                    ? "External preview URL blocked"
+                    : "Preview embed blocked"}
               </p>
               <p className="text-[11.5px] leading-relaxed text-muted-foreground">
-                {rawBlocked
-                  ? "Imported apps must load through the internal preview proxy — never raw vodex.dev URLs in the iframe."
-                  : "This route blocks iframe embedding. Open the preview in a new tab or run embed repair."}
+                {previewUrlInvalid
+                  ? "The preview iframe must load an absolute Vodex API route starting with /api/projects/…/preview-html — not a relative app path."
+                  : rawBlocked
+                    ? "Imported apps must load through the internal preview proxy — never raw vodex.dev URLs in the iframe."
+                    : "This route blocks iframe embedding. Open the preview in a new tab or run embed repair."}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {url ? (
@@ -539,7 +564,7 @@ export function PreviewPanel({
                 <iframe
                     ref={iframeRef}
                     key={`${reloadKey}-${url ?? "inline"}`}
-                    src={hasInline ? undefined : url ?? undefined}
+                    src={hasInline ? undefined : resolvedPreviewUrl ?? undefined}
                     srcDoc={hasInline ? (srcDoc ?? undefined) : undefined}
                     title={appName ?? "App preview"}
                     className="h-full w-full flex-1 border-0"

@@ -218,7 +218,7 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
       return;
     }
 
-    const previewUrl = `/api/projects/${job.project_id}/preview-html?format=frame&artifact=${encodeURIComponent(job.id)}`;
+    const previewUrl = `/api/projects/${encodeURIComponent(job.project_id)}/preview-html?format=frame&artifact=${encodeURIComponent(job.id)}`;
     const diagnostics = {
       framework: fw,
       frameworkLabel: framework.label,

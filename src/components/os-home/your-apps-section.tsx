@@ -18,6 +18,7 @@ import type { ProjectCardStatus } from "@/lib/projects/project-card-status";
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { projectIconSrc } from "@/lib/projects/ensure-project-icon";
+import { tryNormalizeInternalPreviewUrl } from "@/lib/preview/internal-preview-url";
 
 export type YourAppsProject = ProjectCardInput & {
   name: string;
@@ -88,9 +89,7 @@ export function YourAppsSection({
               cardStatus === "ready" && (Boolean(p.preview_url) || previewRenderable);
             const bannerPreviewUrl =
               showPreview && !importedPending
-                ? p.preview_url?.includes("/preview-html")
-                  ? p.preview_url
-                  : cardFramePreviewUrl
+                ? tryNormalizeInternalPreviewUrl(p.preview_url) ?? cardFramePreviewUrl
                 : null;
             const showStatusCtas =
               cardStatus === "preview_failed" || cardStatus === "failed" || isAdmin;
