@@ -102,12 +102,18 @@ export function resolveAppBuildTruthFromFacts(input: AppBuildTruthFacts): AppBui
     input.previewStatus === "preparing";
 
   const hasRealFiles = dbAppFilesCount >= MIN_RENDERABLE_FILES;
-  const canPreview =
-    !isBlocked &&
-    hasRealFiles &&
-    sourceIntegrityOk &&
-    (previewRenderable || previewArtifactExists || previewActive) &&
-    Boolean(previewSessionId || previewBuildJobId || previewArtifactExists);
+  const importedPreviewArtifactReady =
+    isImportedApp &&
+    previewRenderable &&
+    previewArtifactExists &&
+    Boolean(previewBuildJobId);
+  const canPreview = importedPreviewArtifactReady
+    ? !isBlocked && sourceIntegrityOk
+    : !isBlocked &&
+      hasRealFiles &&
+      sourceIntegrityOk &&
+      (previewRenderable || previewArtifactExists || previewActive) &&
+      Boolean(previewSessionId || previewBuildJobId || previewArtifactExists);
 
   const canPublish = canPreview && previewRenderable;
 

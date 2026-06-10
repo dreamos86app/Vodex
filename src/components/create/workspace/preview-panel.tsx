@@ -42,6 +42,9 @@ import {
   type PreviewInnerRouteErrorMessage,
 } from "@/lib/preview/preview-inner-route-types";
 import { PreviewInnerRouteErrorPanel } from "@/components/preview/preview-inner-route-error-panel";
+import { PreviewUniversalErrorPanel } from "@/components/preview/preview-universal-error-panel";
+import { PreviewDebugDrawer } from "@/components/preview/preview-debug-drawer";
+import { resolvePreviewState } from "@/lib/preview/resolve-preview-state";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 
@@ -81,13 +84,20 @@ export interface PreviewPanelProps {
   onPrepareImportedPreview?: () => void;
   onRepairPreview?: () => void;
   prepareImportBusy?: boolean;
-  /** When false, never show preview loading — generation has not produced a previewable app yet. */
+  /** Legacy build-truth gate — canonical preview state overrides UI for imported ZIP artifacts. */
   canPreview?: boolean;
   projectId?: string | null;
+  projectMetadata?: unknown;
+  projectPreviewUrl?: string | null;
+  projectFileCount?: number;
   urlResolution?: PreviewIframeUrlResolution | null;
   onClearPreviewCache?: () => void;
   onInnerRouteRepair?: () => void;
   innerRouteRepairing?: boolean;
+  onRepairPreviewState?: () => void;
+  previewStateRepairing?: boolean;
+  showPreviewDebug?: boolean;
+  onRefreshRuntimeStatus?: () => void;
 }
 
 function isUnrenderableSrcDoc(doc: string | null | undefined): boolean {
@@ -124,10 +134,17 @@ export function PreviewPanel({
   prepareImportBusy = false,
   canPreview = true,
   projectId = null,
+  projectMetadata = null,
+  projectPreviewUrl = null,
+  projectFileCount = 0,
   urlResolution = null,
   onClearPreviewCache,
   onInnerRouteRepair,
   innerRouteRepairing = false,
+  onRepairPreviewState,
+  previewStateRepairing = false,
+  showPreviewDebug = false,
+  onRefreshRuntimeStatus,
 }: PreviewPanelProps) {
   const [viewport, setViewport] = React.useState<Viewport>("desktop");
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -141,6 +158,8 @@ export function PreviewPanel({
     reason: string | null;
     headers: Record<string, string | null>;
   } | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = React.useState<number | null>(null);
+  const [loadingExceeded60s, setLoadingExceeded60s] = React.useState(false);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
 
   const effectivePreviewPath = urlResolution?.normalizedPreviewUrl ?? url;
@@ -151,7 +170,13 @@ export function PreviewPanel({
     setIframeError(false);
     setIframeLoaded(false);
     setInnerRouteError(null);
-    if (url || srcDoc) setIframeLoading(true);
+    setLoadingExceeded60s(false);
+    if (url || srcDoc) {
+      setIframeLoading(true);
+      setLoadingStartedAt(Date.now());
+    } else {
+      setLoadingStartedAt(null);
+    }
   }, [url, srcDoc, reloadKey, previewRoute]);
 
   React.useEffect(() => {
@@ -343,31 +368,89 @@ export function PreviewPanel({
           : !isArtifactUrl && effectivePreviewPath
             ? "This route blocks iframe embedding"
             : "Preview embed blocked";
-  const showBuildShell = buildActive || thinking;
+
+  React.useEffect(() => {
+    if (!iframeLoading || !loadingStartedAt) return;
+    const t = window.setTimeout(() => {
+      setLoadingExceeded60s(true);
+      onRefreshRuntimeStatus?.();
+    }, 60_000);
+    return () => window.clearTimeout(t);
+  }, [iframeLoading, loadingStartedAt, onRefreshRuntimeStatus]);
+
+  const canonicalPreview = React.useMemo(
+    () =>
+      resolvePreviewState({
+        projectId,
+        projectMetadata,
+        projectPreviewUrl,
+        projectFileCount,
+        framework: runtimeStatus?.framework ?? null,
+        runtimeStatus,
+        urlResolution,
+        iframeUrl: effectivePreviewPath,
+        iframeSrc: resolvedPreviewUrl,
+        buildActive,
+        thinking,
+        hasInline,
+        embedBlocked,
+        embedBlockReason,
+        previewUrlInvalid,
+        innerRouteError: Boolean(innerRouteError),
+        iframeError,
+        iframeLoading,
+        loadingExceeded60s,
+        iframeEmbeddable: iframeHeaderProbe?.embeddable ?? null,
+        iframeBlockReason: iframeHeaderProbe?.reason ?? null,
+        legacyCanPreview: canPreview,
+      }),
+    [
+      projectId,
+      projectMetadata,
+      projectPreviewUrl,
+      projectFileCount,
+      runtimeStatus,
+      urlResolution,
+      effectivePreviewPath,
+      resolvedPreviewUrl,
+      buildActive,
+      thinking,
+      hasInline,
+      embedBlocked,
+      embedBlockReason,
+      previewUrlInvalid,
+      innerRouteError,
+      iframeError,
+      iframeLoading,
+      loadingExceeded60s,
+      iframeHeaderProbe,
+      canPreview,
+    ],
+  );
+
+  const showBuildShell = canonicalPreview.showBuildingShell;
   const showArtifact = hasPreviewArtifact && !showBuildShell;
-  const awaitingRuntimeStatus = Boolean(url && isArtifactUrl && !hasInline && !runtimeStatus);
-  const showRuntimeOverlay =
-    showArtifact &&
-    !embedBlocked &&
-    (awaitingRuntimeStatus ||
-      (Boolean(runtimeStatus) && (!iframeRenderable || previewPreparing)));
-  const showEmbedFallback = showArtifact && embedBlocked && !hasInline;
-  const showIframe =
-    showArtifact &&
-    !showEmbedFallback &&
-    !showRuntimeOverlay &&
-    (hasInline || iframeRenderable);
-  const generationContinuing = canPreview === false && !buildActive;
+  const showRuntimeOverlay = showArtifact && canonicalPreview.showRuntimeOverlay;
+  const showEmbedFallback = showArtifact && embedBlocked && !hasInline && !canonicalPreview.showErrorPanel;
+  const showIframe = showArtifact && canonicalPreview.showIframe && !showEmbedFallback && !showRuntimeOverlay;
+  const generationContinuing = canonicalPreview.showGenerationContinuingCopy;
   const showInnerRouteError = Boolean(innerRouteError && showArtifact && !embedBlocked);
+  const showUniversalError =
+    canonicalPreview.showErrorPanel &&
+    !showBuildShell &&
+    !showInnerRouteError &&
+    !showEmbedFallback &&
+    canonicalPreview.state !== "inner_route_error";
   const showSlowLoadHint =
-    canPreview !== false &&
     showArtifact &&
     iframeError &&
     !embedBlocked &&
     !previewPreparing &&
     !previewBuildFailed &&
     !hasInline &&
-    !showInnerRouteError;
+    !showInnerRouteError &&
+    !showUniversalError &&
+    canonicalPreview.state === "ready";
   const shellState =
     buildActive || thinking
       ? previewState === "compiling"
@@ -386,6 +469,7 @@ export function PreviewPanel({
   return (
     <div
       data-testid="preview-panel"
+      data-preview-canonical-state={canonicalPreview.state}
       data-preview-srcdoc-ready={hasInline ? "true" : "false"}
       className={cn(
         "flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-xl)] bg-background ring-1 ring-border",
@@ -570,15 +654,44 @@ export function PreviewPanel({
 
         {generationContinuing && !showBuildShell && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-atmosphere p-6">
-            <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl bg-background p-8 text-center shadow-lg ring-1 ring-border">
-              <Loader2 className="size-6 animate-spin text-accent" strokeWidth={1.75} />
-              <p className="text-[13px] font-semibold text-foreground">
-                Preview not available yet — generation is still continuing.
-              </p>
-              <p className="text-[11.5px] leading-relaxed text-muted-foreground">
-                Continue generation from chat when the build pauses — preview opens once real app files are saved.
-              </p>
-            </div>
+            <PreviewUniversalErrorPanel
+              resolved={canonicalPreview}
+              iframeUrl={resolvedPreviewUrl}
+              onRetryLoad={() => {
+                setIframeError(false);
+                setIframeLoading(true);
+                setReloadKey((k) => k + 1);
+              }}
+              onClearCache={onClearPreviewCache}
+              onRebuildPreview={onRebuildPreview}
+              onRunRepair={onRepairPreview}
+              onRepairPreviewState={onRepairPreviewState}
+              rebuilding={previewRebuilding}
+              repairing={previewRebuilding}
+              stateRepairing={previewStateRepairing}
+            />
+          </div>
+        )}
+
+        {showUniversalError && (
+          <div className="absolute inset-0 z-25 flex items-center justify-center bg-atmosphere/95 p-6 backdrop-blur-sm">
+            <PreviewUniversalErrorPanel
+              resolved={canonicalPreview}
+              iframeUrl={resolvedPreviewUrl}
+              onRetryLoad={() => {
+                setIframeError(false);
+                setIframeLoading(true);
+                setLoadingExceeded60s(false);
+                setReloadKey((k) => k + 1);
+              }}
+              onClearCache={onClearPreviewCache}
+              onRebuildPreview={onRebuildPreview}
+              onRunRepair={onRepairPreview}
+              onRepairPreviewState={onRepairPreviewState}
+              rebuilding={previewRebuilding}
+              repairing={previewRebuilding}
+              stateRepairing={previewStateRepairing}
+            />
           </div>
         )}
 
@@ -850,6 +963,13 @@ export function PreviewPanel({
             </motion.div>
           )}
         </AnimatePresence>
+
+        <PreviewDebugDrawer
+          resolved={canonicalPreview}
+          urlResolution={urlResolution}
+          iframeHeaderProbe={iframeHeaderProbe?.headers ?? null}
+          visible={showPreviewDebug}
+        />
 
         {previewDiagnostics && (showIframe || previewUrlInvalid) ? (
           <div

@@ -2664,6 +2664,7 @@ export function ImmersiveWorkspace({
   ]);
   const [previewRoute, setPreviewRoute] = React.useState("/");
   const [previewRebuilding, setPreviewRebuilding] = React.useState(false);
+  const [previewStateRepairing, setPreviewStateRepairing] = React.useState(false);
 
   React.useEffect(() => {
     if (codeFiles.length === 0) return;
@@ -2848,11 +2849,8 @@ export function ImmersiveWorkspace({
 
   const previewFrameUrl = previewUrlResolution?.normalizedPreviewUrl ?? null;
 
-  const handleClearPreviewCache = React.useCallback(() => {
+  const refreshPreviewRuntime = React.useCallback(() => {
     if (!effectiveProjectId) return;
-    clearPreviewClientCache(effectiveProjectId);
-    previewArtifactLockedRef.current = null;
-    setProjectDataRefresh((n) => n + 1);
     void fetch(`/api/projects/${effectiveProjectId}/preview/import-status`, {
       credentials: "include",
       cache: "no-store",
@@ -2863,6 +2861,42 @@ export function ImmersiveWorkspace({
       })
       .catch(() => undefined);
   }, [effectiveProjectId]);
+
+  const handleClearPreviewCache = React.useCallback(() => {
+    if (!effectiveProjectId) return;
+    clearPreviewClientCache(effectiveProjectId);
+    previewArtifactLockedRef.current = null;
+    setProjectDataRefresh((n) => n + 1);
+    refreshPreviewRuntime();
+  }, [effectiveProjectId, refreshPreviewRuntime]);
+
+  const handleRepairPreviewState = React.useCallback(async () => {
+    if (!effectiveProjectId || previewStateRepairing) return;
+    setPreviewStateRepairing(true);
+    try {
+      const res = await fetch(`/api/projects/${effectiveProjectId}/preview/state-repair`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const body = (await res.json()) as {
+        ok?: boolean;
+        repaired?: boolean;
+        runtime?: PreviewRuntimeStatusPayload;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(body.error ?? "Preview state repair failed");
+      if (body.runtime) setPreviewRuntime(body.runtime);
+      clearPreviewClientCache(effectiveProjectId);
+      previewArtifactLockedRef.current = null;
+      setProjectDataRefresh((n) => n + 1);
+      refreshPreviewRuntime();
+      toast.success(body.repaired ? "Preview state repaired" : "Preview state refreshed");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Preview state repair failed");
+    } finally {
+      setPreviewStateRepairing(false);
+    }
+  }, [effectiveProjectId, previewStateRepairing, refreshPreviewRuntime]);
 
   const previewSrcRenderable = previewRuntime?.previewRenderable === true;
 
@@ -3879,16 +3913,28 @@ export function ImmersiveWorkspace({
               <PreviewPanel
                 url={previewFrameUrl}
                 projectId={effectiveProjectId}
+                projectMetadata={effectiveProject?.metadata}
+                projectPreviewUrl={effectiveProject?.preview_url ?? null}
+                projectFileCount={projectFiles.length}
                 urlResolution={previewUrlResolution}
                 onClearPreviewCache={effectiveProjectId ? handleClearPreviewCache : undefined}
+                onRefreshRuntimeStatus={effectiveProjectId ? refreshPreviewRuntime : undefined}
+                onRepairPreviewState={
+                  effectiveProjectId ? () => void handleRepairPreviewState() : undefined
+                }
+                previewStateRepairing={previewStateRepairing}
+                showPreviewDebug
                 appName={effectiveProject?.name ?? null}
-                buildActive={buildActive && !previewRuntime?.jobId}
+                buildActive={buildActive && !previewSrcRenderable}
                 thinking={buildActive || (isBusy && !previewSrcRenderable)}
                 editMode={mode === "edit"}
                 hasGenerated={
                   previewSrcRenderable ||
-                  (appBuildTruth.canPreview && projectFiles.length > 0) ||
-                  (isImportedZipProject && codeFiles.length > 0)
+                  appBuildTruth.canPreview ||
+                  (isImportedZipProject &&
+                    ((zipImportMeta?.file_count ?? 0) > 0 ||
+                      codeFiles.length > 0 ||
+                      Boolean(previewRuntime?.previewRenderable)))
                 }
                 canPreview={appBuildTruth.canPreview}
                 previewState={previewShellState}
@@ -3918,7 +3964,8 @@ export function ImmersiveWorkspace({
                   isImportedZipProject ? () => void prepareImportedApp() : undefined
                 }
                 onRepairPreview={
-                  effectiveProjectId && appBuildTruth.showRepair
+                  effectiveProjectId &&
+                  (appBuildTruth.showRepair || isImportedZipProject)
                     ? () => sendPreviewRepairToChat(true)
                     : undefined
                 }
