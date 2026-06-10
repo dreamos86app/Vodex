@@ -10,7 +10,9 @@ import { UserRankBadge } from "@/components/community/user-rank-badge";
 import { toast } from "@/lib/toast";
 
 type PublicProfile = {
-  id: string;
+  visibility?: "private" | "public";
+  message?: string;
+  id?: string;
   username: string;
   displayName: string;
   avatarUrl: string | null;
@@ -22,9 +24,9 @@ type PublicProfile = {
   profileVisits30d: number;
   joinedAt: string;
   allowFollows: boolean;
-  following: boolean;
-  isOwner: boolean;
-  apps: Array<{ id: string; name: string; previewUrl: string }>;
+  following?: boolean;
+  isOwner?: boolean;
+  apps?: Array<{ id: string; name: string; previewUrl: string }>;
 };
 
 export function PublicBuilderProfileView({ username }: { username: string }) {
@@ -100,10 +102,34 @@ export function PublicBuilderProfileView({ username }: { username: string }) {
     return (
       <div className="mx-auto max-w-lg py-24 text-center">
         <p className="text-[15px] font-medium text-foreground">Profile not found</p>
-        <p className="mt-2 text-[13px] text-muted-foreground">This builder profile is private or does not exist.</p>
+        <p className="mt-2 text-[13px] text-muted-foreground">This builder profile does not exist.</p>
         <Button variant="secondary" size="sm" className="mt-4" asChild>
           <Link href="/community">Back to Community</Link>
         </Button>
+      </div>
+    );
+  }
+
+  if (profile.visibility === "private") {
+    return (
+      <div className="mx-auto max-w-lg py-24 text-center px-4">
+        <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-muted/40 ring-1 ring-border">
+          <Avatar src={profile.avatarUrl} name={profile.displayName} className="size-12 opacity-80" />
+        </div>
+        <p className="text-[17px] font-semibold text-foreground">{profile.displayName}</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">@{profile.username}</p>
+        <p className="mt-4 text-[14px] leading-relaxed text-muted-foreground">
+          {profile.message ?? "This builder keeps their profile private."}
+        </p>
+        {profile.isOwner ? (
+          <Button variant="accent" size="sm" className="mt-6" asChild>
+            <Link href="/settings">Open profile settings</Link>
+          </Button>
+        ) : (
+          <Button variant="secondary" size="sm" className="mt-6" asChild>
+            <Link href="/community">Back to Community</Link>
+          </Button>
+        )}
       </div>
     );
   }
@@ -128,6 +154,7 @@ export function PublicBuilderProfileView({ username }: { username: string }) {
               {profile.followerCount != null ? (
                 <span>{profile.followerCount.toLocaleString()} followers</span>
               ) : null}
+              <span>{profile.profileVisitCount.toLocaleString()} visits lifetime</span>
               <span>{profile.profileVisits30d.toLocaleString()} visits (30d)</span>
               <span>Joined {new Date(profile.joinedAt).toLocaleDateString()}</span>
             </div>
@@ -163,11 +190,11 @@ export function PublicBuilderProfileView({ username }: { username: string }) {
         </div>
       </motion.div>
 
-      {profile.apps.length > 0 ? (
+      {(profile.apps?.length ?? 0) > 0 ? (
         <section className="space-y-3">
           <h2 className="text-[14px] font-semibold text-foreground">Published apps</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {profile.apps.map((app) => (
+            {(profile.apps ?? []).map((app) => (
               <div key={app.id} className="overflow-hidden rounded-xl ring-1 ring-border">
                 <iframe
                   title={`${app.name} preview`}

@@ -12,6 +12,25 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
   var virtualPath=${JSON.stringify(route)};
   window.__VODEX_PREVIEW_ACTIVE__=true;
   window.__VODEX_VIRTUAL_PATH__=virtualPath;
+  if('serviceWorker' in navigator){
+    try{
+      navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister();});});
+      var _swReg=navigator.serviceWorker.register;
+      navigator.serviceWorker.register=function(){return Promise.resolve({scope:'',active:null,installing:null,waiting:null,updateViaCache:'none',unregister:function(){return Promise.resolve(true);},addEventListener:function(){},removeEventListener:function(){},dispatchEvent:function(){return true;}});};
+    }catch(e){}
+  }
+  try{
+    if(window.__next_f&&Array.isArray(window.__next_f.push)){
+      var _nfPush=window.__next_f.push.bind(window.__next_f);
+      window.__next_f.push=function(item){
+        try{
+          var s=JSON.stringify(item);
+          if(s.indexOf('preview-html')>=0||s.indexOf('api/projects/')>=0)return item.length;
+        }catch(e){}
+        return _nfPush(item);
+      };
+    }
+  }catch(e){}
 
   function normPath(p){
     if(!p)return"/";
@@ -62,7 +81,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
   }
   function internalize(url){
     if(typeof url!=="string")return null;
-    if(url.startsWith("api/projects/")||url.startsWith("/api/projects/"))return"/";
+    if(/^api\\/projects\\//i.test(url)||url.startsWith("api/projects/")||url.startsWith("/api/projects/"))return"/";
     try{
       var u=new URL(url,location.href);
       if(u.pathname.startsWith("/api/projects/")||u.pathname.indexOf("api/projects/")>=0)return"/";

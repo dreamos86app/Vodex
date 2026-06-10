@@ -10,6 +10,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useCommandCenter } from "@/components/command/command-center";
 import { NotificationBell } from "@/components/notifications/notification-panel";
 import { QuickCollaboratorPopover } from "@/components/layout/quick-collaborator-popover";
+import { useAppearanceStore } from "@/lib/stores/appearance-store";
 
 type TopBarProps = {
   mode: "create" | "standard";
@@ -22,6 +23,9 @@ export function TopBar({ mode, title, subtitle, onMenuClick }: TopBarProps) {
   const isCreate = mode === "create";
   useAuthStore(); // profile available via UserMenu
   const { openCommandCenter } = useCommandCenter();
+  const sidebarCollapsed = useAppearanceStore((s) => s.sidebarCollapsed);
+  const sidebarOpen = !sidebarCollapsed;
+  const hideDuplicateBrandTitle = sidebarOpen && title === "Vodex";
 
   return (
     <header
@@ -46,9 +50,14 @@ export function TopBar({ mode, title, subtitle, onMenuClick }: TopBarProps) {
         priority
       />
 
-      {!isCreate ? (
+      {!isCreate && !hideDuplicateBrandTitle ? (
         <div className="min-w-0 hidden flex-1 lg:block">
-          <h1 className="truncate text-[15px] font-semibold tracking-[-0.03em] text-foreground sm:text-[16px]">
+          <h1
+            className={cn(
+              "truncate font-semibold tracking-[-0.03em] text-foreground",
+              sidebarCollapsed ? "text-[17px] sm:text-[18px]" : "text-[15px] sm:text-[16px]",
+            )}
+          >
             {title}
           </h1>
           {subtitle && (

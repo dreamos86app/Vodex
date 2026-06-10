@@ -26,6 +26,7 @@ import { sortByTrending } from "@/lib/community/trending-score";
 
 type DiscussionWithAuthor = Discussion & {
   author_name?: string;
+  author_username?: string | null;
   author_avatar?: string;
   liked?: boolean;
 };
@@ -510,6 +511,8 @@ function DiscussionCard({
     return `${Math.floor(hrs / 24)}d ago`;
   }, [disc.created_at]);
 
+  const profileHref = disc.author_username ? `/builders/${disc.author_username}` : null;
+
   return (
     <div
       role="button"
@@ -518,33 +521,43 @@ function DiscussionCard({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") onOpen(disc);
       }}
-      className="flex cursor-pointer items-start gap-4 px-5 py-4 transition hover:bg-muted/20"
+      className="flex min-h-[148px] cursor-pointer flex-col rounded-[var(--radius-xl)] bg-surface p-4 ring-1 ring-border transition hover:ring-accent/30"
     >
-      <Avatar name={authorName} src={disc.author_avatar} size="sm" />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-2">
-          <p className="flex-1 text-[13px] font-medium text-foreground leading-snug">{disc.title}</p>
-          {disc.is_pinned && (
-            <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent shrink-0">Pinned</span>
-          )}
-        </div>
-        <div className="mt-1 flex items-center gap-2 flex-wrap">
-          <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", CATEGORY_COLORS[disc.category] ?? CATEGORY_COLORS.General)}>
-            {disc.category}
-          </span>
-          <span className="text-[11.5px] text-muted-foreground">{authorName}</span>
-          <span className="text-[11.5px] text-muted-foreground/40">·</span>
-          <span className="text-[11.5px] text-muted-foreground">{timeAgo}</span>
+      <div className="flex items-start gap-3">
+        {profileHref ? (
+          <Link href={profileHref} onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <Avatar name={authorName} src={disc.author_avatar} size="sm" />
+          </Link>
+        ) : (
+          <Avatar name={authorName} src={disc.author_avatar} size="sm" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <p className="flex-1 text-[14px] font-semibold text-foreground leading-snug line-clamp-2">{disc.title}</p>
+            {disc.is_pinned ? (
+              <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent shrink-0">Pinned</span>
+            ) : null}
+          </div>
+          <p className="mt-2 line-clamp-3 text-[12.5px] leading-relaxed text-muted-foreground">{disc.body}</p>
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", CATEGORY_COLORS[disc.category] ?? CATEGORY_COLORS.General)}>
+              {disc.category}
+            </span>
+            {profileHref ? (
+              <Link href={profileHref} onClick={(e) => e.stopPropagation()} className="text-[11.5px] font-medium text-foreground hover:text-accent">
+                {authorName}
+              </Link>
+            ) : (
+              <span className="text-[11.5px] text-muted-foreground">{authorName}</span>
+            )}
+            <span className="text-[11.5px] text-muted-foreground/40">·</span>
+            <span className="text-[11.5px] text-muted-foreground">{timeAgo}</span>
+          </div>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
+      <div className="mt-auto flex items-center justify-end gap-3 pt-3 text-[11px] text-muted-foreground">
         <div onClick={(e) => e.stopPropagation()} role="presentation">
-          <CommunityHeartButton
-            liked={!!disc.liked}
-            count={disc.like_count}
-            onToggle={() => onLike(disc.id)}
-            size="sm"
-          />
+          <CommunityHeartButton liked={!!disc.liked} count={disc.like_count} onToggle={() => onLike(disc.id)} size="sm" />
         </div>
         <span className="flex items-center gap-1">
           <MessageCircle className="size-3.5" strokeWidth={1.55} />
@@ -950,11 +963,23 @@ export function CommunityView() {
         const likes = likesRes.data ?? [];
         const liked = new Set(likes.map((l: { discussion_id: string }) => l.discussion_id));
         setLikedIds(liked);
+        const rows = (discRes.data ?? []) as Discussion[];
+        const userIds = [...new Set(rows.map((d) => d.user_id))];
+        const { data: profiles } = userIds.length
+          ? await supabase.from("profiles").select("id, full_name, username, avatar_url").in("id", userIds)
+          : { data: [] as { id: string; full_name: string | null; username: string | null; avatar_url: string | null }[] };
+        const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
         setDiscussions(
-          (discRes.data ?? []).map((d) => ({
-            ...d,
-            liked: liked.has(d.id),
-          })) as DiscussionWithAuthor[],
+          rows.map((d) => {
+            const p = profileMap.get(d.user_id);
+            return {
+              ...d,
+              liked: liked.has(d.id),
+              author_name: p?.full_name ?? p?.username ?? "Community member",
+              author_username: p?.username ?? null,
+              author_avatar: p?.avatar_url ?? undefined,
+            };
+          }),
         );
       } catch (e) {
         if (!cancelled) {

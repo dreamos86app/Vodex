@@ -34,6 +34,7 @@ interface Group {
   member_count: number;
   created_at: string;
   creator_id: string | null;
+  rules?: string[] | null;
 }
 
 interface GroupMember {
@@ -61,6 +62,7 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
   const [manageName, setManageName] = React.useState("");
   const [manageDesc, setManageDesc] = React.useState("");
   const [manageCategories, setManageCategories] = React.useState<string[]>(["General"]);
+  const [manageRules, setManageRules] = React.useState<string[]>([]);
   const [savingManage, setSavingManage] = React.useState(false);
 
   const load = React.useCallback(async () => {
@@ -80,6 +82,8 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
     setManageName(groupRow.name);
     setManageDesc(groupRow.description ?? "");
     setManageCategories(parseGroupCategories(groupRow));
+    const rawRules = groupRow.rules;
+    setManageRules(Array.isArray(rawRules) ? rawRules.filter((r): r is string => typeof r === "string") : []);
 
     const memberRows = (mems ?? []) as GroupMember[];
     const userIds = memberRows.map((m) => m.user_id);
@@ -150,13 +154,14 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
     if (!group || group.creator_id !== user?.id) return;
     setSavingManage(true);
     const categories = normalizeGroupCategories(manageCategories);
-    const { error: err } = await supabase
+    const { error: err } = await (supabase as any)
       .from("groups")
       .update({
         name: manageName.trim(),
         description: manageDesc.trim() || null,
         categories,
         category: categories[0],
+        rules: manageRules.filter((r) => r.trim()),
       })
       .eq("id", groupId);
     setSavingManage(false);
@@ -239,6 +244,16 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
               <span className="text-[12px] text-muted-foreground">{members.length || group.member_count} members</span>
             </div>
             {group.description ? <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{group.description}</p> : null}
+            {group.rules && group.rules.length > 0 ? (
+              <div className="mt-4 rounded-xl bg-muted/30 px-4 py-3 ring-1 ring-border/60">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Group rules</p>
+                <ol className="mt-2 space-y-1.5 list-decimal pl-4 text-[12.5px] text-foreground/90">
+                  {group.rules.map((rule, i) => (
+                    <li key={i}>{rule}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
           </div>
         </div>
       </motion.div>
@@ -276,10 +291,12 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
             name={manageName}
             description={manageDesc}
             categories={manageCategories}
+            rules={manageRules}
             saving={savingManage}
             onName={setManageName}
             onDescription={setManageDesc}
             onCategories={setManageCategories}
+            onRules={setManageRules}
             onSave={() => void saveManage()}
             onClose={() => setShowManage(false)}
           />
@@ -390,15 +407,17 @@ function MembersDrawer({
 }
 
 function ManageSheet({
-  name, description, categories, saving, onName, onDescription, onCategories, onSave, onClose,
+  name, description, categories, rules, saving, onName, onDescription, onCategories, onRules, onSave, onClose,
 }: {
   name: string;
   description: string;
   categories: string[];
+  rules: string[];
   saving: boolean;
   onName: (v: string) => void;
   onDescription: (v: string) => void;
   onCategories: (v: string[]) => void;
+  onRules: (v: string[]) => void;
   onSave: () => void;
   onClose: () => void;
 }) {
@@ -411,6 +430,19 @@ function ManageSheet({
           <label className="block text-[12px] font-medium">Name<input value={name} onChange={(e) => onName(e.target.value)} className="mt-1 h-10 w-full rounded-lg bg-surface px-3 text-[13px] ring-1 ring-border" /></label>
           <label className="block text-[12px] font-medium">Description<textarea value={description} onChange={(e) => onDescription(e.target.value)} rows={3} className="mt-1 w-full rounded-lg bg-surface px-3 py-2 text-[13px] ring-1 ring-border" /></label>
           <div><p className="text-[12px] font-medium mb-2">Categories</p><GroupCategoryPicker value={categories} onChange={onCategories} /></div>
+          <div>
+            <p className="text-[12px] font-medium mb-2">Rules</p>
+            <div className="space-y-2">
+              {rules.map((rule, i) => (
+                <div key={i} className="flex gap-2">
+                  <span className="pt-2 text-[12px] font-semibold text-muted-foreground">{i + 1}.</span>
+                  <input value={rule} onChange={(e) => onRules(rules.map((r, j) => (j === i ? e.target.value : r)))} className="min-w-0 flex-1 rounded-lg bg-surface px-3 py-2 text-[13px] ring-1 ring-border" placeholder="Rule text" />
+                  <button type="button" onClick={() => onRules(rules.filter((_, j) => j !== i))} className="text-[11px] text-destructive">Remove</button>
+                </div>
+              ))}
+              <button type="button" onClick={() => onRules([...rules, ""])} className="text-[12px] font-medium text-accent">+ Add rule</button>
+            </div>
+          </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>

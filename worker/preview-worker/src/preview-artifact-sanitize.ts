@@ -1,14 +1,22 @@
 /** Mirror of platform strip-preview-platform-paths for worker upload-time sanitization. */
 
+function stripVodexExternalLinks(text: string): string {
+  return text
+    .replace(/https?:\/\/(?:www\.)?vodex\.dev(\/[^"'\s>]*)?/gi, (_, p: string) => p || "/")
+    .replace(/https?:\/\/[^"'\s>]*\.vodex\.app(\/[^"'\s>]*)?/gi, (_, p: string) => p || "/");
+}
+
 export function stripPreviewPlatformPathsFromText(
   text: string,
   projectId: string,
   opts?: { rewriteAssetUrls?: boolean },
 ): string {
   const esc = projectId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const patterns = [
+  const patterns: RegExp[] = [
     new RegExp(`/api/projects/${esc}/preview-html[^"'\\s>]*`, "gi"),
     new RegExp(`api/projects/${esc}/preview-html[^"'\\s>]*`, "gi"),
+    new RegExp(`api\\\\/projects\\\\/${esc}\\\\/preview-html[^"'\\s>]*`, "gi"),
+    new RegExp(`api\\\\u002Fprojects\\\\u002F${esc}\\\\u002Fpreview-html[^"'\\s>]*`, "gi"),
   ];
   if (opts?.rewriteAssetUrls !== false) {
     patterns.push(
@@ -22,17 +30,16 @@ export function stripPreviewPlatformPathsFromText(
     out = out.replace(pattern, "/");
   }
 
+  out = out.replace(/api\/projects\/[a-f0-9-]{36}\/preview-html[^"'\\s>]*/gi, "/");
   out = out.replace(/"page"\s*:\s*"[^"]*preview-html[^"]*"/gi, '"page":"/"');
   out = out.replace(/"asPath"\s*:\s*"[^"]*preview-html[^"]*"/gi, '"asPath":"/"');
   out = out.replace(/"pathname"\s*:\s*"[^"]*preview-html[^"]*"/gi, '"pathname":"/"');
   out = out.replace(/"url"\s*:\s*"[^"]*preview-html[^"]*"/gi, '"url":"/"');
-  out = out.replace(/preview-html/gi, (m, offset, full) => {
-    const before = full.slice(Math.max(0, offset - 40), offset);
-    if (/api\/projects\//i.test(before) || /api\\u002Fprojects\\u002F/i.test(before)) return "/";
-    return m;
-  });
+  out = out.replace(/__next_f\.push\(\[[^\]]*preview-html[^\]]*\]/gi, (m) =>
+    m.replace(/preview-html[^"'\]]*/gi, ""),
+  );
 
-  return out;
+  return stripVodexExternalLinks(out);
 }
 
 export function shouldSanitizeArtifactFile(relPath: string): boolean {
@@ -42,7 +49,8 @@ export function shouldSanitizeArtifactFile(relPath: string): boolean {
     lower.endsWith(".js") ||
     lower.endsWith(".mjs") ||
     lower.endsWith(".json") ||
-    lower.endsWith(".txt")
+    lower.endsWith(".txt") ||
+    lower.endsWith(".rsc")
   );
 }
 

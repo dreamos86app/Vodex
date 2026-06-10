@@ -123,7 +123,7 @@ export function userFacingProviderMessage(
   if (errorClass === "auth_error") {
     return "The AI system is temporarily busy. Please try again shortly.";
   }
-  return "Something went wrong while generating a response. Please try again.";
+  return "I couldn't finish that response. Please try again.";
 }
 
 export function sanitizeUserFacingAiError(raw: string): string {

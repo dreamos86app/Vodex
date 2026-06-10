@@ -1376,12 +1376,12 @@ export function ChatView() {
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" strokeWidth={1.75} />
                 <div>
                   <p className="text-[13px] font-medium text-destructive">
-                    {tokenError ? "Not enough tokens" : "Something went wrong"}
+                    {tokenError ? "Not enough Build Credits" : "I couldn't finish that response"}
                   </p>
                   <p className="mt-0.5 text-[12px] text-destructive/70">
                     {tokenError
-                      ? "Add tokens or upgrade your plan to keep chatting."
-                      : error?.message ?? "The AI is temporarily unavailable. Try again."}
+                      ? "Add credits or upgrade your plan to keep chatting."
+                      : error?.message ?? "Please try again in a moment."}
                   </p>
                 </div>
                 {!tokenError && (

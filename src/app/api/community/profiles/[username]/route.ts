@@ -49,8 +49,22 @@ export async function GET(
     .ilike("username", slug)
     .maybeSingle()) as { data: PublicProfileRow | null };
 
-  if (!profile?.public_profile_enabled) {
-    return NextResponse.json({ error: "Profile is private" }, { status: 404 });
+  if (!profile) {
+    return NextResponse.json({ error: "Profile not found", visibility: "missing" }, { status: 404 });
+  }
+
+  if (!profile.public_profile_enabled) {
+    const isOwner = user?.id === profile.id;
+    return NextResponse.json({
+      visibility: "private",
+      isOwner,
+      username: profile.username,
+      displayName: profile.display_name ?? profile.username,
+      avatarUrl: isOwner ? profile.avatar_url : null,
+      message: isOwner
+        ? "Your profile is private. Enable it in Settings to share with the community."
+        : "This builder keeps their profile private.",
+    });
   }
 
   if (user && user.id !== profile.id) {
