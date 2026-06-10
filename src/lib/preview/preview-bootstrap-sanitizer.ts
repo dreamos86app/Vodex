@@ -23,7 +23,7 @@ export type DetailedBootstrapLeak = PathLeakMatch & {
 };
 
 const PLATFORM_INJECTION_RE =
-  /<script\b[^>]*(?:data-vodex-preview-(?:watchdog|shim)|id="vodex-preview-(?:inner-watchdog|virtual-history)")[^>]*>[\s\S]*?<\/script>/gi;
+  /<script\b[^>]*(?:data-vodex-preview-(?:watchdog|shim)|id="vodex-preview-(?:inner-watchdog|virtual-history|prehydration-location-rewrite|boot-audit)")[^>]*>[\s\S]*?<\/script>/gi;
 
 /** Remove Vodex-injected preview shims before scanning artifact bootstrap content. */
 export function stripPlatformInjectionScripts(html: string): string {
@@ -50,6 +50,11 @@ function platformPreviewPathPatterns(projectId: string, includeAssetUrls = true)
     /api\\u002Fprojects\\u002F[a-f0-9-]+\\u002Fpreview-html/gi,
     /api\\\/projects\\\/[a-f0-9-]+\\\/preview-html/gi,
     /(?:%2F)?api%2Fprojects%2F[a-f0-9-]+%2Fpreview-html/gi,
+    /** P1.3.39 — preview-runtime iframe route poisons Next router if not stripped. */
+    new RegExp(`/preview-runtime/${esc}/[a-f0-9-]{36}(?!/assets)`, "gi"),
+    new RegExp(`preview-runtime/${esc}/[a-f0-9-]{36}(?!/assets)`, "gi"),
+    /\/preview-runtime\/[a-f0-9-]{36}\/[a-f0-9-]{36}(?!\/assets)/gi,
+    /preview-runtime\/[a-f0-9-]{36}\/[a-f0-9-]{36}(?!\/assets)/gi,
   ];
   if (includeAssetUrls) {
     patterns.push(
@@ -66,7 +71,9 @@ function containsPlatformPreviewPath(value: string, projectId: string): boolean 
     re.lastIndex = 0;
     if (re.test(value)) return true;
   }
-  return /preview-html/i.test(value) && /api\/projects|api%2Fprojects|\\u002Fapi/i.test(value);
+  return (
+    /preview-html/i.test(value) && /api\/projects|api%2Fprojects|\\u002Fapi/i.test(value)
+  ) || /preview-runtime\/[a-f0-9-]{36}\/[a-f0-9-]{36}(?!\/assets)/i.test(value);
 }
 
 function fixPathString(value: string, projectId: string, virtualRoute: string): string {
@@ -151,6 +158,10 @@ export function sanitizePreviewBootstrapState(
     .replace(/"asPath"\s*:\s*"[^"]*preview-html[^"]*"/gi, `"asPath":"${route}"`)
     .replace(/"pathname"\s*:\s*"[^"]*preview-html[^"]*"/gi, `"pathname":"${route}"`)
     .replace(/"url"\s*:\s*"[^"]*preview-html[^"]*"/gi, `"url":"${route}"`)
+    .replace(/"page"\s*:\s*"[^"]*preview-runtime\/[a-f0-9-]{36}\/[a-f0-9-]{36}(?![^"]*\/assets)[^"]*"/gi, `"page":"${route}"`)
+    .replace(/"asPath"\s*:\s*"[^"]*preview-runtime\/[a-f0-9-]{36}\/[a-f0-9-]{36}(?![^"]*\/assets)[^"]*"/gi, `"asPath":"${route}"`)
+    .replace(/"pathname"\s*:\s*"[^"]*preview-runtime\/[a-f0-9-]{36}\/[a-f0-9-]{36}(?![^"]*\/assets)[^"]*"/gi, `"pathname":"${route}"`)
+    .replace(/"url"\s*:\s*"[^"]*preview-runtime\/[a-f0-9-]{36}\/[a-f0-9-]{36}(?![^"]*\/assets)[^"]*"/gi, `"url":"${route}"`)
     .replace(/"buildId"\s*:\s*"[^"]*preview-html[^"]*"/gi, `"buildId":"${route}"`)
     .replace(/"initialTree"[^[]*\[[^\]]*preview-html[^\]]*\]/gi, (m) =>
       m.replace(/preview-html[^"'\]]*/gi, route.replace(/^\//, "")),
@@ -159,7 +170,7 @@ export function sanitizePreviewBootstrapState(
       m.replace(/preview-html[^"'\]]*/gi, route.replace(/^\//, "")),
     )
     .replace(/__next_f\.push\(\[[\s\S]*?\]\)/gi, (m) => {
-      if (!/preview-html|api\/projects|api%2Fprojects/i.test(m)) return m;
+      if (!/preview-html|preview-runtime|api\/projects|api%2Fprojects/i.test(m)) return m;
       return sanitizePreviewBootstrapState(m, projectId, route, { skipNextDataParse: true });
     })
     .replace(/\\u002Fapi\\u002Fprojects\\u002F[^"\\]+\\u002Fpreview-html[^"\\]*/gi, "\\u002F")
@@ -209,7 +220,7 @@ export function scanBootstrapLeaksDetailed(
 export function countHydrationPathLeaks(text: string, projectId: string, excludeInjections = true): number {
   const hay = excludeInjections ? stripPlatformInjectionScripts(text) : text;
   const re = new RegExp(
-    `(?:preview-html|api\\/projects\\/${escapeRegExp(projectId)}\\/preview-html|api%2Fprojects%2F${escapeRegExp(projectId)}%2Fpreview-html)`,
+    `(?:preview-html|preview-runtime\\/[a-f0-9-]{36}\\/[a-f0-9-]{36}(?!\\/assets)|api\\/projects\\/${escapeRegExp(projectId)}\\/preview-html|api%2Fprojects%2F${escapeRegExp(projectId)}%2Fpreview-html)`,
     "gi",
   );
   return (hay.match(re) ?? []).length;

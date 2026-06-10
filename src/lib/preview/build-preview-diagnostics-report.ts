@@ -17,6 +17,7 @@ import { innerRouteBootstrapLikelyBroken } from "@/lib/preview/detect-inner-rout
 import {
   countHydrationPathLeaks,
   scanBootstrapLeaksDetailed,
+  stripPlatformInjectionScripts,
 } from "@/lib/preview/preview-bootstrap-sanitizer";
 import { TEXT_ARTIFACT_EXT } from "@/lib/preview/preview-path-leak-scanner";
 import { scanPreviewArtifactLeaks } from "@/lib/preview/scan-preview-artifact-leaks";
@@ -85,17 +86,23 @@ function artifactIdFromPath(artifactPath: string | null, projectId: string): str
 }
 
 function detectVisibleNext404(html: string): boolean {
-  const lower = html.toLowerCase();
+  const appHtml = stripPlatformInjectionScripts(html);
+  const lower = appHtml.toLowerCase();
   const has404 =
     lower.includes("page not found") ||
     lower.includes("could not be found in this application") ||
     lower.includes("could not be found");
   if (!has404) return false;
-  return /preview-html|api\/projects\/[a-f0-9-]+\/preview-html/i.test(html);
+  return /preview-html|preview-runtime\/[a-f0-9-]+\/[a-f0-9-]+|api\/projects\/[a-f0-9-]+\/preview-html/i.test(appHtml);
 }
 
 function detectBadInnerRouteVisible(html: string): boolean {
-  return /api\/projects\/[a-f0-9-]+\/preview-html/i.test(html) && /page not found/i.test(html);
+  const appHtml = stripPlatformInjectionScripts(html);
+  return (
+    (/api\/projects\/[a-f0-9-]+\/preview-html/i.test(appHtml) ||
+      /preview-runtime\/[a-f0-9-]+\/[a-f0-9-]+/i.test(appHtml)) &&
+    /page not found/i.test(appHtml)
+  );
 }
 
 function scanServedHtmlSignals(html: string, projectId: string) {

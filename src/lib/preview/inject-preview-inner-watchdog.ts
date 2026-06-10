@@ -7,6 +7,7 @@ export function buildPreviewInnerWatchdogScript(): string {
   var SENT=false;
   var PH=('preview'+'-'+'html');
   var AP=('api/'+'projects/');
+  var RTP=('preview'+'-'+'runtime');
   function removeInjectedNodes(root){
     var sel='script,style,noscript,template,svg script,[data-vodex-preview-watchdog],[data-vodex-preview-shim]';
     root.querySelectorAll(sel).forEach(function(n){n.remove();});
@@ -28,6 +29,10 @@ export function buildPreviewInnerWatchdogScript(): string {
     if(m)return m[0];
     m=text.match(new RegExp('"([^"]*api\\\\/projects\\\\/[^"]*'+PH+'[^"]*)"','i'));
     if(m)return m[1];
+    m=text.match(new RegExp(RTP+'\\\\/[a-f0-9-]{36}\\\\/[a-f0-9-]{36}','i'));
+    if(m)return m[0];
+    m=text.match(new RegExp('"([^"]*'+RTP+'\\\\/[a-f0-9-]{36}\\\\/[a-f0-9-]{36}[^"]*)"','i'));
+    if(m)return m[1];
     return null;
   }
   function looksLikeInnerNext404(text){
@@ -37,6 +42,7 @@ export function buildPreviewInnerWatchdogScript(): string {
     var bad=extractBadPath(text);
     if(bad)return true;
     if(lower.indexOf(PH)>=0&&has404)return true;
+    if(lower.indexOf(RTP)>=0&&has404)return true;
     return false;
   }
   function report(){
@@ -45,7 +51,7 @@ export function buildPreviewInnerWatchdogScript(): string {
     if(!looksLikeInnerNext404(text))return;
     SENT=true;
     window.__VODEX_INNER_ERROR_SENT__=true;
-    var bad=extractBadPath(text)||(AP+'.../'+PH);
+    var bad=extractBadPath(text)||(RTP+'/.../...');
     try{
       parent.postMessage({
         type:"vodex-preview-inner-error",

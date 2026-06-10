@@ -33,7 +33,11 @@ export function buildPrehydrationLocationRewriteScript(virtualRoute: string): st
   function normPath(p){if(!p)return'/';p=String(p).split('?')[0].split('#')[0];if(!p.startsWith('/'))p='/'+p;return p;}
   function isPlatform(p){
     var s=normPath(p).toLowerCase();
-    return s.indexOf(AAP)>=0||s.indexOf(PH)>=0;
+    if(s.indexOf(AAP)>=0||s.indexOf(PH)>=0)return true;
+    if(s.indexOf(RT)===0&&s.indexOf('/assets/')<0)return true;
+    var RTP=('preview'+'-'+'runtime/');
+    if(s.indexOf(RTP)>=0&&s.indexOf('/assets/')<0)return true;
+    return false;
   }
   try{
     var d=Object.getOwnPropertyDescriptor(Location.prototype,'pathname');

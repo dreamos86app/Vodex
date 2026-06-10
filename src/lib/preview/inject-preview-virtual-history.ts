@@ -12,6 +12,8 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
   var PH=('preview'+'-'+'html');
   var AP=('api/'+'projects/');
   var AAP=('/'+'api/'+'projects/');
+  var RT=('/'+'preview-runtime/');
+  var RTP=('preview'+'-'+'runtime');
   window.__VODEX_PREVIEW_ACTIVE__=true;
   window.__VODEX_VIRTUAL_PATH__=virtualPath;
   if('serviceWorker' in navigator){
@@ -26,7 +28,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
       window.__next_f.push=function(item){
         try{
           var s=JSON.stringify(item);
-          if(s.indexOf(PH)>=0||s.indexOf(AP)>=0)return item.length;
+          if(s.indexOf(PH)>=0||s.indexOf(AP)>=0||s.indexOf(RTP)>=0)return item.length;
         }catch(e){}
         return _nfPush(item);
       };
@@ -41,7 +43,10 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
   }
   function isPlatformPreviewPath(p){
     var s=normPath(p).toLowerCase();
-    return s.indexOf(AAP)===0||s.indexOf(AP)>=0||s.indexOf(PH)>=0;
+    if(s.indexOf(AAP)===0||s.indexOf(AP)>=0||s.indexOf(PH)>=0)return true;
+    if(s.indexOf(RT)===0&&s.indexOf('/assets/')<0)return true;
+    if(s.indexOf(RTP)>=0&&s.indexOf('/assets/')<0)return true;
+    return false;
   }
   function patchNextData(){
     try{
@@ -52,6 +57,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
         if(!p||typeof p!=='string')return p;
         if(isPlatformPreviewPath(p))return'/';
         if(p.indexOf(PH)>=0)return'/';
+        if(p.indexOf(RTP)>=0&&p.indexOf('/assets/')<0)return'/';
         return p;
       }
       nd.page=fixPath(nd.page);
@@ -87,7 +93,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
       var u=new URL(url,location.href);
       if(u.pathname.indexOf(AAP)===0||u.pathname.indexOf(AP)>=0||u.pathname.indexOf(PH)>=0)return"/";
       var rt=('/'+'preview-runtime/');
-      if(u.pathname.indexOf(rt)===0){
+      if(u.pathname.indexOf(rt)===0&&u.pathname.indexOf('/assets/')<0){
         var segs=u.pathname.split('/').filter(Boolean);
         if(segs.length>3)return normPath('/'+segs.slice(3).join('/'));
         return"/";

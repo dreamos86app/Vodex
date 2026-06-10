@@ -36,6 +36,7 @@ const LEAK_PATTERN_DEFS: Array<{ id: string; re: RegExp; safe?: boolean; repair:
   { id: "vodex_app", re: /https?:\/\/[^"'`\s>]*\.vodex\.app\/[^"'`\s>]*/gi, repair: "Rewrite to in-app virtual path" },
   { id: "preview_html_format_frame", re: /preview-html[^"'`\s>]*format=frame[^"'`\s>]*/gi, repair: "Strip legacy preview-html frame URL" },
   { id: "preview_html_format_frame_encoded", re: /preview-html[^"'`\s>]*format%3Dframe[^"'`\s>]*/gi, repair: "Strip URL-encoded preview-html frame URL" },
+  { id: "preview_runtime_route", re: /(?:\/)?preview-runtime\/[a-f0-9-]+\/[a-f0-9-]+(?![^"'`\s>]*\/assets)/gi, repair: "Replace preview-runtime iframe route with '/'" },
   { id: "next_data_page", re: /"page"\s*:\s*"[^"]*preview-html[^"]*"/gi, repair: 'Set "page":"/"' },
   { id: "next_f_push", re: /__next_f\.push\([^)]*preview-html[^)]*\)/gi, repair: "Strip poisoned flight chunk push" },
   { id: "service_worker_register", re: /navigator\.serviceWorker\.register\s*\(/gi, safe: true, repair: "Block SW registration in preview iframe shim" },
@@ -48,8 +49,12 @@ export function scanTextForPathLeaks(text: string, projectId?: string): PathLeak
     const re = new RegExp(def.re.source, def.re.flags);
     let m: RegExpExecArray | null;
     while ((m = re.exec(hay))) {
-      if (projectId && !m[0].includes(projectId) && /api\/projects|preview-html/i.test(m[0])) {
-        if (!m[0].match(/api\/projects\/[a-f0-9-]+/i)) continue;
+      if (
+        projectId &&
+        !m[0].includes(projectId) &&
+        /api\/projects|preview-html|preview-runtime/i.test(m[0])
+      ) {
+        if (!m[0].match(/api\/projects\/[a-f0-9-]+/i) && !m[0].match(/preview-runtime\/[a-f0-9-]+/i)) continue;
       }
       const start = Math.max(0, m.index - 40);
       const end = Math.min(hay.length, m.index + m[0].length + 40);

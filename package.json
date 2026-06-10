@@ -919,6 +919,7 @@
     "verify:preview-runtime-assets-canonical": "npx tsx scripts/verify-preview-runtime-assets-canonical.mjs",
     "verify:clear-cache-removes-sw-and-caches": "node scripts/verify-clear-cache-removes-sw-and-caches.mjs",
     "verify:visible-next-404-fails-readiness": "node scripts/verify-visible-next-404-fails-readiness.mjs",
+    "verify:preview-runtime-route-sanitized": "npx tsx scripts/verify-preview-runtime-route-sanitized.ts",
     "production-readiness-report": "node scripts/production-readiness-report.mjs",
     "verify:production-readiness-preview-parse": "node scripts/verify-production-readiness-preview-parse.mjs",
     "verify:polling": "node scripts/verify-polling.mjs",

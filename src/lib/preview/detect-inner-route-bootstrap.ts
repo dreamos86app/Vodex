@@ -31,7 +31,7 @@ export function detectInnerRouteBootstrapIssues(
   }
 
   const nextData = appHtml.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
-  if (nextData?.[1] && /preview-html|api\/projects\/[a-f0-9-]+\/preview-html/i.test(nextData[1])) {
+  if (nextData?.[1] && /preview-html|preview-runtime\/[a-f0-9-]+\/[a-f0-9-]+|api\/projects\/[a-f0-9-]+\/preview-html/i.test(nextData[1])) {
     issues.push({
       id: "next_data_router_state",
       severity: "error",
