@@ -58,7 +58,7 @@ export default async function AppBuilderPage({
   const sp = await searchParams;
   const initialMode: Mode = VALID_MODES.includes(sp.mode as Mode) ? (sp.mode as Mode) : "build";
   const initialAutoStart = sp.autostart === "1" || sp.autostart === "true";
-  const initialBuildStrategy = sp.strategy === "build_now" ? "build_now" : "plan_first";
+  const initialBuildStrategy = sp.strategy === "plan_first" ? "plan_first" : "build_now";
 
   const { data: project, error } = await supabase
     .from("projects")

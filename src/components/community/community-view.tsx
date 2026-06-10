@@ -810,12 +810,17 @@ function GroupsTab({ onCreateGroup, refreshKey }: { onCreateGroup: () => void; r
                 key={g.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(`/community/groups/${g.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") router.push(`/community/groups/${g.id}`);
+                }}
                 className={cn(
-                  "group cursor-pointer overflow-hidden rounded-[var(--radius-xl)] bg-surface ring-1 transition",
-                  g.is_featured ? "ring-accent/30" : "ring-border hover:ring-accent/30",
+                  "group cursor-pointer overflow-hidden rounded-[var(--radius-xl)] bg-surface ring-[0.5px] transition hover:shadow-md",
+                  g.is_featured ? "ring-accent/30" : "ring-border/80 hover:ring-accent/30",
                 )}
               >
-                {/* Banner */}
                 <div className="h-16 w-full relative" style={{ background: g.banner_color }}>
                   {g.is_featured && (
                     <span className="absolute top-2 right-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
@@ -823,23 +828,21 @@ function GroupsTab({ onCreateGroup, refreshKey }: { onCreateGroup: () => void; r
                     </span>
                   )}
                 </div>
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl ring-2 ring-accent -mt-7"
-                        style={{ background: g.icon_url ? undefined : `${g.banner_color}33` }}
-                      >
-                        {g.icon_url ? (
-                          <img src={g.icon_url} alt={g.name} className="size-full object-cover" />
-                        ) : (
-                          <Users className="size-4 text-white" strokeWidth={1.5} />
-                        )}
-                      </div>
-                      <div className="mt-0">
-                        <p className="text-[13.5px] font-semibold text-foreground">{g.name}</p>
-                        <p className="text-[11px] text-muted-foreground">{g.member_count.toLocaleString()} members</p>
-                      </div>
+                <div className="p-4 pt-5">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"
+                      style={{ background: g.icon_url ? undefined : `${g.banner_color}33` }}
+                    >
+                      {g.icon_url ? (
+                        <img src={g.icon_url} alt={g.name} className="size-full object-cover" />
+                      ) : (
+                        <Users className="size-4 text-accent" strokeWidth={1.5} />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13.5px] font-semibold leading-tight text-foreground">{g.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{g.member_count.toLocaleString()} members</p>
                     </div>
                   </div>
                   <GroupCategoryBadges
@@ -850,7 +853,7 @@ function GroupsTab({ onCreateGroup, refreshKey }: { onCreateGroup: () => void; r
                   {g.description && (
                     <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground line-clamp-2">{g.description}</p>
                   )}
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {!isOwner ? (
                       <button
                         type="button"

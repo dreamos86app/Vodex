@@ -46,8 +46,12 @@ function CommunityProfileSettings({
   setProfile: (p: Tables<"profiles">) => void;
 }) {
   const [bio, setBio] = React.useState((profile as { bio?: string | null })?.bio ?? "");
-  const [publicOn, setPublicOn] = React.useState(!!(profile as { public_profile_enabled?: boolean })?.public_profile_enabled);
-  const [showApps, setShowApps] = React.useState(!!(profile as { show_apps_on_profile?: boolean })?.show_apps_on_profile);
+  const [privateProfile, setPrivateProfile] = React.useState(
+    (profile as { public_profile_enabled?: boolean })?.public_profile_enabled === false,
+  );
+  const [showApps, setShowApps] = React.useState(
+    (profile as { show_apps_on_profile?: boolean })?.show_apps_on_profile !== false,
+  );
   const [showFollowers, setShowFollowers] = React.useState(
     (profile as { show_follower_count?: boolean })?.show_follower_count !== false,
   );
@@ -59,8 +63,8 @@ function CommunityProfileSettings({
   React.useEffect(() => {
     if (!profile) return;
     setBio((profile as { bio?: string | null }).bio ?? "");
-    setPublicOn(!!(profile as { public_profile_enabled?: boolean }).public_profile_enabled);
-    setShowApps(!!(profile as { show_apps_on_profile?: boolean }).show_apps_on_profile);
+    setPrivateProfile((profile as { public_profile_enabled?: boolean }).public_profile_enabled === false);
+    setShowApps((profile as { show_apps_on_profile?: boolean }).show_apps_on_profile !== false);
     setShowFollowers((profile as { show_follower_count?: boolean }).show_follower_count !== false);
     setAllowFollows((profile as { allow_follows?: boolean }).allow_follows !== false);
   }, [profile?.id]);
@@ -73,7 +77,7 @@ function CommunityProfileSettings({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         bio: bio.trim() || null,
-        public_profile_enabled: publicOn,
+        public_profile_enabled: !privateProfile,
         show_apps_on_profile: showApps,
         show_follower_count: showFollowers,
         allow_follows: allowFollows,
@@ -94,7 +98,7 @@ function CommunityProfileSettings({
   return (
     <SectionCard
       title="Community profile"
-      description="Control your public builder page at /builders/your-username. Apps are hidden by default."
+      description="Your builder profile is public by default. Apps stay private until you publish or share to community."
     >
       <div className="space-y-4">
         {username ? (
@@ -111,17 +115,17 @@ function CommunityProfileSettings({
           <FieldLabel>Bio</FieldLabel>
           <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className={textareaCls} placeholder="What you build, what you share with the community…" />
         </label>
-        <SettingRow title="Public profile" description="Let others view your builder page.">
-          <Switch checked={publicOn} onCheckedChange={setPublicOn} />
+        <SettingRow title="Private profile" description="Hide your builder page from the community.">
+          <Switch checked={privateProfile} onCheckedChange={setPrivateProfile} />
         </SettingRow>
-        <SettingRow title="Show apps on profile" description="Only published apps; view-only previews. Off by default.">
-          <Switch checked={showApps} onCheckedChange={setShowApps} disabled={!publicOn} />
+        <SettingRow title="Show apps on profile" description="Published or community-shared apps with view-only previews.">
+          <Switch checked={showApps} onCheckedChange={setShowApps} disabled={privateProfile} />
         </SettingRow>
         <SettingRow title="Show follower count" description="Display how many builders follow you.">
-          <Switch checked={showFollowers} onCheckedChange={setShowFollowers} disabled={!publicOn} />
+          <Switch checked={showFollowers} onCheckedChange={setShowFollowers} disabled={privateProfile} />
         </SettingRow>
         <SettingRow title="Allow follows" description="Let community members follow your profile.">
-          <Switch checked={allowFollows} onCheckedChange={setAllowFollows} disabled={!publicOn} />
+          <Switch checked={allowFollows} onCheckedChange={setAllowFollows} disabled={privateProfile} />
         </SettingRow>
         <Button variant="accent" size="sm" onClick={() => void saveCommunityProfile()} disabled={saving}>
           {saving ? "Saving…" : "Save community profile"}

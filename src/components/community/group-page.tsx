@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Users, Loader2, Lock, Globe, UserPlus, UserCheck, Settings, X,
+  ArrowLeft, Users, Loader2, Lock, Globe, UserPlus, UserCheck, Settings, X, Share2, Flag,
 } from "lucide-react";
+import { toast } from "@/lib/toast";
+import { ReportDialog } from "@/components/community/report-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { variants } from "@/lib/motion";
@@ -64,6 +66,10 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
   const [manageCategories, setManageCategories] = React.useState<string[]>(["General"]);
   const [manageRules, setManageRules] = React.useState<string[]>([]);
   const [savingManage, setSavingManage] = React.useState(false);
+  const [reportOpen, setReportOpen] = React.useState(false);
+  const [manageBanner, setManageBanner] = React.useState("#4f7cff");
+  const [manageIconUrl, setManageIconUrl] = React.useState<string | null>(null);
+  const [uploadingIcon, setUploadingIcon] = React.useState(false);
 
   const load = React.useCallback(async () => {
     const [{ data: grp, error: grpErr }, { data: mems }] = await Promise.all([
@@ -84,6 +90,8 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
     setManageCategories(parseGroupCategories(groupRow));
     const rawRules = groupRow.rules;
     setManageRules(Array.isArray(rawRules) ? rawRules.filter((r): r is string => typeof r === "string") : []);
+    setManageBanner(groupRow.banner_color);
+    setManageIconUrl(groupRow.icon_url);
 
     const memberRows = (mems ?? []) as GroupMember[];
     const userIds = memberRows.map((m) => m.user_id);
@@ -162,6 +170,8 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
         categories,
         category: categories[0],
         rules: manageRules.filter((r) => r.trim()),
+        banner_color: manageBanner,
+        icon_url: manageIconUrl,
       })
       .eq("id", groupId);
     setSavingManage(false);
@@ -213,6 +223,20 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => {
+                  void navigator.clipboard.writeText(window.location.href);
+                  toast.success("Group link copied");
+                }}
+              >
+                <Share2 className="size-3.5" /> Share
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={() => setReportOpen(true)}>
+                <Flag className="size-3.5" /> Report
+              </Button>
               <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => setShowMembers(true)}>
                 <Users className="size-3.5" /> Members
               </Button>
@@ -292,16 +316,43 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
             description={manageDesc}
             categories={manageCategories}
             rules={manageRules}
+            bannerColor={manageBanner}
+            iconUrl={manageIconUrl}
+            uploadingIcon={uploadingIcon}
             saving={savingManage}
             onName={setManageName}
             onDescription={setManageDesc}
             onCategories={setManageCategories}
             onRules={setManageRules}
+            onBannerColor={setManageBanner}
+            onIconUpload={async (file) => {
+              setUploadingIcon(true);
+              try {
+                const fd = new FormData();
+                fd.append("file", file);
+                const res = await fetch("/api/upload/group-icon", { method: "POST", body: fd });
+                const j = (await res.json()) as { url?: string; error?: string };
+                if (!res.ok || !j.url) throw new Error(j.error ?? "Upload failed");
+                setManageIconUrl(j.url);
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "Could not upload icon");
+              } finally {
+                setUploadingIcon(false);
+              }
+            }}
             onSave={() => void saveManage()}
             onClose={() => setShowManage(false)}
           />
         ) : null}
       </AnimatePresence>
+
+      <ReportDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="group"
+        targetId={groupId}
+        targetLabel={group.name}
+      />
     </div>
   );
 }
@@ -407,26 +458,52 @@ function MembersDrawer({
 }
 
 function ManageSheet({
-  name, description, categories, rules, saving, onName, onDescription, onCategories, onRules, onSave, onClose,
+  name, description, categories, rules, bannerColor, iconUrl, uploadingIcon, saving,
+  onName, onDescription, onCategories, onRules, onBannerColor, onIconUpload, onSave, onClose,
 }: {
   name: string;
   description: string;
   categories: string[];
   rules: string[];
+  bannerColor: string;
+  iconUrl: string | null;
+  uploadingIcon: boolean;
   saving: boolean;
   onName: (v: string) => void;
   onDescription: (v: string) => void;
   onCategories: (v: string[]) => void;
   onRules: (v: string[]) => void;
+  onBannerColor: (v: string) => void;
+  onIconUpload: (file: File) => Promise<void>;
   onSave: () => void;
   onClose: () => void;
 }) {
+  const iconInputRef = React.useRef<HTMLInputElement>(null);
   return (
     <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4">
       <button type="button" className="absolute inset-0 bg-foreground/30" onClick={onClose} aria-label="Close" />
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-background p-5 shadow-2xl ring-1 ring-border">
         <p className="text-[15px] font-semibold">Manage group</p>
         <div className="mt-4 space-y-3">
+          <div>
+            <p className="text-[12px] font-medium">Banner color</p>
+            <div className="mt-1 flex items-center gap-2">
+              <input type="color" value={bannerColor} onChange={(e) => onBannerColor(e.target.value)} className="size-10 cursor-pointer rounded-lg border border-border bg-transparent" />
+              <input value={bannerColor} onChange={(e) => onBannerColor(e.target.value)} className="h-10 min-w-0 flex-1 rounded-lg bg-surface px-3 text-[13px] ring-1 ring-border" />
+            </div>
+          </div>
+          <div>
+            <p className="text-[12px] font-medium">Group icon</p>
+            <div className="mt-1 flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border" style={{ background: iconUrl ? undefined : `${bannerColor}33` }}>
+                {iconUrl ? <img src={iconUrl} alt="" className="size-full object-cover" /> : <Users className="size-5 text-accent" />}
+              </div>
+              <input ref={iconInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onIconUpload(f); }} />
+              <Button variant="secondary" size="sm" disabled={uploadingIcon} onClick={() => iconInputRef.current?.click()}>
+                {uploadingIcon ? "Uploading…" : iconUrl ? "Change icon" : "Upload icon"}
+              </Button>
+            </div>
+          </div>
           <label className="block text-[12px] font-medium">Name<input value={name} onChange={(e) => onName(e.target.value)} className="mt-1 h-10 w-full rounded-lg bg-surface px-3 text-[13px] ring-1 ring-border" /></label>
           <label className="block text-[12px] font-medium">Description<textarea value={description} onChange={(e) => onDescription(e.target.value)} rows={3} className="mt-1 w-full rounded-lg bg-surface px-3 py-2 text-[13px] ring-1 ring-border" /></label>
           <div><p className="text-[12px] font-medium mb-2">Categories</p><GroupCategoryPicker value={categories} onChange={onCategories} /></div>

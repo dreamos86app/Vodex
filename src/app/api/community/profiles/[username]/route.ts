@@ -53,7 +53,7 @@ export async function GET(
     return NextResponse.json({ error: "Profile not found", visibility: "missing" }, { status: 404 });
   }
 
-  if (!profile.public_profile_enabled) {
+  if (profile.public_profile_enabled === false) {
     const isOwner = user?.id === profile.id;
     return NextResponse.json({
       visibility: "private",
@@ -114,12 +114,13 @@ export async function GET(
   });
 
   let apps: Array<{ id: string; name: string; previewUrl: string }> = [];
-  if (profile.show_apps_on_profile) {
+  const showApps = profile.show_apps_on_profile !== false;
+  if (showApps) {
     const { data: rows } = await db
       .from("projects")
-      .select("id, name, app_name")
+      .select("id, name, app_name, is_public, metadata")
       .eq("owner_id", profile.id)
-      .eq("is_public", true)
+      .or("is_public.eq.true,metadata->>community_listed.eq.true")
       .order("updated_at", { ascending: false })
       .limit(12);
     apps = (rows ?? []).map((p: { id: string; name: string; app_name: string | null }) => ({

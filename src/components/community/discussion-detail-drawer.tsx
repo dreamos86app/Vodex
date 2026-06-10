@@ -3,7 +3,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Loader2, MessageCircle, Pencil, Trash2, ImagePlus } from "lucide-react";
+import { X, Send, Loader2, MessageCircle, ImagePlus } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/stores/auth-store";
@@ -11,7 +11,10 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { Discussion } from "@/lib/supabase/types";
 import { CommunityHeartButton } from "@/components/community/community-heart-button";
-import { fetchProfileNameMap } from "@/lib/community/profile-display-name";
+import { fetchProfileNameMap, fetchProfilePreviewMap } from "@/lib/community/profile-display-name";
+import { CommunityMessageMenu } from "@/components/community/community-message-menu";
+import { ConfirmDialog } from "@/components/community/confirm-dialog";
+import Link from "next/link";
 
 type CommentRow = {
   id: string;
@@ -22,9 +25,50 @@ type CommentRow = {
   parent_reply_id: string | null;
   edited_at?: string | null;
   author_name?: string;
+  author_avatar?: string | null;
+  author_username?: string | null;
   liked?: boolean;
   attachment_url?: string | null;
 };
+
+function dedupeComments(rows: CommentRow[]): CommentRow[] {
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+}
+
+function AuthorLink({
+  name,
+  avatar,
+  username,
+  userId,
+  currentUserId,
+}: {
+  name: string;
+  avatar?: string | null;
+  username?: string | null;
+  userId: string;
+  currentUserId?: string;
+}) {
+  const label = userId === currentUserId ? "You" : name;
+  const inner = (
+    <div className="flex items-center gap-2">
+      <Avatar name={label} src={avatar ?? undefined} size="sm" />
+      <span className="text-[12px] font-medium text-foreground">{label}</span>
+    </div>
+  );
+  if (username && userId !== currentUserId) {
+    return (
+      <Link href={`/builders/${username}`} className="transition hover:opacity-80">
+        {inner}
+      </Link>
+    );
+  }
+  return inner;
+}
 
 function commentScore(c: CommentRow): number {
   const likes = c.like_count ?? 0;
@@ -39,56 +83,63 @@ function FlatReply({
   userId,
   onLike,
   onEdit,
-  onDelete,
+  onRequestDelete,
 }: {
   reply: CommentRow;
   replyToName?: string;
   userId?: string;
   onLike: (id: string, liked: boolean) => void;
   onEdit: (id: string, text: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onRequestDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(reply.body);
   const isOwn = userId === reply.user_id;
 
   return (
-    <li className="rounded-xl bg-background/60 px-3 py-2 ring-1 ring-border/50">
-      {replyToName ? (
-        <p className="text-[11px] text-muted-foreground">
-          <span className="font-semibold text-foreground">{reply.author_name ?? "Member"}</span>
-          <span className="mx-1.5 font-bold text-accent">→</span>
-          <span className="font-medium">{replyToName}</span>
-        </p>
-      ) : (
-        <p className="text-[11px] font-medium text-muted-foreground">{reply.author_name ?? "Member"}</p>
-      )}
-      {editing ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void onEdit(reply.id, draft.trim()).then(() => setEditing(false));
-          }}
-          className="mt-1 flex gap-2"
-        >
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} className="min-w-0 flex-1 rounded-lg bg-background px-2 py-1 text-[12px] ring-1 ring-border" />
-          <button type="submit" className="rounded-lg bg-accent px-2 py-1 text-[11px] text-white">Save</button>
-        </form>
-      ) : (
-        <p className="mt-1 text-[13px] text-foreground">{reply.body}</p>
-      )}
-      {reply.attachment_url ? (
-        <img src={reply.attachment_url} alt="" className="mt-2 max-h-48 w-full rounded-lg object-cover" />
-      ) : null}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <CommunityHeartButton liked={!!reply.liked} count={reply.like_count} onToggle={() => onLike(reply.id, !!reply.liked)} size="sm" />
-        {reply.edited_at ? <span className="text-[10px] text-muted-foreground">edited</span> : null}
-        {isOwn ? (
-          <>
-            <button type="button" onClick={() => setEditing(true)} className="text-[10px] text-muted-foreground hover:text-foreground"><Pencil className="inline size-3" /> Edit</button>
-            <button type="button" onClick={() => void onDelete(reply.id)} className="text-[10px] text-destructive"><Trash2 className="inline size-3" /> Delete</button>
-          </>
+    <li className="relative ml-5 border-l-2 border-accent/30 pl-4">
+      <div className="rounded-xl bg-background/80 px-3 py-2.5 ring-1 ring-border/60">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <AuthorLink
+              name={reply.author_name ?? "Member"}
+              avatar={reply.author_avatar}
+              username={reply.author_username}
+              userId={reply.user_id}
+              currentUserId={userId}
+            />
+            {replyToName ? (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                <span className="font-semibold text-accent">→</span>{" "}
+                <span className="font-medium">{replyToName}</span>
+              </p>
+            ) : null}
+          </div>
+          {isOwn ? (
+            <CommunityMessageMenu onEdit={() => setEditing(true)} onDelete={() => onRequestDelete(reply.id)} />
+          ) : null}
+        </div>
+        {editing ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void onEdit(reply.id, draft.trim()).then(() => setEditing(false));
+            }}
+            className="mt-2 flex gap-2"
+          >
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} className="min-w-0 flex-1 rounded-lg bg-background px-2 py-1.5 text-[12px] ring-1 ring-border" />
+            <button type="submit" className="rounded-lg bg-accent px-2.5 py-1.5 text-[11px] text-white">Save</button>
+          </form>
+        ) : (
+          <p className="mt-2 text-[13px] leading-relaxed text-foreground">{reply.body}</p>
+        )}
+        {reply.attachment_url ? (
+          <img src={reply.attachment_url} alt="" className="mt-2 max-h-48 w-full rounded-lg object-cover" />
         ) : null}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <CommunityHeartButton liked={!!reply.liked} count={reply.like_count} onToggle={() => onLike(reply.id, !!reply.liked)} size="sm" />
+          {reply.edited_at ? <span className="text-[10px] text-muted-foreground">edited</span> : null}
+        </div>
       </div>
     </li>
   );
@@ -102,7 +153,7 @@ function CommentItem({
   onLike,
   onReply,
   onEdit,
-  onDelete,
+  onRequestDelete,
 }: {
   comment: CommentRow;
   flatReplies: CommentRow[];
@@ -111,7 +162,7 @@ function CommentItem({
   onLike: (id: string, liked: boolean) => void;
   onReply: (parentId: string, text: string) => Promise<void>;
   onEdit: (id: string, text: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onRequestDelete: (id: string) => void;
 }) {
   const [showReplies, setShowReplies] = React.useState(true);
   const [replyOpen, setReplyOpen] = React.useState(false);
@@ -139,14 +190,25 @@ function CommentItem({
   return (
     <li>
       <div className="rounded-xl bg-surface/80 px-3 py-2.5 ring-1 ring-border/60">
-        <p className="text-[11px] font-medium text-muted-foreground">{comment.author_name ?? "Member"}</p>
+        <div className="flex items-start justify-between gap-2">
+          <AuthorLink
+            name={comment.author_name ?? "Member"}
+            avatar={comment.author_avatar}
+            username={comment.author_username}
+            userId={comment.user_id}
+            currentUserId={userId}
+          />
+          {isOwn ? (
+            <CommunityMessageMenu onEdit={() => setEditing(true)} onDelete={() => onRequestDelete(comment.id)} />
+          ) : null}
+        </div>
         {editing ? (
-          <form onSubmit={(e) => { e.preventDefault(); void onEdit(comment.id, draft.trim()).then(() => setEditing(false)); }} className="mt-1 flex gap-2">
+          <form onSubmit={(e) => { e.preventDefault(); void onEdit(comment.id, draft.trim()).then(() => setEditing(false)); }} className="mt-2 flex gap-2">
             <input value={draft} onChange={(e) => setDraft(e.target.value)} className="min-w-0 flex-1 rounded-lg bg-background px-2.5 py-1.5 text-[12px] ring-1 ring-border" />
             <button type="submit" className="rounded-lg bg-accent px-2.5 py-1.5 text-white">Save</button>
           </form>
         ) : (
-          <p className="mt-1 text-[13px] text-foreground">{comment.body}</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-foreground">{comment.body}</p>
         )}
         {comment.attachment_url ? (
           <img src={comment.attachment_url} alt="" className="mt-2 max-h-56 w-full rounded-lg object-cover" />
@@ -158,12 +220,6 @@ function CommentItem({
             <button type="button" onClick={() => setReplyOpen((v) => !v)} className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
               <MessageCircle className="size-3" strokeWidth={1.75} /> Reply
             </button>
-          ) : null}
-          {isOwn ? (
-            <>
-              <button type="button" onClick={() => setEditing(true)} className="text-[10px] text-muted-foreground"><Pencil className="inline size-3" /> Edit</button>
-              <button type="button" onClick={() => void onDelete(comment.id)} className="text-[10px] text-destructive"><Trash2 className="inline size-3" /> Delete</button>
-            </>
           ) : null}
         </div>
         {replyOpen && userId ? (
@@ -179,7 +235,7 @@ function CommentItem({
         </button>
       ) : null}
       {flatReplies.length > 0 && showReplies ? (
-        <ul className="mt-2 space-y-2">
+        <ul className="mt-3 space-y-2">
           {flatReplies.map((r) => {
             const parent = r.parent_reply_id ? nameById.get(r.parent_reply_id) : undefined;
             const replyToName = r.parent_reply_id && r.parent_reply_id !== comment.id ? parent : undefined;
@@ -191,7 +247,7 @@ function CommentItem({
                 userId={userId}
                 onLike={onLike}
                 onEdit={onEdit}
-                onDelete={onDelete}
+                onRequestDelete={onRequestDelete}
               />
             );
           })}
@@ -226,11 +282,17 @@ export function DiscussionDetailDrawer({
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [localLiked, setLocalLiked] = React.useState(!!liked);
   const [localLikeCount, setLocalLikeCount] = React.useState(discussion.like_count);
+  const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     setLocalLiked(!!liked);
     setLocalLikeCount(discussion.like_count);
   }, [liked, discussion.like_count, discussion.id]);
+
+  React.useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [discussion.id]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -253,13 +315,22 @@ export function DiscussionDetailDrawer({
       } else {
         const likedIds = new Set((likesRes.data ?? []).map((l: { reply_id: string }) => l.reply_id));
         const raw = (commentsRes.data ?? []) as CommentRow[];
-        const names = await fetchProfileNameMap(supabase, raw.map((c) => c.user_id));
-        const rows = raw.map((c) => ({
-          ...c,
-          liked: likedIds.has(c.id),
-          author_name: c.user_id === user?.id ? "You" : names.get(c.user_id) ?? "Member",
-        }));
-        setComments([...rows].sort((a, b) => commentScore(b) - commentScore(a)));
+        const userIds = raw.map((c) => c.user_id);
+        const [names, previews] = await Promise.all([
+          fetchProfileNameMap(supabase, userIds),
+          fetchProfilePreviewMap(supabase, userIds),
+        ]);
+        const rows = raw.map((c) => {
+          const preview = previews.get(c.user_id);
+          return {
+            ...c,
+            liked: likedIds.has(c.id),
+            author_name: c.user_id === user?.id ? "You" : names.get(c.user_id) ?? "Member",
+            author_avatar: preview?.avatar_url ?? null,
+            author_username: preview?.username ?? null,
+          };
+        });
+        setComments(dedupeComments([...rows].sort((a, b) => commentScore(b) - commentScore(a))));
       }
       setLoading(false);
     })();
@@ -313,7 +384,9 @@ export function DiscussionDetailDrawer({
   async function handleCommentDelete(commentId: string) {
     const res = await fetch(`/api/community/comments/${commentId}`, { method: "DELETE", credentials: "include" });
     if (!res.ok) { toast.error("Could not delete"); return; }
-    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    setComments((prev) => dedupeComments(prev.filter((c) => c.id !== commentId && c.parent_reply_id !== commentId)));
+    setDeleteTargetId(null);
+    toast.success("Comment deleted");
   }
 
   function handlePostLike() {
@@ -366,7 +439,19 @@ export function DiscussionDetailDrawer({
       toast.error(j.error ?? "Could not post reply");
       throw new Error(j.error ?? "reply failed");
     }
-    setComments((prev) => [...prev, { ...j.reply!, author_name: "You", liked: false }]);
+    const preview = user ? await fetchProfilePreviewMap(supabase, [user.id]).then((m) => m.get(user.id)) : undefined;
+    setComments((prev) =>
+      dedupeComments([
+        ...prev,
+        {
+          ...j.reply!,
+          author_name: "You",
+          author_avatar: preview?.avatar_url ?? null,
+          author_username: preview?.username ?? null,
+          liked: false,
+        },
+      ]),
+    );
   }
 
   async function submitComment(e: React.FormEvent) {
@@ -392,7 +477,7 @@ export function DiscussionDetailDrawer({
       author_name: "You",
       attachment_url: attachmentUrl,
     };
-    setComments((prev) => [...prev, optimistic]);
+    setComments((prev) => dedupeComments([...prev, optimistic]));
     setBody("");
     setAttachment(null);
     try {
@@ -409,10 +494,22 @@ export function DiscussionDetailDrawer({
           url: attachmentUrl,
         });
       }
+      const preview = user ? await fetchProfilePreviewMap(supabase, [user.id]).then((m) => m.get(user.id)) : undefined;
       setComments((prev) =>
-        prev
-          .map((c) => (c.id === optimistic.id ? ({ ...data, author_name: "You" } as CommentRow) : c))
-          .sort((a, b) => commentScore(b) - commentScore(a)),
+        dedupeComments(
+          prev
+            .map((c) =>
+              c.id === optimistic.id
+                ? ({
+                    ...data,
+                    author_name: "You",
+                    author_avatar: preview?.avatar_url ?? null,
+                    author_username: preview?.username ?? null,
+                  } as CommentRow)
+                : c,
+            )
+            .sort((a, b) => commentScore(b) - commentScore(a)),
+        ),
       );
     } catch {
       setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -451,7 +548,7 @@ export function DiscussionDetailDrawer({
               <X className="size-4" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
             <div className="flex items-start gap-3">
               <Avatar name={authorName} src={authorAvatar} size="sm" />
               <div className="min-w-0 flex-1">
@@ -485,7 +582,7 @@ export function DiscussionDetailDrawer({
                       onLike={handleCommentLike}
                       onReply={handleCommentReply}
                       onEdit={handleCommentEdit}
-                      onDelete={handleCommentDelete}
+                      onRequestDelete={setDeleteTargetId}
                     />
                   ))}
                 </ul>
@@ -505,6 +602,12 @@ export function DiscussionDetailDrawer({
                 <input
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }}
                   placeholder="Add a comment…"
                   className="min-w-0 flex-1 rounded-xl bg-surface px-3 py-2.5 text-[13px] ring-1 ring-border"
                 />
@@ -520,6 +623,15 @@ export function DiscussionDetailDrawer({
             </form>
           ) : null}
         </motion.div>
+        <ConfirmDialog
+          open={Boolean(deleteTargetId)}
+          title="Delete this comment?"
+          description="This cannot be undone. Replies to this comment will also be removed from the thread."
+          confirmLabel="Delete comment"
+          destructive
+          onConfirm={() => deleteTargetId && void handleCommentDelete(deleteTargetId)}
+          onCancel={() => setDeleteTargetId(null)}
+        />
       </div>
     </AnimatePresence>,
     document.body,

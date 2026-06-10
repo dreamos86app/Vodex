@@ -79,7 +79,7 @@ function resolveMode(initialMode: string): PendingPrompt["mode"] {
 function resolveStrategy(initialStrategy: string): BuildStrategy {
   return initialStrategy === "build_now" || initialStrategy === "plan_first"
     ? initialStrategy
-    : "plan_first";
+    : "build_now";
 }
 
 export function CreateWorkspaceEntry({
@@ -87,7 +87,7 @@ export function CreateWorkspaceEntry({
   initialProjectId = null,
   initialMode = "build",
   initialAutoStart = false,
-  initialStrategy = "plan_first",
+  initialStrategy = "build_now",
   initialModel = "",
   initialSkipDraft = false,
   onWorkspaceShellReady,

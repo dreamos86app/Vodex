@@ -37,6 +37,8 @@ export type PreviewRuntimeStatusPayload = {
   previewFailureDetail: string | null;
   previewFailureClassification?: import("@/lib/preview/preview-failure-classifier").PreviewFailureClassification | null;
   previewSource: "worker_job" | "preview_session" | "metadata" | "none";
+  /** Canonical preview-html URL from runtime-status / import-status (includes artifact when known). */
+  previewUrl?: string | null;
   generationQualityScore?: number | null;
   sourceIntegrityScore?: number | null;
   previewBuildStatus?: string | null;

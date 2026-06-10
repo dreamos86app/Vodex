@@ -6,12 +6,20 @@ import { Loader2, Layers } from "lucide-react";
 import { IntegrationsCatalogPanel } from "@/components/integrations/integrations-catalog-panel";
 import { DiscordAccountCard } from "@/components/settings/discord-account-card";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { useCreditsStore } from "@/lib/stores/credits-store";
+import { resolveEffectivePlanId } from "@/lib/billing/resolve-effective-plan-id";
 
 type ProjectRow = { id: string; name: string; app_name?: string | null };
 
 export function SettingsIntegrationsView() {
   const { profile } = useAuthStore();
-  const planId = profile?.plan_id ?? "free";
+  const storePlanId = useCreditsStore((s) => s.planId);
+  const creditsConfirmed = useCreditsStore((s) => s.isConfirmed);
+  const planId = resolveEffectivePlanId({
+    profilePlanId: profile?.plan_id,
+    storePlanId,
+    isCreditsConfirmed: creditsConfirmed,
+  });
   const [projects, setProjects] = React.useState<ProjectRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [projectId, setProjectId] = React.useState<string | null>(null);

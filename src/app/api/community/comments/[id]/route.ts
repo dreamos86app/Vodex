@@ -36,12 +36,14 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("discussion_replies")
     .update({ is_deleted: true, body: "[deleted]" })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .select("id")
+    .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (!data) return NextResponse.json({ error: "Not found or not allowed" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

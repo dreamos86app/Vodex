@@ -28,7 +28,7 @@ import {
   resolveProjectCardStatus,
 } from "@/lib/projects/user-safe-project-badges";
 import { projectIconSrc } from "@/lib/projects/ensure-project-icon";
-import { tryNormalizeInternalPreviewUrl } from "@/lib/preview/internal-preview-url";
+import { resolvePreviewIframeUrl } from "@/lib/preview/preview-iframe-url-resolver";
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { subscribeProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
 import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
@@ -131,7 +131,16 @@ function ProjectCard({
   const cardFramePreviewUrl = `/api/projects/${project.id}/preview-html?format=frame&route=${encodeURIComponent("/")}`;
   const resolvedBannerPreviewUrl =
     canPreview && !importedPending
-      ? tryNormalizeInternalPreviewUrl(project.preview_url) ?? cardFramePreviewUrl
+      ? resolvePreviewIframeUrl({
+          projectId: project.id,
+          route: "/",
+          artifactId:
+            typeof meta.preview_build_job_id === "string" ? meta.preview_build_job_id : null,
+          candidates: [
+            { source: "app_card.preview_url", url: project.preview_url },
+            { source: "generated_fallback", url: cardFramePreviewUrl },
+          ],
+        }).normalizedPreviewUrl
       : null;
   const canPublish =
     cardStatus === "ready" &&
@@ -393,6 +402,12 @@ export function ProjectsView() {
         prev.map((p) => (p.id === projectId ? { ...p, is_favorite: !next } : p)),
       );
     }
+  }, []);
+
+  React.useEffect(() => {
+    const main = document.querySelector("main");
+    main?.scrollTo({ top: 0, behavior: "auto" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
 
   React.useEffect(() => {

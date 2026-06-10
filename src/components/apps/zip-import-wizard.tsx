@@ -32,6 +32,45 @@ type ImportPreviewPollStatus = {
   buildLogs?: string | null;
 };
 
+function uploadZipWithProgress(
+  file: File,
+  projectName: string,
+  onProgress: (pct: number) => void,
+): Promise<{ projectId: string; json: Record<string, unknown> }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const fd = new FormData();
+    fd.append("file", file);
+    if (projectName.trim()) fd.append("name", projectName.trim());
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (!e.lengthComputable) return;
+      const uploadPct = Math.max(1, Math.min(24, Math.round((e.loaded / e.total) * 24)));
+      onProgress(uploadPct);
+    });
+
+    xhr.addEventListener("load", () => {
+      let json: Record<string, unknown> = {};
+      try {
+        json = JSON.parse(xhr.responseText) as Record<string, unknown>;
+      } catch {
+        reject(new Error("Invalid server response"));
+        return;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(Object.assign(new Error(String(json.error ?? "Import failed")), { payload: json, status: xhr.status }));
+        return;
+      }
+      resolve({ projectId: String(json.projectId), json });
+    });
+
+    xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+    xhr.open("POST", "/api/projects/import-zip");
+    xhr.withCredentials = true;
+    xhr.send(fd);
+  });
+}
+
 const IMPORT_PREVIEW_STAGES: { pct: number; label: string }[] = [
   { pct: 8, label: "Scanning ZIP" },
   { pct: 18, label: "Uploading source" },
@@ -524,52 +563,41 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
     }
     setStep("importing");
     setImportError(null);
-    setImportProgress(IMPORT_PREVIEW_STAGES[0]!.pct);
-    setImportStageLabel(IMPORT_PREVIEW_STAGES[0]!.label);
+    setImportProgress(1);
+    setImportStageLabel("Uploading source");
     setImportBillingDiag(null);
-    const fd = new FormData();
-    fd.append("file", file);
-    if (projectName.trim()) fd.append("name", projectName.trim());
-    setImportProgress(IMPORT_PREVIEW_STAGES[1]!.pct);
-    setImportStageLabel(IMPORT_PREVIEW_STAGES[1]!.label);
-    const res = await fetch("/api/projects/import-zip", { method: "POST", body: fd });
-    const j = (await res.json()) as {
-      error?: string;
-      devError?: string;
-      code?: string;
-      hint?: string;
-      adminDetail?: Record<string, unknown>;
-      fileCount?: number;
-      framework?: string;
-      frameworkLabel?: string;
-      projectId?: string;
-      redirectTo?: string;
-      previewReady?: boolean;
-      blockedReason?: string | null;
-      previewStatus?: string;
-    };
-    if (!res.ok) {
+    let projectId: string;
+    let j: Record<string, unknown>;
+    try {
+      const uploaded = await uploadZipWithProgress(file, projectName, (pct) => {
+        setImportProgress(pct);
+        setImportStageLabel("Uploading source");
+      });
+      projectId = uploaded.projectId;
+      j = uploaded.json;
+    } catch (err) {
+      const payload = (err as { payload?: Record<string, unknown>; status?: number }).payload ?? {};
+      const status = (err as { status?: number }).status ?? 500;
       const diagnostics = {
-        step: (j.adminDetail as { step?: string } | undefined)?.step ?? "unknown",
-        code: j.code,
-        userMessage: j.error,
-        devError: j.devError ?? j.hint ?? j.error,
-        adminDetail: j.adminDetail,
-        status: res.status,
+        step: (payload.adminDetail as { step?: string } | undefined)?.step ?? "unknown",
+        code: payload.code,
+        userMessage: payload.error ?? (err instanceof Error ? err.message : "Import failed"),
+        devError: payload.devError ?? payload.hint ?? payload.error,
+        adminDetail: payload.adminDetail,
+        status,
       };
       setImportError(diagnostics);
-      if (j.code === "insufficient_action_credits" || res.status === 402) {
-        toast.error(j.error ?? "Not enough Action Credits for this ZIP preview.");
+      if (payload.code === "insufficient_action_credits" || status === 402) {
+        toast.error(String(payload.error ?? "Not enough Action Credits for this ZIP preview."));
         setScanPayload((prev) =>
           prev ? { ...prev, actionCreditsSufficient: false } : prev,
         );
       } else {
-        toast.error(j.error ?? "Import failed");
+        toast.error(String(payload.error ?? "Import failed"));
       }
       setStep("confirm");
       return;
     }
-    const projectId = j.projectId!;
     setImportProgress(IMPORT_PREVIEW_STAGES[2]!.pct);
     setImportStageLabel(IMPORT_PREVIEW_STAGES[2]!.label);
 
@@ -601,12 +629,16 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
 
     const result = {
       projectId,
-      redirectTo: j.redirectTo!,
-      fileCount: j.fileCount ?? 0,
-      framework: j.framework ?? scanPayload.framework,
+      redirectTo: String(j.redirectTo ?? `/apps/${projectId}/builder`),
+      fileCount: Number(j.fileCount ?? 0),
+      framework: String(j.framework ?? scanPayload.framework),
       previewReady,
-      blockedReason: polled.blockedReason ?? j.blockedReason ?? null,
-      previewStatus: previewReady ? "ready" : previewFailed ? "failed" : (polled.previewStatus ?? j.previewStatus ?? "queued"),
+      blockedReason: (polled.blockedReason ?? j.blockedReason ?? null) as string | null,
+      previewStatus: previewReady
+        ? "ready"
+        : previewFailed
+          ? "failed"
+          : String(polled.previewStatus ?? j.previewStatus ?? "queued"),
     };
     setImportResult(result);
     setStep("results");

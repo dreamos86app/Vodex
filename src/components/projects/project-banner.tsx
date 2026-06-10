@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { toPreviewIframeSrc, tryNormalizeInternalPreviewUrl } from "@/lib/preview/internal-preview-url";
+import { resolvePreviewIframeUrl } from "@/lib/preview/preview-iframe-url-resolver";
 
 type Props = {
   projectId: string;
@@ -88,12 +88,26 @@ export function ProjectBanner({
   importedPendingSetup = false,
   iconSrc = null,
 }: Props) {
-  const iframeSrc = previewUrl ? tryNormalizeInternalPreviewUrl(previewUrl) : null;
+  const resolution = previewUrl
+    ? resolvePreviewIframeUrl({
+        projectId,
+        route: "/",
+        candidates: [
+          { source: "app_card.preview_url", url: previewUrl },
+          {
+            source: "generated_fallback",
+            url: `/api/projects/${projectId}/preview-html?format=frame&route=${encodeURIComponent("/")}`,
+          },
+        ],
+      })
+    : null;
+  const iframeSrc = resolution?.iframeSrc ?? null;
   if (iframeSrc) {
     return (
       <div className={cn("relative w-full overflow-hidden bg-muted/20", heightClass, className)}>
         <iframe
-          src={toPreviewIframeSrc(iframeSrc)}
+          key={`${projectId}-${resolution?.artifactId ?? "na"}-${resolution?.normalizedPreviewUrl ?? ""}`}
+          src={iframeSrc}
           title={title ? `${title} preview` : "App preview"}
           tabIndex={-1}
           loading="lazy"

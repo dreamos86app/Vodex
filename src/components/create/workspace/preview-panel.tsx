@@ -30,6 +30,10 @@ import {
   toPreviewIframeSrc,
   tryNormalizeInternalPreviewUrl,
 } from "@/lib/preview/rewrite-preview-artifact-html";
+import {
+  previewIframeDomKey,
+  type PreviewIframeUrlResolution,
+} from "@/lib/preview/preview-iframe-url-resolver";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 
@@ -71,6 +75,9 @@ export interface PreviewPanelProps {
   prepareImportBusy?: boolean;
   /** When false, never show preview loading — generation has not produced a previewable app yet. */
   canPreview?: boolean;
+  projectId?: string | null;
+  urlResolution?: PreviewIframeUrlResolution | null;
+  onClearPreviewCache?: () => void;
 }
 
 function isUnrenderableSrcDoc(doc: string | null | undefined): boolean {
@@ -110,6 +117,9 @@ export function PreviewPanel({
   onRepairPreview,
   prepareImportBusy = false,
   canPreview = true,
+  projectId = null,
+  urlResolution = null,
+  onClearPreviewCache,
 }: PreviewPanelProps) {
   const [viewport, setViewport] = React.useState<Viewport>("desktop");
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -128,27 +138,48 @@ export function PreviewPanel({
 
   const hasInline = !!srcDoc?.trim() && !isUnrenderableSrcDoc(srcDoc);
   const resolvedPreviewUrl = React.useMemo(() => {
-    if (!url || hasInline) return null;
+    if (hasInline) return null;
+    if (urlResolution?.iframeSrc) {
+      if (urlResolution.iframeSrc.includes("api/projects/") && !urlResolution.iframeSrc.includes("/api/projects/")) {
+        console.error("[preview-panel] refused traced relative iframe src", urlResolution);
+        return null;
+      }
+      return urlResolution.iframeSrc;
+    }
+    if (!url) return null;
     if (url.startsWith("api/projects/") && !url.startsWith("/api/projects/")) {
-      console.warn("[preview-panel] correcting relative preview iframe path before render", { url });
+      console.warn("[preview-panel] correcting relative preview iframe path before render", { url, source: "url_prop" });
     }
     const normalized = tryNormalizeInternalPreviewUrl(url);
     if (!normalized) return null;
-    if (normalized !== url.trim()) {
-      console.warn("[preview-panel] normalized preview URL for iframe", { from: url, to: normalized });
-    }
     try {
       const src = toPreviewIframeSrc(normalized);
       if (src.includes("api/projects/") && !src.includes("/api/projects/")) {
-        console.error("[preview-panel] refused relative api/projects iframe src", { src });
+        console.error("[preview-panel] refused relative api/projects iframe src", { src, source: "url_prop" });
         return null;
       }
       return src;
     } catch {
       return null;
     }
-  }, [url, hasInline]);
-  const previewUrlInvalid = Boolean(url && !hasInline && !resolvedPreviewUrl);
+  }, [url, hasInline, urlResolution]);
+
+  const iframeDomKey = React.useMemo(
+    () =>
+      previewIframeDomKey({
+        projectId: projectId ?? "unknown",
+        artifactId: urlResolution?.artifactId ?? null,
+        route: urlResolution?.route ?? previewRoute,
+        normalizedSrc: urlResolution?.normalizedPreviewUrl ?? url,
+        cacheBust: urlResolution?.cacheBust ?? reloadKey,
+        reloadKey,
+      }),
+    [projectId, urlResolution, previewRoute, url, reloadKey],
+  );
+
+  const previewUrlInvalid = Boolean(
+    (url || urlResolution?.selectedPreviewUrl) && !hasInline && !resolvedPreviewUrl,
+  );
   const iframeRenderable = runtimeStatus?.previewRenderable === true;
   const previewBuildFailed =
     runtimeStatus?.jobStatus === "failed" || runtimeStatus?.previewStatus === "failed";
@@ -168,31 +199,53 @@ export function PreviewPanel({
 
   const rawBlocked = Boolean(url && isBlockedRawAppPreviewUrl(url)) || previewUrlInvalid;
   const previewDiagnostics = React.useMemo(() => {
-    if (!url || hasInline) return null;
-    const source = previewUrlInvalid
+    if (hasInline) return null;
+    const activeUrl = urlResolution?.normalizedPreviewUrl ?? url;
+    if (!activeUrl && !urlResolution) return null;
+    const source = urlResolution?.source ?? (previewUrlInvalid
       ? "invalid_preview_url"
       : rawBlocked
         ? "raw_blocked"
         : isArtifactUrl
           ? "artifact_proxy"
-          : "unknown";
+          : "unknown");
     let artifactPath: string | null = null;
     try {
-      const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "https://localhost");
+      const u = new URL(
+        activeUrl ?? "",
+        typeof window !== "undefined" ? window.location.origin : "https://localhost",
+      );
       artifactPath = u.pathname;
     } catch {
-      artifactPath = url;
+      artifactPath = activeUrl;
     }
     const fallbackApplied = previewRoute !== "/" && isArtifactUrl;
     return {
       source,
-      selected_route: previewRoute,
+      selectedPreviewUrl: urlResolution?.selectedPreviewUrl ?? url,
+      normalizedPreviewUrl: urlResolution?.normalizedPreviewUrl ?? activeUrl,
+      iframeSrc: resolvedPreviewUrl,
+      artifactId: urlResolution?.artifactId ?? null,
+      selected_route: urlResolution?.route ?? previewRoute,
       artifact_path: artifactPath,
+      wasNormalized: urlResolution?.wasNormalized ?? false,
+      wasRejected: urlResolution?.wasRejected ?? previewUrlInvalid,
+      rejectReason: urlResolution?.rejectReason ?? null,
       fallback: fallbackApplied ? "index.html" : null,
       rawUrlBlocked: rawBlocked,
       fallback_applied: fallbackApplied,
+      candidates: urlResolution?.candidates ?? [],
     };
-  }, [url, hasInline, rawBlocked, isArtifactUrl, previewRoute, previewUrlInvalid]);
+  }, [
+    url,
+    hasInline,
+    rawBlocked,
+    isArtifactUrl,
+    previewRoute,
+    previewUrlInvalid,
+    urlResolution,
+    resolvedPreviewUrl,
+  ]);
 
   const hasPreviewArtifact = !!url || hasInline;
   const artifactUrlOk = hasInline || !url || (isArtifactUrl && !rawBlocked);
@@ -300,7 +353,6 @@ export function PreviewPanel({
           })}
         </div>
 
-        {/* Reload */}
         <button
           type="button"
           aria-label="Reload preview"
@@ -311,10 +363,27 @@ export function PreviewPanel({
           <RefreshCw className="size-3" strokeWidth={1.7} />
         </button>
 
+        {onClearPreviewCache ? (
+          <button
+            type="button"
+            aria-label="Clear preview cache"
+            onClick={() => {
+              onClearPreviewCache();
+              setReloadKey((k) => k + 1);
+              setIframeError(false);
+              setIframeLoading(true);
+              toast.success("Preview cache cleared — reloading canonical URL");
+            }}
+            className="rounded-md px-2 py-1 text-[10px] font-semibold text-muted-foreground ring-1 ring-border transition hover:bg-surface hover:text-foreground"
+          >
+            Clear cache
+          </button>
+        ) : null}
+
         {/* Open in new tab */}
-        {hasPreviewArtifact && (
+        {hasPreviewArtifact && (resolvedPreviewUrl ?? url) && (
           <a
-            href={url!}
+            href={resolvedPreviewUrl ?? url!}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open in new tab"
@@ -536,7 +605,7 @@ export function PreviewPanel({
           >
             <AnimatePresence mode="wait">
               <motion.div
-                key={`${reloadKey}-${url ?? "inline"}`}
+                key={iframeDomKey}
                 initial={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.97 }}
@@ -574,7 +643,7 @@ export function PreviewPanel({
 
                 <iframe
                     ref={iframeRef}
-                    key={`${reloadKey}-${url ?? "inline"}`}
+                    key={iframeDomKey}
                     src={hasInline ? undefined : resolvedPreviewUrl ?? undefined}
                     srcDoc={hasInline ? (srcDoc ?? undefined) : undefined}
                     title={appName ?? "App preview"}
@@ -612,16 +681,27 @@ export function PreviewPanel({
           )}
         </AnimatePresence>
 
-        {previewDiagnostics && showIframe ? (
+        {previewDiagnostics && (showIframe || previewUrlInvalid) ? (
           <div
             data-testid="preview-diagnostics"
             data-preview-source={previewDiagnostics.source}
             data-preview-route={previewDiagnostics.selected_route}
-            className="pointer-events-none absolute bottom-1 right-2 z-30 max-w-[min(100%,420px)] truncate rounded-md bg-background/85 px-2 py-0.5 text-[9px] font-mono text-muted-foreground/80 ring-1 ring-border/50 backdrop-blur-sm"
-            title={`source=${previewDiagnostics.source} route=${previewDiagnostics.selected_route} path=${previewDiagnostics.artifact_path} fallback=${previewDiagnostics.fallback_applied}`}
+            data-preview-artifact={previewDiagnostics.artifactId ?? ""}
+            data-preview-was-normalized={previewDiagnostics.wasNormalized ? "true" : "false"}
+            data-preview-was-rejected={previewDiagnostics.wasRejected ? "true" : "false"}
+            className="absolute bottom-1 left-2 right-2 z-30 rounded-lg bg-background/92 px-2.5 py-1.5 text-[9px] font-mono text-muted-foreground ring-1 ring-accent/20 backdrop-blur-sm"
           >
-            {previewDiagnostics.source} · {previewDiagnostics.selected_route}
-            {previewDiagnostics.fallback_applied ? " · spa_fallback" : ""}
+            <p className="truncate">
+              <span className="font-semibold text-foreground">{previewDiagnostics.source}</span>
+              {" · "}
+              route={previewDiagnostics.selected_route}
+              {previewDiagnostics.artifactId ? ` · artifact=${previewDiagnostics.artifactId.slice(0, 8)}…` : ""}
+              {previewDiagnostics.wasNormalized ? " · normalized" : ""}
+              {previewDiagnostics.wasRejected ? ` · rejected:${previewDiagnostics.rejectReason}` : ""}
+            </p>
+            <p className="truncate opacity-80" title={previewDiagnostics.iframeSrc ?? undefined}>
+              iframe: {previewDiagnostics.iframeSrc ?? "—"}
+            </p>
           </div>
         ) : null}
       </div>

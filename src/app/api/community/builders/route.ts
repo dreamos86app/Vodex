@@ -14,7 +14,7 @@ export async function GET() {
     .select(
       "id, username, display_name, avatar_url, community_rank, follower_count, bio",
     )
-    .eq("public_profile_enabled", true)
+    .neq("public_profile_enabled", false)
     .not("username", "is", null)
     .order("follower_count", { ascending: false })
     .limit(48);

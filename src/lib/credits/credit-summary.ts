@@ -8,11 +8,15 @@ export type CreditSummary = Awaited<ReturnType<typeof loadCanonicalCredits>>["bu
   planId: string;
 };
 
-/** Display credits with one decimal (e.g. 26.8 BC). */
+/** Display credits — show decimals only when fractional part is non-zero (e.g. 218 vs 26.8). */
 export function formatCreditAmount(value: number): string {
-  if (!Number.isFinite(value)) return "0.0";
+  if (!Number.isFinite(value)) return "0";
   const rounded = Math.round(value * 10) / 10;
-  return rounded.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const isWhole = Math.abs(rounded - Math.round(rounded)) < 1e-9;
+  return rounded.toLocaleString(undefined, {
+    minimumFractionDigits: isWhole ? 0 : 1,
+    maximumFractionDigits: isWhole ? 0 : 1,
+  });
 }
 
 /** @deprecated Use loadCanonicalCredits directly. */

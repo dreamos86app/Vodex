@@ -148,6 +148,8 @@ import { resolveProjectDisplayName } from "@/lib/projects/provisional-app-name";
 import { notifyProjectCatalogUpdated } from "@/lib/projects/project-catalog-sync";
 import { isUuid } from "@/lib/utils/uuid";
 import { projectPreviewFrameUrl } from "@/lib/preview/preview-frame-url";
+import { clearPreviewClientCache } from "@/lib/preview/clear-preview-client-cache";
+import { resolvePreviewIframeUrl } from "@/lib/preview/preview-iframe-url-resolver";
 import type { PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
 import { previewRuntimeStatusEqual } from "@/lib/preview/preview-runtime-status-equal";
 import {
@@ -1105,6 +1107,22 @@ export function ImmersiveWorkspace({
       });
     },
   });
+
+  const visibleMessages = React.useMemo(() => {
+    const out: typeof messages = [];
+    for (const m of messages) {
+      const prev = out[out.length - 1];
+      if (
+        m.role === "user" &&
+        prev?.role === "user" &&
+        messageText(m).trim() === messageText(prev).trim()
+      ) {
+        continue;
+      }
+      out.push(m);
+    }
+    return out;
+  }, [messages]);
 
   React.useEffect(() => {
     if (status === "ready" || status === "error") unlockStream();
@@ -2758,14 +2776,66 @@ export function ImmersiveWorkspace({
       }
     }
   }, [previewRuntime?.previewRenderable, previewRuntime?.jobId]);
-  const previewFrameUrl = effectiveProjectId
-    ? projectPreviewFrameUrl(
-        effectiveProjectId,
-        previewArtifactLockedRef.current ? undefined : projectDataRefresh,
-        previewRoute,
-        previewArtifactLockedRef.current ?? previewRuntime?.jobId ?? null,
-      )
-    : null;
+  const previewArtifactId =
+    previewArtifactLockedRef.current ?? previewRuntime?.jobId ?? null;
+  const previewCacheBust = previewArtifactLockedRef.current ? undefined : projectDataRefresh;
+
+  const previewUrlResolution = React.useMemo(() => {
+    if (!effectiveProjectId) return null;
+    const generatedFallback = projectPreviewFrameUrl(
+      effectiveProjectId,
+      previewCacheBust,
+      previewRoute,
+      previewArtifactId,
+    );
+    const routeSwitcherUrl = projectPreviewFrameUrl(
+      effectiveProjectId,
+      previewCacheBust,
+      previewRoute,
+      previewArtifactId,
+    );
+    return resolvePreviewIframeUrl({
+      projectId: effectiveProjectId,
+      route: previewRoute,
+      cacheBust: previewCacheBust ?? null,
+      artifactId: previewArtifactId,
+      candidates: [
+        { source: "previewRuntime.previewUrl", url: previewRuntime?.previewUrl },
+        { source: "runtime.previewUrl", url: previewRuntime?.previewUrl },
+        { source: "project.preview_url", url: effectiveProject?.preview_url },
+        { source: "route_switcher", url: routeSwitcherUrl },
+        { source: "generated_fallback", url: generatedFallback },
+      ],
+    });
+  }, [
+    effectiveProjectId,
+    previewCacheBust,
+    previewRoute,
+    previewArtifactId,
+    previewRuntime?.previewUrl,
+    previewRuntime?.jobId,
+    effectiveProject?.preview_url,
+    projectDataRefresh,
+  ]);
+
+  const previewFrameUrl = previewUrlResolution?.normalizedPreviewUrl ?? null;
+
+  const handleClearPreviewCache = React.useCallback(() => {
+    if (!effectiveProjectId) return;
+    clearPreviewClientCache(effectiveProjectId);
+    previewArtifactLockedRef.current = null;
+    setProjectDataRefresh((n) => n + 1);
+    void fetch(`/api/projects/${effectiveProjectId}/preview/import-status`, {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (body) setPreviewRuntime(body as PreviewRuntimeStatusPayload);
+      })
+      .catch(() => undefined);
+  }, [effectiveProjectId]);
+
   const previewSrcRenderable = previewRuntime?.previewRenderable === true;
 
   const appBuildTruth = React.useMemo(() => {
@@ -3286,10 +3356,10 @@ export function ImmersiveWorkspace({
               )}
 
               <AnimatePresence initial={false}>
-                {messages.map((m, i) => {
+                {visibleMessages.map((m, i) => {
                   const isLastAssistant =
                     m.role === "assistant" &&
-                    i === messages.length - 1 &&
+                    i === visibleMessages.length - 1 &&
                     !isBusy;
                   const storedCost = assistantMessageCosts[m.id];
                   const costInfo =
@@ -3624,17 +3694,7 @@ export function ImmersiveWorkspace({
                 }}
                 onKeyDown={(e) => {
                   if (e.key !== "Enter" || e.nativeEvent.isComposing || isComposing) return;
-                  const text = resolveComposerPromptText();
-                  if (e.shiftKey) {
-                    e.preventDefault();
-                    if (!composerHasMeaningfulText(text)) {
-                      notifySubmitBlocked("empty");
-                      return;
-                    }
-                    if (submitDisabledReason === "queue_full") return;
-                    void runSubmitRef.current("enter", text, { queueOnly: true });
-                    return;
-                  }
+                  if (e.shiftKey) return;
                   if (!canSendPrompt) {
                     e.preventDefault();
                     return;
@@ -3790,6 +3850,9 @@ export function ImmersiveWorkspace({
               <div className="relative h-full min-h-0">
               <PreviewPanel
                 url={previewFrameUrl}
+                projectId={effectiveProjectId}
+                urlResolution={previewUrlResolution}
+                onClearPreviewCache={effectiveProjectId ? handleClearPreviewCache : undefined}
                 appName={effectiveProject?.name ?? null}
                 buildActive={buildActive && !previewRuntime?.jobId}
                 thinking={buildActive || (isBusy && !previewSrcRenderable)}

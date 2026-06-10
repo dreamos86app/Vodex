@@ -45,7 +45,8 @@ const checks = {
   },
   "credits-one-decimal": () => {
     const cs = read("src/lib/credits/credit-summary.ts");
-    assert(cs.includes("minimumFractionDigits: 1"), "credits must use 1 decimal");
+    assert(cs.includes("minimumFractionDigits"), "credits must format fractional digits");
+    assert(cs.includes("isWhole"), "credits must hide .0 for whole numbers");
     const cv = read("src/components/chat/chat-view.tsx");
     assert(cv.includes("DISCUSS_FLAT_CREDITS"), "chat must deduct discuss flat credits");
   },

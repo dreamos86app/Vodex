@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Loader2, Share2, Flag, UserPlus, UserMinus } from "lucide-react";
+import { Loader2, Share2, Flag, UserPlus, UserMinus, Sparkles, AppWindow } from "lucide-react";
+import { ReportDialog } from "@/components/community/report-dialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { UserRankBadge } from "@/components/community/user-rank-badge";
@@ -33,6 +34,7 @@ export function PublicBuilderProfileView({ username }: { username: string }) {
   const [profile, setProfile] = React.useState<PublicProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [followBusy, setFollowBusy] = React.useState(false);
+  const [reportOpen, setReportOpen] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -183,34 +185,76 @@ export function PublicBuilderProfileView({ username }: { username: string }) {
             >
               <Share2 className="size-3.5" /> Share
             </Button>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={() => setReportOpen(true)}>
               <Flag className="size-3.5" /> Report
             </Button>
           </div>
         </div>
       </motion.div>
 
-      {(profile.apps?.length ?? 0) > 0 ? (
-        <section className="space-y-3">
+      <section className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rank</p>
+          <p className="mt-1 text-[15px] font-semibold text-foreground">{profile.rankLabel}</p>
+        </div>
+        <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Lifetime visits</p>
+          <p className="mt-1 text-[15px] font-semibold text-foreground">{profile.profileVisitCount.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Apps shared</p>
+          <p className="mt-1 text-[15px] font-semibold text-foreground">{(profile.apps?.length ?? 0).toLocaleString()}</p>
+        </div>
+      </section>
+
+      <section className="rounded-[var(--radius-xl)] bg-gradient-to-br from-accent/5 via-background to-violet-500/5 p-5 ring-1 ring-border">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 text-accent" />
+          <h2 className="text-[14px] font-semibold text-foreground">Builder spotlight</h2>
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+          {profile.bio?.trim()
+            ? profile.bio
+            : `${profile.displayName} is building on Vodex. Follow for updates or explore their shared apps below.`}
+        </p>
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <AppWindow className="size-4 text-accent" />
           <h2 className="text-[14px] font-semibold text-foreground">Published apps</h2>
+        </div>
+        {(profile.apps?.length ?? 0) > 0 ? (
           <div className="grid gap-3 sm:grid-cols-2">
             {(profile.apps ?? []).map((app) => (
-              <div key={app.id} className="overflow-hidden rounded-xl ring-1 ring-border">
+              <div key={app.id} className="overflow-hidden rounded-xl bg-surface ring-1 ring-border shadow-sm">
                 <iframe
                   title={`${app.name} preview`}
                   src={app.previewUrl}
-                  className="h-44 w-full border-0 bg-muted/20"
+                  className="h-48 w-full border-0 bg-muted/20"
                   sandbox="allow-scripts allow-same-origin"
                 />
-                <div className="border-t border-border px-3 py-2">
-                  <p className="text-[13px] font-medium text-foreground">{app.name}</p>
+                <div className="border-t border-border px-3 py-2.5">
+                  <p className="text-[13px] font-semibold text-foreground">{app.name}</p>
                   <p className="text-[11px] text-muted-foreground">View-only preview inside Vodex</p>
                 </div>
               </div>
             ))}
           </div>
-        </section>
-      ) : null}
+        ) : (
+          <p className="rounded-xl bg-muted/30 px-4 py-6 text-center text-[13px] text-muted-foreground ring-1 ring-border/60">
+            No public apps yet. Enable &quot;Show apps on profile&quot; in Settings after publishing or sharing to community.
+          </p>
+        )}
+      </section>
+
+      <ReportDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="profile"
+        targetId={profile.id ?? profile.username}
+        targetLabel={profile.displayName}
+      />
     </div>
   );
 }

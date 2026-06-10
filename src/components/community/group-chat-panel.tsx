@@ -7,7 +7,9 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { Avatar } from "@/components/ui/avatar";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { fetchProfileNameMap, profileDisplayName } from "@/lib/community/profile-display-name";
+import { fetchProfileNameMap, fetchProfilePreviewMap, profileDisplayName } from "@/lib/community/profile-display-name";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 
 type ReactionRow = { emoji: string; user_id: string };
 
@@ -19,8 +21,11 @@ type MessageRow = {
   parent_message_id?: string | null;
   author_name?: string;
   author_avatar?: string | null;
+  author_username?: string | null;
   reactions?: ReactionRow[];
 };
+
+type ReactorPreview = { userId: string; name: string; avatar: string | null; username: string | null };
 
 const QUICK_REACTIONS = ["👍", "❤️", "🔥", "😂", "🎉"];
 
@@ -45,15 +50,25 @@ export function GroupChatPanel({
   const channelRef = React.useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [unreadCount, setUnreadCount] = React.useState(0);
   const [reactionViewer, setReactionViewer] = React.useState<{ messageId: string; emoji: string } | null>(null);
-  const [reactorNames, setReactorNames] = React.useState<string[]>([]);
+  const [reactors, setReactors] = React.useState<ReactorPreview[]>([]);
+  const initialScrollDoneRef = React.useRef(false);
 
   const enrichMessages = React.useCallback(
     async (rows: MessageRow[]) => {
-      const names = await fetchProfileNameMap(supabase, rows.map((m) => m.user_id));
-      return rows.map((m) => ({
-        ...m,
-        author_name: m.user_id === user?.id ? "You" : names.get(m.user_id) ?? "Member",
-      }));
+      const ids = rows.map((m) => m.user_id);
+      const [names, previews] = await Promise.all([
+        fetchProfileNameMap(supabase, ids),
+        fetchProfilePreviewMap(supabase, ids),
+      ]);
+      return rows.map((m) => {
+        const preview = previews.get(m.user_id);
+        return {
+          ...m,
+          author_name: m.user_id === user?.id ? "You" : names.get(m.user_id) ?? "Member",
+          author_avatar: preview?.avatar_url ?? null,
+          author_username: preview?.username ?? null,
+        };
+      });
     },
     [supabase, user?.id],
   );
@@ -90,6 +105,10 @@ export function GroupChatPanel({
       setMessages(enriched);
     }
   }, [enrichMessages, groupId, supabase]);
+
+  React.useEffect(() => {
+    initialScrollDoneRef.current = false;
+  }, [groupId]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -133,13 +152,20 @@ export function GroupChatPanel({
   }, []);
 
   React.useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || loading) return;
+    if (!initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
+      el.scrollTop = 0;
+      return;
+    }
     if (isNearBottom()) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      el.scrollTop = el.scrollHeight;
       setUnreadCount(0);
     } else {
       setUnreadCount((n) => n + 1);
     }
-  }, [messages.length, typingUsers.length, isNearBottom]);
+  }, [messages.length, typingUsers.length, isNearBottom, loading]);
 
   React.useEffect(() => {
     if (!reactionViewer) return;
@@ -147,9 +173,21 @@ export function GroupChatPanel({
     const userIds = (msg?.reactions ?? [])
       .filter((r) => r.emoji === reactionViewer.emoji)
       .map((r) => r.user_id);
-    void fetchProfileNameMap(supabase, userIds).then((map) => {
-      setReactorNames(userIds.map((id) => (id === user?.id ? "You" : map.get(id) ?? "Member")));
-    });
+    void Promise.all([fetchProfileNameMap(supabase, userIds), fetchProfilePreviewMap(supabase, userIds)]).then(
+      ([names, previews]) => {
+        setReactors(
+          userIds.map((id) => {
+            const preview = previews.get(id);
+            return {
+              userId: id,
+              name: id === user?.id ? "You" : names.get(id) ?? "Member",
+              avatar: preview?.avatar_url ?? null,
+              username: preview?.username ?? null,
+            };
+          }),
+        );
+      },
+    );
   }, [reactionViewer, messages, supabase, user?.id]);
 
   async function toggleReaction(messageId: string, emoji: string) {
@@ -246,7 +284,8 @@ export function GroupChatPanel({
           <button
             type="button"
             onClick={() => {
-              bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+              const el = scrollRef.current;
+              if (el) el.scrollTop = el.scrollHeight;
               setUnreadCount(0);
             }}
             className="sticky top-2 z-10 mx-auto mb-2 block rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-white shadow"
@@ -268,10 +307,16 @@ export function GroupChatPanel({
                 return acc;
               }, {});
               return (
-                <li key={m.id} className={cn("flex gap-2", mine ? "flex-row-reverse" : "flex-row")}>
-                  {!mine ? <Avatar name={m.author_name ?? "Member"} size="sm" /> : null}
+                <li key={m.id} className={cn("flex gap-2", mine ? "flex-row-reverse" : "flex-row", parent && !mine && "ml-5 border-l-2 border-accent/25 pl-3")}>
+                  <Avatar name={m.author_name ?? "Member"} src={m.author_avatar ?? (mine ? profile?.avatar_url : undefined)} size="sm" />
                   <div className={cn("max-w-[80%] space-y-1", mine && "items-end")}>
-                    {!mine ? <p className="text-[10px] font-medium text-muted-foreground">{m.author_name}</p> : null}
+                    {m.author_username && !mine ? (
+                      <Link href={`/builders/${m.author_username}`} className="text-[10px] font-medium text-muted-foreground hover:text-accent">
+                        {m.author_name}
+                      </Link>
+                    ) : (
+                      <p className="text-[10px] font-medium text-muted-foreground">{m.author_name}</p>
+                    )}
                     {parent ? (
                       <p className="text-[10px] text-muted-foreground">
                         <span className="font-medium">{m.author_name}</span>
@@ -339,28 +384,56 @@ export function GroupChatPanel({
         </div>
       ) : null}
 
-      {reactionViewer ? (
-        <div className="border-t border-border bg-muted/30 px-3 py-2 text-[11px]">
-          <div className="flex items-center justify-between">
-            <span className="font-medium">{reactionViewer.emoji} reactions</span>
-            <button type="button" onClick={() => setReactionViewer(null)} className="text-muted-foreground">Close</button>
-          </div>
-          <ul className="mt-1 space-y-0.5">
-            {reactorNames.map((name, i) => (
-              <li key={i} className="flex items-center justify-between">
-                <span>{name}</span>
-                {name === "You" ? (
-                  <button type="button" onClick={() => void toggleReaction(reactionViewer.messageId, reactionViewer.emoji)} className="text-destructive">Remove</button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {reactionViewer ? (
+          <motion.div
+            initial={{ y: 24, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0 }}
+            className="border-t-2 border-accent/40 bg-white px-4 py-3 shadow-[0_-8px_30px_rgba(79,124,255,0.12)] dark:bg-background"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[12px] font-semibold text-foreground">
+                <span className="mr-1.5 text-lg">{reactionViewer.emoji}</span>
+                Reactions
+              </p>
+              <button type="button" onClick={() => setReactionViewer(null)} className="text-[11px] text-muted-foreground hover:text-foreground">
+                Close
+              </button>
+            </div>
+            <ul className="max-h-40 space-y-2 overflow-y-auto">
+              {reactors.map((r) => (
+                <li key={r.userId} className="flex items-center justify-between gap-2 rounded-xl bg-accent/5 px-2.5 py-2 ring-1 ring-accent/15">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Avatar name={r.name} src={r.avatar ?? undefined} size="sm" />
+                    {r.username && r.userId !== user?.id ? (
+                      <Link href={`/builders/${r.username}`} className="truncate text-[12px] font-medium hover:text-accent">
+                        {r.name}
+                      </Link>
+                    ) : (
+                      <span className="truncate text-[12px] font-medium">{r.name}</span>
+                    )}
+                  </div>
+                  {r.userId === user?.id ? (
+                    <button
+                      type="button"
+                      onClick={() => void toggleReaction(reactionViewer.messageId, reactionViewer.emoji)}
+                      className="shrink-0 text-[11px] font-medium text-destructive"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <form onSubmit={(e) => { e.preventDefault(); void send(); }} className="flex gap-2 border-t border-border px-3 py-3">
-        <input
+        <textarea
           value={body}
+          rows={1}
           onChange={(e) => {
             setBody(e.target.value);
             if (channelRef.current && user) {
@@ -371,8 +444,14 @@ export function GroupChatPanel({
               });
             }
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
           placeholder="Message the group…"
-          className="min-w-0 flex-1 rounded-xl bg-background px-3 py-2.5 text-[13px] ring-1 ring-border"
+          className="min-w-0 flex-1 resize-none rounded-xl bg-background px-3 py-2.5 text-[13px] ring-1 ring-border"
         />
         <button type="submit" disabled={sending || !body.trim()} className="rounded-xl bg-accent px-3 py-2.5 text-white disabled:opacity-50">
           <Send className="size-4" />

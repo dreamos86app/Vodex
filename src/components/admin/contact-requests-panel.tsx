@@ -45,6 +45,7 @@ export function ContactRequestsPanel({
 }: Props) {
   const [requests, setRequests] = React.useState<ContactRequestRow[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [mainSection, setMainSection] = React.useState<"gmail" | "contacts" | "reports">("contacts");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [sourceFilter, setSourceFilter] = React.useState("all");
   const [priorityFilter, setPriorityFilter] = React.useState("all");
@@ -124,6 +125,16 @@ export function ContactRequestsPanel({
     }
   }
 
+  const sectioned = requests.filter((r) => {
+    const kind = (r.kind ?? "").toLowerCase();
+    const source = (r.source ?? "").toLowerCase();
+    if (mainSection === "reports") return kind === "report" || source.includes("report");
+    if (mainSection === "gmail") {
+      return source.includes("gmail") || source.includes("email_inbound") || source.includes("inbound");
+    }
+    return kind !== "report" && !source.includes("report") && !source.includes("gmail") && !source.includes("email_inbound");
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -151,6 +162,22 @@ export function ContactRequestsPanel({
           ) : null}
         </div>
       ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        {(["gmail", "contacts", "reports"] as const).map((section) => (
+          <button
+            key={section}
+            type="button"
+            onClick={() => setMainSection(section)}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-[12px] font-semibold capitalize ring-1 transition",
+              mainSection === section ? "bg-accent text-white ring-accent" : "ring-border text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {section}
+          </button>
+        ))}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <Input
@@ -197,7 +224,7 @@ export function ContactRequestsPanel({
               <p className="text-[13px] text-muted-foreground">No contact requests match these filters</p>
             </div>
           ) : (
-            requests.map((c) => (
+            sectioned.map((c) => (
               <button
                 key={c.id}
                 type="button"

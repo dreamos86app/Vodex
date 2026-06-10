@@ -3,6 +3,12 @@ export type ProfileNameRow = {
   full_name: string | null;
   email?: string | null;
   username?: string | null;
+  avatar_url?: string | null;
+};
+
+export type ProfilePreviewRow = ProfileNameRow & {
+  avatar_url: string | null;
+  username: string | null;
 };
 
 export function profileDisplayName(
@@ -27,6 +33,30 @@ export async function fetchProfileNameMap(
   const { data } = await supabase.from("profiles").select("id, full_name, email, username").in("id", unique);
   for (const p of data ?? []) {
     map.set(p.id, profileDisplayName(p));
+  }
+  return map;
+}
+
+export async function fetchProfilePreviewMap(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  userIds: string[],
+): Promise<Map<string, ProfilePreviewRow>> {
+  const map = new Map<string, ProfilePreviewRow>();
+  const unique = [...new Set(userIds.filter(Boolean))];
+  if (!unique.length) return map;
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, username, avatar_url")
+    .in("id", unique);
+  for (const p of data ?? []) {
+    map.set(p.id, {
+      id: p.id,
+      full_name: p.full_name ?? null,
+      email: p.email ?? null,
+      username: p.username ?? null,
+      avatar_url: p.avatar_url ?? null,
+    });
   }
   return map;
 }
