@@ -901,6 +901,7 @@
     "verify:billing-production-flow": "node scripts/verify-billing-production-flow.mjs",
     "verify:preview-diagnostics": "npx tsx scripts/run-preview-diagnostics.ts",
     "production-readiness-report": "node scripts/production-readiness-report.mjs",
+    "verify:production-readiness-preview-parse": "node scripts/verify-production-readiness-preview-parse.mjs",
     "verify:polling": "node scripts/verify-polling.mjs",
     "verify:pricing": "node scripts/verify-pricing.mjs",
     "verify:analytics": "node scripts/verify-analytics.mjs",

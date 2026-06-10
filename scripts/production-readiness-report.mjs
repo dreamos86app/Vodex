@@ -12,6 +12,7 @@ import {
   arg,
   env,
 } from "./lib/production-validation.mjs";
+import { extractFirstJsonObject, isPreviewDiagnosticsPass } from "./lib/extract-json-object.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const projectId = arg("--project", DEFAULT_PREVIEW_PROJECT_ID);
@@ -20,7 +21,7 @@ function runNpm(script) {
   const r = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", script], {
     cwd: root,
     encoding: "utf8",
-    env: process.env,
+    env: env(),
     shell: process.platform === "win32",
   });
   return { ok: r.status === 0, stdout: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
@@ -34,23 +35,28 @@ async function evaluatePreview() {
     return { pass: false, detail: "missing Supabase credentials" };
   }
 
-  const r = spawnSync("npx", ["tsx", "scripts/run-preview-diagnostics.ts", "--project", projectId], {
-    cwd: root,
-    encoding: "utf8",
-    env: process.env,
-    shell: process.platform === "win32",
-  });
-  const out = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
+  const r = spawnSync(
+    "npx",
+    ["tsx", "scripts/lib/fetch-preview-diagnostics.ts", "--project", projectId, "--compact"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: e,
+      shell: process.platform === "win32",
+    },
+  );
+
   if (r.status !== 0) {
-    return { pass: false, detail: out.slice(0, 400) || "diagnostics script failed" };
+    const errText = `${r.stderr ?? ""}${r.stdout ?? ""}`.trim();
+    return { pass: false, detail: errText.slice(0, 400) || "diagnostics loader failed" };
   }
 
-  let report;
-  try {
-    const jsonStart = out.indexOf("{");
-    report = JSON.parse(out.slice(jsonStart));
-  } catch {
-    return { pass: false, detail: "could not parse diagnostics JSON" };
+  const report = extractFirstJsonObject(r.stdout ?? "");
+  if (!report) {
+    return {
+      pass: false,
+      detail: `could not parse diagnostics JSON (stdout bytes=${(r.stdout ?? "").length})`,
+    };
   }
 
   const required = [
@@ -69,6 +75,7 @@ async function evaluatePreview() {
     "hydration_path_count",
     "current_iframe_url",
     "rebuild_required",
+    "issues",
   ];
   const missing = required.filter((k) => !(k in report));
   if (missing.length) {
@@ -82,17 +89,13 @@ async function evaluatePreview() {
     return { pass: false, detail: "GET /api/projects/:id/preview/diagnostics route missing" };
   }
 
-  const healthy =
-    report.preview_renderable === true &&
-    report.rebuild_required !== true &&
-    report.latest_worker_status !== "failed" &&
-    (report.unsafe_path_count ?? 0) === 0;
+  const healthy = isPreviewDiagnosticsPass(report);
 
   return {
     pass: healthy,
     detail: healthy
-      ? `renderable, job=${report.latest_worker_status}, iframe configured`
-      : `rebuild_required=${report.rebuild_required}, renderable=${report.preview_renderable}, issues=${(report.issues ?? []).join("; ") || "none"}`,
+      ? `renderable, job=${report.latest_worker_status}, 0 leaks, 0 issues`
+      : `renderable=${report.preview_renderable}, rebuild_required=${report.rebuild_required}, unsafe=${report.unsafe_path_count}, hydration=${report.hydration_path_count}, issues=${(report.issues ?? []).join("; ") || "none"}`,
     report,
   };
 }
