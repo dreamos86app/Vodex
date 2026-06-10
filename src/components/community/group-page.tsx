@@ -99,8 +99,8 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userIds }),
         });
-        const pj = (await pr.json()) as { presences?: Record<string, { status?: string }> };
-        presenceMap = new Map(Object.entries(pj.presences ?? {}).map(([id, v]) => [id, v.status ?? "offline"]));
+        const pj = (await pr.json()) as { statuses?: Record<string, string> };
+        presenceMap = new Map(Object.entries(pj.statuses ?? {}).map(([id, status]) => [id, status ?? "offline"]));
       } catch { /* optional */ }
     }
 
@@ -117,6 +117,10 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
   React.useEffect(() => {
     void load();
   }, [load]);
+
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [groupId]);
 
   async function handleJoin() {
     if (!user) { router.push("/auth/login"); return; }
@@ -192,9 +196,9 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
       <motion.div variants={variants.fadeUp} initial="hidden" animate="show" className="overflow-hidden rounded-[var(--radius-2xl)] bg-surface ring-1 ring-border">
         <div className="h-32 w-full sm:h-40" style={{ background: group.banner_color }} />
         <div className="relative px-5 pb-5 sm:px-6">
-          <div className="relative -mt-8 mb-4 flex items-end justify-between gap-4 sm:-mt-10">
+          <div className="mt-4 mb-4 flex flex-wrap items-center justify-between gap-4">
             <div
-              className="flex size-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-2 ring-accent sm:size-20"
+              className="flex size-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-1 ring-accent sm:size-20"
               style={{ background: group.icon_url ? undefined : "rgba(79,124,255,0.12)" }}
             >
               {group.icon_url ? (
@@ -203,7 +207,7 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
                 <Users className="size-8 text-accent/70" strokeWidth={1.5} />
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 pt-6">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => setShowMembers(true)}>
                 <Users className="size-3.5" /> Members
               </Button>
@@ -232,7 +236,7 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <GroupCategoryBadges categories={parseGroupCategories(group)} />
-              <span className="text-[12px] text-muted-foreground">{group.member_count} members</span>
+              <span className="text-[12px] text-muted-foreground">{members.length || group.member_count} members</span>
             </div>
             {group.description ? <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{group.description}</p> : null}
           </div>
@@ -255,7 +259,14 @@ export function GroupPageClient({ groupId }: { groupId: string }) {
 
       <AnimatePresence>
         {showMembers ? (
-          <MembersDrawer members={members} onClose={() => setShowMembers(false)} />
+          <MembersDrawer
+            members={members}
+            groupId={groupId}
+            creatorId={group.creator_id}
+            currentUserId={user?.id}
+            onClose={() => setShowMembers(false)}
+            onChanged={() => void load()}
+          />
         ) : null}
       </AnimatePresence>
 
@@ -284,7 +295,54 @@ function presenceColor(status: string) {
   return "bg-muted-foreground/40";
 }
 
-function MembersDrawer({ members, onClose }: { members: GroupMember[]; onClose: () => void }) {
+function MembersDrawer({
+  members,
+  groupId,
+  creatorId,
+  currentUserId,
+  onClose,
+  onChanged,
+}: {
+  members: GroupMember[];
+  groupId: string;
+  creatorId: string | null;
+  currentUserId?: string;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const canModerate = Boolean(currentUserId && creatorId === currentUserId);
+
+  async function kickMember(userId: string) {
+    const res = await fetch(`/api/community/groups/${groupId}/members/${userId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) return;
+    onChanged();
+  }
+
+  async function banMember(userId: string) {
+    const res = await fetch(`/api/community/groups/${groupId}/sanctions`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, sanctionType: "ban", reason: "Removed by moderator" }),
+    });
+    if (!res.ok) return;
+    onChanged();
+  }
+
+  async function transferOwnership(userId: string) {
+    const res = await fetch(`/api/community/groups/${groupId}/transfer`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    if (!res.ok) return;
+    onChanged();
+  }
+
   return (
     <div className="fixed inset-0 z-[1500] flex justify-end">
       <button type="button" className="absolute inset-0 bg-foreground/30" onClick={onClose} aria-label="Close" />
@@ -296,6 +354,9 @@ function MembersDrawer({ members, onClose }: { members: GroupMember[]; onClose: 
         <ul className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2">
           {members.map((m) => {
             const name = profileDisplayName(m.profiles ?? null);
+            const profileHref = m.profiles?.username ? `/builders/${m.profiles.username}` : null;
+            const isSelf = m.user_id === currentUserId;
+            const isOwner = m.user_id === creatorId;
             return (
               <li key={m.user_id} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5 ring-1 ring-border">
                 <div className="relative">
@@ -303,9 +364,22 @@ function MembersDrawer({ members, onClose }: { members: GroupMember[]; onClose: 
                   <span className={cn("absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-background", presenceColor(m.presence ?? "offline"))} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium">{name}</p>
-                  <p className="text-[11px] capitalize text-muted-foreground">{m.role}</p>
+                  {profileHref ? (
+                    <Link href={profileHref} className="truncate text-[13px] font-medium hover:text-accent">
+                      {name}
+                    </Link>
+                  ) : (
+                    <p className="truncate text-[13px] font-medium">{name}</p>
+                  )}
+                  <p className="text-[11px] capitalize text-muted-foreground">{m.role}{isOwner ? " · Owner" : ""}</p>
                 </div>
+                {canModerate && !isSelf && !isOwner ? (
+                  <div className="flex shrink-0 gap-1">
+                    <button type="button" onClick={() => void kickMember(m.user_id)} className="rounded-lg px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted">Kick</button>
+                    <button type="button" onClick={() => void banMember(m.user_id)} className="rounded-lg px-2 py-1 text-[10px] text-destructive hover:bg-destructive/10">Ban</button>
+                    <button type="button" onClick={() => void transferOwnership(m.user_id)} className="rounded-lg px-2 py-1 text-[10px] text-accent hover:bg-accent/10">Make owner</button>
+                  </div>
+                ) : null}
               </li>
             );
           })}

@@ -37,7 +37,9 @@ export type NotificationKind =
   | "comment_liked"
   | "user_followed"
   | "group_invite"
-  | "group_mention";
+  | "group_mention"
+  | "group_kicked"
+  | "group_banned";
 
 export type NotificationInboxTab =
   | "main"
@@ -79,6 +81,8 @@ const MAIN_KINDS = new Set<NotificationKind>([
   "user_followed",
   "group_invite",
   "group_mention",
+  "group_kicked",
+  "group_banned",
 ]);
 
 const TAB_KINDS: Record<Exclude<NotificationInboxTab, "main" | "all">, Set<NotificationKind>> = {

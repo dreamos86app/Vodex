@@ -41,7 +41,11 @@ export function GroupChatPanel({
   const [typingUsers, setTypingUsers] = React.useState<{ userId: string; name: string }[]>([]);
   const [reactionPickerFor, setReactionPickerFor] = React.useState<string | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
   const channelRef = React.useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+  const [reactionViewer, setReactionViewer] = React.useState<{ messageId: string; emoji: string } | null>(null);
+  const [reactorNames, setReactorNames] = React.useState<string[]>([]);
 
   const enrichMessages = React.useCallback(
     async (rows: MessageRow[]) => {
@@ -122,9 +126,31 @@ export function GroupChatPanel({
     };
   }, [enrichMessages, groupId, loadMessages, supabase, user?.id]);
 
+  const isNearBottom = React.useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
+
   React.useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, typingUsers.length]);
+    if (isNearBottom()) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      setUnreadCount(0);
+    } else {
+      setUnreadCount((n) => n + 1);
+    }
+  }, [messages.length, typingUsers.length, isNearBottom]);
+
+  React.useEffect(() => {
+    if (!reactionViewer) return;
+    const msg = messages.find((m) => m.id === reactionViewer.messageId);
+    const userIds = (msg?.reactions ?? [])
+      .filter((r) => r.emoji === reactionViewer.emoji)
+      .map((r) => r.user_id);
+    void fetchProfileNameMap(supabase, userIds).then((map) => {
+      setReactorNames(userIds.map((id) => (id === user?.id ? "You" : map.get(id) ?? "Member")));
+    });
+  }, [reactionViewer, messages, supabase, user?.id]);
 
   async function toggleReaction(messageId: string, emoji: string) {
     if (!user) return;
@@ -215,7 +241,19 @@ export function GroupChatPanel({
         <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Live</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+        {unreadCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+              setUnreadCount(0);
+            }}
+            className="sticky top-2 z-10 mx-auto mb-2 block rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-white shadow"
+          >
+            {unreadCount} new message{unreadCount === 1 ? "" : "s"}
+          </button>
+        ) : null}
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
         ) : messages.length === 0 ? (
@@ -242,14 +280,28 @@ export function GroupChatPanel({
                       </p>
                     ) : null}
                     <div className={cn("rounded-2xl px-3 py-2 text-[13px] leading-relaxed", mine ? "bg-accent text-white" : "bg-muted/50 text-foreground")}>
-                      <p>{m.body}</p>
+                      <p>
+                        {m.body.split(/(@[a-zA-Z0-9_]{2,32})/g).map((part, i) =>
+                          part.startsWith("@") ? (
+                            <span key={i} className={cn("font-semibold", mine ? "text-white underline" : "text-accent")}>{part}</span>
+                          ) : (
+                            <React.Fragment key={i}>{part}</React.Fragment>
+                          ),
+                        )}
+                      </p>
                       <p className={cn("mt-1 text-[9px] opacity-70", mine ? "text-right text-white/80" : "text-muted-foreground")}>
                         {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </p>
                     </div>
                     <div className={cn("flex flex-wrap items-center gap-1", mine && "justify-end")}>
                       {Object.entries(reactionCounts).map(([emoji, count]) => (
-                        <button key={emoji} type="button" onClick={() => void toggleReaction(m.id, emoji)} className="rounded-full bg-background/80 px-1.5 py-0.5 text-[11px] ring-1 ring-border">
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setReactionViewer({ messageId: m.id, emoji })}
+                          onContextMenu={(e) => { e.preventDefault(); void toggleReaction(m.id, emoji); }}
+                          className="rounded-full bg-background/80 px-1.5 py-0.5 text-[11px] ring-1 ring-border"
+                        >
                           {emoji} {count}
                         </button>
                       ))}
@@ -284,6 +336,25 @@ export function GroupChatPanel({
         <div className="flex items-center justify-between border-t border-border bg-muted/30 px-3 py-1.5 text-[11px]">
           <span>Replying to <strong>{replyTo.author_name}</strong></span>
           <button type="button" onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground">Cancel</button>
+        </div>
+      ) : null}
+
+      {reactionViewer ? (
+        <div className="border-t border-border bg-muted/30 px-3 py-2 text-[11px]">
+          <div className="flex items-center justify-between">
+            <span className="font-medium">{reactionViewer.emoji} reactions</span>
+            <button type="button" onClick={() => setReactionViewer(null)} className="text-muted-foreground">Close</button>
+          </div>
+          <ul className="mt-1 space-y-0.5">
+            {reactorNames.map((name, i) => (
+              <li key={i} className="flex items-center justify-between">
+                <span>{name}</span>
+                {name === "You" ? (
+                  <button type="button" onClick={() => void toggleReaction(reactionViewer.messageId, reactionViewer.emoji)} className="text-destructive">Remove</button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 

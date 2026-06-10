@@ -372,7 +372,7 @@ function CreateGroupModal({
         />
 
         <form onSubmit={handleSubmit} className="space-y-4 p-5">
-          <div className="flex items-end gap-4 -mt-2">
+          <div className="flex items-end gap-4 mt-4">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -652,6 +652,7 @@ function GroupsTab({ onCreateGroup, refreshKey }: { onCreateGroup: () => void; r
   const [error, setError] = React.useState<string | null>(null);
   const [retryKey, setRetryKey] = React.useState(0);
   const [joinedIds, setJoinedIds] = React.useState<Set<string>>(new Set());
+  const [groupFilter, setGroupFilter] = React.useState<"discover" | "mine">("discover");
   const [joiningId, setJoiningId] = React.useState<string | null>(null);
   const [leaveGroupId, setLeaveGroupId] = React.useState<string | null>(null);
   const router = useRouter();
@@ -751,9 +752,28 @@ function GroupsTab({ onCreateGroup, refreshKey }: { onCreateGroup: () => void; r
     );
   }
 
+  const visibleGroups =
+    groupFilter === "mine" ? groups.filter((g) => joinedIds.has(g.id)) : groups;
+
   return (
     <div className="space-y-4">
-      {groups.length === 0 ? (
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setGroupFilter("discover")}
+          className={cn("rounded-full px-3 py-1 text-[12px] font-medium ring-1", groupFilter === "discover" ? "bg-accent text-white ring-accent" : "ring-border text-muted-foreground")}
+        >
+          Discover
+        </button>
+        <button
+          type="button"
+          onClick={() => setGroupFilter("mine")}
+          className={cn("rounded-full px-3 py-1 text-[12px] font-medium ring-1", groupFilter === "mine" ? "bg-accent text-white ring-accent" : "ring-border text-muted-foreground")}
+        >
+          My groups
+        </button>
+      </div>
+      {visibleGroups.length === 0 ? (
         <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface py-14 text-center ring-1 ring-border px-6">
           <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
             <Users className="size-7 text-accent" strokeWidth={1.5} />
@@ -769,7 +789,7 @@ function GroupsTab({ onCreateGroup, refreshKey }: { onCreateGroup: () => void; r
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {groups.map((g) => {
+          {visibleGroups.map((g) => {
             const isJoined = joinedIds.has(g.id);
             const isOwner = g.creator_id === user?.id;
             return (
@@ -1131,7 +1151,7 @@ export function CommunityView() {
           ) : discussions.length === 0 ? (
             <EmptyDiscussions onStart={() => setShowCreate(true)} />
           ) : (
-            <div className="overflow-hidden rounded-[var(--radius-xl)] bg-surface shadow-[var(--shadow-card)] ring-1 ring-border divide-y divide-border/60">
+            <div className="grid gap-3 md:grid-cols-2">
               {discussions.map((disc) => (
                 <DiscussionCard
                   key={disc.id}

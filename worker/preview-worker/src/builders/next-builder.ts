@@ -6,11 +6,14 @@ import { resolveOutputDir } from "../sandbox.js";
 import { npmInstall, npmRunBuild } from "./run-command.js";
 import { injectPreviewEnvShims, detectLegacy } from "../adapters/base44-adapter.js";
 import { ensureNextStaticExportOnDisk } from "./next-static-export.js";
+import { stripPreviewPlatformPathsFromText } from "../preview-artifact-sanitize.js";
+import { injectPreviewVirtualHistory } from "../inject-preview-shim.js";
 
 export async function buildNext(
   root: string,
   framework: FrameworkInfo,
   files: WorkspaceFile[],
+  projectId: string,
 ): Promise<
   | { ok: true; outputDir: string; logs: string }
   | { ok: false; logs: string; blockedReason: string }
@@ -49,9 +52,26 @@ export async function buildNext(
   const indexPath = path.join(outDir, "index.html");
   try {
     await fs.access(indexPath);
-    let html = await fs.readFile(indexPath, "utf8");
-    html = injectPreviewEnvShims(html, detectLegacy(files));
-    await fs.writeFile(indexPath, html, "utf8");
+    async function walkHtml(dir: string): Promise<string[]> {
+      const found: string[] = [];
+      for (const ent of await fs.readdir(dir, { withFileTypes: true })) {
+        const abs = path.join(dir, ent.name);
+        if (ent.isDirectory()) found.push(...(await walkHtml(abs)));
+        else if (ent.isFile() && ent.name.toLowerCase().endsWith(".html")) found.push(abs);
+      }
+      return found;
+    }
+    const htmlFiles = await walkHtml(outDir);
+    const legacy = detectLegacy(files);
+    for (const htmlPath of htmlFiles) {
+      const rel = path.relative(outDir, htmlPath).replace(/\\/g, "/");
+      const routePath = rel === "index.html" ? "/" : `/${rel.replace(/index\.html$/i, "").replace(/\/$/, "")}`;
+      let html = await fs.readFile(htmlPath, "utf8");
+      html = stripPreviewPlatformPathsFromText(html, projectId);
+      html = injectPreviewEnvShims(html, legacy);
+      html = injectPreviewVirtualHistory(html, routePath || "/");
+      await fs.writeFile(htmlPath, html, "utf8");
+    }
     return { ok: true, outputDir: outDir, logs };
   } catch {
     return {

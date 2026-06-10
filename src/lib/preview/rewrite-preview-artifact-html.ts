@@ -1,6 +1,7 @@
 import { injectPreviewRouterShim } from "@/lib/preview/inject-preview-router-shim";
 import { buildInternalPreviewHtmlUrl } from "@/lib/preview/internal-preview-url";
 import { stripPreviewPlatformPathsFromText } from "@/lib/preview/strip-preview-platform-paths";
+import { sanitizePreviewDocument } from "@/lib/preview/preview-html-sanitizer";
 
 export {
   assertInternalPreviewUrl,
@@ -64,7 +65,7 @@ export function rewritePreviewArtifactHtml(
 
   out = rewriteAbsoluteVodexLinksInHtml(out);
   out = injectPreviewRouterShim(out, routePath);
-  return out;
+  return sanitizePreviewDocument(out);
 }
 
 /** True when URL is safe for iframe embed (internal preview proxy only). */

@@ -8,13 +8,10 @@ export type CreditSummary = Awaited<ReturnType<typeof loadCanonicalCredits>>["bu
   planId: string;
 };
 
-/** Display credits — one decimal when needed (26.8), whole numbers otherwise. */
+/** Display credits with one decimal (e.g. 26.8 BC). */
 export function formatCreditAmount(value: number): string {
-  if (!Number.isFinite(value)) return "0";
+  if (!Number.isFinite(value)) return "0.0";
   const rounded = Math.round(value * 10) / 10;
-  if (Math.abs(rounded - Math.round(rounded)) < 0.05) {
-    return Math.round(rounded).toLocaleString();
-  }
   return rounded.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 

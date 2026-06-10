@@ -566,7 +566,8 @@ export function ChatView() {
     },
     onFinish: () => {
       pendingAttachmentIdsRef.current = [];
-      useCreditsStore.getState().deductOptimistic(1);
+      useCreditsStore.getState().deductOptimistic(DISCUSS_FLAT_CREDITS);
+      if (convRef.current) updateChatUrl(convRef.current);
       if (userId) void refreshCredits({ reason: "charge" });
       void reloadConversations();
     },
@@ -583,16 +584,18 @@ export function ChatView() {
   const lastMessage = messages[messages.length - 1];
   const showStreamLoader = isBusy && (!lastMessage || lastMessage.role === "user");
 
-  const updateChatUrl = React.useCallback(
-    (conversationId: string | null) => {
-      const params = new URLSearchParams(searchParams?.toString() ?? "");
-      if (conversationId) params.set("c", conversationId);
-      else params.delete("c");
-      const qs = params.toString();
-      router.replace(qs ? `/chat?${qs}` : "/chat", { scroll: false });
-    },
-    [router, searchParams],
-  );
+  const updateChatUrl = React.useCallback((conversationId: string | null) => {
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : searchParams?.toString() ?? "",
+    );
+    if (conversationId) params.set("c", conversationId);
+    else params.delete("c");
+    const qs = params.toString();
+    const href = qs ? `/chat?${qs}` : "/chat";
+    if (typeof window !== "undefined") {
+      window.history.replaceState(window.history.state, "", href);
+    }
+  }, [searchParams]);
 
   const switchConversation = React.useCallback(
     (conversationId: string) => {
@@ -624,6 +627,7 @@ export function ChatView() {
   React.useEffect(() => {
     const fromUrl = searchParams?.get("c");
     if (!userId) return;
+    if (isBusy || submitInFlightRef.current) return;
     if (fromUrl && fromUrl !== activeConvId) {
       switchConversation(fromUrl);
       return;
@@ -862,7 +866,6 @@ export function ChatView() {
     if (pre.conversationId) {
       convRef.current = pre.conversationId;
       setActiveConvId(pre.conversationId);
-      updateChatUrl(pre.conversationId);
       streamConvRef.current = pre.conversationId;
       if (!hadConv) {
         const stub: Conversation = {

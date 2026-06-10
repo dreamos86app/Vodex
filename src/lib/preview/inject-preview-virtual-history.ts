@@ -167,6 +167,7 @@ export function injectPreviewVirtualHistory(html: string, routePath: string): st
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (m) => `${m}${script}`);
   }
+  // Shim must be first executable in head — strip duplicate injections
   if (/<html[^>]*>/i.test(html)) {
     return html.replace(/<html[^>]*>/i, (m) => `${m}<head>${script}</head>`);
   }

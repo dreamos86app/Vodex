@@ -137,7 +137,7 @@ export async function runJob(job: PreviewBuildJobRow): Promise<void> {
         buildMeta: viteResult.buildMeta as unknown as Record<string, unknown>,
       };
     } else if (fw === "nextjs_app" || fw === "nextjs_pages") {
-      result = await buildNext(workspace, framework, files);
+      result = await buildNext(workspace, framework, files, job.project_id);
     } else {
       result = {
         ok: false,

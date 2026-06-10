@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { supabase } from "./supabase.js";
 import { config } from "./config.js";
+import { sanitizeArtifactBuffer } from "./preview-artifact-sanitize.js";
 
 function contentType(filePath: string): string {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
@@ -35,7 +36,8 @@ export async function uploadArtifacts(
   const files = await walk(outputDir);
   let uploaded = 0;
   for (const file of files) {
-    const buf = await fs.readFile(file.abs);
+    const raw = await fs.readFile(file.abs);
+    const buf = sanitizeArtifactBuffer(raw, file.rel, projectId);
     const storagePath = `${prefix}/${file.rel}`;
     const { error } = await supabase.storage.from(config.artifactBucket).upload(storagePath, buf, {
       contentType: contentType(file.rel),

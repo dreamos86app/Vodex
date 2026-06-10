@@ -3,7 +3,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Loader2, MessageCircle } from "lucide-react";
+import { X, Send, Loader2, MessageCircle, Pencil, Trash2, ImagePlus } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/stores/auth-store";
@@ -20,8 +20,10 @@ type CommentRow = {
   user_id: string;
   like_count: number;
   parent_reply_id: string | null;
+  edited_at?: string | null;
   author_name?: string;
   liked?: boolean;
+  attachment_url?: string | null;
 };
 
 function commentScore(c: CommentRow): number {
@@ -31,29 +33,93 @@ function commentScore(c: CommentRow): number {
   return likes * 3 + recency * 2 + Math.random() * 0.15;
 }
 
+function FlatReply({
+  reply,
+  replyToName,
+  userId,
+  onLike,
+  onEdit,
+  onDelete,
+}: {
+  reply: CommentRow;
+  replyToName?: string;
+  userId?: string;
+  onLike: (id: string, liked: boolean) => void;
+  onEdit: (id: string, text: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(reply.body);
+  const isOwn = userId === reply.user_id;
+
+  return (
+    <li className="rounded-xl bg-background/60 px-3 py-2 ring-1 ring-border/50">
+      {replyToName ? (
+        <p className="text-[11px] text-muted-foreground">
+          <span className="font-semibold text-foreground">{reply.author_name ?? "Member"}</span>
+          <span className="mx-1.5 font-bold text-accent">→</span>
+          <span className="font-medium">{replyToName}</span>
+        </p>
+      ) : (
+        <p className="text-[11px] font-medium text-muted-foreground">{reply.author_name ?? "Member"}</p>
+      )}
+      {editing ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void onEdit(reply.id, draft.trim()).then(() => setEditing(false));
+          }}
+          className="mt-1 flex gap-2"
+        >
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} className="min-w-0 flex-1 rounded-lg bg-background px-2 py-1 text-[12px] ring-1 ring-border" />
+          <button type="submit" className="rounded-lg bg-accent px-2 py-1 text-[11px] text-white">Save</button>
+        </form>
+      ) : (
+        <p className="mt-1 text-[13px] text-foreground">{reply.body}</p>
+      )}
+      {reply.attachment_url ? (
+        <img src={reply.attachment_url} alt="" className="mt-2 max-h-48 w-full rounded-lg object-cover" />
+      ) : null}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <CommunityHeartButton liked={!!reply.liked} count={reply.like_count} onToggle={() => onLike(reply.id, !!reply.liked)} size="sm" />
+        {reply.edited_at ? <span className="text-[10px] text-muted-foreground">edited</span> : null}
+        {isOwn ? (
+          <>
+            <button type="button" onClick={() => setEditing(true)} className="text-[10px] text-muted-foreground hover:text-foreground"><Pencil className="inline size-3" /> Edit</button>
+            <button type="button" onClick={() => void onDelete(reply.id)} className="text-[10px] text-destructive"><Trash2 className="inline size-3" /> Delete</button>
+          </>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
 function CommentItem({
   comment,
-  replies,
+  flatReplies,
+  nameById,
   userId,
   onLike,
   onReply,
-  depth = 0,
-  replyToName,
-  getChildReplies,
+  onEdit,
+  onDelete,
 }: {
   comment: CommentRow;
-  replies: CommentRow[];
+  flatReplies: CommentRow[];
+  nameById: Map<string, string>;
   userId?: string;
   onLike: (id: string, liked: boolean) => void;
   onReply: (parentId: string, text: string) => Promise<void>;
-  depth?: number;
-  replyToName?: string;
-  getChildReplies: (id: string) => CommentRow[];
+  onEdit: (id: string, text: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
-  const [showReplies, setShowReplies] = React.useState(false);
+  const [showReplies, setShowReplies] = React.useState(true);
   const [replyOpen, setReplyOpen] = React.useState(false);
   const [replyText, setReplyText] = React.useState("");
   const [replying, setReplying] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(comment.body);
+  const isOwn = userId === comment.user_id;
 
   async function submitReply(e: React.FormEvent) {
     e.preventDefault();
@@ -71,78 +137,64 @@ function CommentItem({
   }
 
   return (
-    <li className={cn(depth > 0 && "ml-4 border-l-2 border-border/60 pl-3")}>
+    <li>
       <div className="rounded-xl bg-surface/80 px-3 py-2.5 ring-1 ring-border/60">
-        {replyToName ? (
-          <p className="text-[11px] text-muted-foreground">
-            <span className="font-semibold text-foreground">{comment.author_name ?? "Member"}</span>
-            <span className="mx-1.5 font-bold text-accent">→</span>
-            <span className="font-medium">{replyToName}</span>
-          </p>
+        <p className="text-[11px] font-medium text-muted-foreground">{comment.author_name ?? "Member"}</p>
+        {editing ? (
+          <form onSubmit={(e) => { e.preventDefault(); void onEdit(comment.id, draft.trim()).then(() => setEditing(false)); }} className="mt-1 flex gap-2">
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} className="min-w-0 flex-1 rounded-lg bg-background px-2.5 py-1.5 text-[12px] ring-1 ring-border" />
+            <button type="submit" className="rounded-lg bg-accent px-2.5 py-1.5 text-white">Save</button>
+          </form>
         ) : (
-          <p className="text-[11px] font-medium text-muted-foreground">{comment.author_name ?? "Member"}</p>
+          <p className="mt-1 text-[13px] text-foreground">{comment.body}</p>
         )}
-        <p className="mt-1 text-[13px] text-foreground">{comment.body}</p>
+        {comment.attachment_url ? (
+          <img src={comment.attachment_url} alt="" className="mt-2 max-h-56 w-full rounded-lg object-cover" />
+        ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <CommunityHeartButton
-            liked={!!comment.liked}
-            count={comment.like_count}
-            onToggle={() => onLike(comment.id, !!comment.liked)}
-            size="sm"
-          />
+          <CommunityHeartButton liked={!!comment.liked} count={comment.like_count} onToggle={() => onLike(comment.id, !!comment.liked)} size="sm" />
+          {comment.edited_at ? <span className="text-[10px] text-muted-foreground">edited</span> : null}
           {userId ? (
-            <button
-              type="button"
-              onClick={() => setReplyOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition hover:text-foreground"
-            >
-              <MessageCircle className="size-3" strokeWidth={1.75} />
-              Reply
+            <button type="button" onClick={() => setReplyOpen((v) => !v)} className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
+              <MessageCircle className="size-3" strokeWidth={1.75} /> Reply
             </button>
+          ) : null}
+          {isOwn ? (
+            <>
+              <button type="button" onClick={() => setEditing(true)} className="text-[10px] text-muted-foreground"><Pencil className="inline size-3" /> Edit</button>
+              <button type="button" onClick={() => void onDelete(comment.id)} className="text-[10px] text-destructive"><Trash2 className="inline size-3" /> Delete</button>
+            </>
           ) : null}
         </div>
         {replyOpen && userId ? (
           <form onSubmit={(e) => void submitReply(e)} className="mt-2 flex gap-2">
-            <input
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Write a reply…"
-              className="min-w-0 flex-1 rounded-lg bg-background px-2.5 py-1.5 text-[12px] ring-1 ring-border"
-            />
-            <button
-              type="submit"
-              disabled={replying || !replyText.trim()}
-              className="rounded-lg bg-accent px-2.5 py-1.5 text-white disabled:opacity-50"
-            >
-              <Send className="size-3.5" />
-            </button>
+            <input value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="Write a reply…" className="min-w-0 flex-1 rounded-lg bg-background px-2.5 py-1.5 text-[12px] ring-1 ring-border" />
+            <button type="submit" disabled={replying || !replyText.trim()} className="rounded-lg bg-accent px-2.5 py-1.5 text-white disabled:opacity-50"><Send className="size-3.5" /></button>
           </form>
         ) : null}
       </div>
-      {replies.length > 0 && !showReplies ? (
-        <button
-          type="button"
-          onClick={() => setShowReplies(true)}
-          className="mt-1.5 text-[11px] text-muted-foreground transition hover:text-foreground"
-        >
-          View all {replies.length} {replies.length === 1 ? "reply" : "replies"}
+      {flatReplies.length > 0 && !showReplies ? (
+        <button type="button" onClick={() => setShowReplies(true)} className="mt-1.5 text-[11px] text-muted-foreground transition hover:text-foreground">
+          View all {flatReplies.length} {flatReplies.length === 1 ? "reply" : "replies"}
         </button>
       ) : null}
-      {replies.length > 0 && showReplies ? (
+      {flatReplies.length > 0 && showReplies ? (
         <ul className="mt-2 space-y-2">
-          {replies.map((r) => (
-            <CommentItem
-              key={r.id}
-              comment={r}
-              replies={getChildReplies(r.id)}
-              getChildReplies={getChildReplies}
-              userId={userId}
-              onLike={onLike}
-              onReply={onReply}
-              depth={depth + 1}
-              replyToName={comment.parent_reply_id ? comment.author_name : undefined}
-            />
-          ))}
+          {flatReplies.map((r) => {
+            const parent = r.parent_reply_id ? nameById.get(r.parent_reply_id) : undefined;
+            const replyToName = r.parent_reply_id && r.parent_reply_id !== comment.id ? parent : undefined;
+            return (
+              <FlatReply
+                key={r.id}
+                reply={r}
+                replyToName={replyToName}
+                userId={userId}
+                onLike={onLike}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            );
+          })}
         </ul>
       ) : null}
     </li>
@@ -169,7 +221,9 @@ export function DiscussionDetailDrawer({
   const [comments, setComments] = React.useState<CommentRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [body, setBody] = React.useState("");
+  const [attachment, setAttachment] = React.useState<File | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
   const [localLiked, setLocalLiked] = React.useState(!!liked);
   const [localLikeCount, setLocalLikeCount] = React.useState(discussion.like_count);
 
@@ -219,15 +273,48 @@ export function DiscussionDetailDrawer({
     [comments],
   );
   const repliesByParent = React.useMemo(() => {
+    const byId = new Map(comments.map((c) => [c.id, c]));
+    function topLevelParentId(row: CommentRow): string {
+      let cur: CommentRow | undefined = row;
+      while (cur?.parent_reply_id) {
+        const parent = byId.get(cur.parent_reply_id);
+        if (!parent?.parent_reply_id) return parent?.id ?? cur.parent_reply_id;
+        cur = parent;
+      }
+      return row.parent_reply_id ?? row.id;
+    }
     const map = new Map<string, CommentRow[]>();
     for (const c of comments) {
       if (!c.parent_reply_id) continue;
-      const list = map.get(c.parent_reply_id) ?? [];
+      const topId = topLevelParentId(c);
+      const list = map.get(topId) ?? [];
       list.push(c);
-      map.set(c.parent_reply_id, list);
+      map.set(topId, list);
     }
     return map;
   }, [comments]);
+
+  const nameById = React.useMemo(
+    () => new Map(comments.map((c) => [c.id, c.author_name ?? "Member"])),
+    [comments],
+  );
+
+  async function handleCommentEdit(commentId: string, text: string) {
+    const res = await fetch(`/api/community/comments/${commentId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) { toast.error("Could not save edit"); return; }
+    setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, body: text, edited_at: new Date().toISOString() } : c)));
+  }
+
+  async function handleCommentDelete(commentId: string) {
+    const res = await fetch(`/api/community/comments/${commentId}`, { method: "DELETE", credentials: "include" });
+    if (!res.ok) { toast.error("Could not delete"); return; }
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+  }
 
   function handlePostLike() {
     setLocalLiked((v) => !v);
@@ -287,6 +374,14 @@ export function DiscussionDetailDrawer({
     const text = body.trim();
     if (!text || !user) return;
     setSaving(true);
+    let attachmentUrl: string | null = null;
+    if (attachment) {
+      const fd = new FormData();
+      fd.append("file", attachment);
+      const up = await fetch("/api/chat/attachments", { method: "POST", body: fd });
+      const uj = (await up.json()) as { url?: string };
+      if (uj.url) attachmentUrl = uj.url;
+    }
     const optimistic: CommentRow = {
       id: `opt-${Date.now()}`,
       body: text,
@@ -295,9 +390,11 @@ export function DiscussionDetailDrawer({
       like_count: 0,
       parent_reply_id: null,
       author_name: "You",
+      attachment_url: attachmentUrl,
     };
     setComments((prev) => [...prev, optimistic]);
     setBody("");
+    setAttachment(null);
     try {
       const { data, error } = await supabase
         .from("discussion_replies")
@@ -305,6 +402,13 @@ export function DiscussionDetailDrawer({
         .select("id, body, created_at, user_id, like_count, parent_reply_id")
         .single();
       if (error) throw error;
+      if (attachmentUrl && data?.id) {
+        await (supabase as any).from("discussion_attachments").insert({
+          reply_id: data.id,
+          user_id: user.id,
+          url: attachmentUrl,
+        });
+      }
       setComments((prev) =>
         prev
           .map((c) => (c.id === optimistic.id ? ({ ...data, author_name: "You" } as CommentRow) : c))
@@ -375,11 +479,13 @@ export function DiscussionDetailDrawer({
                     <CommentItem
                       key={c.id}
                       comment={c}
-                      replies={repliesByParent.get(c.id) ?? []}
-                      getChildReplies={(id) => repliesByParent.get(id) ?? []}
+                      flatReplies={repliesByParent.get(c.id) ?? []}
+                      nameById={nameById}
                       userId={user?.id}
                       onLike={handleCommentLike}
                       onReply={handleCommentReply}
+                      onEdit={handleCommentEdit}
+                      onDelete={handleCommentDelete}
                     />
                   ))}
                 </ul>
@@ -392,6 +498,10 @@ export function DiscussionDetailDrawer({
               className="border-t border-border px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
             >
               <div className="flex gap-2">
+                <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={(e) => setAttachment(e.target.files?.[0] ?? null)} />
+                <button type="button" onClick={() => fileRef.current?.click()} className="rounded-xl bg-surface px-3 py-2.5 ring-1 ring-border" aria-label="Attach image">
+                  <ImagePlus className="size-4 text-muted-foreground" />
+                </button>
                 <input
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
@@ -406,6 +516,7 @@ export function DiscussionDetailDrawer({
                   <Send className="size-4" />
                 </button>
               </div>
+              {attachment ? <p className="mt-1 text-[11px] text-muted-foreground">Attached: {attachment.name}</p> : null}
             </form>
           ) : null}
         </motion.div>

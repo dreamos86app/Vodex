@@ -26,5 +26,17 @@ export function stripPreviewPlatformPathsFromText(
   out = out.replace(/"pathname"\s*:\s*"[^"]*preview-html[^"]*"/gi, '"pathname":"/"');
   out = out.replace(/"url"\s*:\s*"[^"]*preview-html[^"]*"/gi, '"url":"/"');
 
+  // Next.js App Router flight / RSC payloads
+  out = out.replace(/\\u002Fapi\\u002Fprojects\\u002F[^"\\]+\\u002Fpreview-html[^"\\]*/gi, "\\u002F");
+  out = out.replace(/"initialTree"[^[]*\[[^\]]*preview-html[^\]]*\]/gi, (m) =>
+    m.replace(/preview-html[^"'\]]*/gi, ""),
+  );
+
+  // Encoded path segments in bundles
+  out = out.replace(
+    new RegExp(`(?:%2F|\\\\u002F)?api(?:%2F|\\\\u002F)projects(?:%2F|\\\\u002F)${esc}(?:%2F|\\\\u002F)preview-html[^"'\\s>]*`, "gi"),
+    "/",
+  );
+
   return out;
 }

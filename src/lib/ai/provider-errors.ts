@@ -145,8 +145,14 @@ export function sanitizeUserFacingAiError(raw: string): string {
   if (QUOTA_RE.test(m) && /anthropic|claude/i.test(m)) {
     return "That model is temporarily unavailable. I switched to another available model and continued.";
   }
+  if (m.includes("missing_conversation") || m.includes("conversation not found")) {
+    return "That conversation could not be found. Start a new chat and try again.";
+  }
   if (QUOTA_RE.test(m) || m.includes("insufficient_tokens") || m.includes("not enough credits")) {
     return "You do not have enough credits for this request. Please upgrade or buy more credits.";
+  }
+  if (m.includes("something went wrong")) {
+    return "The AI request could not complete. Please try again in a moment.";
   }
   if (/anthropic|claude/i.test(m) && (QUOTA_RE.test(m) || AUTH_RE.test(m))) {
     return "The AI system is temporarily busy. Please try again shortly.";

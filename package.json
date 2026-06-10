@@ -1746,6 +1746,9 @@
     "verify:server": "node scripts/verify-server.mjs",
     "doctor:dev-server": "node scripts/doctor-dev-server.mjs",
     "setup:zip-import-storage": "node scripts/setup-zip-import-storage.mjs",
+    "setup:preview-storage": "node scripts/setup-preview-storage.mjs",
+    "verify:zip-next-preview": "node scripts/verify-zip-next-preview.mjs",
+    "rebuild:preview-artifact": "node scripts/rebuild-preview-artifact.mjs",
     "test:zip-storage": "npx tsx scripts/test-zip-storage.ts",
     "test:app-files-rows": "npx tsx scripts/test-app-files-rows.ts"
   },
