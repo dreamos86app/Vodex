@@ -187,6 +187,9 @@ export function PreviewPanel({
   const [bootFailureDismissed, setBootFailureDismissed] = React.useState(false);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const lastNavigatedRouteRef = React.useRef<string | null>(null);
+  const lastMountSrcRef = React.useRef<string | null>(null);
+  const stableArtifactIdRef = React.useRef<string | null>(null);
+  const [overlayVisible, setOverlayVisible] = React.useState(false);
 
   const effectivePreviewPath = urlResolution?.normalizedPreviewUrl ?? url;
 
@@ -241,40 +244,65 @@ export function PreviewPanel({
     }
   }, [resolvedPreviewUrl, previewRoute, urlResolution?.route]);
 
+  if (urlResolution?.artifactId && !stableArtifactIdRef.current) {
+    stableArtifactIdRef.current = urlResolution.artifactId;
+  }
+
   const iframeDomKey = React.useMemo(
     () =>
       previewIframeDomKey({
         projectId: projectId ?? "unknown",
-        artifactId: urlResolution?.artifactId ?? null,
+        artifactId: stableArtifactIdRef.current ?? urlResolution?.artifactId ?? null,
         reloadKey,
       }),
     [projectId, urlResolution?.artifactId, reloadKey],
   );
 
-  const iframeLoadKey = React.useMemo(
-    () => `${iframeDomKey}::${iframeMountSrc ?? "inline"}`,
-    [iframeDomKey, iframeMountSrc],
+  const artifactPreviewReady = Boolean(
+    stableArtifactIdRef.current &&
+      (runtimeStatus?.previewRenderable === true || runtimeStatus?.jobStatus === "succeeded"),
   );
+
+  const overlayMaxMs = artifactPreviewReady ? 0 : 1000;
 
   // Route changes navigate inside the iframe — iframe src stays on preview root.
 
   React.useEffect(() => {
     lastNavigatedRouteRef.current = null;
-  }, [iframeLoadKey]);
+    lastMountSrcRef.current = null;
+  }, [iframeDomKey]);
 
   React.useEffect(() => {
-    setIframeError(false);
-    setIframeLoaded(false);
-    setInnerRouteError(null);
-    setLoadingExceeded60s(false);
-    if (iframeMountSrc || srcDoc) {
-      setIframeLoading(true);
-      setLoadingStartedAt(Date.now());
-    } else {
+    const mountKey = hasInline ? `inline:${reloadKey}` : iframeMountSrc;
+    if (!mountKey) {
+      setOverlayVisible(false);
       setIframeLoading(false);
       setLoadingStartedAt(null);
+      return;
     }
-  }, [iframeLoadKey, srcDoc]);
+    if (lastMountSrcRef.current === mountKey) return;
+    lastMountSrcRef.current = mountKey;
+
+    setIframeError(false);
+    setInnerRouteError(null);
+    setLoadingExceeded60s(false);
+    setIframeLoaded(false);
+    setLoadingStartedAt(Date.now());
+
+    if (overlayMaxMs <= 0) {
+      setOverlayVisible(false);
+      setIframeLoading(false);
+      return;
+    }
+
+    setOverlayVisible(true);
+    setIframeLoading(true);
+    const t = window.setTimeout(() => {
+      setOverlayVisible(false);
+      setIframeLoading(false);
+    }, overlayMaxMs);
+    return () => window.clearTimeout(t);
+  }, [iframeMountSrc, hasInline, reloadKey, overlayMaxMs]);
 
   React.useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -333,6 +361,7 @@ export function PreviewPanel({
       if (frameWin && event.source !== frameWin) return;
       setBootAuditEvents((prev) => [...prev.slice(-80), event.data]);
       if (event.data.phase === "ready" || event.data.phase === "snapshot") {
+        setOverlayVisible(false);
         setIframeLoading(false);
         setIframeLoaded(true);
         setIframeError(false);
@@ -361,11 +390,12 @@ export function PreviewPanel({
   }, [previewRoute, urlResolution?.route, iframeLoaded, hasInline, iframeMountSrc]);
 
   React.useEffect(() => {
-    if (!iframeLoading || hasInline || !iframeMountSrc) return;
+    if (!overlayVisible || hasInline || !iframeMountSrc) return;
     const checkReady = () => {
       try {
         const doc = iframeRef.current?.contentDocument;
         if (doc?.readyState === "complete") {
+          setOverlayVisible(false);
           setIframeLoading(false);
           setIframeLoaded(true);
           setIframeError(false);
@@ -375,9 +405,9 @@ export function PreviewPanel({
       }
     };
     checkReady();
-    const interval = window.setInterval(checkReady, 500);
+    const interval = window.setInterval(checkReady, 200);
     return () => window.clearInterval(interval);
-  }, [iframeLoading, iframeMountSrc, hasInline]);
+  }, [overlayVisible, iframeMountSrc, hasInline]);
 
   const previewUrlInvalid = Boolean(
     (effectivePreviewPath || urlResolution?.selectedPreviewUrl) && !hasInline && !resolvedPreviewUrl,
@@ -389,15 +419,6 @@ export function PreviewPanel({
   const isArtifactUrl = Boolean(
     effectivePreviewPath && isInternalPreviewProxyUrl(effectivePreviewPath),
   );
-
-  React.useEffect(() => {
-    if (!iframeLoading) return;
-    const timeoutMs = isArtifactUrl ? 30_000 : 18_000;
-    const t = window.setTimeout(() => {
-      setIframeLoading(false);
-    }, timeoutMs);
-    return () => window.clearTimeout(t);
-  }, [iframeLoading, iframeLoadKey, isArtifactUrl]);
 
   const rawBlocked =
     Boolean(
@@ -503,8 +524,8 @@ export function PreviewPanel({
         previewUrlInvalid,
         innerRouteError: Boolean(innerRouteError),
         iframeError,
-        iframeLoading,
-        loadingExceeded60s,
+        iframeLoading: artifactPreviewReady ? false : iframeLoading,
+        loadingExceeded60s: artifactPreviewReady ? false : loadingExceeded60s,
         iframeEmbeddable: iframeHeaderProbe?.embeddable ?? null,
         iframeBlockReason: iframeHeaderProbe?.reason ?? null,
         legacyCanPreview: canPreview,
@@ -530,6 +551,7 @@ export function PreviewPanel({
       loadingExceeded60s,
       iframeHeaderProbe,
       canPreview,
+      artifactPreviewReady,
     ],
   );
 
@@ -551,7 +573,7 @@ export function PreviewPanel({
     canonicalPreview.state === "ready" &&
     showIframe &&
     Boolean(bootAuditSummary.bootFailureReason) &&
-    !iframeLoading &&
+    !overlayVisible &&
     (bootAuditEvents.some((e) => e.phase === "asset-error" || e.phase === "runtime-error") ||
       bootAuditEvents.filter((e) => e.phase === "snapshot").length >= 2);
 
@@ -659,10 +681,10 @@ export function PreviewPanel({
             <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-muted-foreground">
               {displayHost}
             </span>
-            {(hasPreviewArtifact && iframeLoading) && (
+            {(hasPreviewArtifact && overlayVisible) && (
               <Wifi className="size-3 shrink-0 animate-pulse text-accent/60" strokeWidth={1.75} />
             )}
-            {(hasPreviewArtifact && !iframeLoading && !iframeError && iframeRenderable) && (
+            {(hasPreviewArtifact && !overlayVisible && !iframeError && iframeRenderable) && (
               <span className="size-1.5 shrink-0 rounded-full bg-green-400" />
             )}
           </div>
@@ -1065,13 +1087,8 @@ export function PreviewPanel({
             )}
             data-testid="preview-fit-canvas"
           >
-            <AnimatePresence mode="wait">
-              <motion.div
+              <div
                 key={iframeDomKey}
-                initial={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.98 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
                   "relative flex flex-col overflow-hidden",
                   viewport === "desktop" &&
@@ -1117,43 +1134,36 @@ export function PreviewPanel({
                     viewport === "desktop" && "h-full w-full",
                   )}
                 >
-                <AnimatePresence>
-                  {iframeLoading && (
-                    <motion.div
-                      initial={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="size-5 animate-spin text-accent" strokeWidth={1.75} />
-                        <span className="text-[11px] text-muted-foreground">Loading preview…</span>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {overlayVisible ? (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="size-5 animate-spin text-accent" strokeWidth={1.75} />
+                      <span className="text-[11px] text-muted-foreground">Loading preview…</span>
+                    </div>
+                  </div>
+                ) : null}
 
                 <iframe
                     ref={iframeRef}
-                    key={iframeDomKey}
                     src={hasInline ? undefined : iframeMountSrc ?? undefined}
                     srcDoc={hasInline ? (srcDoc ?? undefined) : undefined}
                     title={appName ?? "App preview"}
                     className="h-full w-full flex-1 border-0"
                     onLoad={() => {
+                      setOverlayVisible(false);
                       setIframeLoading(false);
                       setIframeLoaded(true);
                       setIframeError(false);
                     }}
                     onError={() => {
                       setIframeError(true);
+                      setOverlayVisible(false);
                       setIframeLoading(false);
                     }}
-                    sandbox="allow-scripts allow-same-origin"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                   />
                 </div>
-              </motion.div>
-            </AnimatePresence>
+              </div>
           </div>
         )}
 

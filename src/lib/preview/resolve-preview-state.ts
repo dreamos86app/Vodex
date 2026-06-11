@@ -270,7 +270,7 @@ export function resolvePreviewState(input: PreviewStateRawInputs): ResolvedPrevi
   const hardImportedReady = importedReady && hasPreviewUrl && !input.innerRouteError;
 
   if (hardImportedReady) {
-    if (input.iframeError || input.loadingExceeded60s) {
+    if (input.iframeError) {
       return {
         state: "needs_rebuild",
         classification,
@@ -339,7 +339,7 @@ export function resolvePreviewState(input: PreviewStateRawInputs): ResolvedPrevi
   }
 
   if (importedReady || (previewRenderable && hasPreviewUrl)) {
-    if (input.iframeError || input.loadingExceeded60s) {
+    if (input.iframeError) {
       return {
         state: "needs_rebuild",
         classification,
