@@ -1,39 +1,27 @@
 /** Preview-only auth compat — Base44 / Supabase clients missing redirectToLogin in iframe. */
 
 import { buildPreviewAuthGuardScript } from "@/lib/preview/inject-preview-auth-guard";
+import {
+  PREVIEW_AUTH_NAV_FN,
+  PREVIEW_AUTH_URL_RESOLVER_SNIPPET,
+  buildPreviewRuntimeAuthUrlBootstrapScript,
+} from "@/lib/preview/preview-runtime-auth-url-script";
 
 export function buildPreviewAuthCompatScript(): string {
   return `(function(){
   if(window.__VODEX_AUTH_COMPAT__)return;
   window.__VODEX_AUTH_COMPAT__=true;
-  var warn=function(m){try{console.warn("[Vodex preview]",m);}catch(e){}};
+  ${PREVIEW_AUTH_URL_RESOLVER_SNIPPET}
   var mockUser={id:"preview-user",email:"preview@vodex.dev",user_metadata:{full_name:"Preview User"}};
   function previewAuthed(){try{return localStorage.getItem("sb-preview-auth")==="1";}catch(e){return false;}}
-  function previewAuthUrl(){
-    try{
-      var m=window.location.pathname.match(/^(\\/preview-runtime\\/[^/]+\\/[^/]+)/);
-      if(m)return m[1]+"/login";
-    }catch(e){}
-    return null;
-  }
   function navLogin(){
-    warn("auth -> Vodex preview login");
-    var authUrl=previewAuthUrl();
-    if(authUrl){window.location.href=authUrl;return Promise.resolve({ok:true});}
-    try{
-      if(window.__VODEX_VIRTUAL_PATH__!==undefined){
-        window.__VODEX_VIRTUAL_PATH__="/login";
-        history.replaceState({__vodex:"/login"},"","/");
-        window.dispatchEvent(new PopStateEvent("popstate"));
-      }else{
-        window.postMessage({type:"vodex:navigate",path:"/login"},"*");
-      }
-    }catch(e){}
+    __vodexGoLogin("auth compat -> Vodex preview login");
     return Promise.resolve({ok:true});
   }
   function navSignup(){
-    var authUrl=previewAuthUrl();
-    if(authUrl){window.location.href=authUrl.replace(/\\/login$/,"/signup");return Promise.resolve({ok:true});}
+    if(typeof window.__vodexPreviewGoSignup==="function"&&window.__vodexPreviewGoSignup("auth compat signup"))return Promise.resolve({ok:true});
+    var u=__vodexResolveLoginUrl();
+    if(u){window.location.replace(u.replace(/\\/login$/,"/signup"));return Promise.resolve({ok:true});}
     return navLogin();
   }
   function enrichAuth(auth){
@@ -87,11 +75,8 @@ export function buildPreviewAuthCompatScript(): string {
 /** Prepend auth compat to served JS bundles (Vite chunks with inlined Base44 client). */
 export function prependPreviewAuthCompatToJs(bundle: string): string {
   if (bundle.includes("__VODEX_AUTH_COMPAT__")) return bundle;
-  return `${buildPreviewAuthGuardScript()}\n${buildPreviewAuthCompatScript()}\n${patchMinifiedAuthObjectsInJs(bundle)}`;
+  return `${buildPreviewRuntimeAuthUrlBootstrapScript()}\n${buildPreviewAuthGuardScript()}\n${buildPreviewAuthCompatScript()}\n${patchMinifiedAuthObjectsInJs(bundle)}`;
 }
-
-const PREVIEW_AUTH_NAV_FN =
-  'async function(){try{window.__VODEX_VIRTUAL_PATH__="/login";history.replaceState({},"","/");window.dispatchEvent(new PopStateEvent("popstate"));}catch(e){}return Promise.resolve()}';
 
 /** Patch sanitized Base44 auth literals baked into built chunks (missing redirectToLogin). */
 export function patchMinifiedAuthObjectsInJs(text: string): string {

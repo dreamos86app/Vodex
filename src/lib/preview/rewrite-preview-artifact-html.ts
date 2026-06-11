@@ -86,7 +86,8 @@ export function rewritePreviewArtifactHtml(
   out = injectPreviewBootAudit(out);
   /** Auth compat last — prepends first in <head> so it runs before module bundles. */
   out = injectPreviewAuthCompat(out);
-  out = injectPreviewProjectContext(out, projectId);
+  /** Last prepend = first execution — runtime base must exist before auth shims. */
+  out = injectPreviewProjectContext(out, projectId, artifactBuildId);
   return sanitizePreviewDocument(out);
 }
 

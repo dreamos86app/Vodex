@@ -22,6 +22,7 @@ export function buildPrehydrationLocationRewriteScript(virtualRoute: string): st
   if(!onProxy&&!onRuntime)return;
   if(onRuntime){
     var parts=path.split('/').filter(Boolean);
+    if(parts.length>=3){window.__VODEX_PREVIEW_RUNTIME_BASE__='/'+parts.slice(0,3).join('/');}
     if(parts.length>3){route='/'+parts.slice(3).join('/');}
     else{route='/';}
   }

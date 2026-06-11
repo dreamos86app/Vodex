@@ -42,6 +42,7 @@ import {
 } from "@/lib/preview/preview-iframe-url-resolver";
 import { navigatePreviewIframe } from "@/lib/preview/preview-route-navigation";
 import { isPreviewAuthSystemRoute } from "@/lib/preview/preview-auth-routes";
+import { withPreviewRuntimeLoginPath } from "@/lib/preview/preview-runtime-login-url";
 import {
   isPreviewInnerRouteErrorMessage,
   type PreviewInnerRouteErrorMessage,
@@ -486,7 +487,7 @@ export function PreviewPanel({
         setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
         if ((phase === "auth-stuck" || phase === "base44-ui-detected") && activeIframeSrc) {
           try {
-            const loginUrl = activeIframeSrc.replace(/\/?$/, "") + "/login";
+            const loginUrl = withPreviewRuntimeLoginPath(activeIframeSrc);
             if (iframeRef.current && iframeRef.current.src !== loginUrl) {
               iframeRef.current.src = loginUrl;
             }
@@ -523,7 +524,7 @@ export function PreviewPanel({
 
   React.useEffect(() => {
     if (!iframeLoaded || !activeIframeSrc || hasInline) return;
-    const loginUrl = activeIframeSrc.replace(/\/?$/, "") + "/login";
+    const loginUrl = withPreviewRuntimeLoginPath(activeIframeSrc);
     const tick = () => {
       try {
         const doc = iframeRef.current?.contentDocument;

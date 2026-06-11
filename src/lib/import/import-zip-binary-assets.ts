@@ -148,7 +148,9 @@ export async function importZipBinaryAssets(input: {
 }): Promise<ZipBinaryImportResult> {
   const result: ZipBinaryImportResult = { imported: 0, skipped: 0, errors: [] };
 
-  const bucket = await ensurePublicBucket(input.admin, MEDIA_BUCKET);
+  const bucket = await ensurePublicBucket(input.admin, MEDIA_BUCKET, {
+    fileSizeLimit: 50 * 1024 * 1024,
+  });
   if (!bucket.ok) {
     result.errors.push(`media bucket: ${bucket.error}`);
     return result;
@@ -232,7 +234,7 @@ async function listArtifactPaths(
     for (const item of data) {
       if (!item.name) continue;
       const full = prefix ? `${prefix}/${item.name}` : item.name;
-      const isFolder = item.id == null;
+      const isFolder = item.id == null || item.metadata == null;
       if (isFolder) {
         await listArtifactPaths(admin, full, acc);
       } else {
@@ -253,7 +255,9 @@ export async function importPreviewArtifactBinaryAssets(input: {
   artifactPath: string;
 }): Promise<ZipBinaryImportResult> {
   const result: ZipBinaryImportResult = { imported: 0, skipped: 0, errors: [] };
-  const bucket = await ensurePublicBucket(input.admin, MEDIA_BUCKET);
+  const bucket = await ensurePublicBucket(input.admin, MEDIA_BUCKET, {
+    fileSizeLimit: 50 * 1024 * 1024,
+  });
   if (!bucket.ok) {
     result.errors.push(`media bucket: ${bucket.error}`);
     return result;

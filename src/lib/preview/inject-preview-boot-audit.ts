@@ -1,9 +1,12 @@
 /** P1.3.37 — Boot/resource audit inside preview iframe; reports to parent via postMessage. */
 
+import { PREVIEW_AUTH_URL_RESOLVER_SNIPPET } from "@/lib/preview/preview-runtime-auth-url-script";
+
 export function buildPreviewBootAuditScript(): string {
   return `(function(){
   if(window.__VODEX_BOOT_AUDIT__)return;
   window.__VODEX_BOOT_AUDIT__=true;
+  ${PREVIEW_AUTH_URL_RESOLVER_SNIPPET}
   function post(phase,payload){
     try{
       parent.postMessage(Object.assign({type:"vodex-preview-boot-audit",phase:phase,iframeUrl:location.href,virtualPath:window.__VODEX_VIRTUAL_PATH__||null,at:new Date().toISOString()},payload||{}),"*");
@@ -83,13 +86,6 @@ export function buildPreviewBootAuditScript(): string {
     }catch(e){return "";}
   }
   function previewAuthed(){try{return localStorage.getItem("sb-preview-auth")==="1";}catch(e){return false;}}
-  function previewLoginUrl(){
-    try{
-      var m=location.pathname.match(/^(\\/preview-runtime\\/[^/]+\\/[^/]+)/);
-      if(m)return m[1]+"/login";
-    }catch(e){}
-    return null;
-  }
   function isGoogleStuckText(t){
     t=String(t||"").toLowerCase();
     return t.indexOf("opening secure google")>=0||t.indexOf("google sign-in")>=0||t.indexOf("connecting you securely")>=0;
@@ -114,13 +110,9 @@ export function buildPreviewBootAuditScript(): string {
         post("auth-stuck",{
           authStuckReason:"App waiting on Google OAuth in preview iframe (popup/redirect blocked)",
           bodySnippet:snippet,
-          suggestedFix:"Redirect to preview-runtime /login Vodex auth page"
+          suggestedFix:"pathname is virtualized — use __vodexPreviewGoLogin() to hit preview-runtime /login"
         });
-        var login=previewLoginUrl();
-        if(login&&location.pathname.indexOf("/login")<0){
-          post("auth-redirect",{navigationMethod:"auth-guard",navigationUrl:login});
-          location.href=login;
-        }
+        __vodexGoLogin("boot audit auth-stuck");
       }
     }
     if(!isBase44WelcomeText(snippet)){base44Since=0;return;}
@@ -129,13 +121,9 @@ export function buildPreviewBootAuditScript(): string {
     post("base44-ui-detected",{
       base44UiReason:"Imported app default welcome/auth UI visible instead of Vodex preview login",
       bodySnippet:snippet,
-      suggestedFix:"Mount iframe at preview-runtime/.../login; ensure inject-preview-root-auth-gate runs before SPA bundles"
+      suggestedFix:"Virtual pathname hid preview-runtime base — fixed via __VODEX_PREVIEW_RUNTIME_BASE__"
     });
-    var loginUrl=previewLoginUrl();
-    if(loginUrl&&location.pathname.indexOf("/login")<0){
-      post("auth-redirect",{navigationMethod:"base44-ui-detected",navigationUrl:loginUrl});
-      location.replace(loginUrl);
-    }
+    __vodexGoLogin("boot audit base44-ui-detected");
   }
   setInterval(auditAuthStuck,500);
   document.addEventListener("DOMContentLoaded",auditAuthStuck);

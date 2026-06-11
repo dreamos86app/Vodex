@@ -67,6 +67,7 @@ export async function GET(
     ? await resolvePreviewAuthPageHtml(
         admin,
         projectId,
+        artifactId,
         effectiveRoute,
         meta,
         typeof proj.name === "string" ? proj.name : null,

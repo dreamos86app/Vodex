@@ -8,6 +8,7 @@ import {
 } from "@/lib/publish/default-auth-pages";
 import { mergePreviewIframeEmbedHeaders } from "@/lib/preview/preview-iframe-embed-headers";
 import { resolvePreviewAppIconUrl } from "@/lib/preview/resolve-preview-app-icon-url";
+import { buildPreviewRuntimeAuthUrlBootstrapScript } from "@/lib/preview/preview-runtime-auth-url-script";
 
 type AuthPageKind = "login" | "signup" | "forgot" | "callback";
 
@@ -24,7 +25,8 @@ export function buildPreviewAuthPageHtml(input: {
   iconUrl: string;
   route: string;
   settings: AppAuthSettings;
-  projectId?: string;
+  projectId: string;
+  artifactId: string;
 }): string {
   const kind = pageKind(input.route);
   const initialView =
@@ -48,6 +50,7 @@ export function buildPreviewAuthPageHtml(input: {
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Sign in · ${input.appName}</title>
+<script id="vodex-preview-auth-bootstrap">${buildPreviewRuntimeAuthUrlBootstrapScript(input.projectId, input.artifactId)}</script>
 <style>
 *,*::before,*::after{box-sizing:border-box}
 :root{
@@ -176,10 +179,12 @@ h1{font-size:1.45rem;font-weight:700;margin:14px 0 4px;letter-spacing:-.02em;col
   var titles={login:{h:"Welcome back",s:"Sign in to continue"},signup:{h:"Create your account",s:"Join in seconds"},forgot:{h:"Reset password",s:"We'll email you a secure link"},"forgot-sent":{h:"Check your email",s:"Reset link sent"},"callback":{h:"Signing in…",s:"One moment"}};
   function showErr(msg){var el=document.getElementById("vx-error");if(!el)return;el.textContent=msg;el.classList.add("show");setTimeout(function(){el.classList.remove("show");},5000);}
   function previewRuntimeBase(){
+    if(typeof window.__vodexPreviewRuntimeBase==="function"){var b=window.__vodexPreviewRuntimeBase();if(b)return b;}
     try{
-      var m=window.location.pathname.match(/^(\\/preview-runtime\\/[^/]+\\/[^/]+)/);
-      return m?m[1]:null;
-    }catch(e){return null;}
+      var m=String(document.URL||location.href).match(/\\/preview-runtime\\/[^/?#]+\\/[^/?#]+/);
+      if(m)return m[0];
+    }catch(e){}
+    return null;
   }
   function previewAppHomeUrl(){
     var base=previewRuntimeBase();
@@ -245,6 +250,7 @@ h1{font-size:1.45rem;font-weight:700;margin:14px 0 4px;letter-spacing:-.02em;col
 export async function resolvePreviewAuthPageHtml(
   admin: SupabaseClient,
   projectId: string,
+  artifactId: string,
   route: string,
   projectMeta?: Record<string, unknown>,
   projectName?: string | null,
@@ -282,6 +288,7 @@ export async function resolvePreviewAuthPageHtml(
     route,
     settings,
     projectId,
+    artifactId,
   });
 }
 

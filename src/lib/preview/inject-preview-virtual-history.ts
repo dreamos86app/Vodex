@@ -103,9 +103,11 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
     return /accounts\\.google|google\\.com\\/o\\/oauth|oauth2\\/auth|base44\\.(dev|app)|appleid\\.apple\\.com|\\/auth\\/google|\\/oauth\\/google/i.test(url);
   }
   function redirectPreviewLogin(){
+    if(typeof window.__vodexPreviewGoLogin==="function"){window.__vodexPreviewGoLogin("virtual-history OAuth");return;}
     try{
-      var m=location.pathname.match(/^(\\/preview-runtime\\/[^/]+\\/[^/]+)/);
-      if(m){location.href=m[1]+"/login";return;}
+      var raw=window.__VODEX_PREVIEW_ORIGINAL_URL__||document.URL||location.href||"";
+      var m=String(raw).match(/\\/preview-runtime\\/[^/?#]+\\/[^/?#]+/);
+      if(m){location.replace(m[0]+"/login");return;}
     }catch(e){}
     setVirtualPath("/login");
   }

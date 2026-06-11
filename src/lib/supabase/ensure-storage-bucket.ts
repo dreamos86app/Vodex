@@ -16,7 +16,9 @@ export type EnsureBucketResult =
 export async function ensurePublicBucket(
   admin: SupabaseAdminClient,
   bucketId: string,
+  options?: { fileSizeLimit?: number },
 ): Promise<EnsureBucketResult> {
+  const fileSizeLimit = options?.fileSizeLimit ?? 5 * 1024 * 1024;
   const { data: buckets, error: listErr } = await admin.storage.listBuckets();
   if (listErr) {
     return {
@@ -31,7 +33,7 @@ export async function ensurePublicBucket(
 
   const { error: createErr } = await admin.storage.createBucket(bucketId, {
     public: true,
-    fileSizeLimit: 5 * 1024 * 1024,
+    fileSizeLimit,
   });
 
   if (createErr) {

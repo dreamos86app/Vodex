@@ -41,6 +41,24 @@ export function StorageDashboardPanel({ projectId }: Props) {
     void loadAssets();
   }, [loadAssets]);
 
+  React.useEffect(() => {
+    if (loading || assets.length > 0) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/projects/imported-assets/backfill-all", { method: "POST" });
+        const body = (await res.json().catch(() => ({}))) as { imported?: number; errors?: string[] };
+        if (res.ok && (body.imported ?? 0) > 0) {
+          await loadAssets();
+          toast.success(`Imported ${body.imported} assets from ZIP archives`);
+        } else if (body.errors?.length) {
+          toast.error(body.errors[0] ?? "Asset import found no files");
+        }
+      } catch {
+        /* best-effort */
+      }
+    })();
+  }, [loading, assets.length, loadAssets]);
+
   async function handleUpload(files: File[]) {
     setUploading(true);
     for (const file of files) {
@@ -169,9 +187,12 @@ export function StorageDashboardPanel({ projectId }: Props) {
           onClick={async () => {
             setBackfilling(true);
             try {
-              const res = await fetch(`/api/projects/${projectId}/imported-assets/backfill`, {
-                method: "POST",
-              });
+              const res = await fetch(
+                projectId
+                  ? `/api/projects/${projectId}/imported-assets/backfill`
+                  : "/api/projects/imported-assets/backfill-all",
+                { method: "POST" },
+              );
               const body = (await res.json().catch(() => ({}))) as {
                 imported?: number;
                 from_zip?: number;

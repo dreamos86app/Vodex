@@ -79,7 +79,13 @@ function suggestFixes(input: PreviewIncidentPromptInput): string[] {
   );
   if (authStuckEntry) {
     fixes.unshift(
-      `Functional blocker: ${authStuckEntry.message}${authStuckEntry.rootCause ? ` — ${authStuckEntry.rootCause}` : ""}. Redirect iframe to preview-runtime/.../login (inject-preview-root-auth-gate.ts, preview-panel.tsx).`,
+      `Functional blocker: ${authStuckEntry.message}${authStuckEntry.rootCause ? ` — ${authStuckEntry.rootCause}` : ""}. Root cause #1: virtual history patches location.pathname so previewAuthUrl() failed — use __VODEX_PREVIEW_RUNTIME_BASE__ + location.replace(/login). Parent panel also forces iframe.src to /login.`,
+    );
+  }
+  const authRedirectLog = (input.bootEvents ?? []).find((e) => e.phase === "auth-redirect");
+  if (authRedirectLog && !authStuckEntry) {
+    fixes.unshift(
+      `Auth redirect fired (${authRedirectLog.navigationMethod ?? "unknown"}) → ${authRedirectLog.navigationUrl ?? "/login"}. If Base44 UI persists: stale artifact cache, shims not in served JS chunks, or OAuth via assign() before shims load.`,
     );
   } else if (
     previewBootSucceeded(input.bootEvents ?? [], { iframeRemountCount: input.iframeMountCount })

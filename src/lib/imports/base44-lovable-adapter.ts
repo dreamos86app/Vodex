@@ -1,6 +1,10 @@
 import type { ZipImportFile } from "@/lib/import/zip-file-validator";
 import type { FrameworkDetection } from "@/lib/imports/framework-detector";
 import { rewriteForeignSupabaseStorageUrls } from "@/lib/preview/preview-external-asset-rewrite";
+import {
+  PREVIEW_AUTH_NAV_FN,
+  PREVIEW_AUTH_URL_RESOLVER_SNIPPET,
+} from "@/lib/preview/preview-runtime-auth-url-script";
 
 export type LegacyAdapterInfo = {
   platform: "base44" | "lovable" | "bolt" | "v0" | null;
@@ -57,24 +61,9 @@ export function analyzeLegacyAdapter(
   if(typeof window!=="undefined"){
     window.__VODEX_PREVIEW__=true;
     window.__BASE44_PREVIEW_MOCK__=true;
-    function previewAuthUrl(){
-      try{
-        var m=window.location.pathname.match(/^(\\/preview-runtime\\/[^/]+\\/[^/]+)/);
-        if(m)return m[1]+"/login";
-      }catch(e){}
-      return null;
-    }
+    ${PREVIEW_AUTH_URL_RESOLVER_SNIPPET}
     function vodexNavigateLogin(){
-      warn("auth -> Vodex preview login");
-      var authUrl=previewAuthUrl();
-      if(authUrl){window.location.href=authUrl;return Promise.resolve({ok:true});}
-      try{
-        if(window.__VODEX_VIRTUAL_PATH__!==undefined){
-          window.__VODEX_VIRTUAL_PATH__="/login";
-          history.replaceState({__vodex:"/login"},"","/");
-          window.dispatchEvent(new PopStateEvent("popstate"));
-        }else{window.postMessage({type:"vodex:navigate",path:"/login"},"*");}
-      }catch(e){}
+      __vodexGoLogin("base44 shim -> Vodex preview login");
       return Promise.resolve({ok:true});
     }
     function vodexPreviewAuthed(){
@@ -314,7 +303,7 @@ export function sanitizeBase44LegacyContent(content: string): string {
     "// vodex: removed @base44/sdk import\n",
   );
   const previewAuthMock =
-    "{ redirectToLogin: async () => { try { window.__VODEX_VIRTUAL_PATH__ = '/login'; history.replaceState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); } catch (e) {} return Promise.resolve(); }, getUser: async () => ({ data: { user: { id: 'preview-user', email: 'preview@vodex.dev' } } }), getSession: async () => ({ data: { session: { user: { id: 'preview-user' } } } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }) }";
+    `{ redirectToLogin: ${PREVIEW_AUTH_NAV_FN}, getUser: async () => ({ data: { user: { id: 'preview-user', email: 'preview@vodex.dev' } } }), getSession: async () => ({ data: { session: { user: { id: 'preview-user' } } } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }) }`;
   out = out.replace(
     /import\s*\(\s*['"]@base44\/sdk['"]\s*\)/g,
     `Promise.resolve({ auth: ${previewAuthMock} })`,
