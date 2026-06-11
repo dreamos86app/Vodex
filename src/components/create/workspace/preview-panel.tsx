@@ -53,6 +53,7 @@ import { PreviewLiveDiagnosticBar } from "@/components/preview/preview-live-diag
 import { createPreviewLiveDiagnostics } from "@/lib/preview/preview-live-diagnostics";
 import { resolvePreviewState } from "@/lib/preview/resolve-preview-state";
 import {
+  isIgnorablePreviewAssetLoadFailure,
   isPreviewBootAuditMessage,
   summarizeBootAudit,
   type PreviewBootAuditPayload,
@@ -438,11 +439,24 @@ export function PreviewPanel({
       if (frameWin && event.source !== frameWin) return;
       setBootAuditEvents((prev) => [...prev.slice(-80), event.data]);
       const phase = event.data.phase;
-      if (phase === "asset-error" || phase === "runtime-error") {
+      if (phase === "asset-error") {
+        const failedUrl = event.data.failedAssetUrl ?? "";
+        if (
+          !isIgnorablePreviewAssetLoadFailure(failedUrl, event.data.failedAssetTag ?? null)
+        ) {
+          liveDiagnosticsRef.current.push({
+            kind: "boot",
+            level: "error",
+            message: String(failedUrl || phase),
+            detail: phase,
+          });
+          setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
+        }
+      } else if (phase === "runtime-error") {
         liveDiagnosticsRef.current.push({
           kind: "boot",
           level: "error",
-          message: String(event.data.errorMessage ?? event.data.failedAssetUrl ?? phase),
+          message: String(event.data.errorMessage ?? phase),
           detail: phase,
         });
         setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());

@@ -41,6 +41,41 @@ export function isPreviewBootAuditMessage(data: unknown): data is PreviewBootAud
   return (data as Record<string, unknown>).type === "vodex-preview-boot-audit";
 }
 
+/** Route roots and SPA shell links are not static asset failures in preview-runtime. */
+export function isIgnorablePreviewAssetLoadFailure(
+  url: string,
+  tagName?: string | null,
+): boolean {
+  const raw = url.trim();
+  if (!raw || raw === "#" || raw.startsWith("#")) return true;
+
+  let path = raw;
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      path = new URL(raw).pathname;
+    } else {
+      path = raw.split("?")[0]?.split("#")[0] ?? raw;
+    }
+  } catch {
+    path = raw.split("?")[0] ?? raw;
+  }
+
+  if (path === "/" || path === "") return true;
+
+  const tag = (tagName ?? "").toUpperCase();
+  const hasStaticExt = /\.(js|mjs|cjs|css|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|map|json)(\?|$)/i.test(
+    path,
+  );
+  if (hasStaticExt) return false;
+
+  // Bare app routes (/login, /dashboard) — link/preload noise, not bundle failures.
+  if (/^\/[A-Za-z0-9_./-]*$/.test(path) && !path.includes(".")) {
+    if (tag === "LINK" || tag === "A" || tag === "SCRIPT") return true;
+  }
+
+  return false;
+}
+
 export function summarizeBootAudit(
   events: PreviewBootAuditPayload[],
   opts?: { iframeRemountCount?: number },
@@ -52,11 +87,16 @@ export function summarizeBootAudit(
   let firstRuntimeError: string | null = null;
   let serviceWorkerCount: number | null = null;
 
+  const sawReady = events.some((ev) => ev.phase === "ready");
+
   for (const ev of events) {
     if (ev.phase === "snapshot" && ev.resources) {
       resources.push(...ev.resources);
     }
     if (ev.phase === "asset-error" && ev.failedAssetUrl) {
+      if (isIgnorablePreviewAssetLoadFailure(ev.failedAssetUrl, ev.failedAssetTag)) {
+        continue;
+      }
       failedCount += 1;
       firstFailedAssetUrl ??= ev.failedAssetUrl;
     }
@@ -82,7 +122,10 @@ export function summarizeBootAudit(
   let bootFailureReason: string | null = null;
   if (firstRuntimeError) {
     bootFailureReason = `Script runtime error: ${firstRuntimeError}`;
-  } else if (firstFailedAssetUrl) {
+  } else if (
+    firstFailedAssetUrl &&
+    !(sawReady && loadedCount >= 3 && isIgnorablePreviewAssetLoadFailure(firstFailedAssetUrl))
+  ) {
     bootFailureReason = `Asset failed to load: ${firstFailedAssetUrl}`;
   } else if ((opts?.iframeRemountCount ?? 0) > 1 && cancelledOrIncompleteCount > 0) {
     bootFailureReason = "Assets cancelled — iframe remounted before boot completed";

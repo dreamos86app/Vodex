@@ -23,5 +23,7 @@ assert(audit.includes("pushState"), "navigation audit");
 assert(rewrite.includes("injectPreviewBootAudit"), "rewrite wires audit");
 assert(panel.includes("isPreviewBootAuditMessage"), "panel handles audit messages");
 assert(types.includes("summarizeBootAudit"), "audit summarizer exists");
+assert(types.includes("isIgnorablePreviewAssetLoadFailure"), "ignorable asset filter exists");
+assert(audit.includes("ignorableAssetFailure"), "iframe audit filters route-root false positives");
 
 console.log("✓ verify:preview-boot-resource-audit");

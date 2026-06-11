@@ -23,11 +23,27 @@ export function buildPreviewBootAuditScript(): string {
   window.addEventListener("unhandledrejection",function(ev){
     post("runtime-error",{errorMessage:String(ev.reason||"unhandled rejection"),errorStack:ev.reason&&ev.reason.stack?String(ev.reason.stack):undefined});
   });
+  function ignorableAssetFailure(url,tagName){
+    var raw=String(url||"").trim();
+    if(!raw||raw==="#"||raw.indexOf("#")===0)return true;
+    var path=raw;
+    try{
+      if(/^https?:\\/\\//i.test(raw))path=new URL(raw).pathname;
+      else path=(raw.split("?")[0]||raw).split("#")[0]||raw;
+    }catch(e){path=(raw.split("?")[0]||raw);}
+    if(path==="/"||path==="")return true;
+    if(/\\.(js|mjs|cjs|css|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|map|json)(\\?|$)/i.test(path))return false;
+    var tag=String(tagName||"").toUpperCase();
+    if(/^\\/[A-Za-z0-9_./-]*$/.test(path)&&path.indexOf(".")===-1){
+      if(tag==="LINK"||tag==="A"||tag==="SCRIPT")return true;
+    }
+    return false;
+  }
   document.addEventListener("error",function(ev){
     var t=ev.target;
     if(!t||!(t instanceof HTMLElement))return;
     var url=t.getAttribute("src")||t.getAttribute("href")||"";
-    if(!url)return;
+    if(!url||ignorableAssetFailure(url,t.tagName))return;
     post("asset-error",{failedAssetUrl:url,failedAssetTag:t.tagName});
   },true);
   if("serviceWorker" in navigator){
