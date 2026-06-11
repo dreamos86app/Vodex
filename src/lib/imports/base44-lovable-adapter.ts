@@ -159,18 +159,27 @@ export function analyzeLegacyAdapter(
       if(path==="/me"||path.endsWith("/me"))return jsonResponse({data:mockUser,user:mockUser,session:{user:mockUser}});
       if(/\\/batch(\\?|$|\\/)/i.test(path))return jsonResponse({data:[],results:[],ok:true});
       if(path==="/null"||path.endsWith("/null"))return jsonResponse({data:null,ok:true});
-      if(/getRipoAssetPublic|RipoAsset|AssetPublic/i.test(path)){
+      if(/getRipoAssetPublic|RipoAsset|AssetPublic|ripo|lottie|animation/i.test(path)||/getRipoAssetPublic|RipoAsset|ripo|lottie/i.test(String(url))){
         var pid=window.__VODEX_PROJECT_ID__;
         if(pid){
           var q=String(url).split("?")[1]||"";
-          var nameMatch=q.match(/(?:name|asset|id|key)=([^&]+)/i)||path.match(/([^/]+)$/);
+          var nameMatch=q.match(/(?:name|asset|id|key|file|path)=([^&]+)/i)||path.match(/([^/?]+)(?:\\?|$)/);
           var assetName=nameMatch?decodeURIComponent(nameMatch[1]):"";
-          return origFetch("/api/projects/"+pid+"/imported-assets/lookup?name="+encodeURIComponent(assetName))
+          return origFetch("/api/projects/"+pid+"/imported-assets/lookup?name="+encodeURIComponent(assetName),{credentials:"include"})
             .then(function(r){return r.ok?r.json():{data:null};})
-            .then(function(j){return jsonResponse(j&&j.data?j:{data:j,items:j?[j]:[],ok:true,url:j&&j.public_url});})
+            .then(function(j){
+              var url=j&&j.public_url||j&&j.url||(j&&j.data&&j.data.public_url);
+              if(url)return jsonResponse({data:j.data||j,items:j.items||[j.data||j],ok:true,url:url,public_url:url,animation_url:url,src:url});
+              return jsonResponse({data:j&&j.data?j.data:j,items:j&&j.items?j.items:[],ok:true});
+            })
             .catch(function(){return jsonResponse({data:[],items:[],ok:true});});
         }
         return jsonResponse({data:[],items:[],ok:true});
+      }
+      if(/\\/auth\\/|\\/oauth\\/|loginWithGoogle|signInWithGoogle/i.test(path)&&(!init||!init.method||init.method==="GET"||init.method==="POST")){
+        var loginUrl=previewAuthUrl();
+        if(loginUrl)return jsonResponse({url:loginUrl,redirect_url:loginUrl,authorization_url:loginUrl,ok:true});
+        return jsonResponse({data:mockUser,user:mockUser});
       }
       if(/\\/auth\\/|\\/login|\\/signup/i.test(path)&&(!init||!init.method||init.method==="GET"))return jsonResponse({data:mockUser,user:mockUser});
       if(/\\/entities\\/|\\/records\\/|\\/invoke/i.test(path))return jsonResponse({data:[],ok:true});
@@ -181,6 +190,14 @@ export function analyzeLegacyAdapter(
       var mocked=mockPreviewApi(url,init);
       if(mocked)return mocked;
       if(/base44\\.dev|\\/api\\/base44|functions\\.invoke/i.test(url)){
+        if(/ripo|lottie|asset|animation|getRipo/i.test(url)){
+          var ripoMock=mockPreviewApi(url,init);
+          if(ripoMock)return ripoMock;
+        }
+        if(/\\/auth\\/|\\/oauth\\/|loginWithGoogle|signInWithGoogle/i.test(url)){
+          var loginUrl=previewAuthUrl();
+          if(loginUrl)return jsonResponse({url:loginUrl,redirect_url:loginUrl,ok:true});
+        }
         warn("Mocked Base44 API: "+url);
         return jsonResponse({data:[],ok:true,user:mockUser,session:{user:mockUser}});
       }

@@ -98,6 +98,17 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
       window.dispatchEvent(new PopStateEvent("popstate",{state:{__vodex:virtualPath}}));
     }catch(e){}
   }
+  function isOAuthNavUrl(url){
+    if(typeof url!=="string"||!url)return false;
+    return /accounts\\.google|google\\.com\\/o\\/oauth|oauth2\\/auth|base44\\.(dev|app)|appleid\\.apple\\.com|\\/auth\\/google|\\/oauth\\/google/i.test(url);
+  }
+  function redirectPreviewLogin(){
+    try{
+      var m=location.pathname.match(/^(\\/preview-runtime\\/[^/]+\\/[^/]+)/);
+      if(m){location.href=m[1]+"/login";return;}
+    }catch(e){}
+    setVirtualPath("/login");
+  }
   function internalize(url){
     if(typeof url!=="string")return null;
     if(/base44\\.dev|base44\\.app/i.test(url))return"/login";
@@ -135,6 +146,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
     var hrefDesc=Object.getOwnPropertyDescriptor(Location.prototype,"href");
     if(hrefDesc&&hrefDesc.get){
       var origHrefGet=hrefDesc.get;
+      var origHrefSet=hrefDesc.set;
       Object.defineProperty(Location.prototype,"href",{
         get:function(){
           if(window.__VODEX_PREVIEW_ACTIVE__){
@@ -143,6 +155,10 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
             return location.origin+p+(location.search||"");
           }
           return origHrefGet.call(this);
+        },
+        set:function(v){
+          if(typeof v==="string"&&isOAuthNavUrl(v)){redirectPreviewLogin();return;}
+          if(origHrefSet)return origHrefSet.call(this,v);
         },
         configurable:true
       });
@@ -180,6 +196,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
     var _open=window.open;
     window.open=function(url,target,features){
       if(typeof url==="string"){
+        if(isOAuthNavUrl(url)){redirectPreviewLogin();return null;}
         var p=internalize(url);
         if(p){setVirtualPath(p);return null;}
       }
@@ -187,6 +204,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
     };
     var _assign=location.assign.bind(location);
     location.assign=function(url){
+      if(typeof url==="string"&&isOAuthNavUrl(url)){redirectPreviewLogin();return;}
       var p=internalize(url);
       if(p){setVirtualPath(p);return;}
       if(typeof url==="string"&&isPlatformPreviewPath(url)){setVirtualPath("/");return;}
@@ -194,6 +212,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
     };
     var _locReplace=location.replace.bind(location);
     location.replace=function(url){
+      if(typeof url==="string"&&isOAuthNavUrl(url)){redirectPreviewLogin();return;}
       var p=internalize(url);
       if(p){setVirtualPath(p);return;}
       if(typeof url==="string"&&isPlatformPreviewPath(url)){setVirtualPath("/");return;}

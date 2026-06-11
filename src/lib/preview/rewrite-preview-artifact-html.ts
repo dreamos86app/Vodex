@@ -5,6 +5,7 @@ import { buildInternalPreviewHtmlUrl } from "@/lib/preview/internal-preview-url"
 import { stripPreviewPlatformPathsFromText } from "@/lib/preview/strip-preview-platform-paths";
 import { sanitizePreviewDocument } from "@/lib/preview/preview-html-sanitizer";
 import { injectPreviewAuthCompat } from "@/lib/preview/inject-preview-auth-compat";
+import { injectPreviewAuthGuard } from "@/lib/preview/inject-preview-auth-guard";
 import { injectPreviewProjectContext } from "@/lib/preview/inject-preview-project-context";
 import { injectPreviewBootAudit } from "@/lib/preview/inject-preview-boot-audit";
 import { rewriteForeignSupabaseStorageUrls } from "@/lib/preview/preview-external-asset-rewrite";
@@ -75,6 +76,8 @@ export function rewritePreviewArtifactHtml(
 
   out = rewriteAbsoluteVodexLinksInHtml(out);
   out = rewriteForeignSupabaseStorageUrls(out);
+  /** Auth guard first in inject chain — executes last so href setter survives virtual-history patches. */
+  out = injectPreviewAuthGuard(out);
   /** Router shim first, prehydration last — last prepend wins first execution in <head>. */
   out = injectPreviewRouterShim(out, routePath);
   out = injectPreviewPrehydrationLocationRewrite(out, routePath);

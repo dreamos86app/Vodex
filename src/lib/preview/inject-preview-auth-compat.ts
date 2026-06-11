@@ -1,5 +1,7 @@
 /** Preview-only auth compat — Base44 / Supabase clients missing redirectToLogin in iframe. */
 
+import { buildPreviewAuthGuardScript } from "@/lib/preview/inject-preview-auth-guard";
+
 export function buildPreviewAuthCompatScript(): string {
   return `(function(){
   if(window.__VODEX_AUTH_COMPAT__)return;
@@ -85,7 +87,7 @@ export function buildPreviewAuthCompatScript(): string {
 /** Prepend auth compat to served JS bundles (Vite chunks with inlined Base44 client). */
 export function prependPreviewAuthCompatToJs(bundle: string): string {
   if (bundle.includes("__VODEX_AUTH_COMPAT__")) return bundle;
-  return `${buildPreviewAuthCompatScript()}\n${patchMinifiedAuthObjectsInJs(bundle)}`;
+  return `${buildPreviewAuthGuardScript()}\n${buildPreviewAuthCompatScript()}\n${patchMinifiedAuthObjectsInJs(bundle)}`;
 }
 
 const PREVIEW_AUTH_NAV_FN =

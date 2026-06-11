@@ -51,6 +51,10 @@ function suggestFixes(input: PreviewIncidentPromptInput): string[] {
       fixes.push(
         "Add Base44 auth.redirectToLogin to preview shim (inject-preview-auth-compat.ts, base44-lovable-adapter.ts) and patch served JS chunks.",
       );
+    } else if (/google sign-in|opening secure google/i.test(s.bootFailureReason ?? "")) {
+      fixes.push(
+        "Intercept OAuth via inject-preview-auth-guard.ts (location.href + window.open) and redirect to preview-runtime /login.",
+      );
     } else {
       fixes.push(`Fix runtime error in imported bundle: ${s.firstRuntimeError}`);
     }
