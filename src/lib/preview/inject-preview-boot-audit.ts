@@ -94,22 +94,47 @@ export function buildPreviewBootAuditScript(): string {
     t=String(t||"").toLowerCase();
     return t.indexOf("opening secure google")>=0||t.indexOf("google sign-in")>=0||t.indexOf("connecting you securely")>=0;
   }
+  function isBase44WelcomeText(t){
+    t=String(t||"").toLowerCase();
+    if(isGoogleStuckText(t))return true;
+    if(t.indexOf("hang tight")>=0&&t.indexOf("secure")>=0)return true;
+    if(t.indexOf("base44")>=0)return true;
+    if(t.indexOf("sign in with google")>=0)return true;
+    if(t.indexOf("welcome")>=0&&t.indexOf("chef")>=0)return true;
+    return false;
+  }
   var stuckSince=0;
+  var base44Since=0;
   function auditAuthStuck(){
-    if(previewAuthed()){stuckSince=0;return;}
+    if(previewAuthed()){stuckSince=0;base44Since=0;return;}
     var snippet=bodySnippet();
-    if(!isGoogleStuckText(snippet)){stuckSince=0;return;}
-    if(!stuckSince)stuckSince=Date.now();
-    if(Date.now()-stuckSince<900)return;
-    post("auth-stuck",{
-      authStuckReason:"App waiting on Google OAuth in preview iframe (popup/redirect blocked)",
+    if(!isGoogleStuckText(snippet)){stuckSince=0;}else{
+      if(!stuckSince)stuckSince=Date.now();
+      if(Date.now()-stuckSince>=900){
+        post("auth-stuck",{
+          authStuckReason:"App waiting on Google OAuth in preview iframe (popup/redirect blocked)",
+          bodySnippet:snippet,
+          suggestedFix:"Redirect to preview-runtime /login Vodex auth page"
+        });
+        var login=previewLoginUrl();
+        if(login&&location.pathname.indexOf("/login")<0){
+          post("auth-redirect",{navigationMethod:"auth-guard",navigationUrl:login});
+          location.href=login;
+        }
+      }
+    }
+    if(!isBase44WelcomeText(snippet)){base44Since=0;return;}
+    if(!base44Since)base44Since=Date.now();
+    if(Date.now()-base44Since<1200)return;
+    post("base44-ui-detected",{
+      base44UiReason:"Imported app default welcome/auth UI visible instead of Vodex preview login",
       bodySnippet:snippet,
-      suggestedFix:"Redirect to preview-runtime /login Vodex auth page"
+      suggestedFix:"Mount iframe at preview-runtime/.../login; ensure inject-preview-root-auth-gate runs before SPA bundles"
     });
-    var login=previewLoginUrl();
-    if(login&&location.pathname.indexOf("/login")<0){
-      post("auth-redirect",{navigationMethod:"auth-guard",navigationUrl:login});
-      location.href=login;
+    var loginUrl=previewLoginUrl();
+    if(loginUrl&&location.pathname.indexOf("/login")<0){
+      post("auth-redirect",{navigationMethod:"base44-ui-detected",navigationUrl:loginUrl});
+      location.replace(loginUrl);
     }
   }
   setInterval(auditAuthStuck,500);

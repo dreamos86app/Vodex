@@ -68,12 +68,18 @@ function suggestFixes(input: PreviewIncidentPromptInput): string[] {
   if (s.loadedCount === 0 && s.cancelledOrIncompleteCount > 0) {
     fixes.push("Iframe remounted or wrong base path — lock preview-runtime mount URL; verify artifact index.html.");
   }
+  const base44Event = (input.bootEvents ?? []).find((e) => e.phase === "base44-ui-detected");
+  if (base44Event) {
+    fixes.unshift(
+      `Base44 default UI detected: ${base44Event.base44UiReason ?? "welcome/OAuth screen"}${base44Event.suggestedFix ? ` — ${base44Event.suggestedFix}` : ""}`,
+    );
+  }
   const authStuckEntry = (input.liveSnapshot?.entries ?? []).find(
-    (e) => e.kind === "auth" && /google|oauth|sign-in/i.test(e.message),
+    (e) => e.kind === "auth" && /google|oauth|sign-in|base44/i.test(e.message),
   );
   if (authStuckEntry) {
     fixes.unshift(
-      `Functional blocker: ${authStuckEntry.message}${authStuckEntry.rootCause ? ` — ${authStuckEntry.rootCause}` : ""}. Redirect iframe to preview-runtime/.../login (inject-preview-auth-guard.ts, preview-panel.tsx).`,
+      `Functional blocker: ${authStuckEntry.message}${authStuckEntry.rootCause ? ` — ${authStuckEntry.rootCause}` : ""}. Redirect iframe to preview-runtime/.../login (inject-preview-root-auth-gate.ts, preview-panel.tsx).`,
     );
   } else if (
     previewBootSucceeded(input.bootEvents ?? [], { iframeRemountCount: input.iframeMountCount })

@@ -42,6 +42,7 @@ import {
 } from "@/lib/preview/preview-iframe-url-resolver";
 import { navigatePreviewIframe } from "@/lib/preview/preview-route-navigation";
 import { isPreviewAuthSystemRoute } from "@/lib/preview/preview-auth-routes";
+import { withPreviewRuntimeLoginPath } from "@/lib/preview/preview-runtime-login-url";
 import {
   isPreviewInnerRouteErrorMessage,
   type PreviewInnerRouteErrorMessage,
@@ -298,16 +299,23 @@ export function PreviewPanel({
       Boolean(runtimeArtifactId && candidateMountSrc.includes(runtimeArtifactId));
 
     if (isPreviewPath && runtimePathReady && !lockedIframeSrcRef.current) {
-      lockedIframeSrcRef.current = candidateMountSrc;
+      const route = previewRoute ?? urlResolution?.route ?? "/";
+      lockedIframeSrcRef.current =
+        isImportedZip && route === "/"
+          ? withPreviewRuntimeLoginPath(candidateMountSrc)
+          : candidateMountSrc;
     }
   }
 
   const lockedMountSrc = lockedIframeSrcRef.current;
 
   const activeIframeSrc = React.useMemo(() => {
-    const base = lockedMountSrc;
+    let base = lockedMountSrc;
     if (!base) return null;
     const route = previewRoute ?? urlResolution?.route ?? "/";
+    if (isImportedZip && route === "/" && !isPreviewAuthSystemRoute(route)) {
+      base = withPreviewRuntimeLoginPath(base);
+    }
     if (!isPreviewAuthSystemRoute(route)) return base;
     try {
       const u = new URL(
@@ -319,7 +327,7 @@ export function PreviewPanel({
     } catch {
       return base;
     }
-  }, [lockedMountSrc, previewRoute, urlResolution?.route]);
+  }, [lockedMountSrc, previewRoute, urlResolution?.route, isImportedZip]);
 
   if (!stableArtifactIdRef.current) {
     stableArtifactIdRef.current =
@@ -463,17 +471,28 @@ export function PreviewPanel({
           detail: event.data.errorStack ? String(event.data.errorStack).slice(0, 320) : phase,
         });
         setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
-      } else if (phase === "auth-stuck" || phase === "auth-redirect") {
+      } else if (
+        phase === "auth-stuck" ||
+        phase === "auth-redirect" ||
+        phase === "base44-ui-detected"
+      ) {
         liveDiagnosticsRef.current.push({
           kind: "auth",
-          level: phase === "auth-stuck" ? "warn" : "info",
-          message: String(event.data.authStuckReason ?? event.data.navigationUrl ?? phase),
+          level: phase === "auth-redirect" ? "info" : "warn",
+          message: String(
+            event.data.base44UiReason ??
+              event.data.authStuckReason ??
+              event.data.navigationUrl ??
+              phase,
+          ),
           detail: typeof event.data.bodySnippet === "string" ? event.data.bodySnippet : undefined,
           rootCause:
-            "Google/Base44 OAuth blocked in iframe — Vodex login page required at preview-runtime/.../login",
+            typeof event.data.suggestedFix === "string"
+              ? event.data.suggestedFix
+              : "Google/Base44 OAuth blocked in iframe — Vodex login page required at preview-runtime/.../login",
         });
         setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
-        if (phase === "auth-stuck" && activeIframeSrc) {
+        if ((phase === "auth-stuck" || phase === "base44-ui-detected") && activeIframeSrc) {
           try {
             const loginUrl = activeIframeSrc.replace(/\/?$/, "") + "/login";
             if (iframeRef.current && iframeRef.current.src !== loginUrl) {

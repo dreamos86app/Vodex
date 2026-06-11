@@ -1091,7 +1091,7 @@ export function ChatView() {
   }, [hydrated]);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden overscroll-none">
       {debugEnabled && (
         <div
           className="shrink-0 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1 text-center text-[11px] font-semibold text-amber-950 dark:text-amber-100"

@@ -1652,11 +1652,18 @@ export function ImmersiveWorkspace({
   const nextPlanLabel = PLAN_NEXT_LABEL[planId] ?? "Starter";
   const showUpgradeCard = tokenBlocked && planId !== "enterprise";
 
+  const lockPageScroll = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "auto" });
+    document.querySelector("main")?.scrollTo({ top: 0, behavior: "auto" });
+  }, []);
+
   const scrollToBottom = React.useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior });
-  }, []);
+    lockPageScroll();
+  }, [lockPageScroll]);
 
   const buildStreamTick =
     buildJobProgress?.events?.length ??
@@ -3257,7 +3264,7 @@ export function ImmersiveWorkspace({
     <DropZone
       onFiles={onFiles}
       disabled={composerBlocked}
-      className="flex h-screen w-full flex-col overflow-hidden"
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden"
       data-testid="builder-shell"
     >
       {mode === "build" ? (
@@ -3353,8 +3360,8 @@ export function ImmersiveWorkspace({
 
         <div
           className={cn(
-            "flex min-h-0 flex-col overflow-hidden border-border/50 max-lg:flex-1 max-lg:w-full max-lg:max-w-none",
-            "lg:w-[34%] lg:min-w-[280px] lg:max-w-[420px] lg:border-r",
+            "flex min-h-0 flex-1 flex-col overflow-hidden border-border/50 max-lg:w-full max-lg:max-w-none",
+            "lg:w-[34%] lg:min-w-[280px] lg:max-w-[420px] lg:flex-none lg:border-r",
             mobilePanel !== "chat" && "max-lg:hidden",
           )}
         >
@@ -3388,7 +3395,7 @@ export function ImmersiveWorkspace({
             ref={scrollRef}
             onScroll={onChatScroll}
             className={cn(
-              "scrollbar-workflow vodex-scroll-panel min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]",
+              "scrollbar-workflow vodex-scroll-panel min-h-0 flex-1 overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]",
               mode === "build" && "bg-gradient-to-b from-accent/[0.04] to-transparent",
             )}
           >
@@ -3718,7 +3725,7 @@ export function ImmersiveWorkspace({
           <div
             ref={composerRootRef}
             className={cn(
-              "relative z-30 shrink-0 border-t border-border/50 bg-background/85 px-2.5 pb-3 pt-2 backdrop-blur-md max-lg:pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+              "relative z-30 shrink-0 border-t border-border/50 bg-background/85 px-2.5 pb-3 pt-2 backdrop-blur-md max-lg:pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+0.5rem))]",
               mobilePanel !== "chat" && "max-lg:hidden",
             )}
           >

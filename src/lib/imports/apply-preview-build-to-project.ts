@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ImportPreviewDiagnostics } from "@/lib/imports/import-diagnostics";
+import { importPreviewArtifactBinaryAssets } from "@/lib/import/import-zip-binary-assets";
 import { lifecyclePatch } from "@/lib/projects/project-lifecycle";
 import {
   canonicalPreviewRuntimeUrl,
   tryNormalizeInternalPreviewUrl,
 } from "@/lib/preview/internal-preview-url";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function applyPreviewBuildToProject(input: {
   writer: SupabaseClient;
@@ -83,4 +85,16 @@ export async function applyPreviewBuildToProject(input: {
     } as never)
     .eq("id", input.projectId)
     .eq("owner_id", input.userId);
+
+  if (input.diagnostics.previewRenderable && input.diagnostics.artifactPath) {
+    const admin = createSupabaseAdmin();
+    if (admin) {
+      await importPreviewArtifactBinaryAssets({
+        admin,
+        userId: input.userId,
+        projectId: input.projectId,
+        artifactPath: input.diagnostics.artifactPath,
+      });
+    }
+  }
 }

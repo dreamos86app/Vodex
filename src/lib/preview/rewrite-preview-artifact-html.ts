@@ -7,6 +7,7 @@ import { sanitizePreviewDocument } from "@/lib/preview/preview-html-sanitizer";
 import { injectPreviewAuthCompat } from "@/lib/preview/inject-preview-auth-compat";
 import { injectPreviewAuthGuard } from "@/lib/preview/inject-preview-auth-guard";
 import { injectPreviewProjectContext } from "@/lib/preview/inject-preview-project-context";
+import { injectPreviewRootAuthGate } from "@/lib/preview/inject-preview-root-auth-gate";
 import { injectPreviewBootAudit } from "@/lib/preview/inject-preview-boot-audit";
 import { rewriteForeignSupabaseStorageUrls } from "@/lib/preview/preview-external-asset-rewrite";
 import { stripIframeBlockingMetaFromHtml } from "@/lib/preview/preview-iframe-embed-headers";
@@ -87,6 +88,8 @@ export function rewritePreviewArtifactHtml(
   /** Auth compat last — prepends first in <head> so it runs before module bundles. */
   out = injectPreviewAuthCompat(out);
   out = injectPreviewProjectContext(out, projectId);
+  /** Last prepend = first execution — block Base44 welcome before any bundle runs. */
+  out = injectPreviewRootAuthGate(out);
   return sanitizePreviewDocument(out);
 }
 

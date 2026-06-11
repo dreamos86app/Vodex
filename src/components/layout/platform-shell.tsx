@@ -309,8 +309,8 @@ export function PlatformShell({
         </main>
       </div>
 
-      {/* Mobile bottom navigation — hide while drawer is open */}
-      {!mobileOpen && <MobileBottomNav />}
+      {/* Mobile bottom navigation — hide on full-bleed workspaces and while drawer is open */}
+      {!mobileOpen && !isFullBleed && <MobileBottomNav />}
       <DiagnosticsBootstrap />
       <AdminDiagnosticsDrawer />
     </div>

@@ -40,14 +40,22 @@ export async function POST(
   let zipResult = { imported: 0, skipped: 0, errors: [] as string[] };
   const { data: imported } = await supabase
     .from("imported_projects")
-    .select("source_archive_path")
+    .select("source_archive_path, meta")
     .eq("project_id", projectId)
     .maybeSingle();
 
-  if (imported?.source_archive_path) {
+  const importedMeta =
+    imported?.meta && typeof imported.meta === "object" && !Array.isArray(imported.meta)
+      ? (imported.meta as Record<string, unknown>)
+      : {};
+  const archivePath =
+    imported?.source_archive_path ??
+    (typeof importedMeta.storage_path === "string" ? importedMeta.storage_path : null);
+
+  if (archivePath) {
     const { data: blob, error: dlErr } = await admin.storage
       .from(ZIP_IMPORT_BUCKET)
-      .download(imported.source_archive_path);
+      .download(archivePath);
     if (dlErr || !blob) {
       zipResult.errors.push(dlErr?.message ?? "ZIP archive not found in storage");
     } else {

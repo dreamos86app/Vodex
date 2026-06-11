@@ -219,18 +219,28 @@ async function listArtifactPaths(
   prefix: string,
   acc: string[] = [],
 ): Promise<string[]> {
-  const { data, error } = await admin.storage.from(PREVIEW_ARTIFACTS_BUCKET).list(prefix, {
-    limit: 500,
-  });
-  if (error || !data) return acc;
-  for (const item of data) {
-    if (!item.name) continue;
-    const full = prefix ? `${prefix}/${item.name}` : item.name;
-    if (item.id) {
-      acc.push(full);
-    } else {
-      await listArtifactPaths(admin, full, acc);
+  let offset = 0;
+  const pageSize = 500;
+  for (;;) {
+    const { data, error } = await admin.storage.from(PREVIEW_ARTIFACTS_BUCKET).list(prefix, {
+      limit: pageSize,
+      offset,
+      sortBy: { column: "name", order: "asc" },
+    });
+    if (error) return acc;
+    if (!data?.length) break;
+    for (const item of data) {
+      if (!item.name) continue;
+      const full = prefix ? `${prefix}/${item.name}` : item.name;
+      const isFolder = item.id == null;
+      if (isFolder) {
+        await listArtifactPaths(admin, full, acc);
+      } else {
+        acc.push(full);
+      }
     }
+    if (data.length < pageSize) break;
+    offset += data.length;
   }
   return acc;
 }

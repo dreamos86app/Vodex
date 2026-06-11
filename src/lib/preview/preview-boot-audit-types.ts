@@ -18,8 +18,11 @@ export type PreviewBootAuditPayload = {
     | "navigation"
     | "serviceworker"
     | "auth-stuck"
-    | "auth-redirect";
+    | "auth-redirect"
+    | "base44-ui-detected";
   authStuckReason?: string;
+  base44UiReason?: string;
+  suggestedFix?: string;
   bodySnippet?: string;
   resources?: PreviewBootResourceEntry[];
   failedAssetUrl?: string;

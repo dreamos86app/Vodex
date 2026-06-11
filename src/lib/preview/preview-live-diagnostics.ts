@@ -113,6 +113,17 @@ export function createPreviewLiveDiagnostics(): {
           level: "info",
           message: `Redirecting to Vodex login: ${String(data.navigationUrl ?? "/login")}`,
         });
+      } else if (phase === "base44-ui-detected") {
+        push({
+          kind: "auth",
+          level: "warn",
+          message: String(data.base44UiReason ?? "Base44 default welcome UI detected"),
+          detail: typeof data.bodySnippet === "string" ? data.bodySnippet : undefined,
+          rootCause:
+            typeof data.suggestedFix === "string"
+              ? data.suggestedFix
+              : "SPA mounted before Vodex auth gate — use preview-runtime /login mount URL",
+        });
       } else if (phase === "ready") {
         push({ kind: "boot", level: "info", message: "Preview boot ready" });
       }
