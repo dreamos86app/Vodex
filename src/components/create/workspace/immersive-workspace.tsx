@@ -2856,7 +2856,6 @@ export function ImmersiveWorkspace({
   }, [
     effectiveProjectId,
     previewCacheBust,
-    previewRoute,
     previewArtifactId,
     previewRuntime?.previewUrl,
     previewRuntime?.jobId,

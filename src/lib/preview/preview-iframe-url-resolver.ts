@@ -186,12 +186,11 @@ export function resolvePreviewIframeUrl(input: {
       rejectReason = null;
       wasRejected = false;
     }
-  } else if (artifactId) {
+  } else if (artifactId && !isVirtualPreviewRuntimePath(normalizedPreviewUrl ?? "")) {
     normalizedPreviewUrl = buildVirtualPreviewRuntimeUrl({
       projectId: input.projectId,
       artifactBuildId: artifactId,
       route: "/",
-      cacheBust: cacheBust ?? undefined,
     });
     source = "rebuilt_canonical";
     wasNormalized = true;
@@ -214,7 +213,6 @@ export function resolvePreviewIframeUrl(input: {
             projectId: input.projectId,
             artifactBuildId: resolvedArtifactId,
             route: "/",
-            cacheBust: cacheBust ?? undefined,
           });
         } else {
           const parts = normalizedPreviewUrl.split("?")[0]!.split("/").filter(Boolean);
@@ -258,7 +256,13 @@ export function resolvePreviewIframeUrl(input: {
     candidates: evaluated,
   };
 
-  tracePreviewUrlCandidates(resolution, { projectId: input.projectId });
+  if (
+    typeof console !== "undefined" &&
+    process.env.NODE_ENV === "development" &&
+    process.env.NEXT_PUBLIC_PREVIEW_DEBUG === "true"
+  ) {
+    tracePreviewUrlCandidates(resolution, { projectId: input.projectId });
+  }
   return resolution;
 }
 

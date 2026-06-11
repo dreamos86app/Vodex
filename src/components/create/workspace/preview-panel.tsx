@@ -31,7 +31,10 @@ import {
   toPreviewIframeSrc,
   tryNormalizeInternalPreviewUrl,
 } from "@/lib/preview/rewrite-preview-artifact-html";
-import { isVirtualPreviewRuntimePath } from "@/lib/preview/internal-preview-url";
+import {
+  isVirtualPreviewRuntimePath,
+  stripPreviewCacheBustFromUrl,
+} from "@/lib/preview/internal-preview-url";
 import { analyzeIframeEmbeddabilityFromHeaders } from "@/lib/preview/preview-iframe-embed-headers";
 import {
   previewIframeDomKey,
@@ -189,7 +192,15 @@ export function PreviewPanel({
   const lastNavigatedRouteRef = React.useRef<string | null>(null);
   const lastMountSrcRef = React.useRef<string | null>(null);
   const stableArtifactIdRef = React.useRef<string | null>(null);
+  const lockedIframeSrcRef = React.useRef<string | null>(null);
   const [overlayVisible, setOverlayVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    lockedIframeSrcRef.current = null;
+    stableArtifactIdRef.current = null;
+    lastMountSrcRef.current = null;
+    lastNavigatedRouteRef.current = null;
+  }, [projectId, reloadKey]);
 
   const effectivePreviewPath = urlResolution?.normalizedPreviewUrl ?? url;
 
@@ -228,34 +239,58 @@ export function PreviewPanel({
     }
   }, [url, hasInline, urlResolution]);
 
-  const iframeMountSrc = React.useMemo(() => {
+  const candidateMountSrc = React.useMemo(() => {
     if (!resolvedPreviewUrl) return null;
+    return stripPreviewCacheBustFromUrl(resolvedPreviewUrl);
+  }, [resolvedPreviewUrl]);
+
+  const runtimeArtifactId =
+    urlResolution?.artifactId ?? stableArtifactIdRef.current;
+
+  if (candidateMountSrc) {
+    const isPreviewPath =
+      candidateMountSrc.includes("/preview-runtime/") ||
+      candidateMountSrc.includes("/preview-html");
+    const runtimePathReady =
+      !candidateMountSrc.includes("/preview-runtime/") ||
+      Boolean(runtimeArtifactId && candidateMountSrc.includes(runtimeArtifactId));
+
+    if (isPreviewPath && runtimePathReady && !lockedIframeSrcRef.current) {
+      lockedIframeSrcRef.current = candidateMountSrc;
+    }
+  }
+
+  const lockedMountSrc = lockedIframeSrcRef.current;
+
+  const activeIframeSrc = React.useMemo(() => {
+    const base = lockedMountSrc;
+    if (!base) return null;
     const route = previewRoute ?? urlResolution?.route ?? "/";
-    if (!isPreviewAuthSystemRoute(route)) return resolvedPreviewUrl;
+    if (!isPreviewAuthSystemRoute(route)) return base;
     try {
       const u = new URL(
-        resolvedPreviewUrl,
+        base,
         typeof window !== "undefined" ? window.location.origin : "https://vodex.dev",
       );
       u.searchParams.set("route", route);
       return u.href;
     } catch {
-      return resolvedPreviewUrl;
+      return base;
     }
-  }, [resolvedPreviewUrl, previewRoute, urlResolution?.route]);
+  }, [lockedMountSrc, previewRoute, urlResolution?.route]);
 
   if (urlResolution?.artifactId && !stableArtifactIdRef.current) {
     stableArtifactIdRef.current = urlResolution.artifactId;
   }
 
-  const iframeDomKey = React.useMemo(
+  const iframeReloadKey = React.useMemo(
     () =>
       previewIframeDomKey({
         projectId: projectId ?? "unknown",
-        artifactId: stableArtifactIdRef.current ?? urlResolution?.artifactId ?? null,
+        artifactId: "mount",
         reloadKey,
       }),
-    [projectId, urlResolution?.artifactId, reloadKey],
+    [projectId, reloadKey],
   );
 
   const artifactPreviewReady = Boolean(
@@ -268,19 +303,20 @@ export function PreviewPanel({
   // Route changes navigate inside the iframe — iframe src stays on preview root.
 
   React.useEffect(() => {
-    lastNavigatedRouteRef.current = null;
-    lastMountSrcRef.current = null;
-  }, [iframeDomKey]);
-
-  React.useEffect(() => {
-    const mountKey = hasInline ? `inline:${reloadKey}` : iframeMountSrc;
+    const mountKey = hasInline ? `inline:${reloadKey}` : activeIframeSrc;
     if (!mountKey) {
       setOverlayVisible(false);
       setIframeLoading(false);
       setLoadingStartedAt(null);
       return;
     }
-    if (lastMountSrcRef.current === mountKey) return;
+    if (lastMountSrcRef.current === mountKey) {
+      if (overlayMaxMs <= 0 || iframeLoaded) {
+        setOverlayVisible(false);
+        setIframeLoading(false);
+      }
+      return;
+    }
     lastMountSrcRef.current = mountKey;
 
     setIframeError(false);
@@ -295,14 +331,13 @@ export function PreviewPanel({
       return;
     }
 
-    setOverlayVisible(true);
     setIframeLoading(true);
     const t = window.setTimeout(() => {
       setOverlayVisible(false);
       setIframeLoading(false);
     }, overlayMaxMs);
     return () => window.clearTimeout(t);
-  }, [iframeMountSrc, hasInline, reloadKey, overlayMaxMs]);
+  }, [activeIframeSrc, hasInline, reloadKey, overlayMaxMs, iframeLoaded]);
 
   React.useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -318,16 +353,16 @@ export function PreviewPanel({
   }, []);
 
   React.useEffect(() => {
-    if (hasInline || !iframeMountSrc) {
+    if (hasInline || !activeIframeSrc) {
       setIframeHeaderProbe(null);
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        let res = await fetch(iframeMountSrc, { method: "HEAD", credentials: "include" });
+        let res = await fetch(activeIframeSrc, { method: "HEAD", credentials: "include" });
         if (res.status === 405 || res.status === 501) {
-          res = await fetch(iframeMountSrc, {
+          res = await fetch(activeIframeSrc, {
             method: "GET",
             credentials: "include",
             headers: { Range: "bytes=0-0" },
@@ -347,7 +382,7 @@ export function PreviewPanel({
     return () => {
       cancelled = true;
     };
-  }, [iframeMountSrc, hasInline, reloadKey]);
+  }, [activeIframeSrc, hasInline, reloadKey]);
 
   React.useEffect(() => {
     setBootAuditEvents([]);
@@ -378,19 +413,19 @@ export function PreviewPanel({
 
   React.useEffect(() => {
     setIframeMountCount((c) => c + 1);
-  }, [iframeDomKey]);
+  }, [iframeReloadKey]);
 
   React.useEffect(() => {
-    if (!iframeLoaded || hasInline || !iframeMountSrc) return;
+    if (!iframeLoaded || hasInline || !activeIframeSrc) return;
     const route = previewRoute ?? urlResolution?.route ?? "/";
     if (isPreviewAuthSystemRoute(route)) return;
     if (lastNavigatedRouteRef.current === route) return;
     lastNavigatedRouteRef.current = route;
     navigatePreviewIframe(iframeRef.current, route);
-  }, [previewRoute, urlResolution?.route, iframeLoaded, hasInline, iframeMountSrc]);
+  }, [previewRoute, urlResolution?.route, iframeLoaded, hasInline, activeIframeSrc]);
 
   React.useEffect(() => {
-    if (!overlayVisible || hasInline || !iframeMountSrc) return;
+    if (!overlayVisible || hasInline || !activeIframeSrc) return;
     const checkReady = () => {
       try {
         const doc = iframeRef.current?.contentDocument;
@@ -407,7 +442,7 @@ export function PreviewPanel({
     checkReady();
     const interval = window.setInterval(checkReady, 200);
     return () => window.clearInterval(interval);
-  }, [overlayVisible, iframeMountSrc, hasInline]);
+  }, [overlayVisible, activeIframeSrc, hasInline]);
 
   const previewUrlInvalid = Boolean(
     (effectivePreviewPath || urlResolution?.selectedPreviewUrl) && !hasInline && !resolvedPreviewUrl,
@@ -481,8 +516,16 @@ export function PreviewPanel({
     hasInline ||
     !effectivePreviewPath ||
     ((isArtifactUrl || Boolean(resolvedPreviewUrl)) && !rawBlocked && !headerBlocksEmbed);
+  const internalPreviewMount = Boolean(
+    isInternalPreviewProxyUrl(effectivePreviewPath) ||
+      isInternalPreviewProxyUrl(url) ||
+      (resolvedPreviewUrl ? isInternalPreviewProxyUrl(resolvedPreviewUrl) : false),
+  );
   const embedBlocked = Boolean(
-    (effectivePreviewPath || url) && !hasInline && (!artifactUrlOk || rawBlocked || headerBlocksEmbed),
+    !internalPreviewMount &&
+      (effectivePreviewPath || url) &&
+      !hasInline &&
+      (!artifactUrlOk || rawBlocked || headerBlocksEmbed),
   );
   const embedBlockReason =
     previewUrlInvalid
@@ -559,7 +602,21 @@ export function PreviewPanel({
   const showArtifact = hasPreviewArtifact && !showBuildShell;
   const showRuntimeOverlay = showArtifact && canonicalPreview.showRuntimeOverlay;
   const showEmbedFallback = showArtifact && embedBlocked && !hasInline && !canonicalPreview.showErrorPanel;
-  const showIframe = showArtifact && canonicalPreview.showIframe && !showEmbedFallback && !showRuntimeOverlay;
+  const showIframeSurface =
+    showArtifact && canonicalPreview.showIframe && !showEmbedFallback && !showRuntimeOverlay;
+  const iframeMountEligible = hasInline
+    ? showArtifact && hasInline
+    : Boolean(lockedMountSrc && hasPreviewArtifact && !embedBlocked);
+
+  React.useEffect(() => {
+    if (!showIframeSurface || iframeLoaded || overlayMaxMs <= 0) {
+      if (iframeLoaded || overlayMaxMs <= 0) setOverlayVisible(false);
+      return;
+    }
+    if (!activeIframeSrc && !hasInline) return;
+    setOverlayVisible(true);
+  }, [showIframeSurface, iframeLoaded, overlayMaxMs, activeIframeSrc, hasInline]);
+
   const generationContinuing = canonicalPreview.showGenerationContinuingCopy;
   const showInnerRouteError = Boolean(innerRouteError && showArtifact && !embedBlocked);
   const showUniversalError =
@@ -571,7 +628,7 @@ export function PreviewPanel({
   const showBootFailure =
     !bootFailureDismissed &&
     canonicalPreview.state === "ready" &&
-    showIframe &&
+    showIframeSurface &&
     Boolean(bootAuditSummary.bootFailureReason) &&
     !overlayVisible &&
     (bootAuditEvents.some((e) => e.phase === "asset-error" || e.phase === "runtime-error") ||
@@ -585,7 +642,8 @@ export function PreviewPanel({
     console.info("[preview-render-gate]", {
       canonicalState: canonicalPreview.state,
       sourceOfTruth: canonicalPreview.sourceOfTruth,
-      showIframe,
+      showIframe: showIframeSurface,
+      iframeMountEligible,
       showBuildShell,
       showRuntimeOverlay,
       showUniversalError,
@@ -607,7 +665,8 @@ export function PreviewPanel({
   }, [
     showPreviewDebug,
     canonicalPreview,
-    showIframe,
+    showIframeSurface,
+    iframeMountEligible,
     showBuildShell,
     showRuntimeOverlay,
     showUniversalError,
@@ -1079,16 +1138,16 @@ export function PreviewPanel({
           </div>
         ) : null}
 
-        {showIframe && (
+        {iframeMountEligible && (
           <div
             className={cn(
               "absolute inset-0 overflow-hidden",
+              !showIframeSurface && "pointer-events-none invisible",
               viewport !== "desktop" && "flex items-center justify-center bg-[#0a0a0b] p-4",
             )}
             data-testid="preview-fit-canvas"
           >
               <div
-                key={iframeDomKey}
                 className={cn(
                   "relative flex flex-col overflow-hidden",
                   viewport === "desktop" &&
@@ -1134,7 +1193,7 @@ export function PreviewPanel({
                     viewport === "desktop" && "h-full w-full",
                   )}
                 >
-                {overlayVisible ? (
+                {showIframeSurface && overlayVisible && !iframeLoaded ? (
                   <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm">
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="size-5 animate-spin text-accent" strokeWidth={1.75} />
@@ -1144,8 +1203,9 @@ export function PreviewPanel({
                 ) : null}
 
                 <iframe
+                    key={iframeReloadKey}
                     ref={iframeRef}
-                    src={hasInline ? undefined : iframeMountSrc ?? undefined}
+                    src={hasInline ? undefined : activeIframeSrc ?? undefined}
                     srcDoc={hasInline ? (srcDoc ?? undefined) : undefined}
                     title={appName ?? "App preview"}
                     className="h-full w-full flex-1 border-0"

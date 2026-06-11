@@ -178,6 +178,24 @@ export function isVirtualPreviewRuntimePath(url: string): boolean {
   return url.startsWith(VIRTUAL_PREVIEW_PREFIX);
 }
 
+/** Strip cache-bust query params so iframe src does not churn on poll/refresh. */
+export function stripPreviewCacheBustFromUrl(url: string): string {
+  try {
+    const base =
+      typeof window !== "undefined" ? window.location.origin : "https://vodex.dev";
+    const parsed = new URL(url.trim(), base);
+    parsed.searchParams.delete("v");
+    return parsed.href;
+  } catch {
+    return url.replace(/([?&])v=[^&]+&?/g, "$1").replace(/[?&]$/, "");
+  }
+}
+
+/** Canonical mount URL for iframe — stable href without cache bust. */
+export function canonicalPreviewMountUrl(url: string): string {
+  return stripPreviewCacheBustFromUrl(url);
+}
+
 /** Build preview-html frame path with route + optional artifact build id. */
 export function buildInternalPreviewHtmlUrl(input: {
   projectId: string;
