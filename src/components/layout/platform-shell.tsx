@@ -272,6 +272,7 @@ export function PlatformShell({
 
         {/* Only this scrolls — sidebar/topbar stay fixed */}
         <main
+          data-full-bleed={isFullBleed ? "true" : undefined}
           className={
             isHomeShellScroll
               ? "relative flex min-h-0 flex-1 min-w-0 flex-col overflow-y-auto overflow-x-hidden vodex-scroll-panel vodex-mobile-content-pad lg:pb-0"
@@ -296,11 +297,11 @@ export function PlatformShell({
               isHomeShellScroll
                 ? "flex min-h-full w-full min-w-0 flex-col"
                 : isFullBleed
-                  ? "flex h-full min-h-0 min-w-0 flex-col"
+                  ? "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
                   : "flex min-h-full flex-1 flex-col"
             }
           >
-            <div className="flex-1">{children}</div>
+            {children}
             {!isFullBleed &&
               !isOnboarding &&
               pathname !== "/projects" &&

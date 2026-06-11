@@ -78,14 +78,18 @@ function safeStorageName(relativePath: string): string {
 }
 
 function isImportableAssetPath(relativePath: string, ext: string): boolean {
+  const lower = relativePath.toLowerCase();
   if (BINARY_EXT.has(ext)) {
     if (ext === "json" || ext === "ripo") {
-      return (
-        LOTTIE_PATH_RE.test(relativePath) ||
-        /^public\/.+\.(json|ripo)$/i.test(relativePath) ||
-        /\/assets\/.+\.(json|ripo)$/i.test(relativePath)
-      );
+      if (LOTTIE_PATH_RE.test(relativePath)) return true;
+      if (/^public\//i.test(lower)) return true;
+      if (/\/assets\//i.test(lower)) return true;
+      if (/^src\/assets\//i.test(lower)) return true;
+      return false;
     }
+    if (/^public\//i.test(lower)) return true;
+    if (/^src\/assets\//i.test(lower)) return true;
+    if (/\/assets\//i.test(lower)) return true;
     return true;
   }
   return false;

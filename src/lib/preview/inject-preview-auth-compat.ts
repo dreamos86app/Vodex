@@ -15,6 +15,17 @@ export function buildPreviewAuthCompatScript(): string {
   var mockUser={id:"preview-user",email:"preview@vodex.dev",user_metadata:{full_name:"Preview User"}};
   function previewAuthed(){try{return localStorage.getItem("sb-preview-auth")==="1";}catch(e){return false;}}
   function navLogin(){
+    if(previewAuthed()){
+      try{
+        var t=sessionStorage.getItem("vodex-preview-post-auth-route");
+        if(t&&typeof window.__VODEX_VIRTUAL_PATH__!=="undefined"){
+          var p=t.startsWith("/")?t:"/"+t;
+          window.__VODEX_VIRTUAL_PATH__=p;
+          try{history.replaceState({__vodex:p},"",location.pathname+(location.search||""));window.dispatchEvent(new PopStateEvent("popstate",{state:{__vodex:p}}));}catch(e){}
+        }
+      }catch(e){}
+      return Promise.resolve({data:{user:mockUser,session:{user:mockUser}},error:null});
+    }
     __vodexGoLogin("auth compat -> Vodex preview login");
     return Promise.resolve({ok:true});
   }
@@ -28,7 +39,9 @@ export function buildPreviewAuthCompatScript(): string {
     if(!auth||typeof auth!=="object")return auth;
     var names=["redirectToLogin","login","signIn","requireAuth"];
     for(var i=0;i<names.length;i++){
-      if(typeof auth[names[i]]!=="function")auth[names[i]]=navLogin;
+      if(typeof auth[names[i]]!=="function"){
+        auth[names[i]]=function(){return previewAuthed()?Promise.resolve(mockUser):navLogin();};
+      }
     }
     if(typeof auth.redirectToSignup!=="function")auth.redirectToSignup=navSignup;
     if(typeof auth.signUp!=="function")auth.signUp=navSignup;

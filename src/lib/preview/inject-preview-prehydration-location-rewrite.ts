@@ -14,8 +14,15 @@ export function buildPrehydrationLocationRewriteScript(virtualRoute: string): st
   var RTP=('preview'+'-'+'runtime');
   var params=new URLSearchParams(location.search);
   var route=${JSON.stringify(route)};
+  var routeLocked=false;
   var override=params.get('route');
-  if(override){if(!override.startsWith('/'))override='/'+override;route=override;}
+  if(override){if(!override.startsWith('/'))override='/'+override;route=override;routeLocked=true;}
+  if(!routeLocked){
+    try{
+      var stored=sessionStorage.getItem('vodex-preview-post-auth-route');
+      if(stored){if(!stored.startsWith('/'))stored='/'+stored;route=stored;routeLocked=true;}
+    }catch(e){}
+  }
   var path=location.pathname||'';
   var onProxy=path.indexOf(AAP)>=0&&path.indexOf(PH)>=0;
   var onRuntime=path.indexOf(RT)===0;
@@ -23,8 +30,10 @@ export function buildPrehydrationLocationRewriteScript(virtualRoute: string): st
   if(onRuntime){
     var parts=path.split('/').filter(Boolean);
     if(parts.length>=3){window.__VODEX_PREVIEW_RUNTIME_BASE__='/'+parts.slice(0,3).join('/');}
-    if(parts.length>3){route='/'+parts.slice(3).join('/');}
-    else{route='/';}
+    if(!routeLocked){
+      if(parts.length>3){route='/'+parts.slice(3).join('/');}
+      else{route='/';}
+    }
   }
   window.__VODEX_PREVIEW_ORIGINAL_URL__=location.href;
   window.__VODEX_PREVIEW_VIRTUAL_ROUTE__=route;

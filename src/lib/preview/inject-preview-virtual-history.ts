@@ -20,6 +20,15 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
   }
   var LOCK='/';
   var virtualPath=${JSON.stringify(route)};
+  var params=new URLSearchParams(location.search);
+  var routeOverride=params.get('route');
+  if(routeOverride){if(!routeOverride.startsWith('/'))routeOverride='/'+routeOverride;virtualPath=routeOverride;}
+  else{
+    try{
+      var stored=sessionStorage.getItem('vodex-preview-post-auth-route');
+      if(stored){virtualPath=stored.startsWith('/')?stored:'/'+stored;}
+    }catch(e){}
+  }
   var PH=('preview'+'-'+'html');
   var AP=('api/'+'projects/');
   var AAP=('/'+'api/'+'projects/');

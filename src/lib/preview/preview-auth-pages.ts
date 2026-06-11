@@ -126,6 +126,20 @@ h1{font-size:1.45rem;font-weight:700;margin:14px 0 4px;letter-spacing:-.02em;col
 }
 .btn-primary:hover{background:var(--accent-hover);box-shadow:0 6px 18px rgba(30,107,255,.32)}
 .btn-primary:active{transform:scale(.99)}
+.btn-primary.loading{opacity:.85;pointer-events:none;position:relative;color:transparent}
+.btn-primary.loading::after{
+  content:"";position:absolute;inset:0;margin:auto;width:20px;height:20px;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;
+  animation:vxSpin .65s linear infinite;
+}
+@keyframes vxSpin{to{transform:rotate(360deg)}}
+.loading-overlay{
+  display:none;position:fixed;inset:0;z-index:9999;background:rgba(255,255,255,.72);
+  backdrop-filter:blur(4px);align-items:center;justify-content:center;flex-direction:column;gap:12px;
+}
+.loading-overlay.show{display:flex}
+.loading-spinner{width:36px;height:36px;border:3px solid rgba(30,107,255,.2);border-top-color:var(--accent);border-radius:50%;animation:vxSpin .65s linear infinite}
+.loading-text{font-size:.9rem;font-weight:600;color:var(--text)}
 .err{display:none;margin-bottom:12px;padding:10px 12px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:.82rem}
 .err.show{display:block}
 .links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 16px;margin-top:16px;font-size:.82rem}
@@ -136,6 +150,10 @@ h1{font-size:1.45rem;font-weight:700;margin:14px 0 4px;letter-spacing:-.02em;col
 </style>
 </head>
 <body>
+<div id="vx-loading" class="loading-overlay" aria-live="polite">
+  <div class="loading-spinner"></div>
+  <p class="loading-text" id="vx-loading-msg">Signing you in…</p>
+</div>
 <div class="shell">
   <main class="card">
     <div class="brand">${icon}<h1 id="vx-title">Welcome back</h1><p class="sub" id="vx-sub">Sign in to continue to ${input.appName}</p></div>
@@ -207,16 +225,26 @@ h1{font-size:1.45rem;font-weight:700;margin:14px 0 4px;letter-spacing:-.02em;col
     var base=previewRuntimeBase();
     return base?base+"/":null;
   }
+  function showLoading(msg){
+    var el=document.getElementById("vx-loading");
+    var m=document.getElementById("vx-loading-msg");
+    if(m&&msg)m.textContent=msg;
+    if(el)el.classList.add("show");
+    document.querySelectorAll(".btn-primary").forEach(function(b){b.classList.add("loading");b.disabled=true;});
+  }
   function finish(user){
     var home=previewAppHomeUrl();
     if(!home){showErr("Could not return to the app preview.");return;}
     var u=user||mockUser;
-    var route=postAuthRoute||"/";
+    var route=postAuthRoute||"/home";
+    showLoading(route==="/home"||route==="/Home"?"Opening your app…":"Taking you to "+route+"…");
     try{localStorage.setItem("sb-preview-auth","1");localStorage.setItem("vodex-preview-session",JSON.stringify(u));}catch(e){}
     try{sessionStorage.setItem("vodex-preview-post-auth-route",route);}catch(e){}
     try{parent.postMessage({type:"vodex-preview-route",path:route},"*");}catch(e){}
     var sep=home.indexOf("?")>=0?"&":"?";
-    window.location.replace(home+sep+"route="+encodeURIComponent(route));
+    setTimeout(function(){
+      window.location.replace(home+sep+"route="+encodeURIComponent(route));
+    },450);
   }
   function setView(name){
     document.querySelectorAll(".view").forEach(function(v){v.classList.remove("active");});

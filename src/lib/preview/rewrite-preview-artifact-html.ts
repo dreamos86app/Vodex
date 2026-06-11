@@ -8,6 +8,7 @@ import { injectPreviewAuthCompat } from "@/lib/preview/inject-preview-auth-compa
 import { injectPreviewAuthGuard } from "@/lib/preview/inject-preview-auth-guard";
 import { injectPreviewProjectContext } from "@/lib/preview/inject-preview-project-context";
 import { injectPreviewBootAudit } from "@/lib/preview/inject-preview-boot-audit";
+import { injectPreviewPostAuthEnforcer } from "@/lib/preview/inject-preview-post-auth-enforcer";
 import { rewriteForeignSupabaseStorageUrls } from "@/lib/preview/preview-external-asset-rewrite";
 import { stripIframeBlockingMetaFromHtml } from "@/lib/preview/preview-iframe-embed-headers";
 import {
@@ -84,6 +85,7 @@ export function rewritePreviewArtifactHtml(
   out = injectPreviewInnerWatchdog(out);
   out = stripIframeBlockingMetaFromHtml(out);
   out = injectPreviewBootAudit(out);
+  out = injectPreviewPostAuthEnforcer(out);
   /** Auth compat last — prepends first in <head> so it runs before module bundles. */
   out = injectPreviewAuthCompat(out);
   /** Last prepend = first execution — runtime base must exist before auth shims. */

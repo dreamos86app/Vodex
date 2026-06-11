@@ -17,8 +17,10 @@ function ChatFallback() {
 
 export default function ChatPage() {
   return (
-    <Suspense fallback={<ChatFallback />}>
-      <ChatView />
-    </Suspense>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <Suspense fallback={<ChatFallback />}>
+        <ChatView />
+      </Suspense>
+    </div>
   );
 }

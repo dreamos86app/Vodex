@@ -119,6 +119,14 @@ export function BuilderProjectGate({
     };
   }, [appId, failureReason, fetchProject, initialProject, loadError, userId]);
 
+  React.useEffect(() => {
+    if (phase !== "ready" || !appId) return;
+    void fetch(`/api/projects/${appId}/imported-assets/backfill`, {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => {});
+  }, [phase, appId]);
+
   if (phase === "loading") {
     return (
       <div

@@ -1510,7 +1510,7 @@ export function ChatView() {
         {/* Input area — pinned; never scrolls with messages */}
         <div
           ref={composerRootRef}
-          className="relative z-30 shrink-0 border-t border-border/60 bg-background px-2.5 pt-2 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.08)] pb-[max(0.75rem,calc(var(--vodex-mobile-bottom-nav-height,68px)+env(safe-area-inset-bottom,0px)+0.5rem))] sm:px-3 lg:pb-3"
+          className="relative z-30 shrink-0 border-t border-border/60 bg-background px-2.5 pt-2 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.08)] pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)+0.5rem))] sm:px-3 lg:pb-3"
         >
           {attachments.length > 0 && (
             <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-2">

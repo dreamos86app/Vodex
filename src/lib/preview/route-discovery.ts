@@ -21,7 +21,13 @@ const SKIP_SEGMENTS = new Set([
   "reset-password",
   "callback",
   "_auth",
+  "admin",
 ]);
+
+function isAdminOrDiagnosticRoute(path: string): boolean {
+  const lower = path.toLowerCase();
+  return /admin|diagnostic|debug|test-auth|authdiagnost/.test(lower);
+}
 
 function isAuthRoute(path: string): boolean {
   const parts = path.split("/").filter(Boolean);
@@ -200,7 +206,8 @@ export function resolvePreviewPostAuthRoute(paths: string[]): string {
   const normalized = [...new Set(paths.map(normalizeRoutePath))];
 
   for (const pref of POST_AUTH_ROUTE_PREFS) {
-    if (normalized.includes(pref)) return pref;
+    const found = normalized.find((p) => p.toLowerCase() === pref.toLowerCase());
+    if (found) return found;
   }
 
   const candidate = normalized.find(
@@ -208,10 +215,11 @@ export function resolvePreviewPostAuthRoute(paths: string[]): string {
       p !== "/" &&
       !WELCOME_LIKE.test(p) &&
       !isAuthRoute(p) &&
+      !isAdminOrDiagnosticRoute(p) &&
       !/\/welcome|splash|onboarding|intro|landing/i.test(p),
   );
 
-  return candidate ?? "/";
+  return candidate ?? "/home";
 }
 
 export function routesFromProjectMetadata(meta: Record<string, unknown> | null | undefined): string[] {

@@ -12,6 +12,7 @@ import {
   backfillProjectMediaIfNeeded,
   readBannerSvg,
 } from "@/lib/projects/backfill-project-media";
+import { backfillProjectIconIfMissing } from "@/lib/projects/backfill-project-icon";
 import { isWeakIconSvg } from "@/lib/projects/ensure-project-icon";
 import { isUserVisibleProject } from "@/lib/projects/user-visible-projects";
 import { computeProjectCardStatus } from "@/lib/projects/project-card-status";
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
   const { data: rows, error } = await writer
     .from("projects")
     .select(
-      "id, name, slug, status, framework, gradient, icon_url, icon_svg, preview_url, published_subdomain, build_status, metadata, description, updated_at, created_at, app_name, short_description",
+      "id, name, slug, status, framework, gradient, icon_url, icon_svg, preview_url, published_subdomain, build_status, metadata, description, updated_at, created_at, app_name, short_description, owner_id",
     )
     .eq("owner_id", user.id)
     .order("updated_at", { ascending: false });
@@ -50,8 +51,26 @@ export async function GET(request: Request) {
   let reconcileBudget = reconcile ? 12 : 0;
   for (const row of rows ?? []) {
     let icon_svg = row.icon_svg;
+    let icon_url = row.icon_url;
     let banner_svg = readBannerSvg(row.metadata);
     let metadata = row.metadata;
+
+    if (backfillBudget > 0 && (!icon_url?.trim() || isWeakIconSvg(icon_svg))) {
+      const iconFill = await backfillProjectIconIfMissing(writer, {
+        id: row.id,
+        owner_id: row.owner_id,
+        name: row.name,
+        app_name: row.app_name,
+        icon_url: row.icon_url,
+        icon_svg: row.icon_svg,
+        metadata: row.metadata,
+      });
+      if (iconFill.updated) {
+        icon_svg = iconFill.icon_svg;
+        icon_url = iconFill.icon_url;
+      }
+      backfillBudget -= 1;
+    }
 
     if (backfillBudget > 0 && (isWeakIconSvg(icon_svg) || !banner_svg)) {
       const filled = await backfillProjectMediaIfNeeded(writer, row);
@@ -105,6 +124,7 @@ export async function GET(request: Request) {
     projects.push({
       ...row,
       preview_url: normalizedPreviewUrl,
+      icon_url,
       icon_svg,
       banner_svg,
       metadata,
