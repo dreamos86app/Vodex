@@ -35,7 +35,7 @@ export async function GET(
 
   const { data: proj } = await supabase
     .from("projects")
-    .select("id, name, metadata")
+    .select("id, name, app_name, icon_url, metadata")
     .eq("id", projectId)
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -70,6 +70,8 @@ export async function GET(
         effectiveRoute,
         meta,
         typeof proj.name === "string" ? proj.name : null,
+        typeof proj.app_name === "string" ? proj.app_name : null,
+        typeof proj.icon_url === "string" ? proj.icon_url : null,
       )
     : null;
   if (authHtml) {

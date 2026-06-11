@@ -7,6 +7,7 @@ import {
   type AppAuthSettings,
 } from "@/lib/publish/default-auth-pages";
 import { mergePreviewIframeEmbedHeaders } from "@/lib/preview/preview-iframe-embed-headers";
+import { resolvePreviewAppIconUrl } from "@/lib/preview/resolve-preview-app-icon-url";
 
 type AuthPageKind = "login" | "signup" | "forgot" | "callback";
 
@@ -20,11 +21,10 @@ function pageKind(route: string): AuthPageKind {
 
 export function buildPreviewAuthPageHtml(input: {
   appName: string;
-  iconUrl?: string | null;
+  iconUrl: string;
   route: string;
   settings: AppAuthSettings;
   projectId?: string;
-  artifactId?: string;
 }): string {
   const kind = pageKind(input.route);
   const initialView =
@@ -37,9 +37,7 @@ export function buildPreviewAuthPageHtml(input: {
   if (input.settings.microsoft_enabled) providers.push("microsoft");
   if (input.settings.facebook_enabled) providers.push("facebook");
 
-  const icon = input.iconUrl
-    ? `<img src="${input.iconUrl}" alt="" class="brand-icon" />`
-    : `<div class="brand-fallback">${input.appName.charAt(0).toUpperCase()}</div>`;
+  const icon = `<img src="${input.iconUrl}" alt="" class="brand-icon" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.add('show');" /><div class="brand-fallback">${input.appName.charAt(0).toUpperCase()}</div>`;
 
   const oauthProvidersJson = JSON.stringify(providers);
   const emailEnabled = input.settings.email_password_enabled;
@@ -53,76 +51,75 @@ export function buildPreviewAuthPageHtml(input: {
 <style>
 *,*::before,*::after{box-sizing:border-box}
 :root{
-  --bg0:#0b0f1a;--bg1:#12182b;--card:rgba(255,255,255,.06);--card-border:rgba(255,255,255,.12);
-  --text:#f8fafc;--muted:#94a3b8;--accent:#6366f1;--accent2:#8b5cf6;--accent-glow:rgba(99,102,241,.45);
-  --danger:#f87171;--ok:#34d399;--input-bg:rgba(15,23,42,.65);--input-border:rgba(148,163,184,.22);
-  --radius:18px;--font:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --bg:#ffffff;--surface:#f8fafc;--text:#0f172a;--muted:#64748b;
+  --accent:#1e6bff;--accent-hover:#1558d6;--accent-soft:rgba(30,107,255,.1);
+  --border:#e2e8f0;--danger:#dc2626;--ok:#16a34a;
+  --radius:16px;--font:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --shadow:0 4px 24px rgba(15,23,42,.06),0 1px 3px rgba(15,23,42,.04);
 }
-html,body{margin:0;min-height:100%;font-family:var(--font);color:var(--text);background:var(--bg0)}
+html,body{margin:0;min-height:100%;font-family:var(--font);color:var(--text);background:var(--bg)}
 body{
-  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
   background:
-    radial-gradient(ellipse 80% 50% at 20% -10%,rgba(99,102,241,.35),transparent 55%),
-    radial-gradient(ellipse 60% 45% at 100% 0%,rgba(139,92,246,.28),transparent 50%),
-    linear-gradient(165deg,var(--bg0),var(--bg1));
+    radial-gradient(ellipse 90% 60% at 50% -20%,rgba(30,107,255,.08),transparent 60%),
+    linear-gradient(180deg,#f8fafc 0%,#ffffff 45%);
 }
-.shell{width:100%;max-width:440px;position:relative}
-.glow{position:absolute;inset:-40px -20px auto -20px;height:120px;background:radial-gradient(circle,rgba(99,102,241,.25),transparent 70%);filter:blur(24px);pointer-events:none}
+.shell{width:100%;max-width:420px}
 .card{
-  position:relative;border-radius:calc(var(--radius) + 4px);padding:32px 28px 28px;
-  background:linear-gradient(145deg,rgba(255,255,255,.09),rgba(255,255,255,.03));
-  border:1px solid var(--card-border);backdrop-filter:blur(18px);
-  box-shadow:0 24px 80px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);
+  border-radius:calc(var(--radius) + 2px);padding:32px 28px 24px;
+  background:var(--bg);border:1px solid var(--border);box-shadow:var(--shadow);
 }
-.brand{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:24px}
-.brand-icon,.brand-fallback{width:64px;height:64px;border-radius:18px}
-.brand-icon{object-fit:cover;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.brand{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:22px}
+.brand-icon,.brand-fallback{width:72px;height:72px;border-radius:20px}
+.brand-icon{object-fit:cover;border:1px solid var(--border);box-shadow:0 8px 20px rgba(15,23,42,.08)}
 .brand-fallback{
-  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
-  box-shadow:0 8px 28px var(--accent-glow);
+  display:none;align-items:center;justify-content:center;font-weight:800;font-size:28px;
+  background:linear-gradient(135deg,var(--accent),#4d8dff);color:#fff;
+  box-shadow:0 8px 24px rgba(30,107,255,.25);
 }
-h1{font-size:1.55rem;font-weight:700;margin:14px 0 6px;letter-spacing:-.02em}
-.sub{color:var(--muted);font-size:.9rem;margin:0;line-height:1.45}
-.view{display:none;animation:fadeIn .28s ease}
+.brand-fallback.show{display:flex}
+h1{font-size:1.45rem;font-weight:700;margin:14px 0 4px;letter-spacing:-.02em;color:var(--text)}
+.sub{color:var(--muted);font-size:.9rem;margin:0;line-height:1.5}
+.view{display:none;animation:fadeIn .22s ease}
 .view.active{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.oauth-grid{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.oauth-grid{display:flex;flex-direction:column;gap:10px;margin-top:18px}
 .oauth{
-  display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px 14px;
-  border-radius:14px;border:1px solid var(--input-border);background:rgba(15,23,42,.55);
-  color:var(--text);font-size:.9rem;font-weight:600;cursor:pointer;transition:transform .15s,border-color .15s,background .15s;
+  display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px 14px;
+  border-radius:12px;border:1px solid var(--border);background:var(--bg);
+  color:var(--text);font-size:.88rem;font-weight:600;cursor:pointer;
+  transition:border-color .15s,background .15s,box-shadow .15s;
 }
-.oauth:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.28);background:rgba(30,41,59,.75)}
-.oauth svg{width:18px;height:18px;flex-shrink:0}
-.divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.08em}
-.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--input-border)}
+.oauth:hover{border-color:#cbd5e1;background:var(--surface);box-shadow:0 2px 8px rgba(15,23,42,.04)}
+.divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--border)}
 .field{margin-bottom:12px}
-.field label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:6px}
+.field label{display:block;font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:6px}
 .field input{
-  width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--input-border);
-  background:var(--input-bg);color:var(--text);font-size:.92rem;outline:none;transition:border-color .15s,box-shadow .15s;
+  width:100%;padding:11px 13px;border-radius:12px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-size:.92rem;outline:none;
+  transition:border-color .15s,box-shadow .15s;
 }
-.field input:focus{border-color:rgba(99,102,241,.65);box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+.field input:focus{border-color:rgba(30,107,255,.55);box-shadow:0 0 0 3px rgba(30,107,255,.14)}
 .btn-primary{
-  width:100%;padding:13px;border:none;border-radius:14px;cursor:pointer;font-weight:700;font-size:.95rem;
-  color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));
-  box-shadow:0 10px 30px var(--accent-glow);transition:transform .15s,box-shadow .15s;
+  width:100%;padding:12px;border:none;border-radius:12px;cursor:pointer;font-weight:700;font-size:.92rem;
+  color:#fff;background:var(--accent);margin-top:4px;
+  transition:background .15s,transform .12s,box-shadow .15s;
+  box-shadow:0 4px 14px rgba(30,107,255,.28);
 }
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 14px 36px var(--accent-glow)}
-.btn-primary:active{transform:translateY(0)}
-.err{display:none;margin-bottom:12px;padding:11px 12px;border-radius:12px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);color:#fecaca;font-size:.82rem}
+.btn-primary:hover{background:var(--accent-hover);box-shadow:0 6px 18px rgba(30,107,255,.32)}
+.btn-primary:active{transform:scale(.99)}
+.err{display:none;margin-bottom:12px;padding:10px 12px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:.82rem}
 .err.show{display:block}
-.links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 16px;margin-top:18px;font-size:.82rem}
-.links a,.links button.link{color:var(--muted);background:none;border:none;padding:0;cursor:pointer;font:inherit;text-decoration:none}
-.links a:hover,.links button.link:hover{color:#e2e8f0;text-decoration:underline}
-.footnote{margin-top:22px;text-align:center;font-size:.72rem;color:rgba(148,163,184,.75);line-height:1.5}
-.success-icon{width:56px;height:56px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;background:rgba(52,211,153,.15);color:var(--ok);font-size:28px}
+.links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 16px;margin-top:16px;font-size:.82rem}
+.links button.link{color:var(--muted);background:none;border:none;padding:0;cursor:pointer;font:inherit}
+.links button.link:hover{color:var(--accent);text-decoration:underline}
+.footnote{margin-top:20px;text-align:center;font-size:.72rem;color:var(--muted);line-height:1.5}
+.success-icon{width:52px;height:52px;border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--ok);font-size:26px;font-weight:700}
 </style>
 </head>
 <body>
 <div class="shell">
-  <div class="glow"></div>
   <main class="card">
     <div class="brand">${icon}<h1 id="vx-title">Welcome back</h1><p class="sub" id="vx-sub">Sign in to continue to ${input.appName}</p></div>
     <div id="vx-error" class="err"></div>
@@ -162,7 +159,7 @@ h1{font-size:1.55rem;font-weight:700;margin:14px 0 6px;letter-spacing:-.02em}
     <section id="view-forgot-sent" class="view">
       <div class="success-icon">✓</div>
       <p class="sub" style="text-align:center">If an account exists for that email, we sent a reset link. Check your inbox.</p>
-      <div class="links" style="margin-top:24px"><button type="button" class="link" data-go="login">Return to sign in</button></div>
+      <div class="links" style="margin-top:20px"><button type="button" class="link" data-go="login">Return to sign in</button></div>
     </section>
 
     <section id="view-callback" class="view ${initialView === "callback" ? "active" : ""}">
@@ -178,19 +175,23 @@ h1{font-size:1.55rem;font-weight:700;margin:14px 0 6px;letter-spacing:-.02em}
   var providers=${oauthProvidersJson};
   var titles={login:{h:"Welcome back",s:"Sign in to continue"},signup:{h:"Create your account",s:"Join in seconds"},forgot:{h:"Reset password",s:"We'll email you a secure link"},"forgot-sent":{h:"Check your email",s:"Reset link sent"},"callback":{h:"Signing in…",s:"One moment"}};
   function showErr(msg){var el=document.getElementById("vx-error");if(!el)return;el.textContent=msg;el.classList.add("show");setTimeout(function(){el.classList.remove("show");},5000);}
-  function previewHomeUrl(){
+  function previewRuntimeBase(){
     try{
       var m=window.location.pathname.match(/^(\\/preview-runtime\\/[^/]+\\/[^/]+)/);
-      if(m)return m[1]+"/";
-    }catch(e){}
-    return "/";
+      return m?m[1]:null;
+    }catch(e){return null;}
+  }
+  function previewAppHomeUrl(){
+    var base=previewRuntimeBase();
+    return base?base+"/":null;
   }
   function finish(user){
+    var home=previewAppHomeUrl();
+    if(!home){showErr("Could not return to the app preview.");return;}
     var u=user||mockUser;
     try{localStorage.setItem("sb-preview-auth","1");localStorage.setItem("vodex-preview-session",JSON.stringify(u));}catch(e){}
-    try{window.parent.postMessage({type:"vodex:navigate",path:"/"},"*");}catch(e){}
-    try{window.__VODEX_VIRTUAL_PATH__="/";history.replaceState({__vodex:"/"},"","/");window.dispatchEvent(new PopStateEvent("popstate"));}catch(e){}
-    window.location.replace(previewHomeUrl());
+    try{parent.postMessage({type:"vodex-preview-route",path:"/"},"*");}catch(e){}
+    window.location.replace(home);
   }
   function setView(name){
     document.querySelectorAll(".view").forEach(function(v){v.classList.remove("active");});
@@ -247,6 +248,8 @@ export async function resolvePreviewAuthPageHtml(
   route: string,
   projectMeta?: Record<string, unknown>,
   projectName?: string | null,
+  appName?: string | null,
+  iconUrl?: string | null,
 ): Promise<string | null> {
   if (!isAuthSystemRoute(route)) return null;
 
@@ -266,12 +269,16 @@ export async function resolvePreviewAuthPageHtml(
 
   if (!authEnabled(settings)) return null;
 
-  const iconPath =
-    projectMeta && typeof projectMeta.icon_path === "string" ? projectMeta.icon_path : null;
+  const displayName = appName?.trim() || projectName?.trim() || "App";
+  const resolvedIcon = resolvePreviewAppIconUrl({
+    projectId,
+    iconUrl,
+    metadata: projectMeta,
+  });
 
   return buildPreviewAuthPageHtml({
-    appName: projectName ?? "App",
-    iconUrl: iconPath,
+    appName: displayName,
+    iconUrl: resolvedIcon,
     route,
     settings,
     projectId,

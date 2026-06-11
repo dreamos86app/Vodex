@@ -42,7 +42,6 @@ import {
 } from "@/lib/preview/preview-iframe-url-resolver";
 import { navigatePreviewIframe } from "@/lib/preview/preview-route-navigation";
 import { isPreviewAuthSystemRoute } from "@/lib/preview/preview-auth-routes";
-import { withPreviewRuntimeLoginPath } from "@/lib/preview/preview-runtime-login-url";
 import {
   isPreviewInnerRouteErrorMessage,
   type PreviewInnerRouteErrorMessage,
@@ -299,23 +298,16 @@ export function PreviewPanel({
       Boolean(runtimeArtifactId && candidateMountSrc.includes(runtimeArtifactId));
 
     if (isPreviewPath && runtimePathReady && !lockedIframeSrcRef.current) {
-      const route = previewRoute ?? urlResolution?.route ?? "/";
-      lockedIframeSrcRef.current =
-        isImportedZip && route === "/"
-          ? withPreviewRuntimeLoginPath(candidateMountSrc)
-          : candidateMountSrc;
+      lockedIframeSrcRef.current = candidateMountSrc;
     }
   }
 
   const lockedMountSrc = lockedIframeSrcRef.current;
 
   const activeIframeSrc = React.useMemo(() => {
-    let base = lockedMountSrc;
+    const base = lockedMountSrc;
     if (!base) return null;
     const route = previewRoute ?? urlResolution?.route ?? "/";
-    if (isImportedZip && route === "/" && !isPreviewAuthSystemRoute(route)) {
-      base = withPreviewRuntimeLoginPath(base);
-    }
     if (!isPreviewAuthSystemRoute(route)) return base;
     try {
       const u = new URL(
@@ -327,7 +319,7 @@ export function PreviewPanel({
     } catch {
       return base;
     }
-  }, [lockedMountSrc, previewRoute, urlResolution?.route, isImportedZip]);
+  }, [lockedMountSrc, previewRoute, urlResolution?.route]);
 
   if (!stableArtifactIdRef.current) {
     stableArtifactIdRef.current =
@@ -515,6 +507,19 @@ export function PreviewPanel({
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [activeIframeSrc]);
+
+  React.useEffect(() => {
+    const onRoute = (event: MessageEvent) => {
+      const data = event.data as { type?: string; path?: string } | null;
+      if (!data || data.type !== "vodex-preview-route") return;
+      const frameWin = iframeRef.current?.contentWindow;
+      if (frameWin && event.source !== frameWin) return;
+      const path = typeof data.path === "string" ? data.path : "/";
+      onPreviewRouteChange?.(path);
+    };
+    window.addEventListener("message", onRoute);
+    return () => window.removeEventListener("message", onRoute);
+  }, [onPreviewRouteChange]);
 
   React.useEffect(() => {
     if (!iframeLoaded || !activeIframeSrc || hasInline) return;
