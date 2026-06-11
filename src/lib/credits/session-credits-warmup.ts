@@ -99,11 +99,9 @@ export function beginSessionCreditsWarmup(
   }
 
   if (warmupUserId === userId) {
-    if (!useCreditsStore.getState().isConfirmed) {
-      void syncCreditsLiteForSession(userId).then((payload) => {
-        if (payload) markLiteCreditsFetched(userId);
-      });
-    }
+    void syncCreditsLiteForSession(userId).then((payload) => {
+      if (payload) markLiteCreditsFetched(userId);
+    });
     return;
   }
   warmupUserId = userId;

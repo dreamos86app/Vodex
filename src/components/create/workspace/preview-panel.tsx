@@ -49,6 +49,8 @@ import {
 import { PreviewInnerRouteErrorPanel } from "@/components/preview/preview-inner-route-error-panel";
 import { PreviewUniversalErrorPanel } from "@/components/preview/preview-universal-error-panel";
 import { PreviewDebugDrawer } from "@/components/preview/preview-debug-drawer";
+import { PreviewLiveDiagnosticBar } from "@/components/preview/preview-live-diagnostic-bar";
+import { createPreviewLiveDiagnostics } from "@/lib/preview/preview-live-diagnostics";
 import { resolvePreviewState } from "@/lib/preview/resolve-preview-state";
 import {
   isPreviewBootAuditMessage,
@@ -204,13 +206,36 @@ export function PreviewPanel({
   const stableArtifactIdRef = React.useRef<string | null>(null);
   const lockedIframeSrcRef = React.useRef<string | null>(null);
   const [overlayVisible, setOverlayVisible] = React.useState(false);
+  const liveDiagnosticsRef = React.useRef(createPreviewLiveDiagnostics());
+  const [liveDiagSnapshot, setLiveDiagSnapshot] = React.useState(
+    () => liveDiagnosticsRef.current.snapshot(),
+  );
+  const [previewLoadingMs, setPreviewLoadingMs] = React.useState(0);
 
   React.useEffect(() => {
     lockedIframeSrcRef.current = null;
     stableArtifactIdRef.current = null;
     lastMountSrcRef.current = null;
     lastNavigatedRouteRef.current = null;
+    liveDiagnosticsRef.current.reset();
+    setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
   }, [projectId, reloadKey]);
+
+  React.useEffect(() => {
+    const detach = liveDiagnosticsRef.current.attachWindow();
+    return detach;
+  }, []);
+
+  React.useEffect(() => {
+    if (!loadingStartedAt || iframeLoaded) {
+      setPreviewLoadingMs(0);
+      return;
+    }
+    const tick = window.setInterval(() => {
+      setPreviewLoadingMs(Date.now() - loadingStartedAt);
+    }, 250);
+    return () => window.clearInterval(tick);
+  }, [loadingStartedAt, iframeLoaded]);
 
   const effectivePreviewPath = urlResolution?.normalizedPreviewUrl ?? url;
 
@@ -412,7 +437,19 @@ export function PreviewPanel({
       const frameWin = iframeRef.current?.contentWindow;
       if (frameWin && event.source !== frameWin) return;
       setBootAuditEvents((prev) => [...prev.slice(-80), event.data]);
-      if (event.data.phase === "ready" || event.data.phase === "snapshot") {
+      const phase = event.data.phase;
+      if (phase === "asset-error" || phase === "runtime-error") {
+        liveDiagnosticsRef.current.push({
+          kind: "boot",
+          level: "error",
+          message: String(event.data.errorMessage ?? event.data.failedAssetUrl ?? phase),
+          detail: phase,
+        });
+        setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
+      }
+      if (phase === "ready" || phase === "snapshot") {
+        liveDiagnosticsRef.current.push({ kind: "boot", level: "info", message: "Preview boot ready" });
+        setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
         setOverlayVisible(false);
         setIframeLoading(false);
         setIframeLoaded(true);
@@ -628,13 +665,30 @@ export function PreviewPanel({
     : Boolean(lockedMountSrc && hasPreviewArtifact && !embedBlocked);
 
   React.useEffect(() => {
-    if (!showIframeSurface || iframeLoaded || overlayMaxMs <= 0) {
-      if (iframeLoaded || overlayMaxMs <= 0) setOverlayVisible(false);
-      return;
+    if (embedBlocked) {
+      liveDiagnosticsRef.current.push({
+        kind: "state",
+        level: "error",
+        message: embedBlockReason,
+      });
+      setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
     }
-    if (!activeIframeSrc && !hasInline) return;
-    setOverlayVisible(true);
-  }, [showIframeSurface, iframeLoaded, overlayMaxMs, activeIframeSrc, hasInline]);
+  }, [embedBlocked, embedBlockReason]);
+
+  React.useEffect(() => {
+    if (!loadingStartedAt || iframeLoaded || !showIframeSurface) return;
+    const t = window.setTimeout(() => {
+      liveDiagnosticsRef.current.push({
+        kind: "state",
+        level: "warn",
+        message: "Preview iframe load exceeded 12s — check boot errors or blocked assets",
+      });
+      setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
+      setOverlayVisible(false);
+      setIframeLoading(false);
+    }, 12_000);
+    return () => window.clearTimeout(t);
+  }, [loadingStartedAt, iframeLoaded, showIframeSurface, activeIframeSrc, reloadKey]);
 
   const generationContinuing = canonicalPreview.showGenerationContinuingCopy;
   const showInnerRouteError = Boolean(innerRouteError && showArtifact && !embedBlocked);
@@ -1292,6 +1346,13 @@ export function PreviewPanel({
             </motion.div>
           )}
         </AnimatePresence>
+
+        <PreviewLiveDiagnosticBar
+          snapshot={liveDiagSnapshot}
+          iframeUrl={resolvedPreviewUrl}
+          canonicalState={canonicalPreview.state}
+          loadingMs={iframeLoaded ? 0 : previewLoadingMs}
+        />
 
         <PreviewDebugDrawer
           resolved={canonicalPreview}

@@ -1,7 +1,7 @@
 import type { CanonicalCreditsPayload } from "@/lib/credits/canonical-credits";
 
-/** v2 — action bucket must come from DB, not plan-allowance seed */
-const KEY_PREFIX = "vodex:credits:v2:";
+/** v3 — invalidate stale plan-allowance action balances from older caches */
+const KEY_PREFIX = "vodex:credits:v3:";
 
 type CachedCredits = CanonicalCreditsPayload & { savedAt: number };
 

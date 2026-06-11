@@ -350,7 +350,7 @@ export function hydrateCreditsFromLocalCache(userId: string): void {
   if (!cached) return;
   const state = useCreditsStore.getState();
   if (state.isConfirmed) return;
-  useCreditsStore.getState().applyCanonical(cached);
+  useCreditsStore.getState().applyInstantCredits(cached);
   markCreditsFirstPaint(userId);
   if (typeof window !== "undefined") {
     try {

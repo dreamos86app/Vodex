@@ -14,6 +14,7 @@ import {
 } from "@/lib/credits/e2e-credit-bypass-server";
 import { getChargeTokensProbeCached } from "@/lib/db/charge-probe-cache";
 import { maybeNotifyActionCreditWarning } from "@/lib/action-credits/action-credit-warnings";
+import { batchUserLevelActionBalances } from "@/lib/admin/batch-action-balances";
 
 export async function GET(req: Request) {
   const t0 = performance.now();
@@ -30,18 +31,13 @@ export async function GET(req: Request) {
 
   const admin = createSupabaseAdmin();
 
-  const [{ data: profile }, { data: actionRow }] = await Promise.all([
+  const [{ data: profile }, actionPoolMap] = await Promise.all([
     admin
       .from("profiles")
       .select("plan_id, credits_remaining, credits_reset_at, email")
       .eq("id", user.id)
       .maybeSingle(),
-    admin
-      .from("action_credit_balances" as never)
-      .select("balance")
-      .eq("owner_user_id" as never, user.id)
-      .is("project_id" as never, null)
-      .maybeSingle(),
+    batchUserLevelActionBalances(admin, [user.id]),
   ]);
 
   const tDb = performance.now();
@@ -58,8 +54,9 @@ export async function GET(req: Request) {
 
   const planId = normalizePlanId(profile.plan_id ?? "free");
   const actionPlanAllowance = monthlyActionCreditsForPlan(planId);
-  const actionBalance = (actionRow as { balance: number } | null)?.balance;
-  const actionAvailable = typeof actionBalance === "number" ? actionBalance : actionPlanAllowance;
+  const actionBalance = actionPoolMap.get(user.id);
+  const actionAvailable =
+    typeof actionBalance === "number" ? actionBalance : actionPlanAllowance;
 
   let canonical = lite
     ? loadCanonicalCreditsLite({

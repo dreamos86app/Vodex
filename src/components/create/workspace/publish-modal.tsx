@@ -44,6 +44,7 @@ type PublishApiPayload = {
   projectId?: string;
   subdomain: string | null;
   publicWebUrl: string | null;
+  customDomain?: string | null;
   customDomainAllowed: boolean;
   platformBaseDomain?: string;
   error?: string;
@@ -227,6 +228,9 @@ export function PublishModal({
         error?: string;
         message?: string;
         code?: string;
+        publicWebUrl?: string | null;
+        subdomain?: string | null;
+        publishMode?: string;
       };
       if (!res.ok) {
         const msg = body.message ?? body.error ?? body.code ?? "Publish failed";
@@ -237,14 +241,24 @@ export function PublishModal({
       const next = (await verifyRes.json()) as PublishApiPayload;
       setPhase("finalizing");
       await refreshPublishAfterAllocate(next);
-      const liveUrl = next.publicWebUrl ?? null;
+      setPublishInfo(next);
+      const platformDomain = next.platformBaseDomain ?? publishInfo?.platformBaseDomain ?? "vodex.app";
+      const constructedSubdomainUrl =
+        body.subdomain?.trim() || next.subdomain?.trim()
+          ? `https://${(body.subdomain ?? next.subdomain)!.trim()}.${platformDomain}`
+          : null;
+      const liveUrl =
+        body.publicWebUrl?.trim() ||
+        next.publicWebUrl?.trim() ||
+        constructedSubdomainUrl ||
+        null;
       setPhase("published", { url: liveUrl ?? undefined });
       if (liveUrl) {
         setPublishSuccessUrl(liveUrl);
         setSuccessOverlayOpen(true);
-        onClose();
       }
-      toast.success("Your app is live!");
+      onClose();
+      toast.success(liveUrl ? "Your app is live!" : "Published — open Apps to view your live URL.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Publish failed";
       setPublishError(msg);
@@ -426,7 +440,8 @@ export function PublishModal({
         open={successOverlayOpen && Boolean(publishSuccessUrl)}
         appName={readiness?.appName ?? "Your app"}
         publicUrl={publishSuccessUrl ?? ""}
-        subdomainUrl={subdomainLiveUrl}
+        subdomainUrl={subdomainLiveUrl ?? publishSuccessUrl}
+        customDomain={publishInfo?.customDomain ?? null}
         customDomainHint={customAllowed ? undefined : "Upgrade to connect a custom domain."}
         onDone={() => {
           setSuccessOverlayOpen(false);

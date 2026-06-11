@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { formatCreditAmount } from "@/lib/credits/credit-summary";
+import { refreshCredits } from "@/lib/stores/credits-store";
 import { useCreditsStore } from "@/lib/stores/credits-store";
 import { CreditsTracker } from "@/components/credits/credits-tracker";
 import { PlanBadge } from "@/components/billing/plan-badge";
@@ -131,6 +132,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       }
     }
   }, [router, visibleSections]);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+    void refreshCredits({ force: true, reason: "bootstrap" });
+  }, [user?.id]);
 
   const showBrandWordmark = !collapsed || mobileOpen;
 

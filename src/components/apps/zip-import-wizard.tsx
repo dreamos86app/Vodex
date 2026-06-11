@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ZIP_IMPORT_MAX_MB } from "@/lib/import/zip-import-limits";
 import { splitZipScanBlockers, webPreviewReady } from "@/lib/import/zip-scan-classification";
-import { refreshCredits } from "@/lib/stores/credits-store";
+import { refreshCredits, useCreditsStore } from "@/lib/stores/credits-store";
 
 type ImportPreviewPollStatus = {
   previewRenderable?: boolean;
@@ -458,6 +458,8 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
     const fd = new FormData();
     fd.append("file", file);
 
+    await refreshCredits({ force: true, reason: "manual" });
+
     const res = await fetch("/api/import/zip/preview", { method: "POST", body: fd });
     const j = (await res.json()) as {
       error?: string;
@@ -501,7 +503,11 @@ export function ZipImportWizard({ onClose, onComplete }: ZipImportWizardProps) {
     const fwId = j.framework?.id ?? "unknown";
     const fwLabel = j.framework?.label;
     const required = j.actionCreditsRequired ?? j.creditEstimate.estimatedActionCredits;
-    const balance = j.actionCreditBalance ?? 0;
+    const storeBalance = useCreditsStore.getState().action.available;
+    const balance =
+      typeof storeBalance === "number" && storeBalance >= 0
+        ? storeBalance
+        : (j.actionCreditBalance ?? 0);
     setScanPayload({
       creditEstimate: j.creditEstimate,
       workerConnected: j.workerConnected === true,
