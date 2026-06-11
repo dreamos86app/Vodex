@@ -1,6 +1,7 @@
 import {
   buildInternalPreviewHtmlUrl,
   buildVirtualPreviewRuntimeUrl,
+  isVirtualPreviewRuntimePath,
   normalizeInternalPreviewUrl,
   toPreviewIframeSrc,
   tryNormalizeInternalPreviewUrl,
@@ -204,7 +205,33 @@ export function resolvePreviewIframeUrl(input: {
           normalizedPreviewUrl.startsWith("api/projects/") ? `/${normalizedPreviewUrl}` : normalizedPreviewUrl,
         );
       }
-      iframeSrc = toPreviewIframeSrc(normalizedPreviewUrl);
+      const resolvedArtifactId =
+        artifactId ?? extractArtifactIdFromPreviewUrl(normalizedPreviewUrl);
+      let mountPath = normalizedPreviewUrl;
+      if (isVirtualPreviewRuntimePath(normalizedPreviewUrl)) {
+        if (resolvedArtifactId) {
+          mountPath = buildVirtualPreviewRuntimeUrl({
+            projectId: input.projectId,
+            artifactBuildId: resolvedArtifactId,
+            route: "/",
+            cacheBust: cacheBust ?? undefined,
+          });
+        } else {
+          const parts = normalizedPreviewUrl.split("?")[0]!.split("/").filter(Boolean);
+          mountPath =
+            parts.length >= 3
+              ? `/${parts.slice(0, 3).join("/")}${normalizedPreviewUrl.includes("?") ? `?${normalizedPreviewUrl.split("?")[1]}` : ""}`
+              : normalizedPreviewUrl;
+        }
+      } else if (normalizedPreviewUrl.includes("/preview-html")) {
+        mountPath = buildInternalPreviewHtmlUrl({
+          projectId: input.projectId,
+          route: "/",
+          cacheBust: cacheBust ?? undefined,
+          artifactBuildId: resolvedArtifactId,
+        });
+      }
+      iframeSrc = toPreviewIframeSrc(mountPath);
       if (isRelativeApiProjectsPath(iframeSrc)) {
         iframeSrc = null;
         wasRejected = true;
@@ -235,18 +262,12 @@ export function resolvePreviewIframeUrl(input: {
   return resolution;
 }
 
-/** Stable iframe mount key — only changes on project/artifact/route or explicit user reload. */
+/** Stable iframe mount key — only changes on project/artifact or explicit user reload (not route). */
 export function previewIframeDomKey(input: {
   projectId: string;
   artifactId?: string | null;
-  route?: string;
   /** User-initiated reload counter only — not runtime poll cache bust. */
   reloadKey?: string | number;
 }): string {
-  return [
-    input.projectId,
-    input.artifactId ?? "no-artifact",
-    input.route ?? "/",
-    input.reloadKey ?? "0",
-  ].join("::");
+  return [input.projectId, input.artifactId ?? "no-artifact", input.reloadKey ?? "0"].join("::");
 }

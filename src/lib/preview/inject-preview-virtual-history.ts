@@ -100,6 +100,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
   }
   function internalize(url){
     if(typeof url!=="string")return null;
+    if(/base44\\.dev|base44\\.app/i.test(url))return"/login";
     if(url.indexOf(AP)===0||url.indexOf(AAP)===0)return"/";
     try{
       var u=new URL(url,location.href);
@@ -111,6 +112,7 @@ export function buildPreviewVirtualHistoryScript(initialRoute: string): string {
         return"/";
       }
       if(u.origin===location.origin)return normPath(u.pathname);
+      if(/base44\\.dev|base44\\.app/i.test(u.hostname))return"/login";
       if(isExternalPlatformHost(u.hostname))return normPath(u.pathname)||"/";
     }catch(e){}
     return null;

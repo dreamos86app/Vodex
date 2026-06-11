@@ -8,6 +8,7 @@ import { rewritePreviewArtifactHtml } from "@/lib/preview/rewrite-preview-artifa
 import { assertPreviewBootstrapClean } from "@/lib/preview/preview-bootstrap-sanitizer";
 import { buildPreviewBootstrapLeakPanel } from "@/lib/preview/preview-bootstrap-leak-panel";
 import { mergePreviewIframeEmbedHeaders } from "@/lib/preview/preview-iframe-embed-headers";
+import { resolvePreviewAuthPageHtml, previewAuthHtmlHeaders } from "@/lib/preview/preview-auth-pages";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export async function GET(
 
   const { data: proj } = await supabase
     .from("projects")
-    .select("id, metadata")
+    .select("id, name, metadata")
     .eq("id", projectId)
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -52,7 +53,32 @@ export async function GET(
   const virtualRoute =
     pathSegments?.length ? `/${pathSegments.map(decodeURIComponent).join("/")}` : "/";
 
+  const reqUrl = new URL(req.url);
+  const queryRoute = reqUrl.searchParams.get("route")?.trim();
+  const effectiveRoute =
+    queryRoute && queryRoute !== "/"
+      ? queryRoute.startsWith("/")
+        ? queryRoute
+        : `/${queryRoute}`
+      : virtualRoute;
+
   const admin = createSupabaseAdmin();
+  const authHtml = admin
+    ? await resolvePreviewAuthPageHtml(
+        admin,
+        projectId,
+        effectiveRoute,
+        meta,
+        typeof proj.name === "string" ? proj.name : null,
+      )
+    : null;
+  if (authHtml) {
+    return new NextResponse(authHtml, {
+      status: 200,
+      headers: previewAuthHtmlHeaders(),
+    });
+  }
+
   const file = admin
     ? await downloadPreviewArtifactFile({ admin, artifactPath, relativePath: "index.html" })
     : null;
@@ -62,7 +88,7 @@ export async function GET(
   const fw = detectImportedFramework(shimHints);
   const legacy = analyzeLegacyAdapter(shimHints, fw);
   let html = injectPreviewShims(file.data.toString("utf8"), legacy);
-  html = rewritePreviewArtifactHtml(html, projectId, artifactId, virtualRoute);
+  html = rewritePreviewArtifactHtml(html, projectId, artifactId, effectiveRoute);
 
   const bootstrapAssert = assertPreviewBootstrapClean(html, projectId);
   if (!bootstrapAssert.ok) {
@@ -86,7 +112,7 @@ export async function GET(
     headers: previewHtmlHeaders({
       "Content-Type": "text/html; charset=utf-8",
       "X-Preview-Renderable": "true",
-      "X-Preview-Virtual-Route": virtualRoute,
+      "X-Preview-Virtual-Route": effectiveRoute,
     }),
   });
 }

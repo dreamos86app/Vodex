@@ -1,5 +1,6 @@
 import type { ZipImportFile } from "@/lib/import/zip-file-validator";
 import { detectImportedFramework } from "@/lib/imports/framework-detector";
+import { sanitizeBase44ImportFiles } from "@/lib/imports/base44-lovable-adapter";
 import type {
   ZipAutoRepairAction,
   ZipAutoRepairMetadata,
@@ -318,8 +319,23 @@ export function runZipAutoRepairEngine(files: ZipImportFile[]): ZipAutoRepairRes
   const modifiedPaths = [...new Set(actions.map((a) => a.path))];
   const canBuild = blockers.length === 0 && fileMap.size > 0;
 
+  let repairedFiles = [...fileMap.values()];
+  if (fw === "base44" || framework.label.toLowerCase().includes("base44")) {
+    const sanitized = sanitizeBase44ImportFiles(repairedFiles);
+    if (sanitized.modifiedPaths.length) {
+      for (const p of sanitized.modifiedPaths) {
+        actions.push({ path: p, action: "modified", reason: "Removed Base44 platform URLs and SDK imports" });
+      }
+      repairedFiles = sanitized.files;
+      for (const f of sanitized.files) fileMap.set(norm(f.path), f);
+      warnings.push(
+        `Stripped Base44 platform references from ${sanitized.modifiedPaths.length} file(s) — Vodex auth replaces legacy login.`,
+      );
+    }
+  }
+
   return {
-    repairedFiles: [...fileMap.values()],
+    repairedFiles,
     repairActions: actions,
     warnings,
     blockers,

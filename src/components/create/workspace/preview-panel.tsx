@@ -37,6 +37,8 @@ import {
   previewIframeDomKey,
   type PreviewIframeUrlResolution,
 } from "@/lib/preview/preview-iframe-url-resolver";
+import { navigatePreviewIframe } from "@/lib/preview/preview-route-navigation";
+import { isPreviewAuthSystemRoute } from "@/lib/preview/preview-auth-routes";
 import {
   isPreviewInnerRouteErrorMessage,
   type PreviewInnerRouteErrorMessage,
@@ -58,8 +60,16 @@ type Viewport = "desktop" | "tablet" | "mobile";
 
 const VIEWPORT_CONFIG: Record<Viewport, { width: string; label: string; icon: React.ElementType }> = {
   desktop: { width: "w-full max-w-[1480px]", label: "Desktop (1480)", icon: Monitor },
-  tablet: { width: "w-[820px] max-w-full", label: "Tablet (820)", icon: Tablet },
-  mobile: { width: "w-[393px] max-w-full", label: "Phone (393)", icon: Smartphone },
+  tablet: { width: "w-[768px] max-w-full", label: "iPad (768)", icon: Tablet },
+  mobile: { width: "w-[390px] max-w-full", label: "iPhone 15 (390)", icon: Smartphone },
+};
+
+const DEVICE_FRAME: Record<
+  Exclude<Viewport, "desktop">,
+  { width: number; height: number; radius: string; bezel: number }
+> = {
+  mobile: { width: 390, height: 844, radius: "2.75rem", bezel: 10 },
+  tablet: { width: 768, height: 1024, radius: "1.25rem", bezel: 8 },
 };
 
 export interface PreviewPanelProps {
@@ -179,7 +189,7 @@ export function PreviewPanel({
 
   const effectivePreviewPath = urlResolution?.normalizedPreviewUrl ?? url;
 
-  // Route changes reload iframe via previewFrameUrl ?route= query — no postMessage escape.
+  // Route changes navigate inside the iframe — iframe src stays on preview root.
 
   React.useEffect(() => {
     setIframeError(false);
@@ -192,7 +202,7 @@ export function PreviewPanel({
     } else {
       setLoadingStartedAt(null);
     }
-  }, [url, srcDoc, reloadKey, previewRoute]);
+  }, [url, srcDoc, reloadKey, urlResolution?.artifactId]);
 
   React.useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -300,15 +310,53 @@ export function PreviewPanel({
       previewIframeDomKey({
         projectId: projectId ?? "unknown",
         artifactId: urlResolution?.artifactId ?? null,
-        route: urlResolution?.route ?? previewRoute,
         reloadKey,
       }),
-    [projectId, urlResolution?.artifactId, urlResolution?.route, previewRoute, reloadKey],
+    [projectId, urlResolution?.artifactId, reloadKey],
   );
 
   React.useEffect(() => {
     setIframeMountCount((c) => c + 1);
   }, [iframeDomKey]);
+
+  React.useEffect(() => {
+    if (hasInline || !resolvedPreviewUrl) return;
+    const route = previewRoute ?? urlResolution?.route ?? "/";
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    if (isPreviewAuthSystemRoute(route)) {
+      const authUrl = new URL(resolvedPreviewUrl, window.location.origin);
+      authUrl.searchParams.set("route", route);
+      const target = authUrl.href;
+      if (iframe.src !== target) {
+        iframe.src = target;
+        setIframeLoading(true);
+        setIframeLoaded(false);
+      }
+      return;
+    }
+
+    const current = new URL(iframe.src || resolvedPreviewUrl, window.location.origin);
+    if (current.searchParams.has("route")) {
+      if (iframe.src !== resolvedPreviewUrl) {
+        iframe.src = resolvedPreviewUrl;
+        setIframeLoading(true);
+        setIframeLoaded(false);
+      }
+      return;
+    }
+
+    if (!iframeLoaded) return;
+    navigatePreviewIframe(iframe, route);
+  }, [
+    previewRoute,
+    urlResolution?.route,
+    iframeLoaded,
+    hasInline,
+    resolvedPreviewUrl,
+    iframeDomKey,
+  ]);
 
   const previewUrlInvalid = Boolean(
     (effectivePreviewPath || urlResolution?.selectedPreviewUrl) && !hasInline && !resolvedPreviewUrl,
@@ -994,32 +1042,62 @@ export function PreviewPanel({
           <div
             className={cn(
               "absolute inset-0 overflow-hidden",
-              viewport !== "desktop" && "flex items-center justify-center overflow-auto bg-black/85 p-3",
+              viewport !== "desktop" && "flex items-center justify-center bg-[#0a0a0b] p-4",
             )}
             data-testid="preview-fit-canvas"
           >
             <AnimatePresence mode="wait">
               <motion.div
                 key={iframeDomKey}
-                initial={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.97 }}
+                initial={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.97 }}
+                exit={{ opacity: 0, scale: viewport === "desktop" ? 1 : 0.98 }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  "relative flex flex-col overflow-hidden bg-white",
+                  "relative flex flex-col overflow-hidden",
                   viewport === "desktop" &&
-                    "absolute inset-x-0 top-2 bottom-1 mx-auto h-[calc(100%-12px)] w-[min(100%,102%)] rounded-sm shadow-[0_2px_24px_-6px_rgba(0,0,0,0.12)] ring-1 ring-border/50",
+                    "absolute inset-x-0 top-2 bottom-1 mx-auto h-[calc(100%-12px)] w-[min(100%,102%)] rounded-sm bg-white shadow-[0_2px_24px_-6px_rgba(0,0,0,0.12)] ring-1 ring-border/50",
                   viewport === "tablet" &&
-                    "h-[min(88vh,1024px)] w-[min(820px,calc(100%-24px))] max-w-full rounded-[var(--radius-lg)] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border",
+                    "max-h-full max-w-full shadow-[0_12px_48px_-12px_rgba(0,0,0,0.55)] ring-1 ring-white/10",
                   viewport === "mobile" &&
-                    "z-10 h-[min(86vh,852px)] w-[min(393px,calc(100%-24px))] max-w-full rounded-[var(--radius-lg)] shadow-[0_0_40px_rgba(0,0,0,0.5)] ring-1 ring-border",
+                    "max-h-full max-w-full shadow-[0_16px_56px_-8px_rgba(0,0,0,0.65)] ring-1 ring-white/10",
                 )}
+                style={
+                  viewport !== "desktop"
+                    ? {
+                        width: `min(${DEVICE_FRAME[viewport].width}px, calc(100% - 1rem))`,
+                        height: `min(${DEVICE_FRAME[viewport].height}px, calc(100% - 1rem))`,
+                        aspectRatio: `${DEVICE_FRAME[viewport].width} / ${DEVICE_FRAME[viewport].height}`,
+                        borderRadius: DEVICE_FRAME[viewport].radius,
+                        background: "#111113",
+                        padding: DEVICE_FRAME[viewport].bezel,
+                      }
+                    : undefined
+                }
               >
                 {viewport === "mobile" && (
-                  <div className="pointer-events-none absolute top-0 left-1/2 z-10 h-4 w-20 -translate-x-1/2 rounded-b-lg bg-black/80" />
+                  <div
+                    className="pointer-events-none relative z-20 flex shrink-0 items-end justify-center"
+                    style={{ height: 28, marginBottom: -2 }}
+                  >
+                    <div className="h-[22px] w-[120px] rounded-full bg-black" />
+                  </div>
                 )}
 
-                {/* Loading overlay */}
+                {viewport === "tablet" && (
+                  <div className="pointer-events-none relative z-20 flex h-2 shrink-0 items-center justify-center">
+                    <div className="size-1.5 rounded-full bg-zinc-700" />
+                  </div>
+                )}
+
+                <div
+                  className={cn(
+                    "relative min-h-0 flex-1 overflow-hidden bg-white",
+                    viewport === "mobile" && "rounded-[2rem]",
+                    viewport === "tablet" && "rounded-lg",
+                    viewport === "desktop" && "h-full w-full",
+                  )}
+                >
                 <AnimatePresence>
                   {iframeLoading && (
                     <motion.div
@@ -1054,6 +1132,7 @@ export function PreviewPanel({
                     }}
                     sandbox="allow-scripts allow-same-origin"
                   />
+                </div>
               </motion.div>
             </AnimatePresence>
           </div>
@@ -1086,7 +1165,7 @@ export function PreviewPanel({
           visible={showPreviewDebug}
         />
 
-        {previewDiagnostics && (showIframe || previewUrlInvalid) ? (
+        {showPreviewDebug && previewDiagnostics && (showIframe || previewUrlInvalid) ? (
           <div
             data-testid="preview-diagnostics"
             data-preview-source={previewDiagnostics.source}
@@ -1109,6 +1188,17 @@ export function PreviewPanel({
               {iframeHeaderProbe?.reason ? ` · ${iframeHeaderProbe.reason}` : ""}
             </p>
           </div>
+        ) : previewDiagnostics ? (
+          <div
+            data-testid="preview-diagnostics"
+            data-preview-source={previewDiagnostics.source}
+            data-preview-route={previewDiagnostics.selected_route}
+            data-preview-artifact={previewDiagnostics.artifactId ?? ""}
+            data-preview-was-normalized={previewDiagnostics.wasNormalized ? "true" : "false"}
+            data-preview-was-rejected={previewDiagnostics.wasRejected ? "true" : "false"}
+            className="sr-only"
+            aria-hidden
+          />
         ) : null}
       </div>
     </div>

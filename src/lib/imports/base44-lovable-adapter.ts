@@ -66,7 +66,7 @@ export function analyzeLegacyAdapter(
       var url=typeof input==="string"?input:(input&&input.url)||"";
       if(/base44\\.dev|\\/api\\/base44|functions\\.invoke/i.test(url)){
         warn("Mocked Base44 API: "+url);
-        return Promise.resolve(new Response(JSON.stringify({data:[],ok:true}),{status:200,headers:{"Content-Type":"application/json"}}));
+        return Promise.resolve(new Response(JSON.stringify({data:[],ok:true,user:mockUser,session:{user:mockUser}}),{status:200,headers:{"Content-Type":"application/json"}}));
       }
       if(/supabase\\.co\\/auth|\\/rest\\/v1\\//i.test(url)&&init&&init.method&&init.method!=="GET"){
         warn("Blocked mutating Supabase call in preview: "+url);
@@ -74,6 +74,27 @@ export function analyzeLegacyAdapter(
       }
       return origFetch.apply(this,arguments);
     };
+    var blockBase44Nav=function(u){
+      if(typeof u!=="string")return false;
+      if(/base44\\.dev|base44\\.app/i.test(u)){
+        warn("Blocked Base44 navigation: "+u);
+        try{
+          if(window.__VODEX_VIRTUAL_PATH__!==undefined){
+            window.__VODEX_VIRTUAL_PATH__="/login";
+            history.replaceState({__vodex:"/login"},"","/");
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          }else{window.postMessage({type:"vodex:navigate",path:"/login"},"*");}
+        }catch(e){}
+        return true;
+      }
+      return false;
+    };
+    try{
+      var _assign=location.assign.bind(location);
+      location.assign=function(u){if(blockBase44Nav(String(u)))return;return _assign(u);};
+      var _replace=location.replace.bind(location);
+      location.replace=function(u){if(blockBase44Nav(String(u)))return;return _replace(u);};
+    }catch(e){}
   }
   try{
     var env={};
@@ -110,4 +131,41 @@ export function injectPreviewShims(html: string, adapter: LegacyAdapterInfo): st
     return html.replace(/<body[^>]*>/i, (m) => `${m}${adapter.shimScript}`);
   }
   return adapter.shimScript + html;
+}
+
+const BASE44_HOST_RE = /https?:\/\/(?:[\w-]+\.)*base44\.(?:dev|app)[^\s"'`)>]*/gi;
+
+/** Strip Base44 platform URLs and SDK hooks from imported source before preview build. */
+export function sanitizeBase44LegacyContent(content: string): string {
+  let out = content;
+  out = out.replace(BASE44_HOST_RE, (match) => {
+    if (/login|auth|signin|signup|register/i.test(match)) return "/login";
+    return "/";
+  });
+  out = out.replace(
+    /import\s+[^;]+from\s+['"]@base44\/sdk['"]\s*;?/g,
+    "// vodex: removed @base44/sdk import\n",
+  );
+  out = out.replace(
+    /import\s*\(\s*['"]@base44\/sdk['"]\s*\)/g,
+    "Promise.resolve({ auth: { getUser: () => ({ data: { user: { id: 'preview-user' } } }) } })",
+  );
+  out = out.replace(/createBase44Client\s*\([^)]*\)/g, "({ auth: { getUser: async () => ({ data: { user: { id: 'preview-user', email: 'preview@vodex.dev' } } }) } })");
+  return out;
+}
+
+export function sanitizeBase44ImportFiles(files: ZipImportFile[]): {
+  files: ZipImportFile[];
+  modifiedPaths: string[];
+} {
+  const modifiedPaths: string[] = [];
+  const next = files.map((f) => {
+    if (!/\.(tsx?|jsx?|ts|js|html|env|json)$/i.test(f.path)) return f;
+    if (!/base44|@base44|BASE44_/i.test(f.content)) return f;
+    const content = sanitizeBase44LegacyContent(f.content);
+    if (content === f.content) return f;
+    modifiedPaths.push(f.path);
+    return { ...f, content, sizeBytes: Buffer.byteLength(content, "utf8") };
+  });
+  return { files: next, modifiedPaths };
 }
