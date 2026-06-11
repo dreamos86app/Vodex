@@ -6,6 +6,7 @@ import { HardDrive, ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { MediaAsset } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/toast";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -171,9 +172,29 @@ export function StorageDashboardPanel({ projectId }: Props) {
               const res = await fetch(`/api/projects/${projectId}/imported-assets/backfill`, {
                 method: "POST",
               });
-              if (res.ok) await loadAssets();
+              const body = (await res.json().catch(() => ({}))) as {
+                imported?: number;
+                from_zip?: number;
+                from_artifact?: number;
+                errors?: string[];
+                error?: string;
+              };
+              if (res.ok) {
+                await loadAssets();
+                if ((body.imported ?? 0) > 0) {
+                  toast.success(
+                    `Imported ${body.imported} asset${body.imported === 1 ? "" : "s"} (ZIP: ${body.from_zip ?? 0}, build: ${body.from_artifact ?? 0})`,
+                  );
+                } else if (body.errors?.length) {
+                  toast.error(body.errors[0] ?? "No assets found in ZIP or build output");
+                } else {
+                  toast.error("No importable assets found — check ZIP contains images/fonts/animations");
+                }
+              } else {
+                toast.error(body.error ?? body.errors?.[0] ?? "Import failed");
+              }
             } catch {
-              /* best-effort */
+              toast.error("Import from ZIP failed");
             }
             setBackfilling(false);
           }}

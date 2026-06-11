@@ -5,6 +5,8 @@ import {
   shouldSkipZipPath,
   isSecretZipPath,
 } from "@/lib/import/zip-file-validator";
+import { ensurePublicBucket } from "@/lib/supabase/ensure-storage-bucket";
+import { PREVIEW_ARTIFACTS_BUCKET } from "@/lib/imports/preview-artifact-storage";
 
 const BINARY_EXT = new Set([
   "png",
@@ -24,7 +26,10 @@ const BINARY_EXT = new Set([
   "mp3",
   "wav",
   "pdf",
+  "json",
 ]);
+
+const LOTTIE_PATH_RE = /lottie|animation|ripo|motion|splash|welcome|loader/i;
 
 const MIME: Record<string, string> = {
   png: "image/png",
@@ -44,7 +49,10 @@ const MIME: Record<string, string> = {
   mp3: "audio/mpeg",
   wav: "audio/wav",
   pdf: "application/pdf",
+  json: "application/json",
 };
+
+const MEDIA_BUCKET = "media";
 
 export type ZipBinaryImportResult = {
   imported: number;
@@ -67,6 +75,70 @@ function safeStorageName(relativePath: string): string {
   return relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
+function isImportableAssetPath(relativePath: string, ext: string): boolean {
+  if (BINARY_EXT.has(ext)) {
+    if (ext === "json") return LOTTIE_PATH_RE.test(relativePath);
+    return true;
+  }
+  return false;
+}
+
+async function insertProjectMediaAsset(input: {
+  admin: SupabaseClient;
+  userId: string;
+  projectId: string;
+  rel: string;
+  data: Buffer;
+  mime: string;
+  result: ZipBinaryImportResult;
+}): Promise<void> {
+  const storagePath = `${input.userId}/${input.projectId}/imported/${input.rel.replace(/\//g, "__")}`;
+
+  const { error: uploadError } = await input.admin.storage
+    .from(MEDIA_BUCKET)
+    .upload(storagePath, input.data, { contentType: input.mime, upsert: true });
+  if (uploadError) {
+    input.result.errors.push(`${input.rel}: ${uploadError.message}`);
+    return;
+  }
+
+  const {
+    data: { publicUrl },
+  } = input.admin.storage.from(MEDIA_BUCKET).getPublicUrl(storagePath);
+
+  const filename = input.rel.split("/").pop() ?? input.rel;
+  const { data: existing } = await input.admin
+    .from("media_assets")
+    .select("id")
+    .eq("project_id", input.projectId)
+    .eq("storage_path", storagePath)
+    .maybeSingle();
+  if (existing?.id) {
+    input.result.skipped += 1;
+    return;
+  }
+
+  const { error: dbError } = await input.admin.from("media_assets").insert({
+    user_id: input.userId,
+    project_id: input.projectId,
+    filename,
+    storage_path: storagePath,
+    public_url: publicUrl,
+    mime_type: input.mime,
+    size_bytes: input.data.length,
+    asset_type: assetTypeForMime(input.mime),
+    generated: false,
+    tags: ["zip_import", input.rel],
+  } as never);
+
+  if (dbError) {
+    input.result.errors.push(`${input.rel}: ${dbError.message}`);
+    return;
+  }
+
+  input.result.imported += 1;
+}
+
 /** Extract binary files from ZIP archive into project media storage. */
 export async function importZipBinaryAssets(input: {
   admin: SupabaseClient;
@@ -75,6 +147,12 @@ export async function importZipBinaryAssets(input: {
   projectId: string;
 }): Promise<ZipBinaryImportResult> {
   const result: ZipBinaryImportResult = { imported: 0, skipped: 0, errors: [] };
+
+  const bucket = await ensurePublicBucket(input.admin, MEDIA_BUCKET);
+  if (!bucket.ok) {
+    result.errors.push(`media bucket: ${bucket.error}`);
+    return result;
+  }
 
   let zip: JSZip;
   try {
@@ -102,7 +180,7 @@ export async function importZipBinaryAssets(input: {
     }
 
     const ext = extOf(normalized);
-    if (!BINARY_EXT.has(ext)) {
+    if (!isImportableAssetPath(normalized, ext)) {
       result.skipped += 1;
       continue;
     }
@@ -122,53 +200,84 @@ export async function importZipBinaryAssets(input: {
 
     const mime = MIME[ext] ?? "application/octet-stream";
     const rel = safeStorageName(normalized);
-    const storagePath = `${input.userId}/${input.projectId}/imported/${rel.replace(/\//g, "__")}`;
-
-    const { error: uploadError } = await input.admin.storage.from("media").upload(storagePath, data, {
-      contentType: mime,
-      upsert: true,
+    await insertProjectMediaAsset({
+      admin: input.admin,
+      userId: input.userId,
+      projectId: input.projectId,
+      rel,
+      data,
+      mime,
+      result,
     });
-    if (uploadError) {
-      result.errors.push(`${rel}: ${uploadError.message}`);
-      continue;
+  }
+
+  return result;
+}
+
+async function listArtifactPaths(
+  admin: SupabaseClient,
+  prefix: string,
+  acc: string[] = [],
+): Promise<string[]> {
+  const { data, error } = await admin.storage.from(PREVIEW_ARTIFACTS_BUCKET).list(prefix, {
+    limit: 500,
+  });
+  if (error || !data) return acc;
+  for (const item of data) {
+    if (!item.name) continue;
+    const full = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.id) {
+      acc.push(full);
+    } else {
+      await listArtifactPaths(admin, full, acc);
     }
+  }
+  return acc;
+}
 
-    const {
-      data: { publicUrl },
-    } = input.admin.storage.from("media").getPublicUrl(storagePath);
+/** Copy built preview artifact media (dist/assets) into project storage. */
+export async function importPreviewArtifactBinaryAssets(input: {
+  admin: SupabaseClient;
+  userId: string;
+  projectId: string;
+  artifactPath: string;
+}): Promise<ZipBinaryImportResult> {
+  const result: ZipBinaryImportResult = { imported: 0, skipped: 0, errors: [] };
+  const bucket = await ensurePublicBucket(input.admin, MEDIA_BUCKET);
+  if (!bucket.ok) {
+    result.errors.push(`media bucket: ${bucket.error}`);
+    return result;
+  }
 
-    const filename = rel.split("/").pop() ?? rel;
-    const { data: existing } = await input.admin
-      .from("media_assets")
-      .select("id")
-      .eq("project_id", input.projectId)
-      .eq("storage_path", storagePath)
-      .maybeSingle();
-    if (existing?.id) {
+  const paths = await listArtifactPaths(input.admin, input.artifactPath.replace(/\/+$/, ""));
+  for (const storagePath of paths) {
+    const rel = storagePath.slice(input.artifactPath.length).replace(/^\/+/, "") || storagePath;
+    const ext = extOf(rel);
+    if (!isImportableAssetPath(rel, ext)) {
       result.skipped += 1;
       continue;
     }
-
-    const { error: dbError } = await input.admin.from("media_assets").insert({
-      user_id: input.userId,
-      project_id: input.projectId,
-      filename,
-      storage_path: storagePath,
-      public_url: publicUrl,
-      mime_type: mime,
-      size_bytes: data.length,
-      asset_type: assetTypeForMime(mime),
-      generated: false,
-      tags: ["zip_import", rel],
-    } as never);
-
-    if (dbError) {
-      result.errors.push(`${rel}: ${dbError.message}`);
+    const { data: blob, error } = await input.admin.storage
+      .from(PREVIEW_ARTIFACTS_BUCKET)
+      .download(storagePath);
+    if (error || !blob) {
+      result.skipped += 1;
       continue;
     }
-
-    result.imported += 1;
+    const data = Buffer.from(await blob.arrayBuffer());
+    if (data.length === 0) {
+      result.skipped += 1;
+      continue;
+    }
+    await insertProjectMediaAsset({
+      admin: input.admin,
+      userId: input.userId,
+      projectId: input.projectId,
+      rel,
+      data,
+      mime: MIME[ext] ?? "application/octet-stream",
+      result,
+    });
   }
-
   return result;
 }

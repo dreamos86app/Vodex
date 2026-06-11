@@ -34,8 +34,16 @@ export function PreviewLiveDiagnosticBar({
       })
     : false;
 
+  const authStuck = snapshot.entries.some(
+    (e) => e.kind === "auth" && e.level === "warn" && /google|oauth|sign-in/i.test(e.message),
+  );
+
   const hasIssues =
-    !bootOk && (snapshot.errorCount > 0 || snapshot.networkFailCount > 0 || Boolean(incidentInput?.bootAudit.bootFailureReason));
+    authStuck ||
+    (!bootOk &&
+      (snapshot.errorCount > 0 ||
+        snapshot.networkFailCount > 0 ||
+        Boolean(incidentInput?.bootAudit.bootFailureReason)));
 
   const showBar = hasIssues || (loadingMs ?? 0) >= 1500 || bootOk;
   if (!showBar) return null;
@@ -82,7 +90,9 @@ export function PreviewLiveDiagnosticBar({
           )}
         />
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
-          {bootOk
+          {authStuck
+            ? "App stuck on Google sign-in — redirecting to Vodex login…"
+            : bootOk
             ? `Preview boot OK — ${incidentInput?.bootAudit.loadedCount ?? 0} assets loaded`
             : hasIssues
               ? `Preview blocked — ${snapshot.errorCount} error${snapshot.errorCount === 1 ? "" : "s"}`
@@ -122,6 +132,7 @@ export function PreviewLiveDiagnosticBar({
                 .map((e, i) => (
                   <li key={`${e.at}-${i}`} className={e.level === "error" ? "text-destructive" : ""}>
                     [{e.kind}] {e.message}
+                    {e.rootCause ? ` — ${e.rootCause}` : ""}
                     {e.detail ? ` (${e.detail})` : ""}
                   </li>
                 ))}

@@ -4,10 +4,11 @@ import { isIgnorablePreviewAssetLoadFailure } from "@/lib/preview/preview-boot-a
 
 export type PreviewLiveDiagnosticEntry = {
   at: string;
-  kind: "console" | "network" | "boot" | "state";
+  kind: "console" | "network" | "boot" | "state" | "auth";
   level: "error" | "warn" | "info";
   message: string;
   detail?: string;
+  rootCause?: string;
 };
 
 export type PreviewLiveDiagnosticsSnapshot = {
@@ -58,15 +59,17 @@ export function createPreviewLiveDiagnostics(): {
     if (typeof window === "undefined") return () => undefined;
 
     const onError = (ev: ErrorEvent) => {
+      const msg = ev.message || "Script error";
       const src = ev.filename ? `${ev.filename}:${ev.lineno ?? 0}` : "unknown";
-      if (!/preview-runtime|preview-html|format=frame/i.test(src) && !/preview/i.test(ev.message ?? "")) {
+      const stack = ev.error && typeof ev.error === "object" && "stack" in ev.error ? String(ev.error.stack) : undefined;
+      if (!/preview-runtime|preview-html|format=frame/i.test(src) && !/preview|oauth|auth|google|ripo/i.test(msg)) {
         return;
       }
       push({
         kind: "console",
         level: "error",
-        message: ev.message || "Script error",
-        detail: src,
+        message: msg,
+        detail: stack ? `${src}\n${stack.slice(0, 280)}` : src,
       });
     };
 
@@ -94,6 +97,21 @@ export function createPreviewLiveDiagnostics(): {
           level: "error",
           message: String(data.errorMessage ?? phase),
           detail: phase,
+        });
+      } else if (phase === "auth-stuck") {
+        push({
+          kind: "auth",
+          level: "warn",
+          message: String(data.authStuckReason ?? "Stuck on Google sign-in"),
+          detail: typeof data.bodySnippet === "string" ? data.bodySnippet : undefined,
+          rootCause:
+            "Base44/Google OAuth cannot complete inside preview iframe — must use Vodex /login page",
+        });
+      } else if (phase === "auth-redirect") {
+        push({
+          kind: "auth",
+          level: "info",
+          message: `Redirecting to Vodex login: ${String(data.navigationUrl ?? "/login")}`,
         });
       } else if (phase === "ready") {
         push({ kind: "boot", level: "info", message: "Preview boot ready" });

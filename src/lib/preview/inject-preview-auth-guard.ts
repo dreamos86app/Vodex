@@ -61,7 +61,10 @@ export function buildPreviewAuthGuardScript(): string {
   function watchStuck(){
     if(!looksStuckOnGoogle()){stuckSince=0;return;}
     if(!stuckSince)stuckSince=Date.now();
-    if(Date.now()-stuckSince>=1200)goLogin("stuck on Google sign-in screen");
+    if(Date.now()-stuckSince>=800){
+      try{parent.postMessage({type:"vodex-preview-boot-audit",phase:"auth-stuck",authStuckReason:"Google OAuth hang — redirecting to Vodex login",bodySnippet:bodyText().slice(0,400)},"*");}catch(e){}
+      goLogin("stuck on Google sign-in screen");
+    }
   }
   if(typeof MutationObserver!=="undefined"&&document.documentElement){
     try{new MutationObserver(watchStuck).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}catch(e){}

@@ -5,6 +5,11 @@ import { reconcileProjectBuildStateServer } from "@/lib/build/reconcile-project-
 import { isZipImportProject, readImportMeta, preferredEntryFile } from "@/lib/projects/imported-project-state";
 import { requireAuthUser, requireMutationProjectId, isNextResponse } from "@/lib/ids/api-mutation-guard";
 import { runProjectPreviewBuild } from "@/lib/imports/run-project-preview-build";
+import {
+  estimateZipPreviewCreditsWithPlatformMultiplier,
+  reserveZipPreviewActionCredits,
+} from "@/lib/imports/zip-preview-action-credits";
+import { loadZipPreviewHoldStatus } from "@/lib/imports/zip-preview-billing";
 
 export const dynamic = "force-dynamic";
 
@@ -87,11 +92,29 @@ export async function POST(
 
   await reconcileProjectBuildStateServer(admin, projectId, authUser.id);
 
+  const hold = await loadZipPreviewHoldStatus(projectId);
+  let creditEstimate: Awaited<ReturnType<typeof estimateZipPreviewCreditsWithPlatformMultiplier>> | undefined;
+  if (!hold || hold.status !== "reserved") {
+    const totalBytes = files.reduce((sum, f) => sum + Buffer.byteLength(f.content, "utf8"), 0);
+    creditEstimate = await estimateZipPreviewCreditsWithPlatformMultiplier({
+      sizeBytes: totalBytes,
+      fileCount: files.length,
+      frameworkId: String(meta.framework ?? "vite"),
+      dependencyCount: 0,
+    });
+    await reserveZipPreviewActionCredits({
+      userId: authUser.id,
+      projectId,
+      estimate: creditEstimate,
+    });
+  }
+
   const build = await runProjectPreviewBuild({
     admin,
     writer: admin,
     userId: authUser.id,
     projectId,
+    creditEstimate,
   });
 
   return NextResponse.json({

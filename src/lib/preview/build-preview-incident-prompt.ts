@@ -68,8 +68,27 @@ function suggestFixes(input: PreviewIncidentPromptInput): string[] {
   if (s.loadedCount === 0 && s.cancelledOrIncompleteCount > 0) {
     fixes.push("Iframe remounted or wrong base path — lock preview-runtime mount URL; verify artifact index.html.");
   }
-  if (previewBootSucceeded(input.bootEvents ?? [], { iframeRemountCount: input.iframeMountCount })) {
-    fixes.push("Boot audit reports healthy load — dismiss false-positive failure overlay if preview renders.");
+  const authStuckEntry = (input.liveSnapshot?.entries ?? []).find(
+    (e) => e.kind === "auth" && /google|oauth|sign-in/i.test(e.message),
+  );
+  if (authStuckEntry) {
+    fixes.unshift(
+      `Functional blocker: ${authStuckEntry.message}${authStuckEntry.rootCause ? ` — ${authStuckEntry.rootCause}` : ""}. Redirect iframe to preview-runtime/.../login (inject-preview-auth-guard.ts, preview-panel.tsx).`,
+    );
+  } else if (
+    previewBootSucceeded(input.bootEvents ?? [], { iframeRemountCount: input.iframeMountCount })
+  ) {
+    const bodyHint = (input.liveSnapshot?.entries ?? [])
+      .map((e) => e.detail ?? e.message)
+      .join(" ")
+      .toLowerCase();
+    if (/opening secure google|connecting you securely/.test(bodyHint)) {
+      fixes.unshift(
+        "Boot OK but app stuck on Google OAuth welcome — intercept location.href/window.open and serve Vodex /login page.",
+      );
+    } else {
+      fixes.push("Boot audit reports healthy load — dismiss false-positive failure overlay if preview renders.");
+    }
   }
   if (fixes.length === 0) {
     fixes.push("Open expanded diagnostic bar; check Network tab for 404 on /assets/* under preview-runtime.");

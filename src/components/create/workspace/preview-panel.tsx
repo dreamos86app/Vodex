@@ -64,6 +64,7 @@ import type { PreviewIncidentPromptInput } from "@/lib/preview/build-preview-inc
 import { PreviewBootFailurePanel } from "@/components/preview/preview-boot-failure-panel";
 import { postPreviewIframeDeepClean } from "@/lib/preview/post-preview-iframe-deep-clean";
 import { extractArtifactIdFromRuntimeUrl } from "@/lib/preview/preview-external-asset-rewrite";
+import { refreshCredits } from "@/lib/stores/credits-store";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 
@@ -459,9 +460,29 @@ export function PreviewPanel({
           kind: "boot",
           level: "error",
           message: String(event.data.errorMessage ?? phase),
-          detail: phase,
+          detail: event.data.errorStack ? String(event.data.errorStack).slice(0, 320) : phase,
         });
         setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
+      } else if (phase === "auth-stuck" || phase === "auth-redirect") {
+        liveDiagnosticsRef.current.push({
+          kind: "auth",
+          level: phase === "auth-stuck" ? "warn" : "info",
+          message: String(event.data.authStuckReason ?? event.data.navigationUrl ?? phase),
+          detail: typeof event.data.bodySnippet === "string" ? event.data.bodySnippet : undefined,
+          rootCause:
+            "Google/Base44 OAuth blocked in iframe — Vodex login page required at preview-runtime/.../login",
+        });
+        setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
+        if (phase === "auth-stuck" && activeIframeSrc) {
+          try {
+            const loginUrl = activeIframeSrc.replace(/\/?$/, "") + "/login";
+            if (iframeRef.current && iframeRef.current.src !== loginUrl) {
+              iframeRef.current.src = loginUrl;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
       }
       if (phase === "ready" || phase === "snapshot") {
         liveDiagnosticsRef.current.push({ kind: "boot", level: "info", message: "Preview boot ready" });
@@ -474,7 +495,49 @@ export function PreviewPanel({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [activeIframeSrc]);
+
+  React.useEffect(() => {
+    if (!iframeLoaded || !activeIframeSrc || hasInline) return;
+    const loginUrl = activeIframeSrc.replace(/\/?$/, "") + "/login";
+    const tick = () => {
+      try {
+        const doc = iframeRef.current?.contentDocument;
+        const text = (doc?.body?.innerText ?? "").toLowerCase();
+        if (!text.includes("opening secure google") && !text.includes("connecting you securely")) return;
+        let authed = false;
+        try {
+          authed = iframeRef.current?.contentWindow?.localStorage?.getItem("sb-preview-auth") === "1";
+        } catch {
+          /* ignore */
+        }
+        if (authed) return;
+        const frame = iframeRef.current;
+        if (frame && frame.src !== loginUrl) {
+          liveDiagnosticsRef.current.push({
+            kind: "auth",
+            level: "warn",
+            message: "Detected stuck Google sign-in — redirecting to Vodex login",
+            rootCause: "OAuth popup/redirect cannot complete inside preview iframe",
+          });
+          setLiveDiagSnapshot(liveDiagnosticsRef.current.snapshot());
+          frame.src = loginUrl;
+        }
+      } catch {
+        /* same-origin only */
+      }
+    };
+    const id = window.setInterval(tick, 900);
+    tick();
+    return () => window.clearInterval(id);
+  }, [iframeLoaded, activeIframeSrc, hasInline]);
+
+  const creditsChargedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!runtimeStatus?.creditsCharged || creditsChargedRef.current) return;
+    creditsChargedRef.current = true;
+    void refreshCredits({ reason: "charge", force: true });
+  }, [runtimeStatus?.creditsCharged, runtimeStatus?.chargedActionCredits]);
 
   const bootAuditSummary = React.useMemo(
     () => summarizeBootAudit(bootAuditEvents, { iframeRemountCount: iframeMountCount }),

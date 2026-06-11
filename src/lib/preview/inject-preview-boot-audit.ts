@@ -76,6 +76,46 @@ export function buildPreviewBootAuditScript(): string {
   setTimeout(snapshotResources,1500);
   setTimeout(snapshotResources,5000);
   setTimeout(snapshotResources,12000);
+  function bodySnippet(){
+    try{
+      var t=document.body&&(document.body.innerText||document.body.textContent)||"";
+      return String(t).replace(/\\s+/g," ").trim().slice(0,400);
+    }catch(e){return "";}
+  }
+  function previewAuthed(){try{return localStorage.getItem("sb-preview-auth")==="1";}catch(e){return false;}}
+  function previewLoginUrl(){
+    try{
+      var m=location.pathname.match(/^(\\/preview-runtime\\/[^/]+\\/[^/]+)/);
+      if(m)return m[1]+"/login";
+    }catch(e){}
+    return null;
+  }
+  function isGoogleStuckText(t){
+    t=String(t||"").toLowerCase();
+    return t.indexOf("opening secure google")>=0||t.indexOf("google sign-in")>=0||t.indexOf("connecting you securely")>=0;
+  }
+  var stuckSince=0;
+  function auditAuthStuck(){
+    if(previewAuthed()){stuckSince=0;return;}
+    var snippet=bodySnippet();
+    if(!isGoogleStuckText(snippet)){stuckSince=0;return;}
+    if(!stuckSince)stuckSince=Date.now();
+    if(Date.now()-stuckSince<900)return;
+    post("auth-stuck",{
+      authStuckReason:"App waiting on Google OAuth in preview iframe (popup/redirect blocked)",
+      bodySnippet:snippet,
+      suggestedFix:"Redirect to preview-runtime /login Vodex auth page"
+    });
+    var login=previewLoginUrl();
+    if(login&&location.pathname.indexOf("/login")<0){
+      post("auth-redirect",{navigationMethod:"auth-guard",navigationUrl:login});
+      location.href=login;
+    }
+  }
+  setInterval(auditAuthStuck,500);
+  document.addEventListener("DOMContentLoaded",auditAuthStuck);
+  setTimeout(auditAuthStuck,1000);
+  setTimeout(auditAuthStuck,2000);
 })();`;
 }
 
