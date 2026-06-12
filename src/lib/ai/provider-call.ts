@@ -123,7 +123,11 @@ export async function callProviderStructured(input: ProviderCallInput): Promise<
   });
 
   if (!budget.allowed && !userSelectedLocked) {
-    const down = downRouteOperation(spec, input.complexity);
+    const isImplementation =
+      input.operationType === "frontend_implementation" ||
+      input.operationType === "backend_implementation" ||
+      input.operationType === "code_repair_hard";
+    const down = isImplementation ? null : downRouteOperation(spec, input.complexity);
     if (down && down.modelId !== spec.modelId) {
       spec = down;
       budget = checkOperationBudget({

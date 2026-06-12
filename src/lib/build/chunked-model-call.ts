@@ -5,6 +5,7 @@ import {
   domainActiveWorkLines,
 } from "@/lib/build/live-build-activity";
 import type { GenerationChunk } from "@/lib/build/chunked-generation-pipeline";
+import { pickUiImplementationModelId } from "@/lib/ai/ui-implementation-model";
 import { CHUNK_MODEL_TIMEOUT_MS } from "@/lib/ai/provider-timeouts";
 import { callProviderWithBuildTimeout, type TimedProviderResult } from "@/lib/build/timed-build-operations";
 
@@ -49,8 +50,8 @@ export async function callChunkWithFailover(
       prompt,
       timeoutMs,
       userSelectedModelId:
-        options.useFallbackModel && attempt > 0
-          ? null
+        options.useFallbackModel
+          ? pickUiImplementationModelId(input.complexity ?? 7, input.userEmail)
           : input.userSelectedModelId,
     };
 

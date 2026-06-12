@@ -1,4 +1,5 @@
 import { CREATION_MODELS, type CreationModel } from "@/lib/creation/models";
+import { BUILD_UI_EXCLUDED_MODEL_IDS } from "@/lib/creation/model-ratings";
 
 /** Minimum build credits needed to start a turn with this model (relative to catalog weight). */
 export function minBuildCreditsForModel(model: Pick<CreationModel, "credits" | "id">): number {
@@ -28,7 +29,12 @@ export function pickAffordableModelId(
   }
 
   const affordable = [...CREATION_MODELS]
-    .filter((m) => isModelAffordableForBuild(m, buildCreditsAvailable))
+    .filter(
+      (m) =>
+        !BUILD_UI_EXCLUDED_MODEL_IDS.has(m.id) &&
+        m.ratings.frontend >= 4 &&
+        isModelAffordableForBuild(m, buildCreditsAvailable),
+    )
     .sort((a, b) => a.credits - b.credits);
 
   if (affordable[0]) {

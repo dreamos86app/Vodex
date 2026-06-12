@@ -18,6 +18,7 @@ import type { CreationModel, Rating1to5 } from "@/lib/creation/models";
 import { CREATION_MODELS, FLAGSHIP_MODELS, ADDITIONAL_MODELS } from "@/lib/creation/models";
 import {
   COMING_SOON_MODEL_IDS,
+  BUILD_UI_EXCLUDED_MODEL_IDS,
   COST_TIER_LABELS,
   COST_TIER_STYLES,
   costTierFromScore,
@@ -106,7 +107,7 @@ const AUTOMATIC_MODEL = {
   id: "automatic",
   name: "Automatic",
   provider: "anthropic" as const,
-  tagline: "Best model for each step — cost-optimized routing",
+  tagline: "Gemini UI builder — best quality per credit for full app generation",
   ratings: { intelligence: 5, reasoning: 5, frontend: 5, backend: 5, speed: 4, cost: 4, orchestration: 5 },
   multimodal: true,
   contextK: 200,
@@ -572,7 +573,9 @@ export function ModelPicker({
     };
   }, [open, updatePos]);
 
-  const manualModels = query ? CREATION_MODELS : [...FLAGSHIP_MODELS, ...ADDITIONAL_MODELS];
+  const manualModels = query
+    ? CREATION_MODELS.filter((m) => !BUILD_UI_EXCLUDED_MODEL_IDS.has(m.id))
+    : [...FLAGSHIP_MODELS, ...ADDITIONAL_MODELS].filter((m) => !BUILD_UI_EXCLUDED_MODEL_IDS.has(m.id));
   const filteredManual = sortModelsForPicker(
     manualModels.filter((m) => {
       if (!query) return true;

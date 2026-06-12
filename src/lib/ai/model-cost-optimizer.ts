@@ -28,8 +28,8 @@ export type CostOptimizerInput = {
 };
 
 const MINI = "gpt-4o-mini";
-const UI_STRONG = "claude-sonnet";
-const UI_COST_EFFECTIVE = "gemini-flash";
+const UI_STRONG = "gemini-3-1-pro";
+const UI_COST_EFFECTIVE = "gemini-2-5-pro";
 
 export function planStageModels(input: CostOptimizerInput): {
   stages: StageModelPlan[];
@@ -77,7 +77,10 @@ export function planStageModels(input: CostOptimizerInput): {
 
   const uiEscalation: ModelEscalationReason =
     complexity >= 7 || input.qualityLevel === "premium" ? "complex_production_app" : "none";
-  const uiModel = complexity >= 7 || input.qualityLevel === "premium" ? UI_STRONG : UI_COST_EFFECTIVE;
+  const uiModel =
+    complexity >= 7 || input.qualityLevel === "premium" || input.qualityLevel === "production"
+      ? UI_STRONG
+      : UI_COST_EFFECTIVE;
 
   const backendEscalation: ModelEscalationReason = input.requiresBackendSecurity
     ? "security_backend_required"

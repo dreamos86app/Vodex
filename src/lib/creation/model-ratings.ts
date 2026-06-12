@@ -9,6 +9,16 @@ export const COMING_SOON_MODEL_IDS = new Set([
   "mistral-large",
 ]);
 
+/** Hidden from build model picker — too weak for full UI generation. */
+export const BUILD_UI_EXCLUDED_MODEL_IDS = new Set([
+  "gpt-4o-mini",
+  "gpt-5.4-mini",
+  "gemini-flash",
+  "gemini-2-0-flash",
+  "claude-haiku-4-5",
+  "deepseek-chat",
+]);
+
 /** Available models first, coming-soon models at the bottom. */
 export function sortModelsForPicker<T extends { id: string; comingSoon?: boolean }>(
   models: T[],

@@ -1,6 +1,7 @@
 import { isDreamosOwnerEmail } from "@/lib/admin-owner";
 import { isProviderSelectable } from "@/lib/ai/provider-availability";
-import { hasAnyLlmProviderKey, googleGenerativeApiKey } from "@/lib/llm/env-keys";
+import { hasAnyLlmProviderKey } from "@/lib/llm/env-keys";
+import { pickUiImplementationModelId } from "@/lib/ai/ui-implementation-model";
 
 const AUTOMATIC_ALIASES = new Set(["automatic", "auto", "default"]);
 
@@ -18,36 +19,13 @@ export function pickCheapestDiscussModelId(): string {
 }
 
 /**
- * Automatic implementation — best tier that fits complexity (Opus 4.7 → 4.6 → Sonnet 4.6).
- * Cheap models only for trivial scope (complexity ≤ 3).
+ * Automatic implementation — UI-capable models only (Gemini > OpenAI > Claude).
  */
 export function pickAutomaticImplementationModelId(
   complexity: number,
   ownerEmail?: string | null,
 ): string {
-  const c = Math.min(10, Math.max(1, complexity));
-  const anthropicOk = isProviderSelectable("anthropic");
-  const openAiOk = isProviderSelectable("openai");
-
-  if (c <= 6) {
-    if (openAiOk) return "gpt-5.4-mini";
-    if (isProviderSelectable("google")) return "gemini-flash";
-    if (anthropicOk) return "claude-haiku-4.5";
-    return pickCheapestDiscussModelId();
-  }
-
-  if (!anthropicOk) {
-    if (openAiOk) return c >= 8 ? "gpt-5.4" : "gpt-5.4-mini";
-    return pickCheapestDiscussModelId();
-  }
-
-  if (c >= 9) {
-    if (isDreamosOwnerEmail(ownerEmail)) return "claude-opus-4.7";
-    return "claude-opus-4.6";
-  }
-  if (c >= 8) return "claude-opus-4.6";
-  if (c >= 7) return "claude-sonnet-4-6";
-  return "gpt-5.4-mini";
+  return pickUiImplementationModelId(complexity, ownerEmail);
 }
 
 /** Legacy export — maps modes to tiered automatic picks (no longer forces Sonnet everywhere). */

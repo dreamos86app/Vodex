@@ -16,6 +16,11 @@ import {
   isAutomaticModelId,
   pickAutomaticImplementationModelId,
 } from "@/lib/ai/resolve-automatic-model";
+import {
+  ensureUiImplementationModelId,
+  isUiBuildCapableModelId,
+  pickUiImplementationModelId,
+} from "@/lib/ai/ui-implementation-model";
 
 export type { AiOperationType, ModelTier, RoutedModelSpec } from "@/lib/ai/operation-types";
 
@@ -89,9 +94,13 @@ function implementationModel(
   complexity: number,
   ownerEmail?: string | null,
 ): { id: string; tier: ModelTier } {
-  const id = pickAutomaticImplementationModelId(complexity, ownerEmail);
-  if (id.includes("opus")) return { id, tier: "ultra_owner_only" };
-  if (id.includes("sonnet")) return { id, tier: "premium_implementation" };
+  const id = pickUiImplementationModelId(complexity, ownerEmail);
+  if (id.includes("opus") || id.includes("gpt-5-5") || id.includes("3-1-pro")) {
+    return { id, tier: "premium_implementation" };
+  }
+  if (id.includes("sonnet") || id.includes("gpt-5-4") || id.includes("2-5-pro")) {
+    return { id, tier: "premium_implementation" };
+  }
   return { id, tier: "standard_fast" };
 }
 
@@ -165,7 +174,15 @@ export function routeOperation(ctx: RouteOperationContext): RoutedModelSpec {
     const ultraIds = ["claude-opus-4.7", "claude-opus-4-6", "gpt-5.5", "gpt-5.4", "gemini-3.1-pro"];
     let requested = ctx.requestedModelId;
     if (ultraIds.includes(requested) && !isDreamosOwnerEmail(ctx.ownerEmail)) {
-      requested = pickAutomaticImplementationModelId(complexity, ctx.ownerEmail);
+      requested = pickUiImplementationModelId(complexity, ctx.ownerEmail);
+    }
+    if (
+      (ctx.operationType === "frontend_implementation" ||
+        ctx.operationType === "backend_implementation" ||
+        ctx.operationType === "code_repair_hard") &&
+      !isUiBuildCapableModelId(requested)
+    ) {
+      requested = ensureUiImplementationModelId(null, complexity, ctx.ownerEmail);
     }
     const selected = userSelectedSpec(ctx.operationType, requested, complexity);
     if (selected) return selected;
@@ -231,7 +248,7 @@ export function routeOperation(ctx: RouteOperationContext): RoutedModelSpec {
     case "code_repair_small":
       return spec(op, "claude-haiku-4.5", 1800, { temperature: 0.1 });
     case "code_repair_hard":
-      return spec(op, pickAutomaticImplementationModelId(Math.max(7, complexity), ctx.ownerEmail), 4500, {
+      return spec(op, pickUiImplementationModelId(Math.max(7, complexity), ctx.ownerEmail), 4500, {
         tier: "premium_implementation",
         temperature: 0.1,
       });
@@ -247,7 +264,7 @@ export function routeOperation(ctx: RouteOperationContext): RoutedModelSpec {
     case "edit_stream":
       return spec(op, pickStandardFast("openai"), 1700, { temperature: 0.2 });
     case "edit_patch_hard":
-      return spec(op, pickAutomaticImplementationModelId(Math.max(7, complexity), ctx.ownerEmail), 2200, {
+      return spec(op, pickUiImplementationModelId(Math.max(7, complexity), ctx.ownerEmail), 2200, {
         tier: "premium_implementation",
         temperature: 0.2,
       });

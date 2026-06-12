@@ -30,6 +30,7 @@ import type { BuildSuccessContractResult } from "@/lib/build/build-success-contr
 import {
   enforcePostBuildContractWithRepair,
   requiredPageSlugsForArchetype,
+  STANDARD_MIN_RENDERABLE_FILES,
 } from "@/lib/build/post-build-contract";
 import {
   applyArchetypeScaffoldFallback,
@@ -1118,7 +1119,7 @@ export async function runStagedBuildPipeline(input: {
 
   const userPickedPremiumModel =
     Boolean(input.userSelectedModelId) && !isAutomaticModelId(input.userSelectedModelId);
-  const frontendComplexity = smokeBuild ? 3 : userPickedPremiumModel ? Math.max(complexity, 7) : complexity;
+  const frontendComplexity = smokeBuild ? 3 : Math.max(complexity, 7);
 
   if (!scaffoldSufficient) {
     setBuildPhase("model_generating", "writing", "Generating source files");
@@ -1874,7 +1875,11 @@ export async function runStagedBuildPipeline(input: {
   );
   if (scaffoldFallback.usedFallback) {
     const genericCandidate = detectGenericScaffoldBuild(scaffoldFallback.files);
-    const blockGeneric = isProductionBuildMode() && genericCandidate.isGeneric;
+    const blockGeneric =
+      isProductionBuildMode() &&
+      genericCandidate.isGeneric &&
+      scaffoldFallback.beforeCount >= STANDARD_MIN_RENDERABLE_FILES &&
+      rootPageContentOk(scaffoldFallback.files);
     if (blockGeneric) {
       trackAssistant(
         events,

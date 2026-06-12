@@ -250,12 +250,54 @@ export function applyArchetypeScaffoldFallback(
     return emptyFallbackMetrics(id, before, "not_needed");
   }
 
-  /** Production: block weak-output scaffold replacement, but never leave zero files when we have a tree. */
-  const emergencyEmptyScaffold =
-    !allowFullScaffold && beforeCount === 0 && hasFullScaffoldTree(id);
-  if (!allowFullScaffold && !emergencyEmptyScaffold) {
+  /** Production: allow gap-fill when model output cannot preview (missing root page / too few files). */
+  const needsPreviewRescue =
+    beforeCount === 0 ||
+    !rootPageContentOk(before) ||
+    beforeCount < MIN_RENDERABLE_FILES ||
+    countRenderablePages(before) < MIN_ROUTE_PAGES;
+
+  if (!allowFullScaffold && !needsPreviewRescue) {
     const reason: ScaffoldFallbackReason =
       beforeCount === 0 ? "llm_returned_no_files" : "llm_output_too_weak";
+    return emptyFallbackMetrics(id, before, reason);
+  }
+
+  /** Production rescue: gap-fill only — add missing pages without wiping model output. */
+  if (!allowFullScaffold && needsPreviewRescue && beforeCount > 0 && hasFullScaffoldTree(id)) {
+    const gapOnly = filterRenderableBuildFiles(gapFillScaffoldForArchetype(id, files, appName));
+    const improved =
+      gapOnly.length > beforeCount ||
+      rootPageContentOk(gapOnly) ||
+      countRenderablePages(gapOnly) > countRenderablePages(before);
+    if (improved) {
+      return {
+        files: gapOnly,
+        usedFallback: true,
+        reason: !rootPageContentOk(before) ? "llm_output_too_weak" : "below_minimum_renderable",
+        beforeCount,
+        afterCount: gapOnly.length,
+        componentCount: countComponentFiles(gapOnly),
+        pageCount: countRenderablePages(gapOnly),
+        archetypeId: id,
+        filesAdded: Math.max(0, gapOnly.length - beforeCount),
+        filesReplaced: 0,
+        stubsReplaced: 0,
+        rootPageReplaced: rootPageContentOk(gapOnly) && !rootPageContentOk(before),
+        sourceBytesBefore: bytesBefore,
+        sourceBytesAfter: sourceBytes(gapOnly),
+        integrityBefore,
+        integrityAfter: evaluateSourceIntegrity(gapOnly).sourceIntegrityOk,
+      };
+    }
+  }
+
+  if (!allowFullScaffold && beforeCount === 0) {
+    // fall through — empty production builds get full archetype scaffold
+  } else if (!allowFullScaffold && needsPreviewRescue) {
+    // fall through — gap-fill merge below when production rescue did not fully succeed
+  } else if (!allowFullScaffold) {
+    const reason: ScaffoldFallbackReason = "llm_output_too_weak";
     return emptyFallbackMetrics(id, before, reason);
   }
 
