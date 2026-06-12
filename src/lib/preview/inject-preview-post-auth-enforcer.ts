@@ -24,7 +24,6 @@ export function buildPreviewPostAuthEnforcerScript(): string {
   }
   function isGateRoute(p){
     p=norm(p).toLowerCase();
-    if(p==="/")return true;
     if(/\\/(welcome|splash|onboarding|intro|landing)(\\/|$)/.test(p))return true;
     if(/\\/(login|signup|sign-up|register|auth|callback|forgot|reset)(\\/|$)/.test(p))return true;
     if(/admin|diagnostic|debug|test-auth|authdiagnost/.test(p))return true;

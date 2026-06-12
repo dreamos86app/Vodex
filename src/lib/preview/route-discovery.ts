@@ -219,7 +219,9 @@ export function resolvePreviewPostAuthRoute(paths: string[]): string {
       !/\/welcome|splash|onboarding|intro|landing/i.test(p),
   );
 
-  return candidate ?? "/home";
+  if (candidate) return candidate;
+  if (normalized.includes("/")) return "/";
+  return "/home";
 }
 
 export function routesFromProjectMetadata(meta: Record<string, unknown> | null | undefined): string[] {

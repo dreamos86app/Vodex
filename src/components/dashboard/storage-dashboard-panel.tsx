@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { MediaAsset } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { isZipImportedAsset } from "@/lib/import/is-zip-imported-asset";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -28,12 +29,30 @@ export function StorageDashboardPanel({ projectId }: Props) {
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const loadAssets = React.useCallback(async () => {
-    const { data } = await supabase
+    let data: MediaAsset[] | null = null;
+    const full = await supabase
       .from("media_assets")
-      .select("id, filename, public_url, mime_type, size_bytes, asset_type, created_at, tags")
+      .select(
+        "id, filename, public_url, mime_type, size_bytes, asset_type, created_at, tags, metadata, storage_path" as never,
+      )
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
-    setAssets((data ?? []) as MediaAsset[]);
+    if (!full.error) {
+      data = (full.data ?? []) as unknown as MediaAsset[];
+    } else {
+      const slim = await supabase
+        .from("media_assets")
+        .select("id, filename, public_url, mime_type, size_bytes, created_at, storage_path" as never)
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+      if (slim.error) {
+        console.warn("[storage] media_assets query failed:", slim.error.message);
+        toast.error("Could not load storage — try refreshing");
+      } else {
+        data = (slim.data ?? []) as unknown as MediaAsset[];
+      }
+    }
+    setAssets(data ?? []);
     setLoading(false);
   }, [projectId, supabase]);
 
@@ -42,14 +61,23 @@ export function StorageDashboardPanel({ projectId }: Props) {
   }, [loadAssets]);
 
   React.useEffect(() => {
-    if (loading || assets.length > 0) return;
+    if (loading || assets.length > 0 || !projectId) return;
     void (async () => {
       try {
-        const res = await fetch("/api/projects/imported-assets/backfill-all", { method: "POST" });
-        const body = (await res.json().catch(() => ({}))) as { imported?: number; errors?: string[] };
+        const res = await fetch(`/api/projects/${projectId}/imported-assets/backfill`, {
+          method: "POST",
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          imported?: number;
+          from_zip?: number;
+          from_artifact?: number;
+          errors?: string[];
+        };
         if (res.ok && (body.imported ?? 0) > 0) {
           await loadAssets();
-          toast.success(`Imported ${body.imported} assets from ZIP archives`);
+          toast.success(
+            `Imported ${body.imported} asset${body.imported === 1 ? "" : "s"} (ZIP: ${body.from_zip ?? 0}, build: ${body.from_artifact ?? 0})`,
+          );
         } else if (body.errors?.length) {
           toast.error(body.errors[0] ?? "Asset import found no files");
         }
@@ -57,7 +85,7 @@ export function StorageDashboardPanel({ projectId }: Props) {
         /* best-effort */
       }
     })();
-  }, [loading, assets.length, loadAssets]);
+  }, [loading, assets.length, loadAssets, projectId]);
 
   async function handleUpload(files: File[]) {
     setUploading(true);
@@ -93,8 +121,8 @@ export function StorageDashboardPanel({ projectId }: Props) {
     setDeleting(null);
   }
 
-  const imported = assets.filter((a) => Array.isArray(a.tags) && a.tags.includes("zip_import"));
-  const uploaded = assets.filter((a) => !Array.isArray(a.tags) || !a.tags.includes("zip_import"));
+  const imported = assets.filter((a) => isZipImportedAsset(a));
+  const uploaded = assets.filter((a) => !isZipImportedAsset(a));
   const totalBytes = assets.reduce((sum, a) => sum + a.size_bytes, 0);
 
   if (loading) {
@@ -113,7 +141,7 @@ export function StorageDashboardPanel({ projectId }: Props) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {items.map((asset) => {
           const isImage = asset.mime_type.startsWith("image/");
-          const fromZip = Array.isArray(asset.tags) && asset.tags.includes("zip_import");
+          const fromZip = isZipImportedAsset(asset);
           return (
             <div
               key={asset.id}

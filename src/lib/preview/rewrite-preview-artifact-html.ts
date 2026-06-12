@@ -74,6 +74,10 @@ export function rewritePreviewArtifactHtml(
   out = out.replace(/\s(src|href)=["'](assets\/[^"']+)["']/gi, (_, attr, p) => {
     return ` ${attr}="${assetUrl(p)}"`;
   });
+  out = out.replace(
+    /<link([^>]*)\shref=["'](\/assets\/[^"']+)["']/gi,
+    (_, attrs, p) => `<link${attrs} href="${assetUrl(p.slice(1))}"`,
+  );
 
   out = rewriteAbsoluteVodexLinksInHtml(out);
   out = rewriteForeignSupabaseStorageUrls(out);

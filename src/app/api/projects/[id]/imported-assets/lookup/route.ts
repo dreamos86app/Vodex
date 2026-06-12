@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isZipImportedAsset } from "@/lib/import/is-zip-imported-asset";
 
 function normalizeAssetQuery(name: string): string[] {
   const trimmed = name.trim();
@@ -35,32 +36,49 @@ export async function GET(
   const name = url.searchParams.get("name")?.trim();
   if (!name) return NextResponse.json({ data: null, ok: false });
 
-  const { data: assets } = await supabase
+  const { data: assetsRaw } = await supabase
     .from("media_assets")
-    .select("id, filename, public_url, mime_type, size_bytes, tags, storage_path")
+    .select("id, filename, public_url, mime_type, size_bytes, tags, storage_path, metadata" as never)
     .eq("project_id", projectId)
     .order("created_at", { ascending: false })
     .limit(400);
 
+  type LookupAsset = {
+    filename: string;
+    public_url: string;
+    tags?: unknown;
+    storage_path?: string | null;
+    metadata?: unknown;
+  };
+  const assets = (assetsRaw ?? []) as unknown as LookupAsset[];
+
   const queries = normalizeAssetQuery(name);
 
   const match =
-    (assets ?? []).find((a) => queries.includes(a.filename.toLowerCase())) ??
-    (assets ?? []).find((a) => {
+    assets.find((a) => queries.includes(a.filename.toLowerCase())) ??
+    assets.find((a) => {
       const fn = a.filename.toLowerCase();
       return queries.some((q) => fn.includes(q) || q.includes(fn));
     }) ??
-    (assets ?? []).find((a) =>
-      Array.isArray(a.tags)
-        ? a.tags.some((t) => {
-            const tag = String(t).toLowerCase();
-            return queries.some(
-              (q) => tag.includes(q) || tag.endsWith(q) || tag.replace(/__/g, "/").includes(q),
-            );
-          })
-        : false,
-    ) ??
-    (assets ?? []).find((a) => {
+    assets.find((a) => {
+      if (!isZipImportedAsset(a)) return false;
+      if (Array.isArray(a.tags)) {
+        const hit = a.tags.some((t: unknown) => {
+          const tag = String(t).toLowerCase();
+          return queries.some(
+            (q) => tag.includes(q) || tag.endsWith(q) || tag.replace(/__/g, "/").includes(q),
+          );
+        });
+        if (hit) return true;
+      }
+      const meta = a.metadata;
+      if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+        const zipPath = String((meta as { zip_import_path?: string }).zip_import_path ?? "").toLowerCase();
+        return queries.some((q) => zipPath.includes(q) || zipPath.endsWith(q));
+      }
+      return false;
+    }) ??
+    assets.find((a) => {
       const path = String(a.storage_path ?? "").toLowerCase();
       return queries.some((q) => path.includes(q.replace(/\//g, "__")));
     });

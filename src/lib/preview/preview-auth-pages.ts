@@ -236,8 +236,8 @@ h1{font-size:1.45rem;font-weight:700;margin:14px 0 4px;letter-spacing:-.02em;col
     var home=previewAppHomeUrl();
     if(!home){showErr("Could not return to the app preview.");return;}
     var u=user||mockUser;
-    var route=postAuthRoute||"/home";
-    showLoading(route==="/home"||route==="/Home"?"Opening your app…":"Taking you to "+route+"…");
+    var route=postAuthRoute||"/";
+    showLoading(route==="/"||route==="/home"||route==="/Home"?"Opening your app…":"Taking you to "+route+"…");
     try{localStorage.setItem("sb-preview-auth","1");localStorage.setItem("vodex-preview-session",JSON.stringify(u));}catch(e){}
     try{sessionStorage.setItem("vodex-preview-post-auth-route",route);}catch(e){}
     try{parent.postMessage({type:"vodex-preview-route",path:route},"*");}catch(e){}

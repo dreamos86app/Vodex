@@ -9,6 +9,10 @@ import { assertPreviewBootstrapClean } from "@/lib/preview/preview-bootstrap-san
 import { buildPreviewBootstrapLeakPanel } from "@/lib/preview/preview-bootstrap-leak-panel";
 import { mergePreviewIframeEmbedHeaders } from "@/lib/preview/preview-iframe-embed-headers";
 import { resolvePreviewAuthPageHtml, previewAuthHtmlHeaders } from "@/lib/preview/preview-auth-pages";
+import {
+  defaultPreviewShimHints,
+  loadPreviewShimHints,
+} from "@/lib/preview/load-preview-shim-hints";
 
 export const dynamic = "force-dynamic";
 
@@ -87,9 +91,9 @@ export async function GET(
     : null;
   if (!file) return new NextResponse("Artifact not found", { status: 404 });
 
-  const shimHints = [{ path: "package.json", content: "{}", sizeBytes: 2 }];
-  const fw = detectImportedFramework(shimHints);
-  const legacy = analyzeLegacyAdapter(shimHints, fw);
+  const shimHints = await loadPreviewShimHints(supabase, projectId);
+  const fw = detectImportedFramework(shimHints.length ? shimHints : defaultPreviewShimHints());
+  const legacy = analyzeLegacyAdapter(shimHints.length ? shimHints : defaultPreviewShimHints(), fw);
   let html = injectPreviewShims(file.data.toString("utf8"), legacy);
   html = rewritePreviewArtifactHtml(html, projectId, artifactId, effectiveRoute);
 

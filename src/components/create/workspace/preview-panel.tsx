@@ -237,6 +237,18 @@ export function PreviewPanel({
     }).catch(() => {});
   }, [projectId]);
 
+  const artifactBackfillKeyRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!projectId || runtimeStatus?.previewRenderable !== true) return;
+    const key = `${projectId}:${runtimeStatus.artifactPath ?? "none"}`;
+    if (artifactBackfillKeyRef.current === key) return;
+    artifactBackfillKeyRef.current = key;
+    void fetch(`/api/projects/${projectId}/imported-assets/backfill`, {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => {});
+  }, [projectId, runtimeStatus?.previewRenderable, runtimeStatus?.artifactPath]);
+
   React.useEffect(() => {
     const detach = liveDiagnosticsRef.current.attachWindow();
     return detach;

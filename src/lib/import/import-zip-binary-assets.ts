@@ -15,6 +15,7 @@ const BINARY_EXT = new Set([
   "jpeg",
   "gif",
   "webp",
+  "svg",
   "ico",
   "avif",
   "woff",
@@ -39,6 +40,7 @@ const MIME: Record<string, string> = {
   jpeg: "image/jpeg",
   gif: "image/gif",
   webp: "image/webp",
+  svg: "image/svg+xml",
   ico: "image/x-icon",
   avif: "image/avif",
   woff: "font/woff",
@@ -84,8 +86,10 @@ function isImportableAssetPath(relativePath: string, ext: string): boolean {
     if (ext === "json" || ext === "ripo") {
       if (LOTTIE_PATH_RE.test(relativePath)) return true;
       if (/^public\//i.test(lower)) return true;
+      if (/^\.well-known\//i.test(lower)) return true;
       if (/\/assets\//i.test(lower)) return true;
       if (/^src\/assets\//i.test(lower)) return true;
+      if (/^src\//i.test(lower) && /lottie|animation|ripo|manifest/i.test(lower)) return true;
       return false;
     }
     if (/^public\//i.test(lower)) return true;
