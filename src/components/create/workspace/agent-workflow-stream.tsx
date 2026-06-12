@@ -29,7 +29,6 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { userMessageForPreviewFailure, isPreviewFailureCode } from "@/lib/preview/preview-failure-codes";
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { resolveBuildTerminalTruth } from "@/lib/build/build-terminal-truth";
-import { LiveFileLineDelta } from "@/components/create/workspace/live-file-line-delta";
 import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
 import { BuildFinalSummaryBlock } from "@/components/create/workspace/live-build-activity-panel";
 import {
@@ -67,17 +66,11 @@ function compressFileEventsForDisplay(
     (e) => e.stableKey !== activeFile?.stableKey && e.status !== "active",
   );
   if (!completed.length || !activeFile) return events;
-  let added = 0;
-  let removed = 0;
-  for (const e of completed) {
-    added += e.addedLines ?? 0;
-    removed += e.removedLines ?? 0;
-  }
   const summary: AgentWorkflowEvent = {
     id: "file-batch-summary",
     category: "file_created",
     title: `${completed.length} files saved`,
-    subtitle: `+${added} −${removed}`,
+    subtitle: undefined,
     status: "done",
     stableKey: "file-batch-summary",
     at: completed[completed.length - 1]!.at,
@@ -190,14 +183,6 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
   const isDelete = event.category === "file_deleted";
   const Icon = isDelete ? FileMinus : isCreate ? FilePlus : FilePen;
   const path = event.filePath!;
-  const parsedFromSubtitle = (() => {
-    const d = event.subtitle ?? "";
-    const m = d.match(/\+(\d+)\s*[-−](\d+)/);
-    if (!m) return {};
-    return { added: Number(m[1]), removed: Number(m[2]) };
-  })();
-  const addedLines = event.addedLines ?? parsedFromSubtitle.added;
-  const removedLines = event.removedLines ?? parsedFromSubtitle.removed;
   const fileActive = event.status === "active" && event.metadata?.file_in_progress !== false;
 
   return (
@@ -215,12 +200,9 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
       <Icon className="size-3.5 shrink-0 text-accent/85" strokeWidth={1.75} />
       <code className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground">{path}</code>
       {!isDelete ? (
-        <LiveFileLineDelta
-          path={path}
-          active={fileActive}
-          added={addedLines}
-          removed={removedLines}
-        />
+        fileActive ? (
+          <span className="shrink-0 text-[10px] font-medium text-amber-600/90">Writing…</span>
+        ) : null
       ) : null}
     </motion.div>
   );
@@ -554,6 +536,19 @@ export function AgentWorkflowStream({
     return sanitizeUserBuildChatText(last.subtitle ?? last.title) || undefined;
   }, [merged]);
 
+  const narrationTimeline = React.useMemo(() => {
+    const seen = new Set<string>();
+    const lines: string[] = [];
+    for (const ev of merged) {
+      if (ev.category !== "assistant_message" || isHeartbeatNarration(ev)) continue;
+      const text = sanitizeUserBuildChatText(ev.subtitle ?? ev.title);
+      if (!text || seen.has(text)) continue;
+      seen.add(text);
+      lines.push(text);
+    }
+    return lines;
+  }, [merged]);
+
   const diagnosticsNarrationCopy = React.useMemo(() => {
     return merged
       .filter((e) => e.category === "assistant_message" && !isHeartbeatNarration(e))
@@ -563,7 +558,7 @@ export function AgentWorkflowStream({
   }, [merged]);
 
   const fileSummaryLine = fileDiffSummary
-    ? `Generated ${fileDiffSummary.files} files · +${fileDiffSummary.added} −${fileDiffSummary.removed}`
+    ? `Generated ${fileDiffSummary.files} file${fileDiffSummary.files === 1 ? "" : "s"}`
     : "";
 
   const buildPhase = deriveBuildPhaseFromEvents(progress.events ?? []);
@@ -633,13 +628,21 @@ export function AgentWorkflowStream({
 
       {showAnalyzing ? <AnalyzingRequestBubble /> : null}
 
+      {narrationTimeline.length > 0 ? (
+        <div className="space-y-2" data-testid="build-narration-timeline">
+          {narrationTimeline.map((line) => (
+            <WorkflowNarrationLine key={line}>{line}</WorkflowNarrationLine>
+          ))}
+        </div>
+      ) : null}
+
       {working ? (
         <BuildStepPhaseCard
           phase={buildPhase}
           working={working}
           paused={isBuildPaused}
           hasFiles={rawFileStreamEvents.length > 0 || streamFileCount > 0}
-          statusLine={currentNarrationLine}
+          statusLine={narrationTimeline.length > 0 ? undefined : currentNarrationLine}
           chunkProgress={chunkProgressLine}
         />
       ) : null}
@@ -695,8 +698,7 @@ export function AgentWorkflowStream({
           className="mr-6 px-1 text-[10.5px] font-medium text-muted-foreground sm:mr-10"
           data-testid="workflow-file-diff-summary"
         >
-          {fileDiffSummary.files} file{fileDiffSummary.files === 1 ? "" : "s"} changed · +
-          {fileDiffSummary.added} -{fileDiffSummary.removed}
+          {fileDiffSummary.files} file{fileDiffSummary.files === 1 ? "" : "s"} generated
         </p>
       ) : null}
 

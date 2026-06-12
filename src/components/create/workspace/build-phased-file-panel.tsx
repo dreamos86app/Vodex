@@ -11,6 +11,7 @@ import {
   isPhaseComplete,
   type BuildPhaseCategory,
 } from "@/lib/build/build-phase-categories";
+import { buildPhaseCompleteNarration } from "@/lib/build/build-domain-narration";
 import { BUILD_STEP_RING_CLASS, BUILD_STEP_ACCENT_CLASS } from "@/lib/build/build-step-ui";
 
 export function BuildPhasedFilePanel({
@@ -66,13 +67,14 @@ export function BuildPhasedFilePanel({
         <p className="px-0.5 text-[11px] text-muted-foreground">Waiting for first file…</p>
       ) : (
         <div className="space-y-2">
-          {groups.map(({ category, events }) => (
+          {groups.map(({ category, events }, index) => (
             <PhaseSection
               key={category.id}
               category={category}
               events={events}
               open={openSections[category.id] !== false}
               done={isPhaseComplete(category, completedChunkIds)}
+              nextPhaseLabel={groups[index + 1]?.category.label}
               onToggle={() =>
                 setOpenSections((s) => ({ ...s, [category.id]: !s[category.id] }))
               }
@@ -90,6 +92,7 @@ function PhaseSection({
   events,
   open,
   done,
+  nextPhaseLabel,
   onToggle,
   renderFileCard,
 }: {
@@ -97,6 +100,7 @@ function PhaseSection({
   events: AgentWorkflowEvent[];
   open: boolean;
   done: boolean;
+  nextPhaseLabel?: string;
   onToggle: () => void;
   renderFileCard: (event: AgentWorkflowEvent) => React.ReactNode;
 }) {
@@ -125,6 +129,11 @@ function PhaseSection({
           </p>
           {meta.intro && !done ? (
             <p className="mt-0.5 text-[10.5px] text-muted-foreground">{meta.intro}</p>
+          ) : null}
+          {done ? (
+            <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+              {buildPhaseCompleteNarration(category.label, nextPhaseLabel)}
+            </p>
           ) : null}
         </div>
         <span className="text-[10px] tabular-nums text-muted-foreground">

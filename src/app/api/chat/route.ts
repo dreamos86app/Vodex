@@ -111,6 +111,8 @@ import { logServerOperation } from "@/lib/ops/server-ops-log";
 import { requireAuthUser, isNextResponse } from "@/lib/ids/api-mutation-guard";
 import { googleProviderOptionsForApiModel, withGoogleProviderOptions } from "@/lib/ai/gemini-generate-options";
 import { guardExpensiveRoute } from "@/lib/security/route-guard";
+import { pickAffordableModelId } from "@/lib/creation/model-credit-availability";
+import { pickCheapDiscussModel } from "@/lib/ai/cheap-planner";
 
 const LLM_SETUP_ERROR = "AI provider is not configured on this server.";
 const LLM_SETUP_HINT =
@@ -570,11 +572,11 @@ export async function POST(request: Request) {
     qualityLevel: projectQuality,
   });
   const routed = costRuntime.route;
-  const modelId =
+  let modelId =
     discussOnly || (freePlan && taskMode === "discuss")
       ? resolveDiscussModeModel({ planId: profileRow.plan_id as string }).modelId
       : routed.modelId;
-  const billedModelId = modelId;
+  let billedModelId = modelId;
 
   if (routed.missingEnv.length > 0 && !hasAnyLlmProviderKey()) {
     return NextResponse.json(
@@ -667,6 +669,32 @@ export async function POST(request: Request) {
   if (creditBillingTarget && creditBillingTarget.billedUserId !== user.id) {
     balance = await fetchProfileBalance(writer, creditBillingTarget.billedUserId);
   }
+
+  let creditAwareRequestedModel = requestedModel;
+  if (requestedModel && !isAutomaticModelId(requestedModel)) {
+    const affordable = pickAffordableModelId(requestedModel, Math.floor(balance));
+    if (affordable.switched) {
+      creditAwareRequestedModel = affordable.modelId;
+      console.info("[ai-route] credit-aware model fallback", {
+        from: requestedModel,
+        to: affordable.modelId,
+        balance: Math.floor(balance),
+        reason: affordable.reason,
+      });
+    }
+  }
+  if (
+    creditAwareRequestedModel &&
+    requestedModel &&
+    creditAwareRequestedModel !== requestedModel &&
+    !discussOnly &&
+    !(freePlan && taskMode === "discuss")
+  ) {
+    const reRoute = routeModel(taskMode, creditAwareRequestedModel);
+    modelId = reRoute.modelId;
+    billedModelId = modelId;
+  }
+
   const buildAllowance = startBuildPipeline
     ? resolveBuildCreditAllowance(balance, budgetPlan.creditQuote)
     : null;
@@ -1059,14 +1087,22 @@ export async function POST(request: Request) {
       continueIntent.kind === "continue_category";
 
     let asyncBuildModelId = billedModelId;
-    let asyncUserSelectedModel = requestedModel;
-    if (requestedModel && !isAutomaticModelId(requestedModel)) {
-      const buildProvider = providerFromModelId(requestedModel);
+    let asyncUserSelectedModel = creditAwareRequestedModel ?? requestedModel;
+    if (asyncUserSelectedModel && !isAutomaticModelId(asyncUserSelectedModel)) {
+      const buildProvider = providerFromModelId(asyncUserSelectedModel);
       if (!isProviderSelectable(buildProvider)) {
         const failoverId = pickFailoverCatalogModel(buildProvider, "frontend_implementation");
         if (failoverId) {
           asyncBuildModelId = failoverId;
           asyncUserSelectedModel = failoverId;
+        } else {
+          const cheap = pickAffordableModelId(asyncUserSelectedModel, Math.floor(balance));
+          const cheapId =
+            cheap.modelId !== "automatic" ? cheap.modelId : pickCheapDiscussModel(null).modelId;
+          if (cheapId) {
+            asyncBuildModelId = cheapId;
+            asyncUserSelectedModel = cheapId;
+          }
         }
       }
     }
@@ -1158,7 +1194,7 @@ export async function POST(request: Request) {
 
   const mixRouted = routeMainModelSpec({
     operationType: streamOp,
-    userSelectedModelId: requestedModel,
+    userSelectedModelId: creditAwareRequestedModel,
     complexity: buildComplexity,
     ownerEmail: userEmail,
   });
@@ -1198,15 +1234,30 @@ export async function POST(request: Request) {
         requestedModelId: altId,
         complexity: buildComplexity,
       });
-    } else if (!isAutomaticModelId(requestedModel)) {
-      return NextResponse.json(
-        {
-          error:
-            "Selected model is temporarily unavailable and no fallback is configured. Try Automatic.",
-          code: "selected_model_unavailable",
-        },
-        { status: 503 },
+    } else if (!isAutomaticModelId(creditAwareRequestedModel ?? requestedModel)) {
+      const cheap = pickAffordableModelId(
+        creditAwareRequestedModel ?? requestedModel ?? "automatic",
+        Math.floor(balance),
       );
+      const cheapId =
+        cheap.modelId !== "automatic" ? cheap.modelId : pickCheapDiscussModel(null).modelId;
+      if (cheapId) {
+        streamSpec = routeOperation({
+          operationType: streamOp,
+          ownerEmail: userEmail,
+          requestedModelId: cheapId,
+          complexity: buildComplexity,
+        });
+      } else {
+        return NextResponse.json(
+          {
+            error:
+              "Selected model is temporarily unavailable and no fallback is configured. Try Automatic.",
+            code: "selected_model_unavailable",
+          },
+          { status: 503 },
+        );
+      }
     }
   }
 

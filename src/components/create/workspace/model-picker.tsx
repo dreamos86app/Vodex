@@ -29,6 +29,12 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { normalizePlanId } from "@/lib/billing/plans";
 import { canSelectModel } from "@/lib/billing/plan-entitlements";
 import { useCreditsStore } from "@/lib/stores/credits-store";
+import {
+  isModelAffordableForBuild,
+  minBuildCreditsForModel,
+  modelUnaffordableReason,
+  pickAffordableModelId,
+} from "@/lib/creation/model-credit-availability";
 import { toast } from "@/lib/toast";
 
 type ProviderAvailability = Record<string, "available" | "unavailable" | "coming_soon">;
@@ -38,7 +44,7 @@ type ModelAvailability = "ok" | "unavailable" | "coming_soon";
 /** Fixed panel height — side detail + Use button must fit without scrolling. */
 const PANEL_BODY_H = 348;
 
-function modelAvailability(
+function modelProviderAvailability(
   model: CreationModel,
   providers: ProviderAvailability | null,
   providerLoading = false,
@@ -54,6 +60,38 @@ function modelAvailability(
   if (st === "coming_soon") return "coming_soon";
   if (st === "unavailable") return "unavailable";
   return "ok";
+}
+
+function modelAvailability(
+  model: CreationModel,
+  providers: ProviderAvailability | null,
+  providerLoading = false,
+  buildCreditsAvailable = 0,
+): ModelAvailability {
+  const providerState = modelProviderAvailability(model, providers, providerLoading);
+  if (providerState !== "ok") return providerState;
+  if (buildCreditsAvailable <= 0) return "unavailable";
+  if (model.id === "automatic") return "ok";
+  if (!isModelAffordableForBuild(model, buildCreditsAvailable)) return "unavailable";
+  return "ok";
+}
+
+function unavailableReasonForModelWithCredits(
+  model: CreationModel,
+  providers: ProviderAvailability | null,
+  reasons: ProviderUnavailableReasons,
+  providerLoading: boolean,
+  buildCreditsAvailable: number,
+): string | undefined {
+  const providerState = modelProviderAvailability(model, providers, providerLoading);
+  if (providerState === "unavailable") {
+    return unavailableReasonForModel(model, reasons);
+  }
+  if (buildCreditsAvailable <= 0 || !isModelAffordableForBuild(model, buildCreditsAvailable)) {
+    const min = minBuildCreditsForModel(model);
+    return `${modelUnaffordableReason(buildCreditsAvailable)} Needs ~${min} credits per build step.`;
+  }
+  return unavailableReasonForModel(model, reasons);
 }
 
 function unavailableReasonForModel(
@@ -387,6 +425,7 @@ export function ModelPicker({
 }) {
   const { profile } = useAuthStore();
   const creditsPlanId = useCreditsStore((s) => s.planId);
+  const buildCreditsAvailable = useCreditsStore((s) => s.build.available);
   const effectivePlan = normalizePlanId(profile?.plan_id ?? creditsPlanId ?? "free");
   const modelLocked = !canSelectModel(effectivePlan);
 
@@ -441,14 +480,30 @@ export function ModelPicker({
   }, [open, refreshProviderStatus]);
 
   React.useEffect(() => {
-    if (!providerStatus || value === "automatic") return;
+    if (value === "automatic") return;
     const m = CREATION_MODELS.find((x) => x.id === value);
     if (!m) return;
-    if (modelAvailability(m, providerStatus, providerLoading) !== "ok") {
-      onChange("automatic");
-      toast.info("Selected model is temporarily unavailable. Switched to Automatic.");
+    const availability = modelAvailability(m, providerStatus, providerLoading, buildCreditsAvailable);
+    if (availability === "ok") return;
+
+    const fallback = pickAffordableModelId(value, buildCreditsAvailable);
+    if (fallback.switched) {
+      onChange(fallback.modelId);
+      const label =
+        fallback.modelId === "automatic"
+          ? "Automatic"
+          : (CREATION_MODELS.find((x) => x.id === fallback.modelId)?.name ?? fallback.modelId);
+      toast.info(
+        availability === "unavailable" && buildCreditsAvailable > 0
+          ? `Not enough build credits for ${m.name}. Switched to ${label}.`
+          : `${m.name} is unavailable. Switched to ${label}.`,
+      );
+      return;
     }
-  }, [providerStatus, value, onChange]);
+
+    onChange("automatic");
+    toast.info("Selected model is temporarily unavailable. Switched to Automatic.");
+  }, [providerStatus, value, onChange, buildCreditsAvailable, providerLoading]);
 
   const updatePos = React.useCallback(() => {
     if (!triggerRef.current) return;
@@ -529,7 +584,7 @@ export function ModelPicker({
         m.tagline.toLowerCase().includes(q)
       );
     }),
-    (m) => modelAvailability(m, providerStatus, providerLoading) === "coming_soon",
+    (m) => modelAvailability(m, providerStatus, providerLoading, buildCreditsAvailable) === "coming_soon",
   );
 
   const showAutomatic = !query || "automatic".includes(query.toLowerCase()) || AUTOMATIC_MODEL.name.toLowerCase().includes(query.toLowerCase());
@@ -549,7 +604,7 @@ export function ModelPicker({
       return;
     }
     const m = CREATION_MODELS.find((x) => x.id === id);
-    if (!m || modelAvailability(m, providerStatus, providerLoading) !== "ok") return;
+    if (!m || modelAvailability(m, providerStatus, providerLoading, buildCreditsAvailable) !== "ok") return;
     onChange(id);
     setOpen(false);
     setPreviewId(null);
@@ -598,7 +653,12 @@ export function ModelPicker({
                           model={AUTOMATIC_MODEL as CreationModel}
                           active={value === "automatic"}
                           preview={previewId === "automatic"}
-                          availability="ok"
+                          availability={modelAvailability(
+                            AUTOMATIC_MODEL as CreationModel,
+                            providerStatus,
+                            providerLoading,
+                            buildCreditsAvailable,
+                          )}
                           onPreview={() => setPreviewId("automatic")}
                         />
                       </>
@@ -620,7 +680,7 @@ export function ModelPicker({
                             model={m}
                             active={m.id === value}
                             preview={m.id === previewId}
-                            availability={modelAvailability(m, providerStatus, providerLoading)}
+                            availability={modelAvailability(m, providerStatus, providerLoading, buildCreditsAvailable)}
                             onPreview={() => setPreviewId(m.id)}
                           />
                         ))}
@@ -636,14 +696,24 @@ export function ModelPicker({
                         availability={
                           previewModel.id === "automatic"
                             ? "ok"
-                            : modelAvailability(previewModel as CreationModel, providerStatus, providerLoading)
+                            : modelAvailability(
+                                previewModel as CreationModel,
+                                providerStatus,
+                                providerLoading,
+                                buildCreditsAvailable,
+                              )
                         }
                         unavailableReason={
                           previewModel.id === "automatic"
-                            ? undefined
-                            : unavailableReasonForModel(
+                            ? buildCreditsAvailable <= 0
+                              ? modelUnaffordableReason(buildCreditsAvailable)
+                              : undefined
+                            : unavailableReasonForModelWithCredits(
                                 previewModel as CreationModel,
+                                providerStatus,
                                 providerReasons,
+                                providerLoading,
+                                buildCreditsAvailable,
                               )
                         }
                         onUse={() => confirmModel(previewModel.id)}

@@ -121,12 +121,11 @@ function rowToStreamEvent(row: BuildJobEventRow, terminal: boolean): AgentWorkfl
   const oldLineCount =
     typeof meta.old_line_count === "number" ? meta.old_line_count : undefined;
   const added =
-    newLineCount != null && metaAdded != null
-      ? Math.max(metaAdded, newLineCount)
-      : newLineCount != null && (oldLineCount === 0 || oldLineCount == null)
-        ? newLineCount
-        : metaAdded;
+    metaAdded ??
+    (newLineCount != null && (oldLineCount === 0 || oldLineCount == null) ? newLineCount : undefined);
   const removed = metaRemoved;
+  const deltaTotal = (added ?? 0) + (removed ?? 0);
+  const showLineDelta = deltaTotal >= 4 || (added ?? 0) >= 12;
 
   const stepStatus =
     typeof meta.step_status === "string" ? meta.step_status : undefined;
@@ -191,8 +190,8 @@ function rowToStreamEvent(row: BuildJobEventRow, terminal: boolean): AgentWorkfl
     phase: mapActivePhaseFromJobType(row.type),
     status,
     filePath,
-    addedLines: added,
-    removedLines: removed,
+    addedLines: showLineDelta ? added : undefined,
+    removedLines: showLineDelta ? removed : undefined,
     metadata: meta,
     at: row.created_at,
     stableKey: stableKeyForRow(category, title, filePath),
