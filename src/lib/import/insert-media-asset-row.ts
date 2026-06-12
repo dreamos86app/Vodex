@@ -44,6 +44,7 @@ export async function insertMediaAssetRow(
     asset_type: input.assetType,
     generated: false,
     tags,
+    metadata,
   };
 
   let { error } = await admin.from("media_assets").insert(extended as never);

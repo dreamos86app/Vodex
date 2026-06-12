@@ -349,6 +349,7 @@ export async function POST(req: Request) {
     zipBuffer: buf,
     userId: user.id,
     projectId,
+    appFiles: files.map((f) => ({ path: f.path, content: f.content })),
   });
 
   const iconPersist = await persistImportedAppIconFromZip({

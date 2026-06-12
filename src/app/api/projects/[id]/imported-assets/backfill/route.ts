@@ -8,6 +8,7 @@ import {
 import { persistImportedAppIconFromZip } from "@/lib/import/persist-imported-app-icon";
 import { ZIP_IMPORT_BUCKET } from "@/lib/import/zip-storage";
 import { reconcileZipPreviewCreditCapture } from "@/lib/imports/zip-preview-credit-reconcile";
+import { collectReferencedAssetPaths } from "@/lib/import/collect-referenced-asset-paths";
 
 /** Re-extract binary assets from stored ZIP archive and/or built preview artifact. */
 export async function POST(
@@ -40,6 +41,17 @@ export async function POST(
       : {};
 
   let zipResult = { imported: 0, skipped: 0, errors: [] as string[] };
+
+  const { data: appFileRows } = await supabase
+    .from("app_files")
+    .select("path, content")
+    .eq("project_id", projectId)
+    .limit(1500);
+  const appFiles = (appFileRows ?? [])
+    .filter((r): r is { path: string; content: string } => typeof r.path === "string" && typeof r.content === "string")
+    .map((r) => ({ path: r.path, content: r.content }));
+  const referencedPaths = collectReferencedAssetPaths(appFiles);
+
   const { data: imported } = await supabase
     .from("imported_projects")
     .select("source_archive_path, meta")
@@ -68,6 +80,8 @@ export async function POST(
         zipBuffer,
         userId: user.id,
         projectId,
+        appFiles,
+        referencedPaths,
       });
     }
   } else {
@@ -138,6 +152,7 @@ export async function POST(
     from_zip: zipResult.imported,
     from_artifact: artifactResult.imported,
     skipped: zipResult.skipped + artifactResult.skipped,
+    referenced_paths: referencedPaths.size,
     icon_url: iconPersist.icon_url,
     errors,
     creditCapture,

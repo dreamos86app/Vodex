@@ -8,6 +8,11 @@ import {
 import { ensurePublicBucket } from "@/lib/supabase/ensure-storage-bucket";
 import { PREVIEW_ARTIFACTS_BUCKET } from "@/lib/imports/preview-artifact-storage";
 import { insertMediaAssetRow } from "@/lib/import/insert-media-asset-row";
+import {
+  collectReferencedAssetPaths,
+  zipEntryMatchesReference,
+} from "@/lib/import/collect-referenced-asset-paths";
+import { listStorageFilePaths } from "@/lib/import/list-storage-file-paths";
 
 const BINARY_EXT = new Set([
   "png",
@@ -32,7 +37,27 @@ const BINARY_EXT = new Set([
   "ripo",
 ]);
 
-const LOTTIE_PATH_RE = /lottie|animation|ripo|motion|splash|welcome|loader/i;
+const LOTTIE_PATH_RE = /lottie|animation|ripo|motion|splash|welcome|loader|hero|icon|logo|font|media|static/i;
+
+const SOURCE_CODE_EXT = new Set([
+  "ts",
+  "tsx",
+  "jsx",
+  "js",
+  "mjs",
+  "cjs",
+  "vue",
+  "svelte",
+  "md",
+  "mdx",
+  "css",
+  "scss",
+  "sass",
+  "less",
+  "html",
+  "htm",
+  "map",
+]);
 
 const MIME: Record<string, string> = {
   png: "image/png",
@@ -80,24 +105,53 @@ function safeStorageName(relativePath: string): string {
   return relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
-function isImportableAssetPath(relativePath: string, ext: string): boolean {
+function isImportableAssetPath(relativePath: string, ext: string, referenced?: Set<string>): boolean {
   const lower = relativePath.toLowerCase();
+
+  if (referenced?.size && zipEntryMatchesReference(relativePath, referenced)) {
+    return true;
+  }
+
+  if (SOURCE_CODE_EXT.has(ext)) {
+    if (/^public\//i.test(lower) || /\/assets?\//i.test(lower)) return BINARY_EXT.has(ext);
+    return false;
+  }
+
   if (BINARY_EXT.has(ext)) {
     if (ext === "json" || ext === "ripo") {
       if (LOTTIE_PATH_RE.test(relativePath)) return true;
       if (/^public\//i.test(lower)) return true;
       if (/^\.well-known\//i.test(lower)) return true;
-      if (/\/assets\//i.test(lower)) return true;
+      if (/^static\//i.test(lower)) return true;
+      if (/^media\//i.test(lower)) return true;
+      if (/^resources\//i.test(lower)) return true;
+      if (/\/assets?\//i.test(lower)) return true;
       if (/^src\/assets\//i.test(lower)) return true;
-      if (/^src\//i.test(lower) && /lottie|animation|ripo|manifest/i.test(lower)) return true;
+      if (/^src\//i.test(lower) && /lottie|animation|ripo|manifest|icon|splash|welcome|loader/i.test(lower)) {
+        return true;
+      }
       return false;
     }
     if (/^public\//i.test(lower)) return true;
+    if (/^static\//i.test(lower)) return true;
+    if (/^media\//i.test(lower)) return true;
     if (/^src\/assets\//i.test(lower)) return true;
-    if (/\/assets\//i.test(lower)) return true;
+    if (/\/assets?\//i.test(lower)) return true;
+    if (/^src\//i.test(lower) && /image|icon|logo|font|media|animation|ripo|lottie/i.test(lower)) {
+      return true;
+    }
     return true;
   }
   return false;
+}
+
+function isArtifactMediaFile(relativePath: string): boolean {
+  const ext = extOf(relativePath);
+  if (SOURCE_CODE_EXT.has(ext)) return false;
+  if (ext === "js" || ext === "css" || ext === "map") return false;
+  if (BINARY_EXT.has(ext)) return true;
+  if (ext === "txt") return false;
+  return /\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|ripo|json|mp4|webm|mp3|wav|avif)$/i.test(relativePath);
 }
 
 async function insertProjectMediaAsset(input: {
@@ -161,8 +215,14 @@ export async function importZipBinaryAssets(input: {
   zipBuffer: Buffer;
   userId: string;
   projectId: string;
+  referencedPaths?: Set<string>;
+  appFiles?: Array<{ path: string; content: string }>;
 }): Promise<ZipBinaryImportResult> {
   const result: ZipBinaryImportResult = { imported: 0, skipped: 0, errors: [] };
+
+  const referenced =
+    input.referencedPaths ??
+    (input.appFiles?.length ? collectReferencedAssetPaths(input.appFiles) : new Set<string>());
 
   const bucket = await ensurePublicBucket(input.admin, MEDIA_BUCKET, {
     fileSizeLimit: 50 * 1024 * 1024,
@@ -198,7 +258,7 @@ export async function importZipBinaryAssets(input: {
     }
 
     const ext = extOf(normalized);
-    if (!isImportableAssetPath(normalized, ext)) {
+    if (!isImportableAssetPath(normalized, ext, referenced)) {
       result.skipped += 1;
       continue;
     }
@@ -235,32 +295,8 @@ export async function importZipBinaryAssets(input: {
 async function listArtifactPaths(
   admin: SupabaseClient,
   prefix: string,
-  acc: string[] = [],
 ): Promise<string[]> {
-  let offset = 0;
-  const pageSize = 500;
-  for (;;) {
-    const { data, error } = await admin.storage.from(PREVIEW_ARTIFACTS_BUCKET).list(prefix, {
-      limit: pageSize,
-      offset,
-      sortBy: { column: "name", order: "asc" },
-    });
-    if (error) return acc;
-    if (!data?.length) break;
-    for (const item of data) {
-      if (!item.name) continue;
-      const full = prefix ? `${prefix}/${item.name}` : item.name;
-      const isFolder = item.id == null || item.metadata == null;
-      if (isFolder) {
-        await listArtifactPaths(admin, full, acc);
-      } else {
-        acc.push(full);
-      }
-    }
-    if (data.length < pageSize) break;
-    offset += data.length;
-  }
-  return acc;
+  return listStorageFilePaths(admin, PREVIEW_ARTIFACTS_BUCKET, prefix.replace(/\/+$/, ""));
 }
 
 /** Copy built preview artifact media (dist/assets) into project storage. */
@@ -283,7 +319,7 @@ export async function importPreviewArtifactBinaryAssets(input: {
   for (const storagePath of paths) {
     const rel = storagePath.slice(input.artifactPath.length).replace(/^\/+/, "") || storagePath;
     const ext = extOf(rel);
-    if (!isImportableAssetPath(rel, ext)) {
+    if (!isArtifactMediaFile(rel)) {
       result.skipped += 1;
       continue;
     }

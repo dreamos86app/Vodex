@@ -158,6 +158,9 @@ import {
   detectPreviewRoutesFromFiles,
   type PreviewRouteEntry,
 } from "@/lib/preview/detect-preview-routes";
+import {
+  resolvePreviewWelcomeRoute,
+} from "@/lib/preview/preview-route-roles";
 import { reconcileProjectBuildState } from "@/lib/build/reconcile-project-build";
 import { resolveDisplayName } from "@/lib/profile-display";
 import {
@@ -2671,9 +2674,10 @@ export function ImmersiveWorkspace({
     null,
   );
   const [previewRoutes, setPreviewRoutes] = React.useState<PreviewRouteEntry[]>([
-    { path: "/", label: "Home", source: "default" },
+    { path: "/", label: "Welcome", source: "default" },
   ]);
   const [previewRoute, setPreviewRoute] = React.useState("/");
+  const previewRoutesInitializedRef = React.useRef(false);
   const [previewRebuilding, setPreviewRebuilding] = React.useState(false);
   const [previewStateRepairing, setPreviewStateRepairing] = React.useState(false);
 
@@ -2691,6 +2695,11 @@ export function ImmersiveWorkspace({
       }
       return next;
     });
+    const paths = next.map((r) => r.path);
+    if (!previewRoutesInitializedRef.current) {
+      previewRoutesInitializedRef.current = true;
+      setPreviewRoute(resolvePreviewWelcomeRoute(paths));
+    }
   }, [codeFiles]);
 
   const [previewStarting, setPreviewStarting] = React.useState(false);

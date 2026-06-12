@@ -22,6 +22,12 @@ export function buildPreviewPostAuthEnforcerScript(): string {
     }catch(e){}
     return null;
   }
+  function isWelcomeRoute(p){
+    p=norm(p).toLowerCase();
+    if(p==="/")return true;
+    if(/\\/(welcome|splash|onboarding|intro|landing)(\\/|$)/.test(p))return true;
+    return false;
+  }
   function isGateRoute(p){
     p=norm(p).toLowerCase();
     if(/\\/(welcome|splash|onboarding|intro|landing)(\\/|$)/.test(p))return true;
@@ -41,8 +47,12 @@ export function buildPreviewPostAuthEnforcerScript(): string {
   function enforce(){
     if(!authed())return;
     var target=targetRoute();
-    if(!target||isGateRoute(target))return;
+    if(!target||isGateRoute(target))target="/home";
     var cur=window.__VODEX_VIRTUAL_PATH__||norm(location.pathname)||"/";
+    if(isWelcomeRoute(cur)&&!isWelcomeRoute(target)){
+      setVirtualRoute(target);
+      return;
+    }
     if(isGateRoute(cur)||/admin|diagnostic|authdiagnost/i.test(cur)){
       setVirtualRoute(target);
     }

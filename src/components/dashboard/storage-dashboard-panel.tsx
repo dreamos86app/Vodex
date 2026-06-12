@@ -29,32 +29,25 @@ export function StorageDashboardPanel({ projectId }: Props) {
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const loadAssets = React.useCallback(async () => {
-    let data: MediaAsset[] | null = null;
-    const full = await supabase
-      .from("media_assets")
-      .select(
-        "id, filename, public_url, mime_type, size_bytes, asset_type, created_at, tags, metadata, storage_path" as never,
-      )
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
-    if (!full.error) {
-      data = (full.data ?? []) as unknown as MediaAsset[];
-    } else {
-      const slim = await supabase
-        .from("media_assets")
-        .select("id, filename, public_url, mime_type, size_bytes, created_at, storage_path" as never)
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false });
-      if (slim.error) {
-        console.warn("[storage] media_assets query failed:", slim.error.message);
-        toast.error("Could not load storage — try refreshing");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/media-assets`, { credentials: "include" });
+      const body = (await res.json().catch(() => ({}))) as {
+        assets?: MediaAsset[];
+        error?: string;
+      };
+      if (!res.ok) {
+        console.warn("[storage] media_assets API failed:", body.error);
+        toast.error(body.error ?? "Could not load storage");
+        setAssets([]);
       } else {
-        data = (slim.data ?? []) as unknown as MediaAsset[];
+        setAssets(body.assets ?? []);
       }
+    } catch {
+      toast.error("Could not load storage");
+      setAssets([]);
     }
-    setAssets(data ?? []);
     setLoading(false);
-  }, [projectId, supabase]);
+  }, [projectId]);
 
   React.useEffect(() => {
     void loadAssets();
