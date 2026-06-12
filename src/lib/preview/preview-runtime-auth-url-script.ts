@@ -42,8 +42,28 @@ export function buildPreviewRuntimeAuthUrlBootstrapScript(
     var base=captureRuntimeBase();
     return base?base+suffix:null;
   };
+  window.__vodexPreviewAppUrl=function(route){
+    route=route||window.__VODEX_PREVIEW_APP_HOME__||"/home";
+    if(!route.startsWith("/"))route="/"+route;
+    var base=null;
+    if(typeof window.__vodexPreviewLoginUrl==="function")base=window.__vodexPreviewLoginUrl("/");
+    if(!base&&window.__VODEX_PREVIEW_RUNTIME_BASE__)base=window.__VODEX_PREVIEW_RUNTIME_BASE__;
+    if(!base)return null;
+    var sep=base.indexOf("?")>=0?"&":"?";
+    return base+sep+"route="+encodeURIComponent(route);
+  };
+  window.__vodexPreviewGoAppHome=function(reason){
+    try{
+      var route=sessionStorage.getItem("vodex-preview-post-auth-route")||window.__VODEX_PREVIEW_APP_HOME__||"/home";
+      var url=window.__vodexPreviewAppUrl(route);
+      if(!url)return false;
+      try{console.warn("[Vodex preview]",reason||"redirect -> app home");}catch(e){}
+      window.location.replace(url);
+      return true;
+    }catch(e){return false;}
+  };
   window.__vodexPreviewGoLogin=function(reason){
-    try{if(localStorage.getItem("sb-preview-auth")==="1")return false;}catch(e){}
+    try{if(localStorage.getItem("sb-preview-auth")==="1")return window.__vodexPreviewGoAppHome(reason);}catch(e){}
     var url=window.__vodexPreviewLoginUrl("/login");
     if(!url)return false;
     try{console.warn("[Vodex preview]",reason||"redirect -> Vodex login");}catch(e){}
@@ -54,9 +74,9 @@ export function buildPreviewRuntimeAuthUrlBootstrapScript(
     return true;
   };
   window.__vodexPreviewGoSignup=function(reason){
+    try{if(localStorage.getItem("sb-preview-auth")==="1")return window.__vodexPreviewGoAppHome(reason);}catch(e){}
     var url=window.__vodexPreviewLoginUrl("/signup");
     if(!url)return window.__vodexPreviewGoLogin(reason);
-    try{if(localStorage.getItem("sb-preview-auth")==="1")return false;}catch(e){}
     try{console.warn("[Vodex preview]",reason||"redirect -> Vodex signup");}catch(e){}
     window.location.replace(url);
     return true;
@@ -81,6 +101,7 @@ function __vodexResolveLoginUrl(){
 }
 function __vodexGoLogin(reason){
   if(typeof window.__vodexPreviewGoLogin==="function"&&window.__vodexPreviewGoLogin(reason))return true;
+  try{if(localStorage.getItem("sb-preview-auth")==="1"&&typeof window.__vodexPreviewGoAppHome==="function"&&window.__vodexPreviewGoAppHome(reason))return true;}catch(e){}
   var u=__vodexResolveLoginUrl();
   if(!u)return false;
   try{console.warn("[Vodex preview]",reason||"redirect login");}catch(e){}

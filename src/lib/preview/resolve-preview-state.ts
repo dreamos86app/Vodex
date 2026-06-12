@@ -3,6 +3,7 @@
  */
 import type { PreviewRuntimeStatusPayload } from "@/lib/preview/preview-runtime-status";
 import type { PreviewIframeUrlResolution } from "@/lib/preview/preview-iframe-url-resolver";
+import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { isZipImportProject, readImportMeta } from "@/lib/projects/imported-project-state";
 
 export type PreviewState =
@@ -386,6 +387,52 @@ export function resolvePreviewState(input: PreviewStateRawInputs): ResolvedPrevi
   }
 
   if (!isImportedZip && input.legacyCanPreview === false) {
+    const fileCount = input.projectFileCount ?? 0;
+    if (input.buildActive || input.thinking) {
+      return {
+        state: "building",
+        classification,
+        title: "Generating your app…",
+        summary: "Preview will open once enough files are saved.",
+        sourceOfTruth: "ai_build_active",
+        showIframe: false,
+        showErrorPanel: false,
+        showBuildingShell: true,
+        showRuntimeOverlay: true,
+        showGenerationContinuingCopy: false,
+        showSlowLoadHint: false,
+        artifactId,
+        workerJobId,
+        workerJobStatus,
+        previewRenderable,
+        technical,
+        raw,
+      };
+    }
+    if (fileCount > 0 && hasPreviewUrl) {
+      const partial = fileCount < MIN_RENDERABLE_FILES;
+      return {
+        state: "ready",
+        classification,
+        title: partial ? "Early preview" : "Preview ready",
+        summary: partial
+          ? `${fileCount} file${fileCount === 1 ? "" : "s"} saved — continue generation to finish the full app.`
+          : "Your app preview is ready to view.",
+        sourceOfTruth: partial ? "ai_static_snapshot_partial" : "ai_static_snapshot",
+        showIframe: true,
+        showErrorPanel: false,
+        showBuildingShell: false,
+        showRuntimeOverlay: false,
+        showGenerationContinuingCopy: partial,
+        showSlowLoadHint: false,
+        artifactId,
+        workerJobId,
+        workerJobStatus,
+        previewRenderable: true,
+        technical,
+        raw,
+      };
+    }
     const workerNotSucceeded =
       runtime?.jobStatus != null && runtime.jobStatus !== "succeeded";
     const notRenderable = !previewRenderable;

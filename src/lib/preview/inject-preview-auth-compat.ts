@@ -18,12 +18,12 @@ export function buildPreviewAuthCompatScript(): string {
   function previewAuthed(){return __vodexPreviewAuthed();}
   function navLogin(){
     if(previewAuthed()){
+      if(typeof window.__vodexPreviewGoAppHome==="function"&&window.__vodexPreviewGoAppHome("auth compat authed -> app home"))return Promise.resolve({data:{user:mockUser,session:{user:mockUser}},error:null});
       try{
-        var t=sessionStorage.getItem("vodex-preview-post-auth-route");
-        if(t&&typeof window.__VODEX_VIRTUAL_PATH__!=="undefined"){
-          var p=t.startsWith("/")?t:"/"+t;
-          window.__VODEX_VIRTUAL_PATH__=p;
-          try{history.replaceState({__vodex:p},"",location.pathname+(location.search||""));window.dispatchEvent(new PopStateEvent("popstate",{state:{__vodex:p}}));}catch(e){}
+        var t=sessionStorage.getItem("vodex-preview-post-auth-route")||window.__VODEX_PREVIEW_APP_HOME__||"/home";
+        if(typeof window.__vodexPreviewAppUrl==="function"){
+          var u=window.__vodexPreviewAppUrl(t);
+          if(u){window.location.replace(u);return Promise.resolve({data:{user:mockUser,session:{user:mockUser}},error:null});}
         }
       }catch(e){}
       return Promise.resolve({data:{user:mockUser,session:{user:mockUser}},error:null});
@@ -44,7 +44,13 @@ export function buildPreviewAuthCompatScript(): string {
       (function(name){
         if(typeof auth[name]!=="function"){
           auth[name]=function(){
-            if(previewAuthed())return Promise.resolve(mockUser);
+            if(previewAuthed()){
+              if(name==="redirectToLogin"||name==="login"||name==="signIn"){
+                if(typeof window.__vodexPreviewGoAppHome==="function")window.__vodexPreviewGoAppHome("redirectToLogin while authed");
+                return Promise.resolve(mockUser);
+              }
+              return Promise.resolve(mockUser);
+            }
             if(name==="requireAuth"&&__vodexIsWelcomeRoute())return Promise.reject(new Error("Authentication required"));
             return navLogin();
           };

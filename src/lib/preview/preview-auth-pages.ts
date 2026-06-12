@@ -290,7 +290,10 @@ h1{font-size:1.45rem;font-weight:700;margin:14px 0 4px;letter-spacing:-.02em;col
     setView("forgot-sent");
   });
   if(${JSON.stringify(initialView)}==="callback"){finish();}
-  else{setView(${JSON.stringify(initialView)});}
+  else{
+    setView(${JSON.stringify(initialView)});
+    try{if(localStorage.getItem("sb-preview-auth")==="1")finish();}catch(e){}
+  }
 })();
 </script>
 </body>

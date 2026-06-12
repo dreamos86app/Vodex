@@ -193,7 +193,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     runtime.previewRenderable = diagnostics.previewRenderable && meta.preview_honest !== false;
   }
 
-  const frameRenderable = runtime.previewRenderable && diagnostics.previewRenderable && html.trim().length > 80;
+  const frameRenderable =
+    html.trim().length > 80 &&
+    diagnostics.previewRenderable &&
+    (servedFromArtifact ? runtime.previewRenderable : fileCount > 0 || runtime.previewRenderable);
 
   if (wantsHtmlFrame(req)) {
     if (!frameRenderable) {
