@@ -15,6 +15,7 @@ import {
   sanitizeBuildJobEventDetail,
   sanitizeBuildJobEventMetadata,
 } from "@/lib/build/sanitize-build-job-metadata";
+import { touchBuildJobActivity } from "@/lib/build/build-job-activity";
 
 export type BuildJobEventType =
   | "job_created"
@@ -176,6 +177,8 @@ export async function persistBuildJobEvent(
   } else {
     markBuildJobEventsTableMissing(false);
   }
+
+  await touchBuildJobActivity(db, input.jobId, input.progressPercent ?? null);
 }
 
 export async function persistWorkflowEvent(

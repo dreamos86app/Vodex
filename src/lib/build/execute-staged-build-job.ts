@@ -22,7 +22,11 @@ import {
 import { filterRenderableBuildFiles } from "@/lib/build/generated-file-utils";
 import { getAppUrl } from "@/lib/app-url";
 import { hasSuccessfulChargeForOperation } from "@/lib/chat/server-idempotency";
-import { clearGeneratedBuildFiles } from "@/lib/build/persist-generated-files";
+import {
+  clearGeneratedBuildFiles,
+  persistGeneratedBuildFiles,
+  persistIncrementalBuildFile,
+} from "@/lib/build/persist-generated-files";
 import { assertBuildFilesPersisted } from "@/lib/build/assert-build-files-persisted";
 import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { canCompleteWithSavedFiles } from "@/lib/build/post-build-contract";
@@ -84,12 +88,13 @@ import {
 import { countAppRoutes } from "@/lib/build/route-connectivity-check";
 import { detectGenericScaffoldBuild } from "@/lib/build/generic-scaffold-detector";
 import { isProductionBuildMode } from "@/lib/build/build-production-mode";
-import { persistGeneratedBuildFiles } from "@/lib/build/persist-generated-files";
 import {
   analyzePreviewHtml,
   isStaticPreviewSnapshotHealthy,
 } from "@/lib/preview/preview-html-diagnostics";
 import { startValidationWatchdog } from "@/lib/build/validation-watchdog";
+import { BUILD_USER_TIMEOUT_MS } from "@/lib/build/build-step-ui";
+import { loadAllProjectAppFiles } from "@/lib/projects/load-all-app-files";
 
 type Writer = SupabaseClient<Database>;
 
@@ -269,7 +274,9 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       .then(() => undefined, () => undefined);
   }, 10_000);
 
-  const PIPELINE_HARD_CAP_MS = Number(process.env.DREAMOS_PIPELINE_HARD_CAP_MS ?? 360_000);
+  const PIPELINE_HARD_CAP_MS = Number(
+    process.env.DREAMOS_PIPELINE_HARD_CAP_MS ?? BUILD_USER_TIMEOUT_MS + 60_000,
+  );
   const BUILD_NO_FILE_STALL_MS = Number(process.env.DREAMOS_BUILD_NO_FILE_STALL_MS ?? 120_000);
   const pipelineStartedAt = Date.now();
   let filesSeenInPipeline = false;
@@ -354,9 +361,21 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
         }
         await persistWorkflowEvent(input.writer, eventCtx, ev, progressForStep());
       },
+      onFileCommitted: async (file) => {
+        filesSeenInPipeline = true;
+        lastActivityAt = Date.now();
+        await persistIncrementalBuildFile({
+          writer: input.writer,
+          projectId: input.projectId,
+          ownerId: input.userId,
+          file,
+          operationId: input.operationId,
+          executionInstanceId: workerCtx.executionInstanceId,
+        }).catch(() => false);
+      },
     });
 
-    const pr = await Promise.race([
+    let pr = await Promise.race([
       pipelinePromise,
       new Promise<Awaited<typeof pipelinePromise>>((_, reject) => {
         setTimeout(
@@ -445,6 +464,44 @@ export async function executeStagedBuildJob(input: ExecuteStagedBuildJobInput): 
       }
       throw err;
     });
+
+    if (
+      pr.errorMessage?.includes("hard_cap") &&
+      filterRenderableBuildFiles(pr.files).length < MIN_RENDERABLE_FILES
+    ) {
+      const persisted = await loadAllProjectAppFiles(input.writer, input.projectId).catch(
+        () => [],
+      );
+      const recovered = filterRenderableBuildFiles(
+        persisted.map((f) => ({
+          path: f.path,
+          content: f.content,
+          language: f.path.split(".").pop(),
+        })),
+      );
+      if (recovered.length >= MIN_RENDERABLE_FILES) {
+        pr = {
+          ...pr,
+          ok: true,
+          files: recovered,
+          visibleText:
+            "Build reached the time limit — saved progress and preparing preview. Use Continue generation for remaining routes.",
+          buildContract: {
+            ...pr.buildContract,
+            passed: true,
+            allowed: true,
+            renderableCount: recovered.length,
+            previewReady: true,
+            failures: pr.buildContract.failures.filter((f) => f !== "build_pipeline_hard_cap"),
+            userMessage: "Saved partial build — preview preparing.",
+          },
+          postBuildFailures: (pr.postBuildFailures ?? []).filter(
+            (f) => f !== "build_pipeline_hard_cap",
+          ),
+          errorMessage: undefined,
+        };
+      }
+    }
 
     const alreadyCharged = await hasSuccessfulChargeForOperation(
       input.writer,

@@ -301,3 +301,38 @@ export async function clearGeneratedBuildFiles(input: {
 
   return { cleared: true };
 }
+
+/** Upsert a single generated file as soon as it is extracted — survives mid-build timeouts. */
+export async function persistIncrementalBuildFile(input: {
+  writer: Writer;
+  projectId: string;
+  ownerId: string;
+  file: BuildFile;
+  operationId?: string;
+  executionInstanceId?: string;
+}): Promise<boolean> {
+  const writer = persistenceWriter(input.writer);
+  const renderable = filterRenderableBuildFiles([input.file]);
+  if (renderable.length === 0) return false;
+  const f = renderable[0]!;
+  const row = {
+    project_id: input.projectId,
+    owner_id: input.ownerId,
+    path: f.path,
+    content: f.content,
+    language: f.language ?? f.path.split(".").pop() ?? "text",
+    mime_type: f.path.endsWith(".json") ? "application/json" : "text/plain",
+    size_bytes: Buffer.byteLength(f.content, "utf8"),
+    source: "generated",
+    metadata: {
+      kind: "source",
+      operation_id: input.operationId ?? null,
+      execution_instance_id: input.executionInstanceId ?? null,
+      incremental_persist: true,
+    } as never,
+  };
+  const { error } = await writer.from("app_files").upsert(row as never, {
+    onConflict: "project_id,path",
+  });
+  return !error;
+}

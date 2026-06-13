@@ -337,6 +337,7 @@ function mergeIncomingBuildFiles(
   ) => void,
   maxFiles: number,
   onFileStreamStart?: (path: string) => void,
+  onFileCommitted?: (file: BuildFile) => void | Promise<void>,
 ): BuildFile[] {
   const merged = new Map(existing.map((f) => [f.path, f]));
   for (const f of filterRenderableBuildFiles(incoming)) {
@@ -373,6 +374,7 @@ function mergeIncomingBuildFiles(
       });
     }
     merged.set(f.path, f);
+    void onFileCommitted?.(f);
   }
   return [...merged.values()].slice(0, maxFiles);
 }
@@ -402,6 +404,7 @@ async function ingestModelFilesWithExtractionStream(
     current: number,
   ) => void,
   onExtractStart?: () => void,
+  onFileCommitted?: (file: BuildFile) => void | Promise<void>,
 ): Promise<BuildFile[]> {
   onExtractStart?.();
   const existingByPath = new Map(allFiles.map((f) => [f.path, f.content]));
@@ -424,7 +427,15 @@ async function ingestModelFilesWithExtractionStream(
         }
       },
       onFile: async (f) => {
-        merged = mergeIncomingBuildFiles(merged, [f], events, trackFn, maxFiles, onFileStreamStart);
+        merged = mergeIncomingBuildFiles(
+          merged,
+          [f],
+          events,
+          trackFn,
+          maxFiles,
+          onFileStreamStart,
+          onFileCommitted,
+        );
       },
     },
     {
@@ -491,6 +502,8 @@ export async function runStagedBuildPipeline(input: {
   conversationId?: string | null;
   userSelectedModelId?: string | null;
   onWorkflowEvent?: (ev: WorkflowEvent) => void | Promise<void>;
+  /** Persist each extracted file immediately (checkpoint during long builds). */
+  onFileCommitted?: (file: BuildFile) => void | Promise<void>;
   buildTrace?: BuildWorkerTraceSnapshot | null;
   /** When true, pipeline may return early with files saved for partial credit builds. */
   shouldStopForCredits?: () => boolean;
@@ -499,6 +512,7 @@ export async function runStagedBuildPipeline(input: {
   routeByRouteOnly?: boolean;
 }): Promise<StagedBuildResult> {
   const emit = input.onWorkflowEvent;
+  const onFileCommitted = input.onFileCommitted;
   const track = (
     events: WorkflowEvent[],
     type: WorkflowEventType,
@@ -1137,6 +1151,7 @@ export async function runStagedBuildPipeline(input: {
         onFileStreamDelta,
         onFileStreamComplete,
         onExtractStart,
+        onFileCommitted,
       );
 
     if (smokeBuild) {
@@ -1396,6 +1411,7 @@ export async function runStagedBuildPipeline(input: {
       onFileStreamDelta,
       onFileStreamComplete,
       onExtractStart,
+      onFileCommitted,
     );
     }
     clearStalePlannedPlaceholders(allFiles);
@@ -1520,6 +1536,7 @@ export async function runStagedBuildPipeline(input: {
               onFileStreamDelta,
               onFileStreamComplete,
               onExtractStart,
+              onFileCommitted,
             ),
           onChunkStart: (_i, _t, chunk) => {
             emitPhaseIntro(chunk.id);
@@ -1567,6 +1584,7 @@ export async function runStagedBuildPipeline(input: {
         onFileStreamDelta,
         onFileStreamComplete,
         onExtractStart,
+        onFileCommitted,
       ),
     );
     continuationPass += 1;
@@ -1670,6 +1688,7 @@ export async function runStagedBuildPipeline(input: {
         onFileStreamDelta,
         onFileStreamComplete,
         onExtractStart,
+        onFileCommitted,
       ),
     );
     generationQualityReport = scoreGeneratedAppQuality({
@@ -1750,6 +1769,7 @@ export async function runStagedBuildPipeline(input: {
         onFileStreamDelta,
         onFileStreamComplete,
         onExtractStart,
+        onFileCommitted,
       ),
     );
     generationQualityReport = scoreGeneratedAppQuality({
@@ -1952,6 +1972,7 @@ export async function runStagedBuildPipeline(input: {
           track,
           effectiveMaxFiles,
           onFileStreamStart,
+          onFileCommitted,
         );
       }
       }
@@ -2038,7 +2059,15 @@ export async function runStagedBuildPipeline(input: {
     const repaired = parseFilePayload(repairCall.result.text);
     if (repaired.files.length) {
       allFiles = filterRenderableBuildFiles(
-        mergeIncomingBuildFiles(allFiles, repaired.files, events, track, effectiveMaxFiles, onFileStreamStart),
+        mergeIncomingBuildFiles(
+          allFiles,
+          repaired.files,
+          events,
+          track,
+          effectiveMaxFiles,
+          onFileStreamStart,
+          onFileCommitted,
+        ),
       );
     }
     quality = assessBuildQuality(allFiles);

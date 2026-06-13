@@ -1,10 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { WORKER_CONNECTED_THRESHOLD_MS } from "@/lib/preview/preview-worker-status";
+import {
+  getLatestBuildJobActivityMs,
+  isBuildJobStale,
+} from "@/lib/build/build-job-activity";
+import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
+import { repairBuildStateTruth } from "@/lib/build/build-state-truth-repair";
 
 type Writer = SupabaseClient<Database>;
 
-const AI_BUILD_STALE_MS = Number(process.env.DREAMOS_AI_BUILD_STALE_MS ?? 30 * 60 * 1000);
 const PREVIEW_BUILD_RUNNING_STALE_MS = Number(
   process.env.DREAMOS_PREVIEW_BUILD_STALE_MS ?? 15 * 60 * 1000,
 );
@@ -42,18 +47,56 @@ export async function reconcileStaleBuilds(writer: Writer): Promise<StaleReconci
 
   const { data: aiJobs } = await writer
     .from("build_jobs")
-    .select("id, updated_at, created_at, meta")
+    .select("id, updated_at, created_at, meta, project_id, user_id")
     .in("status", ["running", "queued", "starting"])
     .order("created_at", { ascending: false })
     .limit(200);
 
   for (const job of aiJobs ?? []) {
-    const last = new Date(job.updated_at ?? job.created_at).getTime();
-    if (now - last < AI_BUILD_STALE_MS) continue;
+    const lastActivity = await getLatestBuildJobActivityMs(writer, job.id);
+    if (!isBuildJobStale(lastActivity)) continue;
     const meta =
       job.meta && typeof job.meta === "object" && !Array.isArray(job.meta)
         ? (job.meta as Record<string, unknown>)
         : {};
+
+    let recovered = false;
+    if (job.project_id) {
+      const { count: fileCount } = await writer
+        .from("app_files")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", job.project_id);
+      if ((fileCount ?? 0) >= MIN_RENDERABLE_FILES) {
+        await writer
+          .from("build_jobs")
+          .update({
+            status: "completed",
+            error_message: null,
+            completed_at: nowIso,
+            result_summary: `Recovered after timeout — ${fileCount} file(s) on disk`,
+            meta: {
+              ...meta,
+              stale_reason: "ai_build_recovered_with_files",
+              reconciled_at: nowIso,
+              last_event_at: job.updated_at ?? job.created_at,
+            },
+          } as never)
+          .eq("id", job.id);
+        if (job.user_id) {
+          await repairBuildStateTruth(writer, job.project_id, job.user_id, {
+            startPreview: true,
+            apply: true,
+          }).catch(() => undefined);
+        }
+        recovered = true;
+      }
+    }
+
+    if (recovered) {
+      aiBuildsReconciled += 1;
+      continue;
+    }
+
     await writer
       .from("build_jobs")
       .update({

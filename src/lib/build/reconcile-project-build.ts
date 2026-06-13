@@ -2,9 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { reconcileProjectLifecycle } from "@/lib/projects/reconcile-lifecycle";
 import { completeBuildWithValidation } from "@/lib/build/complete-build-with-validation";
-type Writer = SupabaseClient<Database>;
+import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
+import { repairBuildStateTruth } from "@/lib/build/build-state-truth-repair";
+import {
+  getLatestBuildJobActivityMs,
+  isBuildJobStale,
+} from "@/lib/build/build-job-activity";
 
-const STALE_BUILD_MS = 20 * 60 * 1000;
+type Writer = SupabaseClient<Database>;
 
 /** Align build_jobs + projects with app_files reality (publish readiness). */
 export async function reconcileProjectBuildState(
@@ -41,23 +46,42 @@ export async function reconcileProjectBuildState(
 
   let buildStatus = latestBuild?.status ?? null;
   let reconciled = false;
-  const now = Date.now();
 
   if (
     latestBuild &&
-    (latestBuild.status === "running" || latestBuild.status === "building") &&
-    new Date(latestBuild.updated_at ?? latestBuild.created_at).getTime() < now - STALE_BUILD_MS
+    (latestBuild.status === "running" || latestBuild.status === "building")
   ) {
-    await writer
-      .from("build_jobs")
-      .update({
-        status: "failed",
-        error_message: "Build timed out — marked stale by system",
-        completed_at: new Date().toISOString(),
-      } as never)
-      .eq("id", latestBuild.id);
-    buildStatus = "failed";
-    reconciled = true;
+    const lastActivity = await getLatestBuildJobActivityMs(writer, latestBuild.id);
+    if (isBuildJobStale(lastActivity)) {
+      if (files >= MIN_RENDERABLE_FILES) {
+        await writer
+          .from("build_jobs")
+          .update({
+            status: "completed",
+            error_message: null,
+            completed_at: new Date().toISOString(),
+            result_summary: `Recovered after timeout — ${files} file(s) on disk`,
+          } as never)
+          .eq("id", latestBuild.id);
+        buildStatus = "completed";
+        reconciled = true;
+        await repairBuildStateTruth(writer, projectId, userId, {
+          startPreview: true,
+          apply: true,
+        }).catch(() => undefined);
+      } else {
+        await writer
+          .from("build_jobs")
+          .update({
+            status: "failed",
+            error_message: "Build timed out — marked stale by system",
+            completed_at: new Date().toISOString(),
+          } as never)
+          .eq("id", latestBuild.id);
+        buildStatus = "failed";
+        reconciled = true;
+      }
+    }
   }
 
   const projectBuildStatus = project?.build_status ?? null;
