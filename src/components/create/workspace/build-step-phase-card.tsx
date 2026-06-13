@@ -32,11 +32,18 @@ export function BuildStepPhaseCard({
   const kind: BuildStepUiKind = resolveBuildStepUiKind({ phase, working, paused, hasFiles });
   const label = BUILD_STEP_LABEL[kind];
 
+  const goldActive =
+    working &&
+    !paused &&
+    (kind === "parsing" || kind === "generating" || kind === "planning");
+
   return (
     <div
       className={cn(
         "mr-6 rounded-2xl px-3.5 py-3 sm:mr-10",
         BUILD_STEP_RING_CLASS[kind],
+        goldActive &&
+          "workflow-gold-border-active workflow-active-ring shadow-[0_0_20px_-4px_rgba(251,191,36,0.45)]",
         className,
       )}
       data-testid="build-step-phase-card"

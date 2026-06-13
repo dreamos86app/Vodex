@@ -1,16 +1,8 @@
 import type { AgentWorkflowEvent } from "@/lib/build/workflow-stream-types";
 import { sanitizeUserBuildChatText } from "@/lib/build/build-user-copy";
-import {
-  WORKFLOW_SECTIONS,
-  groupFileEventsByPurpose,
-  workflowSectionStatus,
-  type WorkflowSectionId,
-} from "@/lib/workflow/workflow-section-defs";
 
 export type InterleavedWorkflowItem =
   | { kind: "narration"; text: string; key: string }
-  | { kind: "section"; sectionId: WorkflowSectionId; events: AgentWorkflowEvent[]; working: boolean }
-  | { kind: "purpose_header"; label: string; key: string }
   | { kind: "file"; event: AgentWorkflowEvent };
 
 function isHeartbeat(ev: AgentWorkflowEvent): boolean {
@@ -21,83 +13,99 @@ function isFileEvent(ev: AgentWorkflowEvent): boolean {
   return ev.category === "file_created" || ev.category === "file_edited" || ev.category === "file_deleted";
 }
 
-function purposeLabelForPath(path: string): string | null {
-  const groups = groupFileEventsByPurpose([{ filePath: path } as AgentWorkflowEvent]);
-  return groups[0]?.label ?? null;
-}
+export type InterleavedWorkflowDisplay = {
+  /** Committed narration → file pairs (stable history). */
+  committed: InterleavedWorkflowItem[];
+  /** Latest planning line since the last file (shown once, below committed). */
+  liveNarration: string | null;
+  /** Terminal summary when build finished. */
+  terminalNarration: string | null;
+};
 
-/** Chronological interleave: narration + section checkpoints + live files (no batch dump at top). */
-export function buildInterleavedWorkflowItems(input: {
+/**
+ * Strict narration ↔ file alternation: buffer narrations until a file lands, then flush one line + file.
+ * During active builds, section cards and purpose headers are omitted to reduce noise.
+ */
+export function buildInterleavedWorkflowDisplay(input: {
   merged: AgentWorkflowEvent[];
   working: boolean;
-  fileEvents: AgentWorkflowEvent[];
-}): InterleavedWorkflowItem[] {
-  const { merged, working, fileEvents } = input;
-  const items: InterleavedWorkflowItem[] = [];
-  const seenNarration = new Set<string>();
-  const emittedSections = new Set<WorkflowSectionId>();
-  let lastPurpose: string | null = null;
+}): InterleavedWorkflowDisplay {
+  const { merged, working } = input;
+  const committed: InterleavedWorkflowItem[] = [];
+  const seenCommittedNarration = new Set<string>();
+
+  let pendingNarration: { text: string; key: string } | null = null;
 
   const sorted = [...merged].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-  const eventsSoFar: AgentWorkflowEvent[] = [];
+
+  const flushPendingNarration = () => {
+    if (!pendingNarration || seenCommittedNarration.has(pendingNarration.text)) return;
+    seenCommittedNarration.add(pendingNarration.text);
+    committed.push({ kind: "narration", text: pendingNarration.text, key: pendingNarration.key });
+    pendingNarration = null;
+  };
 
   for (const ev of sorted) {
-    eventsSoFar.push(ev);
-
-    for (const section of WORKFLOW_SECTIONS) {
-      if (emittedSections.has(section.id)) continue;
-      if (!section.match(ev)) continue;
-      const st = workflowSectionStatus(section.id, eventsSoFar, working);
-      if (st === "pending") continue;
-      emittedSections.add(section.id);
-      items.push({
-        kind: "section",
-        sectionId: section.id,
-        events: [...eventsSoFar],
-        working,
-      });
-    }
-
     if (ev.category === "assistant_message" && !isHeartbeat(ev)) {
       const text = sanitizeUserBuildChatText(ev.subtitle ?? ev.title);
-      if (text && !seenNarration.has(text)) {
-        seenNarration.add(text);
-        items.push({ kind: "narration", text, key: `n-${ev.stableKey}` });
+      if (text) {
+        if (pendingNarration && pendingNarration.text !== text) {
+          flushPendingNarration();
+        }
+        pendingNarration = { text, key: `n-${ev.stableKey}` };
       }
       continue;
     }
 
     if (isFileEvent(ev) && ev.filePath) {
-      const label = purposeLabelForPath(ev.filePath);
-      if (label && label !== lastPurpose) {
-        lastPurpose = label;
-        items.push({ kind: "purpose_header", label, key: `ph-${label}-${ev.stableKey}` });
-      }
-      items.push({ kind: "file", event: ev });
+      flushPendingNarration();
+      committed.push({ kind: "file", event: ev });
     }
   }
 
-  if (!working && fileEvents.length > 0) {
-    const lastNarration = [...items].reverse().find((i) => i.kind === "narration");
+  let terminalNarration: string | null = null;
+  if (!working) {
     const terminalFromEvents = [...merged]
       .reverse()
       .find(
         (e) =>
           e.category === "assistant_message" &&
           !isHeartbeat(e) &&
-          /complete|saved|finished|continuing|preview/i.test(e.title ?? e.subtitle ?? ""),
+          /complete|saved|finished|continuing|preview|stopped|cancelled/i.test(
+            `${e.title ?? ""} ${e.subtitle ?? ""}`,
+          ),
       );
     if (terminalFromEvents) {
-      const text = sanitizeUserBuildChatText(
+      terminalNarration = sanitizeUserBuildChatText(
         terminalFromEvents.subtitle ?? terminalFromEvents.title ?? "",
       );
-      if (text && (!lastNarration || lastNarration.kind !== "narration" || lastNarration.text !== text)) {
-        if (!seenNarration.has(text)) {
-          items.push({ kind: "narration", text, key: "terminal-summary" });
-        }
-      }
     }
+    if (pendingNarration) {
+      flushPendingNarration();
+    }
+    pendingNarration = null;
   }
 
+  return {
+    committed,
+    liveNarration: working ? pendingNarration?.text ?? null : null,
+    terminalNarration,
+  };
+}
+
+/** @deprecated Use buildInterleavedWorkflowDisplay */
+export function buildInterleavedWorkflowItems(input: {
+  merged: AgentWorkflowEvent[];
+  working: boolean;
+  fileEvents: AgentWorkflowEvent[];
+}) {
+  const display = buildInterleavedWorkflowDisplay(input);
+  const items: InterleavedWorkflowItem[] = [...display.committed];
+  if (display.liveNarration) {
+    items.push({ kind: "narration", text: display.liveNarration, key: "live-narration" });
+  }
+  if (display.terminalNarration) {
+    items.push({ kind: "narration", text: display.terminalNarration, key: "terminal-summary" });
+  }
   return items;
 }

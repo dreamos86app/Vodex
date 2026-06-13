@@ -1532,23 +1532,44 @@ export function ImmersiveWorkspace({
     buildStarting ||
     preflightState === "pending" ||
     postBuildActive;
+  const [buildUserStopped, setBuildUserStopped] = React.useState(false);
+
   const canStopActiveJob =
-    isBusy && !composerHasText && !composerDomHasText && Boolean(activeBuildJob?.jobId || isStreaming);
+    !buildUserStopped &&
+    isBusy &&
+    !composerHasText &&
+    !composerDomHasText &&
+    Boolean(activeBuildJob?.jobId || isStreaming);
 
   const handleStopActiveJob = React.useCallback(async () => {
+    setBuildUserStopped(true);
+    submitInFlightRef.current = false;
     try {
       stop();
     } catch {
       /* ignore */
     }
-    const pid = effectiveProjectId;
-    const jid = activeBuildJob?.jobId;
-    if (pid && jid) {
-      await fetch(`/api/projects/${pid}/build-jobs/${jid}/cancel`, { method: "POST" }).catch(() => undefined);
+    if (buildJobProgressRef.current) {
+      setFrozenBuildWorkflow({
+        ...buildJobProgressRef.current,
+        done: true,
+        status: "cancelled",
+      });
     }
     buildJobActiveRef.current = false;
     setBuildStarting(false);
-  }, [activeBuildJob?.jobId, effectiveProjectId, stop]);
+    clearBuildJob();
+    setLockedTaskMode(null);
+
+    const pid = effectiveProjectId;
+    const jid = activeBuildJob?.jobId;
+    if (pid && jid) {
+      await fetch(`/api/projects/${pid}/build-jobs/${jid}/cancel`, { method: "POST" }).catch(
+        () => undefined,
+      );
+    }
+    setProjectDataRefresh((n) => n + 1);
+  }, [activeBuildJob?.jobId, clearBuildJob, effectiveProjectId, stop]);
 
   React.useEffect(() => {
     const pid = effectiveProjectId;
@@ -1691,11 +1712,13 @@ export function ImmersiveWorkspace({
     document.querySelector("main")?.scrollTo({ top: 0, behavior: "auto" });
   }, []);
 
-  const scrollToBottom = React.useCallback((behavior: ScrollBehavior = "smooth") => {
+  const scrollToBottom = React.useCallback((instant = false) => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior });
-    lockPageScroll();
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (userPinnedScrollRef.current && dist > 48) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: instant ? "auto" : "smooth" });
+    if (instant) lockPageScroll();
   }, [lockPageScroll]);
 
   const buildStreamTick =
@@ -1705,15 +1728,19 @@ export function ImmersiveWorkspace({
   const buildProgressPct = buildJobProgress?.progressPercent ?? frozenBuildWorkflow?.progressPercent ?? 0;
 
   React.useEffect(() => {
-    if (userPinnedScrollRef.current) return;
-    scrollToBottom(isBusy ? "auto" : "smooth");
-  }, [messages, isBusy, scrollToBottom, buildStreamTick, buildProgressPct]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (userPinnedScrollRef.current && dist > 48) return;
+    scrollToBottom(true);
+  }, [messages, buildStreamTick, buildProgressPct, scrollToBottom, isBusy]);
 
   React.useEffect(() => {
+    if (buildJobActive || buildStarting || isBusy) return;
     userPinnedScrollRef.current = false;
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
     lockPageScroll();
-  }, [effectiveProjectId, lockPageScroll]);
+  }, [effectiveProjectId, buildJobActive, buildStarting, isBusy, lockPageScroll]);
 
   React.useEffect(() => {
     if (mobilePanel === "chat") {
@@ -1726,7 +1753,12 @@ export function ImmersiveWorkspace({
     const el = scrollRef.current;
     if (!el) return;
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const pinned = dist > 96;
+    if (dist <= 24) {
+      userPinnedScrollRef.current = false;
+      setShowJumpToLatest(false);
+      return;
+    }
+    const pinned = dist > 48;
     userPinnedScrollRef.current = pinned;
     setShowJumpToLatest(pinned);
   }, []);
@@ -2041,6 +2073,7 @@ export function ImmersiveWorkspace({
     lockedTaskModeRef.current = submitModeEarly;
     setMode(submitModeEarly);
     if (submitModeEarly === "build") {
+      setBuildUserStopped(false);
       setBuildStarting(true);
       buildStartedAtRef.current = Date.now();
       activeBuildPromptRef.current = text;
@@ -2657,25 +2690,9 @@ export function ImmersiveWorkspace({
   }, [effectiveProjectId]);
 
   React.useEffect(() => {
-    if (!importedReady || !effectiveProjectId || prepareImportBusy || importAutoPrepareRef.current) return;
-    const impObj = (effectiveProject?.metadata as Record<string, unknown> | undefined)?.import;
-    const preparedAt =
-      impObj && typeof impObj === "object" && !Array.isArray(impObj)
-        ? (impObj as Record<string, unknown>).prepared_at
-        : null;
-    const fileHint = projectFiles.length > 0 || (zipImportMeta?.file_count ?? 0) > 0;
-    if (fileHint && !preparedAt) {
-      importAutoPrepareRef.current = true;
-      void prepareImportedApp();
-    }
-  }, [
-    importedReady,
-    effectiveProjectId,
-    effectiveProject?.metadata,
-    projectFiles.length,
-    zipImportMeta?.file_count,
-    prepareImportBusy,
-  ]);
+    if (buildJobActive || buildStarting) setBuildUserStopped(false);
+  }, [buildJobActive, buildStarting]);
+
   const isZipImportApp = zipImportMeta != null;
   const isFirstCreatePrompt = showEmpty && !hasGeneratedFiles && !isZipImportApp;
   const disabledModes = React.useMemo((): CreationMode[] => {
@@ -2997,6 +3014,28 @@ export function ImmersiveWorkspace({
   );
 
   const previewReadyForUi = previewSrcRenderable || hardImportedPreviewReady;
+
+  React.useEffect(() => {
+    if (!importedReady || !effectiveProjectId || prepareImportBusy || importAutoPrepareRef.current) return;
+    const impObj = (effectiveProject?.metadata as Record<string, unknown> | undefined)?.import;
+    const preparedAt =
+      impObj && typeof impObj === "object" && !Array.isArray(impObj)
+        ? (impObj as Record<string, unknown>).prepared_at
+        : null;
+    const fileHint = projectFiles.length > 0 || (zipImportMeta?.file_count ?? 0) > 0;
+    if (fileHint && !previewReadyForUi && !preparedAt) {
+      importAutoPrepareRef.current = true;
+      void prepareImportedApp();
+    }
+  }, [
+    importedReady,
+    effectiveProjectId,
+    effectiveProject?.metadata,
+    projectFiles.length,
+    zipImportMeta?.file_count,
+    prepareImportBusy,
+    previewReadyForUi,
+  ]);
 
   const publishedPublicUrl = React.useMemo(
     () => (effectiveProject ? resolveDisplayPublicUrl(effectiveProject) : null),

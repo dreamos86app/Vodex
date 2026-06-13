@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { persistBuildJobEvent } from "@/lib/build/build-job-events";
+import { loadAllProjectAppFiles } from "@/lib/projects/load-all-app-files";
 import { saveAppVersionSnapshot } from "@/lib/projects/app-version-history";
 
 export const dynamic = "force-dynamic";
@@ -68,12 +69,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string; j
     },
   });
 
-  const { data: files } = await writer
-    .from("app_files")
-    .select("path, content")
-    .eq("project_id", projectId);
-
-  const fileRows = (files ?? []) as Array<{ path: string; content: string }>;
+  const fileRows = await loadAllProjectAppFiles(writer, projectId);
   if (fileRows.length > 0) {
     const meta =
       project.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)

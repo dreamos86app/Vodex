@@ -248,7 +248,6 @@ export async function POST(req: Request) {
           preview_ready: false,
           publish_ready: false,
           entry_file: importEntryFile,
-          prepared_at: new Date().toISOString(),
           warnings: validation.warnings,
           rejected_secrets: rejectedSecrets,
           rejected_paths: rejectedPaths,
@@ -445,6 +444,40 @@ export async function POST(req: Request) {
 
   const diagnostics = previewBuild?.diagnostics;
   const previewReady = diagnostics?.previewRenderable === true;
+
+  if (previewReady || previewBuild) {
+    const { data: current } = await supabase
+      .from("projects")
+      .select("metadata")
+      .eq("id", projectId)
+      .single();
+    const prevMeta =
+      current?.metadata && typeof current.metadata === "object" && !Array.isArray(current.metadata)
+        ? (current.metadata as Record<string, unknown>)
+        : {};
+    const prevImport =
+      prevMeta.import && typeof prevMeta.import === "object" && !Array.isArray(prevMeta.import)
+        ? (prevMeta.import as Record<string, unknown>)
+        : {};
+    await supabase
+      .from("projects")
+      .update({
+        metadata: {
+          ...prevMeta,
+          preview_ready: previewReady,
+          preview_renderable: previewReady,
+          preview_honest: previewReady,
+          preview_status: diagnostics?.previewStatus ?? (previewReady ? "ready" : "failed"),
+          import: {
+            ...prevImport,
+            preview_ready: previewReady,
+            prepared_at: previewReady ? new Date().toISOString() : prevImport.prepared_at ?? null,
+          },
+        },
+      } as never)
+      .eq("id", projectId)
+      .eq("owner_id", user.id);
+  }
 
   if (previewReady) {
     await reconcileZipPreviewCreditCapture({

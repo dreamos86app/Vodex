@@ -39,8 +39,8 @@ import { BuildStepPhaseCard } from "@/components/create/workspace/build-step-pha
 import { BuildNoFilesYetCard } from "@/components/create/workspace/build-no-files-yet-card";
 import { BuildActiveWorkChip } from "@/components/create/workspace/build-active-work-chip";
 import { NO_FILES_YET_THRESHOLD_MS, BUILD_USER_TIMEOUT_MS } from "@/lib/build/build-step-ui";
-import { WorkflowSectionCard } from "@/components/create/workspace/build-workflow-sections";
-import { buildInterleavedWorkflowItems } from "@/lib/workflow/workflow-interleaved-timeline";
+import { buildInterleavedWorkflowDisplay } from "@/lib/workflow/workflow-interleaved-timeline";
+import { buildStepHeartbeatLine } from "@/lib/workflow/workflow-step-heartbeat";
 import { useTypedText } from "@/hooks/use-typed-text";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
@@ -115,7 +115,7 @@ function isStructuralTimelineEvent(ev: AgentWorkflowEvent, working: boolean): bo
   return true;
 }
 
-const MAX_ACTIVE_FILE_ROWS = 12;
+const MAX_ACTIVE_FILE_ROWS = 2;
 
 /** Golden-ring focus on all files actively being written. */
 function applyFileStreamFocus(
@@ -652,17 +652,64 @@ export function AgentWorkflowStream({
     chunkProgressLine ??
     (working && narrationTimeline.length === 0 ? currentNarrationLine : undefined);
 
-  const interleavedItems = React.useMemo(
-    () =>
-      buildInterleavedWorkflowItems({
-        merged,
-        working,
-        fileEvents: rawFileStreamEvents,
-      }),
-    [merged, working, rawFileStreamEvents],
+  const interleavedDisplay = React.useMemo(
+    () => buildInterleavedWorkflowDisplay({ merged, working }),
+    [merged, working],
   );
 
-  const showInterleavedStream = interleavedItems.length > 0 || working;
+  const interleavedTick =
+    interleavedDisplay.committed.length +
+    (interleavedDisplay.liveNarration ? 1 : 0) +
+    rawFileStreamEvents.length;
+
+  const phaseHeartbeatLine = buildStepHeartbeatLine({
+    phase: buildPhase,
+    working,
+    elapsedMs: now - startedAt,
+    chunkProgress: chunkProgressLine,
+    ephemeralLine: ephemeralActionLine,
+  });
+
+  const userStopped =
+    progress.status === "cancelled" ||
+    progress.latest?.metadata?.user_stopped === true ||
+    progress.latest?.metadata?.version_status === "stopped_partial";
+
+  const activeLiveFiles = React.useMemo(
+    () =>
+      rawFileStreamEvents
+        .filter((e) => e.status === "active")
+        .slice(-MAX_ACTIVE_FILE_ROWS),
+    [rawFileStreamEvents],
+  );
+  const activeLivePathKeys = React.useMemo(
+    () =>
+      new Set(
+        activeLiveFiles
+          .map((e) => e.filePath?.replace(/\\/g, "/").toLowerCase())
+          .filter(Boolean) as string[],
+      ),
+    [activeLiveFiles],
+  );
+
+  const displayEphemeral =
+    ephemeralActionLine ??
+    (working && (buildPhase === "extracting_files" || buildPhase === "validating_quality")
+      ? phaseHeartbeatLine
+      : undefined);
+
+  const showPhaseChip =
+    working &&
+    !userStopped &&
+    activeLiveFiles.length < MAX_ACTIVE_FILE_ROWS &&
+    (buildPhase === "planning" ||
+      buildPhase === "pending" ||
+      buildPhase === "extracting_files" ||
+      buildPhase === "validating_quality" ||
+      (buildPhase === "model_generating" &&
+        !interleavedDisplay.liveNarration &&
+        interleavedDisplay.committed.filter((i) => i.kind === "file").length === 0 &&
+        activeLiveFiles.length === 0));
 
   const fileEventMap = React.useMemo(() => {
     const map = new Map<string, AgentWorkflowEvent>();
@@ -691,103 +738,83 @@ export function AgentWorkflowStream({
 
       {showAnalyzing ? <AnalyzingRequestBubble /> : null}
 
-      {working && ephemeralActionLine ? (
+      {working && displayEphemeral && !interleavedDisplay.liveNarration ? (
         <p
           className="mr-6 px-0.5 text-[11px] font-medium text-sky-600/90 dark:text-sky-300/80 sm:mr-10"
           data-testid="ephemeral-action-line"
         >
-          {ephemeralActionLine}
+          {displayEphemeral}
         </p>
       ) : null}
 
-      {showInterleavedStream ? (
+      {(interleavedDisplay.committed.length > 0 ||
+        interleavedDisplay.liveNarration ||
+        working) ? (
         <div className="space-y-2 overflow-visible" data-testid="workflow-interleaved-stream">
-          {interleavedItems.map((item) => {
+          {interleavedDisplay.committed.map((item) => {
             if (item.kind === "narration") {
               return <TypedNarrationLine key={item.key} text={item.text} />;
             }
-            if (item.kind === "section") {
-              return (
-                <WorkflowSectionCard
-                  key={`sec-${item.sectionId}`}
-                  sectionId={item.sectionId}
-                  events={item.events}
-                  working={item.working}
-                  className="mr-6 sm:mr-10"
-                />
-              );
-            }
-            if (item.kind === "purpose_header") {
-              return (
-                <p
-                  key={item.key}
-                  className="mr-6 mt-1 px-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:mr-10"
-                >
-                  {item.label}
-                </p>
-              );
-            }
+            const pathKey = item.event.filePath?.replace(/\\/g, "/").toLowerCase();
+            if (pathKey && activeLivePathKeys.has(pathKey)) return null;
             const focused =
-              fileEventMap.get(item.event.filePath!.replace(/\\/g, "/").toLowerCase()) ?? item.event;
+              fileEventMap.get(pathKey ?? "") ?? item.event;
             return (
               <div key={item.event.stableKey} className="overflow-visible">
                 <FileChangeCard event={focused} />
               </div>
             );
           })}
+          {interleavedDisplay.liveNarration ? (
+            <TypedNarrationLine key="live-narration" text={interleavedDisplay.liveNarration} />
+          ) : null}
         </div>
       ) : null}
 
-      {working ? (
+      {working && (userStopped || isBuildPaused) ? (
         <BuildStepPhaseCard
           phase={buildPhase}
           working={working}
-          paused={isBuildPaused}
+          paused
           hasFiles={rawFileStreamEvents.length > 0 || streamFileCount > 0}
-          statusLine={undefined}
+          statusLine={
+            userStopped
+              ? "Prompt stopped. Saved progress is kept."
+              : "Build paused — saved files are preserved."
+          }
+          chunkProgress={chunkProgressLine}
+        />
+      ) : working && showPhaseChip ? (
+        <BuildStepPhaseCard
+          phase={buildPhase}
+          working={working}
+          paused={false}
+          hasFiles={rawFileStreamEvents.length > 0 || streamFileCount > 0}
+          statusLine={phaseHeartbeatLine}
           chunkProgress={chunkProgressLine}
         />
       ) : null}
 
       {buildElapsedStalled ? <BuildNoFilesYetCard variant="hard_timeout" /> : null}
 
-      {working && activeWorkChipLine && activeWorkChipLine !== currentNarrationLine ? (
+      {working && activeWorkChipLine && activeWorkChipLine !== interleavedDisplay.liveNarration ? (
         <BuildActiveWorkChip line={activeWorkChipLine} />
       ) : null}
 
-      {working && (completedTimeline.length > 0 || active) ? (
-        <ul className="space-y-2">
-          <AnimatePresence initial={false}>
-            {completedTimeline.map((ev) => (
-              <li key={ev.stableKey}>
-                <TimelineRow
-                  event={ev}
-                  reducedMotion={Boolean(reducedMotion)}
-                  streamFileCount={streamFileCount}
-                  previewSucceeded={previewSucceeded}
-                  workflowEvents={progress.events}
-                />
-              </li>
-            ))}
-          </AnimatePresence>
-          {active ? (
-            <li data-testid="workflow-active-step">
-              <TimelineRow
-                event={active}
-                reducedMotion={Boolean(reducedMotion)}
-                streamFileCount={streamFileCount}
-                previewSucceeded={previewSucceeded}
-                workflowEvents={progress.events}
-              />
-            </li>
-          ) : null}
-        </ul>
-      ) : null}
+      {working
+        ? activeLiveFiles.map((ev) => (
+              <div key={`live-${ev.stableKey}`} className="overflow-visible">
+                <FileChangeCard event={ev} />
+              </div>
+            ))
+        : null}
 
-      {!working && finalSummaryLine ? (
+      {!working && (interleavedDisplay.terminalNarration || finalSummaryLine) ? (
         <TypedNarrationLine
           key="final-summary"
-          text={sanitizeUserBuildChatText(finalSummaryLine)}
+          text={sanitizeUserBuildChatText(
+            interleavedDisplay.terminalNarration ?? finalSummaryLine ?? "",
+          )}
         />
       ) : null}
 

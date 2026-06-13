@@ -5,6 +5,8 @@ import { reconcileProjectBuildStateServer } from "@/lib/build/reconcile-project-
 import { isZipImportProject, readImportMeta, preferredEntryFile } from "@/lib/projects/imported-project-state";
 import { requireAuthUser, requireMutationProjectId, isNextResponse } from "@/lib/ids/api-mutation-guard";
 import { runProjectPreviewBuild } from "@/lib/imports/run-project-preview-build";
+import { loadAllProjectAppFiles } from "@/lib/projects/load-all-app-files";
+import { countProjectFiles } from "@/lib/preview/project-preview-html";
 import {
   estimateZipPreviewCreditsWithPlatformMultiplier,
   reserveZipPreviewActionCredits,
@@ -49,13 +51,12 @@ export async function POST(
 
   const admin = createServiceRoleClient() ?? supabase;
 
-  const { data: fileRows } = await admin
-    .from("app_files")
-    .select("path, content")
-    .eq("project_id", projectId)
-    .limit(500);
+  const totalFileCount = await countProjectFiles(admin, projectId);
+  if (totalFileCount === 0) {
+    return NextResponse.json({ error: "No imported files found" }, { status: 400 });
+  }
 
-  const files = (fileRows ?? []).map((f) => ({ path: f.path, content: f.content ?? "" }));
+  const files = await loadAllProjectAppFiles(admin, projectId);
   if (files.length === 0) {
     return NextResponse.json({ error: "No imported files found" }, { status: 400 });
   }
@@ -72,7 +73,7 @@ export async function POST(
     preview_honest: false,
     preview_renderable: false,
     preview_status: "queued",
-    file_count: files.length,
+    file_count: totalFileCount,
     import: {
       ...imp,
       preview_ready: false,
@@ -117,11 +118,33 @@ export async function POST(
     creditEstimate,
   });
 
+  const previewReady = build.diagnostics?.previewRenderable === true;
+  if (previewReady) {
+    await admin
+      .from("projects")
+      .update({
+        metadata: {
+          ...nextMeta,
+          preview_ready: true,
+          preview_honest: true,
+          preview_renderable: true,
+          preview_status: build.diagnostics?.previewStatus ?? "ready",
+          import: {
+            ...nextMeta.import,
+            preview_ready: true,
+            prepared_at: new Date().toISOString(),
+          },
+        },
+      } as never)
+      .eq("id", projectId)
+      .eq("owner_id", authUser.id);
+  }
+
   return NextResponse.json({
     ok: true,
-    fileCount: files.length,
+    fileCount: totalFileCount,
     entryFile: entry,
-    previewReady: false,
+    previewReady,
     previewBuild: build,
   });
 }
