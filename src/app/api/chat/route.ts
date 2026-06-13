@@ -54,7 +54,12 @@ import {
   recoverConfiguredProvidersFromAuthError,
 } from "@/lib/ai/provider-availability";
 import { executeStagedBuildJob } from "@/lib/build/execute-staged-build-job";
-import { shouldRunInlineAsyncBuild } from "@/lib/build/schedule-async-build";
+import {
+  shouldRunInlineAsyncBuild,
+  shouldUseLongRunningBuildRoute,
+} from "@/lib/build/schedule-async-build";
+import { kickStagedBuildWorker } from "@/lib/build/kick-staged-build-worker";
+import { persistBuildJobExecutionMeta } from "@/lib/build/resolve-staged-build-job-input";
 import { emitInitialBuildEvents } from "@/lib/build/build-job-events";
 import { buildIntakeFromPrompt } from "@/lib/ai/huge-prompt-intake";
 import { effectivePromptLengthForCredits } from "@/lib/ai/build-credit-classifier";
@@ -1114,6 +1119,15 @@ export async function POST(request: Request) {
       resumeContinuation,
     };
 
+    await persistBuildJobExecutionMeta(writer, buildJobId, {
+      operationId: opId,
+      reservedCredits: reserve.reserved,
+      partialCreditBuild: buildAllowance?.partial ?? false,
+      quotedCreditsRequired: buildAllowance?.quotedReserve ?? tokensNeeded,
+      userSelectedModelId: asyncUserSelectedModel ?? asyncBuildModelId,
+      resumeContinuation,
+    });
+
     const runAsyncBuild = () =>
       executeStagedBuildJob(jobInput).catch((err) => {
         console.error("[async-build] worker_error", {
@@ -1125,6 +1139,20 @@ export async function POST(request: Request) {
 
     if (shouldRunInlineAsyncBuild()) {
       void runAsyncBuild();
+    } else if (shouldUseLongRunningBuildRoute()) {
+      void kickStagedBuildWorker({
+        projectId,
+        buildJobId,
+        requestUrl: request.url,
+      }).then((kick) => {
+        if (!kick.ok) {
+          console.error("[async-build] long_route_kick_failed", {
+            buildJobId,
+            error: kick.error,
+          });
+          after(runAsyncBuild);
+        }
+      });
     } else {
       after(runAsyncBuild);
     }

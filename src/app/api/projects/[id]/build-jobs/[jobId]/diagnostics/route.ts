@@ -6,8 +6,8 @@ import type { BuildDiagnosticsPayload } from "@/lib/build/build-diagnostics";
 import { mapLegacyPreviewErrorCode, isPreviewFailureCode } from "@/lib/preview/preview-failure-codes";
 import type { BuildJobEventRow } from "@/lib/build/build-job-events";
 import { isThinGeneratedFile } from "@/lib/build/meaningful-file-guard";
-import { findPrimaryAppPage } from "@/lib/build/source-integrity-validator";
-import { evaluateSourceIntegrity } from "@/lib/build/source-integrity-validator";
+import { findPrimaryAppPage, evaluateSourceIntegrity } from "@/lib/build/source-integrity-validator";
+import { loadAllProjectAppFiles } from "@/lib/projects/load-all-app-files";
 
 export const dynamic = "force-dynamic";
 
@@ -65,10 +65,8 @@ export async function GET(
     .eq("id", projectId)
     .maybeSingle();
 
-  const { data: files } = await reader
-    .from("app_files")
-    .select("path, content")
-    .eq("project_id", projectId);
+  const fileRows = await loadAllProjectAppFiles(reader, projectId).catch(() => []);
+  const files = fileRows.map((f) => ({ path: f.path, content: f.content ?? "" }));
 
   const conversationId =
     (typeof meta.conversation_id === "string" ? meta.conversation_id : null) ??
@@ -133,22 +131,20 @@ export async function GET(
     ? rawCode
     : mapLegacyPreviewErrorCode(rawCode);
 
-  const pkg = files?.find((f) => f.path === "package.json");
-  const primaryPage = files?.length
-    ? findPrimaryAppPage(
-        files.map((f) => ({ path: f.path, content: f.content ?? "" })),
-      )
+  const pkg = files.find((f) => f.path === "package.json");
+  const primaryPage = files.length
+    ? findPrimaryAppPage(files.map((f) => ({ path: f.path, content: f.content ?? "" })))
     : undefined;
   const root =
     primaryPage ??
-    files?.find((f) => f.path === "app/page.tsx" || f.path === "src/app/page.tsx");
+    files.find((f) => f.path === "app/page.tsx" || f.path === "src/app/page.tsx");
 
-  const thinFiles = (files ?? [])
+  const thinFiles = files
     .filter((f) => f.content && isThinGeneratedFile({ path: f.path, content: f.content }))
     .map((f) => f.path)
     .slice(0, 40);
 
-  const integrity = files?.length
+  const integrity = files.length
     ? evaluateSourceIntegrity(files.map((f) => ({ path: f.path, content: f.content ?? "" })))
     : null;
 
@@ -241,12 +237,36 @@ export async function GET(
       "Icon generation skipped: Action Credits depleted — deterministic symbolic fallback was used. ";
   }
 
-  const dashboardPage = files?.find(
+  const dashboardPage = files.find(
     (f) => f.path === "app/dashboard/page.tsx" || f.path === "src/app/dashboard/page.tsx",
   );
-  const layoutFile = files?.find(
+  const layoutFile = files.find(
     (f) => f.path === "app/layout.tsx" || f.path === "src/app/layout.tsx",
   );
+
+  let failureMessage = job.error_message ?? failed?.detail ?? null;
+  const lastTimeline = rows[rows.length - 1];
+  const lastActivityMs = lastTimeline?.created_at
+    ? Date.now() - Date.parse(lastTimeline.created_at)
+    : null;
+  const streamedFiles = rows.some(
+    (e) => e.type === "writing_file" || e.type === "editing_file" || e.metadata?.filePath,
+  );
+  if (!failureMessage || failureMessage === "unknown") {
+    if (job.status === "running" && lastActivityMs != null && lastActivityMs > 120_000) {
+      failureMessage =
+        "Build worker stopped unexpectedly (likely serverless timeout ~5 min). Redeploy with the long-running build route fix, then retry or Continue generation.";
+    } else if (streamedFiles && files.length === 0) {
+      failureMessage =
+        "Build streamed files in the UI but none were saved to disk — the worker was killed before persist completed.";
+    } else if (files.length > 0 && (job.status === "failed" || job.status === "running")) {
+      failureMessage = `Partial build — ${files.length} file(s) saved. Use Continue generation for remaining routes.`;
+      if (!failureCode) {
+        fieldNotes.failure_code =
+          "preview failed on partial build — failure inferred from job status + saved files";
+      }
+    }
+  }
 
   const modelUsed =
     (typeof meta.primary_model_id === "string" ? meta.primary_model_id : null) ??
@@ -274,7 +294,7 @@ export async function GET(
     file_events: rows.filter((e) => e.type === "writing_file" || e.type === "editing_file"),
     failed_step: failed?.title ?? null,
     failure_code: failureCode,
-    failure_message: job.error_message ?? failed?.detail ?? null,
+    failure_message: failureMessage,
     stack_trace: (failed?.metadata?.stack_trace as string | undefined) ?? null,
     preview_url: project?.preview_url ?? null,
     preview_response: (projMeta.preview_html_snippet as string | undefined) ?? null,
@@ -292,7 +312,7 @@ export async function GET(
               blocked_reason: projMeta.blocked_reason,
             }
           : null) as Record<string, unknown> | null,
-    generated_files: (files ?? []).map((f) => f.path),
+    generated_files: files.map((f) => f.path),
     thin_or_missing_files: thinFiles,
     package_json_excerpt: pkg?.content?.slice(0, 4000) ?? null,
     root_page_excerpt: root?.content?.slice(0, 4000) ?? null,
