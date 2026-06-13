@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, FileMinus, FilePen, FilePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BuildJobPollState } from "@/hooks/use-build-job-progress";
@@ -37,11 +37,12 @@ import {
 import { sanitizeUserBuildChatText } from "@/lib/build/build-user-copy";
 import { BuildStepPhaseCard } from "@/components/create/workspace/build-step-phase-card";
 import { BuildNoFilesYetCard } from "@/components/create/workspace/build-no-files-yet-card";
-import { BuildActiveWorkChip } from "@/components/create/workspace/build-active-work-chip";
 import { NO_FILES_YET_THRESHOLD_MS, BUILD_USER_TIMEOUT_MS } from "@/lib/build/build-step-ui";
 import { buildInterleavedWorkflowDisplay } from "@/lib/workflow/workflow-interleaved-timeline";
 import { buildStepHeartbeatLine } from "@/lib/workflow/workflow-step-heartbeat";
-import { useTypedText } from "@/hooks/use-typed-text";
+import { useSequentialWorkflowReveal } from "@/hooks/use-sequential-workflow-reveal";
+import { BuildFinalSummaryBlock } from "@/components/create/workspace/live-build-activity-panel";
+import { BuildFailureDiagnosticsInline } from "@/components/create/workspace/build-failure-diagnostics-inline";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
   return (
@@ -115,7 +116,7 @@ function isStructuralTimelineEvent(ev: AgentWorkflowEvent, working: boolean): bo
   return true;
 }
 
-const MAX_ACTIVE_FILE_ROWS = 2;
+const MAX_ACTIVE_FILE_ROWS = 1;
 
 /** Golden-ring focus on all files actively being written. */
 function applyFileStreamFocus(
@@ -204,13 +205,7 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
     (removedLines == null || removedLines === 0);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        "mr-6 overflow-visible p-0.5 sm:mr-10",
-      )}
-    >
+    <div className="mr-6 overflow-visible p-0.5 sm:mr-10">
       <div
         className={cn(
           "flex max-w-md items-center gap-2 rounded-2xl bg-surface/90 px-3 py-2",
@@ -235,13 +230,12 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
           )
         ) : null}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-function TypedNarrationLine({ text }: { text: string }) {
-  const visible = useTypedText(text, { cps: 48 });
-  return <WorkflowNarrationLine>{visible}</WorkflowNarrationLine>;
+function NarrationLine({ text }: { text: string }) {
+  return <WorkflowNarrationLine>{text}</WorkflowNarrationLine>;
 }
 
 /** Plain narration line — matches Discuss/Build chat text (no pill background). */
@@ -657,6 +651,12 @@ export function AgentWorkflowStream({
     [merged, working],
   );
 
+  const revealedCommitted = useSequentialWorkflowReveal(
+    interleavedDisplay.committed,
+    working,
+    380,
+  );
+
   const interleavedTick =
     interleavedDisplay.committed.length +
     (interleavedDisplay.liveNarration ? 1 : 0) +
@@ -692,24 +692,29 @@ export function AgentWorkflowStream({
     [activeLiveFiles],
   );
 
-  const displayEphemeral =
-    ephemeralActionLine ??
-    (working && (buildPhase === "extracting_files" || buildPhase === "validating_quality")
-      ? phaseHeartbeatLine
-      : undefined);
+  const buildFinalSummaryText = React.useMemo(() => {
+    if (working) return null;
+    for (let i = (progress.events ?? []).length - 1; i >= 0; i--) {
+      const m = progress.events![i]!.metadata as Record<string, unknown> | undefined;
+      if (typeof m?.build_final_summary === "string" && m.build_final_summary.trim()) {
+        return sanitizeUserBuildChatText(m.build_final_summary);
+      }
+    }
+    const terminal = interleavedDisplay.terminalNarration ?? finalSummaryLine;
+    return terminal ? sanitizeUserBuildChatText(terminal) : null;
+  }, [working, progress.events, interleavedDisplay.terminalNarration, finalSummaryLine]);
 
   const showPhaseChip =
     working &&
     !userStopped &&
-    activeLiveFiles.length < MAX_ACTIVE_FILE_ROWS &&
+    !interleavedDisplay.liveNarration &&
+    activeLiveFiles.length === 0 &&
     (buildPhase === "planning" ||
       buildPhase === "pending" ||
       buildPhase === "extracting_files" ||
       buildPhase === "validating_quality" ||
       (buildPhase === "model_generating" &&
-        !interleavedDisplay.liveNarration &&
-        interleavedDisplay.committed.filter((i) => i.kind === "file").length === 0 &&
-        activeLiveFiles.length === 0));
+        interleavedDisplay.committed.filter((i) => i.kind === "file").length === 0));
 
   const fileEventMap = React.useMemo(() => {
     const map = new Map<string, AgentWorkflowEvent>();
@@ -738,27 +743,15 @@ export function AgentWorkflowStream({
 
       {showAnalyzing ? <AnalyzingRequestBubble /> : null}
 
-      {working && displayEphemeral && !interleavedDisplay.liveNarration ? (
-        <p
-          className="mr-6 px-0.5 text-[11px] font-medium text-sky-600/90 dark:text-sky-300/80 sm:mr-10"
-          data-testid="ephemeral-action-line"
-        >
-          {displayEphemeral}
-        </p>
-      ) : null}
-
-      {(interleavedDisplay.committed.length > 0 ||
-        interleavedDisplay.liveNarration ||
-        working) ? (
+      {(revealedCommitted.length > 0 || interleavedDisplay.liveNarration || working) ? (
         <div className="space-y-2 overflow-visible" data-testid="workflow-interleaved-stream">
-          {interleavedDisplay.committed.map((item) => {
+          {revealedCommitted.map((item) => {
             if (item.kind === "narration") {
-              return <TypedNarrationLine key={item.key} text={item.text} />;
+              return <NarrationLine key={item.key} text={item.text} />;
             }
             const pathKey = item.event.filePath?.replace(/\\/g, "/").toLowerCase();
             if (pathKey && activeLivePathKeys.has(pathKey)) return null;
-            const focused =
-              fileEventMap.get(pathKey ?? "") ?? item.event;
+            const focused = fileEventMap.get(pathKey ?? "") ?? item.event;
             return (
               <div key={item.event.stableKey} className="overflow-visible">
                 <FileChangeCard event={focused} />
@@ -766,7 +759,7 @@ export function AgentWorkflowStream({
             );
           })}
           {interleavedDisplay.liveNarration ? (
-            <TypedNarrationLine key="live-narration" text={interleavedDisplay.liveNarration} />
+            <NarrationLine key="live-narration" text={interleavedDisplay.liveNarration} />
           ) : null}
         </div>
       ) : null}
@@ -797,24 +790,27 @@ export function AgentWorkflowStream({
 
       {buildElapsedStalled ? <BuildNoFilesYetCard variant="hard_timeout" /> : null}
 
-      {working && activeWorkChipLine && activeWorkChipLine !== interleavedDisplay.liveNarration ? (
-        <BuildActiveWorkChip line={activeWorkChipLine} />
-      ) : null}
-
       {working
         ? activeLiveFiles.map((ev) => (
-              <div key={`live-${ev.stableKey}`} className="overflow-visible">
-                <FileChangeCard event={ev} />
-              </div>
-            ))
+            <div key={`live-${ev.stableKey}`} className="overflow-visible">
+              <FileChangeCard event={ev} />
+            </div>
+          ))
         : null}
 
-      {!working && (interleavedDisplay.terminalNarration || finalSummaryLine) ? (
-        <TypedNarrationLine
-          key="final-summary"
-          text={sanitizeUserBuildChatText(
-            interleavedDisplay.terminalNarration ?? finalSummaryLine ?? "",
-          )}
+      {!working && buildFinalSummaryText ? (
+        <BuildFinalSummaryBlock summary={buildFinalSummaryText} />
+      ) : null}
+
+      {!working && (failed || !previewSucceeded) && projectId ? (
+        <BuildFailureDiagnosticsInline
+          projectId={projectId}
+          jobId={progress.jobId}
+          headline={
+            previewSucceeded
+              ? undefined
+              : "Preview did not load — copy the full diagnostic for Cursor"
+          }
         />
       ) : null}
 

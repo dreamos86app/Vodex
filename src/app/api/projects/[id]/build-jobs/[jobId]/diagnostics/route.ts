@@ -26,11 +26,19 @@ export async function GET(
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
+  const reader = createServiceRoleClient() ?? supabase;
+
   if (!canViewBuildDiagnostics(user.email)) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    const { data: owned } = await reader
+      .from("projects")
+      .select("id, owner_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!owned || owned.owner_id !== user.id) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
   }
 
-  const reader = createServiceRoleClient() ?? supabase;
   const { data: job } = await reader
     .from("build_jobs")
     .select("id, project_id, user_id, status, error_message, meta, prompt, conversation_id, created_at")

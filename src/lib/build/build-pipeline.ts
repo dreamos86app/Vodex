@@ -218,6 +218,7 @@ export type WorkflowEventMeta = {
   files_from_chunk?: number;
   active_work?: boolean;
   diagnostics_only?: boolean;
+  build_final_summary?: string;
 };
 
 export type WorkflowEvent = {
@@ -315,9 +316,11 @@ function trackAssistant(
   events: WorkflowEvent[],
   message: string,
   onWorkflowEvent?: (ev: WorkflowEvent) => void | Promise<void>,
+  meta?: WorkflowEventMeta,
 ) {
   appendWorkflowEvent(events, "thinking", message, undefined, onWorkflowEvent, {
     streamCategory: "assistant_message",
+    ...meta,
   });
 }
 
@@ -2283,14 +2286,7 @@ export async function runStagedBuildPipeline(input: {
   const logoStatusLine =
     identityResult.logoGenerationStatus === "generated"
       ? "Logo generated"
-      : identityResult.logoGenerationStatus === "insufficient_credits"
-        ? "Temporary fallback icon — image generation skipped: not enough Action Credits"
-        : identityResult.logoGenerationStatus === "failed"
-          ? `Temporary fallback icon — image generation failed${identityResult.logoGenerationError ? `: ${identityResult.logoGenerationError}` : ""}`
-          : identityResult.iconGenerationMode === "skipped_no_openai_key" ||
-              identityResult.iconGenerationMode === "skipped_provider_disabled"
-            ? "Temporary fallback icon — image provider is not configured"
-            : "Temporary fallback icon — not AI-generated";
+      : "App icon ready";
 
   const finalSummary = buildSummaryFromQuality(primaryModelId, meaningfulQualityReport, {
     durationMs: Date.now() - pipelineStartedAt,
@@ -2327,7 +2323,9 @@ export async function runStagedBuildPipeline(input: {
           ? "continue full-app generation"
           : null,
   });
-  trackAssistant(events, finalSummary, emit);
+  trackAssistant(events, finalSummary, emit, {
+    build_final_summary: finalSummary,
+  });
 
   const ok =
     postContract.passed &&

@@ -1148,6 +1148,7 @@ export function PreviewPanel({
             {runtimeStatus ? (
               <PreviewRuntimeStatusPanel
                 status={runtimeStatus}
+                projectId={projectId ?? undefined}
                 onRebuild={onRebuildPreview}
                 onStartPreview={onStartPreview}
                 onRunRepair={onRepairPreview}

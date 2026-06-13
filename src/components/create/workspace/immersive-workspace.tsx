@@ -1307,6 +1307,16 @@ export function ImmersiveWorkspace({
             });
         }
         if (pid) clearWorkspaceTask(pid);
+        const terminalMeta = (terminal.latest?.metadata ?? {}) as Record<string, unknown>;
+        const previewRenderable = terminalMeta.preview_renderable === true;
+        if (pid && !previewRenderable && terminal.status !== "cancelled") {
+          void fetch(`/api/projects/${pid}/preview/build`, {
+            method: "POST",
+            credentials: "include",
+          })
+            .then(() => setProjectDataRefresh((n) => n + 1))
+            .catch(() => undefined);
+        }
         if (pid && uid) {
           void reconcileProjectBuildState(supabase, pid, uid)
             .then(() => repairPersistedBuildStateTruth(pid))

@@ -13,18 +13,25 @@ function isFileEvent(ev: AgentWorkflowEvent): boolean {
   return ev.category === "file_created" || ev.category === "file_edited" || ev.category === "file_deleted";
 }
 
+function isCollapsedFileBatch(ev: AgentWorkflowEvent): boolean {
+  return Boolean(
+    ev.metadata?.collapsed_file_summary === true ||
+      (Array.isArray(ev.metadata?.file_group) && (ev.metadata.file_group as unknown[]).length > 0),
+  );
+}
+
 export type InterleavedWorkflowDisplay = {
-  /** Committed narration → file pairs (stable history). */
+  /** Stable narration → file pairs (one narration max before each file). */
   committed: InterleavedWorkflowItem[];
-  /** Latest planning line since the last file (shown once, below committed). */
+  /** Single in-flight planning line (never stacked with committed narrations). */
   liveNarration: string | null;
   /** Terminal summary when build finished. */
   terminalNarration: string | null;
 };
 
 /**
- * Strict narration ↔ file alternation: buffer narrations until a file lands, then flush one line + file.
- * During active builds, section cards and purpose headers are omitted to reduce noise.
+ * Strict one-by-one: at most one live narration; narrations commit only when the next file lands.
+ * Orphan narrations are dropped on terminal — never flushed as a wall of text.
  */
 export function buildInterleavedWorkflowDisplay(input: {
   merged: AgentWorkflowEvent[];
@@ -33,32 +40,31 @@ export function buildInterleavedWorkflowDisplay(input: {
   const { merged, working } = input;
   const committed: InterleavedWorkflowItem[] = [];
   const seenCommittedNarration = new Set<string>();
+  const seenFilePaths = new Set<string>();
 
   let pendingNarration: { text: string; key: string } | null = null;
 
   const sorted = [...merged].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 
-  const flushPendingNarration = () => {
-    if (!pendingNarration || seenCommittedNarration.has(pendingNarration.text)) return;
-    seenCommittedNarration.add(pendingNarration.text);
-    committed.push({ kind: "narration", text: pendingNarration.text, key: pendingNarration.key });
-    pendingNarration = null;
-  };
-
   for (const ev of sorted) {
     if (ev.category === "assistant_message" && !isHeartbeat(ev)) {
       const text = sanitizeUserBuildChatText(ev.subtitle ?? ev.title);
-      if (text) {
-        if (pendingNarration && pendingNarration.text !== text) {
-          flushPendingNarration();
-        }
-        pendingNarration = { text, key: `n-${ev.stableKey}` };
-      }
+      if (!text || seenCommittedNarration.has(text)) continue;
+      if (pendingNarration !== null && pendingNarration.text === text) continue;
+      pendingNarration = { text, key: `n-${ev.stableKey}` };
       continue;
     }
 
-    if (isFileEvent(ev) && ev.filePath) {
-      flushPendingNarration();
+    if (isFileEvent(ev) && ev.filePath && !isCollapsedFileBatch(ev)) {
+      const pathKey = ev.filePath.replace(/\\/g, "/").toLowerCase();
+      if (seenFilePaths.has(pathKey)) continue;
+      seenFilePaths.add(pathKey);
+
+      if (pendingNarration) {
+        seenCommittedNarration.add(pendingNarration.text);
+        committed.push({ kind: "narration", text: pendingNarration.text, key: pendingNarration.key });
+        pendingNarration = null;
+      }
       committed.push({ kind: "file", event: ev });
     }
   }
@@ -67,21 +73,19 @@ export function buildInterleavedWorkflowDisplay(input: {
   if (!working) {
     const terminalFromEvents = [...merged]
       .reverse()
-      .find(
-        (e) =>
-          e.category === "assistant_message" &&
-          !isHeartbeat(e) &&
-          /complete|saved|finished|continuing|preview|stopped|cancelled/i.test(
-            `${e.title ?? ""} ${e.subtitle ?? ""}`,
-          ),
-      );
+      .find((e) => {
+        if (e.category !== "assistant_message" || isHeartbeat(e)) return false;
+        const body = `${e.title ?? ""} ${e.subtitle ?? ""}`;
+        return (
+          e.metadata?.build_final_summary === true ||
+          /^Build (complete|saved|blocked|paused)/i.test(body) ||
+          /^(Preview live|Build needs another)/i.test(body.trim())
+        );
+      });
     if (terminalFromEvents) {
       terminalNarration = sanitizeUserBuildChatText(
         terminalFromEvents.subtitle ?? terminalFromEvents.title ?? "",
       );
-    }
-    if (pendingNarration) {
-      flushPendingNarration();
     }
     pendingNarration = null;
   }

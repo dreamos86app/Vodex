@@ -10,6 +10,7 @@ import {
   VITE_BUILD_OOM_CODE,
 } from "@/lib/preview/preview-runtime-status";
 import { Button } from "@/components/ui/button";
+import { BuildFailureDiagnosticsInline } from "@/components/create/workspace/build-failure-diagnostics-inline";
 
 export function PreviewRuntimeStatusPanel({
   status,
@@ -22,6 +23,7 @@ export function PreviewRuntimeStatusPanel({
   rebuilding,
   startingPreview,
   repairing,
+  projectId,
 }: {
   status: PreviewRuntimeStatusPayload;
   compact?: boolean;
@@ -33,6 +35,7 @@ export function PreviewRuntimeStatusPanel({
   rebuilding?: boolean;
   startingPreview?: boolean;
   repairing?: boolean;
+  projectId?: string;
 }) {
   const [logsOpen, setLogsOpen] = React.useState(false);
   const classification = status.previewFailureClassification;
@@ -239,6 +242,12 @@ export function PreviewRuntimeStatusPanel({
               Copy technical details
             </Button>
           </div>
+        ) : null}
+        {projectId && !status.previewRenderable ? (
+          <BuildFailureDiagnosticsInline
+            projectId={projectId}
+            className="mt-2 border-0 bg-transparent p-0"
+          />
         ) : null}
       </div>
 
