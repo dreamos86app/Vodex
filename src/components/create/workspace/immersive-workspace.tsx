@@ -242,6 +242,7 @@ function MessageBubble({
   creditsUsed,
   costState,
   planFooter,
+  workflowStreamOwnsFiles = false,
 }: {
   message: UIMessage;
   userAvatar?: string | null;
@@ -251,6 +252,7 @@ function MessageBubble({
   creditsUsed?: number | null;
   costState?: import("@/components/chat/message-cost-header").MessageCostState;
   planFooter?: React.ReactNode;
+  workflowStreamOwnsFiles?: boolean;
 }) {
   const isUser = message.role === "user";
   const raw = messageText(message);
@@ -330,6 +332,7 @@ function MessageBubble({
             progressIndex={progressIndex}
             creditsUsed={creditsUsed}
             buildFinalized={!streaming}
+            workflowStreamOwnsFiles={workflowStreamOwnsFiles}
           />
         ) : (
           <div className="rounded-xl bg-surface/80 px-3 py-2.5 text-[13.5px] leading-relaxed text-foreground ring-1 ring-border/50">
@@ -1252,13 +1255,19 @@ export function ImmersiveWorkspace({
           credits: creditsFromJob,
         });
         if (uid) {
+          const actionBefore = useCreditsStore.getState().action?.available ?? 0;
           void refreshCredits({ reason: "charge" }).then(() => {
             const after = useCreditsStore.getState().remaining;
+            const actionAfter = useCreditsStore.getState().action?.available ?? 0;
             const delta = Math.max(0, creditsBeforeRefresh - after);
+            const actionDelta = Math.max(0, actionBefore - actionAfter);
             setLastMessageCost({
               state: "final",
               credits: creditsFromJob > 0 ? creditsFromJob : delta,
             });
+            if (actionDelta > 0) {
+              void refreshCredits({ reason: "charge" });
+            }
           });
         }
         if (conversationIdRef.current) {
@@ -1699,6 +1708,19 @@ export function ImmersiveWorkspace({
     if (userPinnedScrollRef.current) return;
     scrollToBottom(isBusy ? "auto" : "smooth");
   }, [messages, isBusy, scrollToBottom, buildStreamTick, buildProgressPct]);
+
+  React.useEffect(() => {
+    userPinnedScrollRef.current = false;
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    lockPageScroll();
+  }, [effectiveProjectId, lockPageScroll]);
+
+  React.useEffect(() => {
+    if (mobilePanel === "chat") {
+      scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+      lockPageScroll();
+    }
+  }, [mobilePanel, lockPageScroll]);
 
   const onChatScroll = React.useCallback(() => {
     const el = scrollRef.current;
@@ -3294,7 +3316,7 @@ export function ImmersiveWorkspace({
     <DropZone
       onFiles={onFiles}
       disabled={composerBlocked}
-      className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden max-lg:h-[100dvh] max-lg:max-h-[100dvh]"
       data-testid="builder-shell"
     >
       {mode === "build" ? (
@@ -3431,7 +3453,7 @@ export function ImmersiveWorkspace({
               mode === "build" && "bg-gradient-to-b from-accent/[0.04] to-transparent",
             )}
           >
-            <div className="space-y-3 px-3 py-4">
+            <div className="space-y-3 px-3 py-4 max-lg:space-y-2 max-lg:px-2 max-lg:py-2">
               {showEmpty && (
                 <div className="flex flex-col items-center pt-4 text-center sm:pt-6">
                   <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent/30 to-accent/10">
@@ -3541,6 +3563,12 @@ export function ImmersiveWorkspace({
                     buildStrategy === "plan_first" &&
                     !blueprintApproved &&
                     Boolean(blueprint);
+                  const streamOwnsWorkflow =
+                    mode === "build" &&
+                    (buildJobActive ||
+                      buildStarting ||
+                      Boolean(frozenBuildWorkflow) ||
+                      Boolean(buildJobProgress));
                   return (
                   <MessageBubble
                     key={m.id}
@@ -3551,6 +3579,7 @@ export function ImmersiveWorkspace({
                     mode={mode}
                     creditsUsed={costInfo?.credits}
                     costState={costInfo?.state}
+                    workflowStreamOwnsFiles={streamOwnsWorkflow && m.role === "assistant"}
                     planFooter={
                       showPlanInChat ? (
                         <div className="mt-2">
@@ -3625,7 +3654,7 @@ export function ImmersiveWorkspace({
                   savedFileCount={projectFiles.length}
                 />
               )}
-              {buildRunSummary && !buildJobActive && !previewSrcRenderable && (
+              {buildRunSummary && !buildJobActive && !previewSrcRenderable && !frozenBuildWorkflow && (
                 <BuildRunSummaryCard
                   variant={buildRunSummary.variant}
                   status={buildRunSummary.status}

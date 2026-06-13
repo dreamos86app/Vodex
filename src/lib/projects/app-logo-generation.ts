@@ -69,12 +69,9 @@ export function buildLogoPrompt(input: {
     audience ? `Target audience: ${audience}.` : "",
     keywords ? `Visual keywords: ${keywords}.` : "",
     `Brand style: ${brandStyle}.`,
-    "1024x1024, bold abstract glyph or object — symbolic mark only, no logotype.",
-    "NO text, NO letters, NO words, NO initials.",
-    "Symbol fills 92% of canvas edge-to-edge; full-bleed saturated gradient background.",
-    "Circular mask safe: no white corners, no white border, no empty ring, no square matte.",
-    "High contrast, app-store quality, minimal, professional, maskable center composition.",
-    "Forbidden: typography, watermark, photo border, drop shadow outside circle, tiny centered logo.",
+    "1024x1024 square app icon — NOT circular, NOT round mask.",
+    "Symbol fills 92% of square canvas edge-to-edge; full-bleed saturated gradient background.",
+    "Square corners with subtle 12% radius — app-store square icon, centered composition.",
   ].join(" ");
 }
 
@@ -235,14 +232,10 @@ async function normalizeIconBuffer(buffer: Buffer): Promise<Buffer> {
     .toBuffer();
 }
 
-async function applyCircularMask(buffer: Buffer): Promise<Buffer> {
-  const size = 1024;
-  const mask = Buffer.from(
-    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg"><circle cx="512" cy="512" r="512" fill="white"/></svg>`,
-  );
+async function applySquareIconMask(buffer: Buffer): Promise<Buffer> {
+  const size = 512;
   return sharp(buffer)
     .resize(size, size, { fit: "cover", position: "centre" })
-    .composite([{ input: mask, blend: "dest-in" }])
     .png()
     .toBuffer();
 }
@@ -330,7 +323,7 @@ async function uploadLogoDerivatives(
   const prepped = await normalizeIconBuffer(source);
   const massed = await scaleIconVisualMass(prepped);
   const cornerFixed = await flattenWhiteCornerArtifacts(massed);
-  const masked = await applyCircularMask(cornerFixed);
+  const masked = await applySquareIconMask(cornerFixed);
   const png1024 = await sharp(masked)
     .resize(1024, 1024, { fit: "cover", position: "centre" })
     .png()

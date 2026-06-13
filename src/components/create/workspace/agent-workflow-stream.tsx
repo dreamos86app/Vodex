@@ -31,17 +31,16 @@ import { MIN_RENDERABLE_FILES } from "@/lib/build/build-success-contract";
 import { resolveBuildTerminalTruth } from "@/lib/build/build-terminal-truth";
 import { LiveFileLineDelta } from "@/components/create/workspace/live-file-line-delta";
 import { DreamOSMessageShell } from "@/components/create/workspace/dreamos-message-shell";
-import { BuildFinalSummaryBlock } from "@/components/create/workspace/live-build-activity-panel";
 import {
   deriveBuildPhaseFromEvents,
 } from "@/lib/build/build-terminal-state-machine";
 import { sanitizeUserBuildChatText } from "@/lib/build/build-user-copy";
 import { BuildStepPhaseCard } from "@/components/create/workspace/build-step-phase-card";
-import { BuildPhasedFilePanel } from "@/components/create/workspace/build-phased-file-panel";
 import { BuildNoFilesYetCard } from "@/components/create/workspace/build-no-files-yet-card";
 import { BuildActiveWorkChip } from "@/components/create/workspace/build-active-work-chip";
 import { NO_FILES_YET_THRESHOLD_MS, BUILD_USER_TIMEOUT_MS } from "@/lib/build/build-step-ui";
-import { BuildWorkflowSections, groupFileEventsByPurpose } from "@/components/create/workspace/build-workflow-sections";
+import { WorkflowSectionCard } from "@/components/create/workspace/build-workflow-sections";
+import { buildInterleavedWorkflowItems } from "@/lib/workflow/workflow-interleaved-timeline";
 import { useTypedText } from "@/hooks/use-typed-text";
 
 function isFileEvent(ev: AgentWorkflowEvent): boolean {
@@ -116,9 +115,9 @@ function isStructuralTimelineEvent(ev: AgentWorkflowEvent, working: boolean): bo
   return true;
 }
 
-const MAX_ACTIVE_FILE_ROWS = 2;
+const MAX_ACTIVE_FILE_ROWS = 12;
 
-/** Golden-ring focus on 1–2 files actually being written; completed files lose the ring. */
+/** Golden-ring focus on all files actively being written. */
 function applyFileStreamFocus(
   events: AgentWorkflowEvent[],
   working: boolean,
@@ -127,7 +126,7 @@ function applyFileStreamFocus(
 
   const inProgressIndices: number[] = [];
   events.forEach((e, i) => {
-    if (isFileEvent(e) && e.metadata?.file_in_progress === true) {
+    if (isFileEvent(e) && (e.metadata?.file_in_progress === true || e.status === "active")) {
       inProgressIndices.push(i);
     }
   });
@@ -135,13 +134,17 @@ function applyFileStreamFocus(
 
   return events.map((e, i) => {
     if (isFileEvent(e)) {
+      const inProgress =
+        e.metadata?.file_in_progress === true ||
+        (e.status === "active" && e.metadata?.file_in_progress !== false);
+      const focused = inProgress && activeSet.has(i);
       const done =
         e.metadata?.file_in_progress === false ||
         e.metadata?.step_status === "completed" ||
-        !activeSet.has(i);
+        (!focused && !inProgress);
       return {
         ...e,
-        status: done ? ("done" as const) : ("active" as const),
+        status: focused ? ("active" as const) : done ? ("done" as const) : e.status,
       };
     }
     if (e.status === "active") {
@@ -212,7 +215,7 @@ function FileChangeCard({ event }: { event: AgentWorkflowEvent }) {
         className={cn(
           "flex max-w-md items-center gap-2 rounded-2xl bg-surface/90 px-3 py-2",
           fileActive
-            ? "workflow-gold-border-active file-active-ring ring-2 ring-amber-400/55"
+            ? "workflow-gold-border-active file-active-ring ring-2 ring-amber-400/45 shadow-[0_0_20px_-4px_rgba(251,191,36,0.45)]"
             : "ring-1 ring-border/60",
         )}
         data-testid="workflow-file-card"
@@ -649,7 +652,27 @@ export function AgentWorkflowStream({
     chunkProgressLine ??
     (working && narrationTimeline.length === 0 ? currentNarrationLine : undefined);
 
-  const filePurposeGroups = groupFileEventsByPurpose(rawFileStreamEvents);
+  const interleavedItems = React.useMemo(
+    () =>
+      buildInterleavedWorkflowItems({
+        merged,
+        working,
+        fileEvents: rawFileStreamEvents,
+      }),
+    [merged, working, rawFileStreamEvents],
+  );
+
+  const showInterleavedStream = interleavedItems.length > 0 || working;
+
+  const fileEventMap = React.useMemo(() => {
+    const map = new Map<string, AgentWorkflowEvent>();
+    for (const ev of timeline) {
+      if (isFileEvent(ev) && ev.filePath) {
+        map.set(ev.filePath.replace(/\\/g, "/").toLowerCase(), ev);
+      }
+    }
+    return map;
+  }, [timeline]);
 
   return (
     <DreamOSMessageShell
@@ -668,19 +691,52 @@ export function AgentWorkflowStream({
 
       {showAnalyzing ? <AnalyzingRequestBubble /> : null}
 
-      {narrationTimeline.length > 0 ? (
-        <div className="space-y-2" data-testid="build-narration-timeline">
-          {narrationTimeline.map((line) => (
-            <TypedNarrationLine key={line} text={line} />
-          ))}
-        </div>
+      {working && ephemeralActionLine ? (
+        <p
+          className="mr-6 px-0.5 text-[11px] font-medium text-sky-600/90 dark:text-sky-300/80 sm:mr-10"
+          data-testid="ephemeral-action-line"
+        >
+          {ephemeralActionLine}
+        </p>
       ) : null}
 
-      <BuildWorkflowSections
-        events={merged}
-        working={working}
-        ephemeralLine={working ? ephemeralActionLine : undefined}
-      />
+      {showInterleavedStream ? (
+        <div className="space-y-2 overflow-visible" data-testid="workflow-interleaved-stream">
+          {interleavedItems.map((item) => {
+            if (item.kind === "narration") {
+              return <TypedNarrationLine key={item.key} text={item.text} />;
+            }
+            if (item.kind === "section") {
+              return (
+                <WorkflowSectionCard
+                  key={`sec-${item.sectionId}`}
+                  sectionId={item.sectionId}
+                  events={item.events}
+                  working={item.working}
+                  className="mr-6 sm:mr-10"
+                />
+              );
+            }
+            if (item.kind === "purpose_header") {
+              return (
+                <p
+                  key={item.key}
+                  className="mr-6 mt-1 px-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:mr-10"
+                >
+                  {item.label}
+                </p>
+              );
+            }
+            const focused =
+              fileEventMap.get(item.event.filePath!.replace(/\\/g, "/").toLowerCase()) ?? item.event;
+            return (
+              <div key={item.event.stableKey} className="overflow-visible">
+                <FileChangeCard event={focused} />
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {working ? (
         <BuildStepPhaseCard
@@ -695,37 +751,11 @@ export function AgentWorkflowStream({
 
       {buildElapsedStalled ? <BuildNoFilesYetCard variant="hard_timeout" /> : null}
 
-      {filePurposeGroups.length > 0 ? (
-        <div className="space-y-3 overflow-visible" data-testid="workflow-file-purpose-groups">
-          {filePurposeGroups.map((group) => (
-            <div key={group.id} className="overflow-visible">
-              <p className="mb-1 px-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                {group.label}
-              </p>
-              <ul className="space-y-1.5 overflow-visible">
-                {group.events.map((ev) => (
-                  <li key={ev.stableKey}>
-                    <FileChangeCard event={ev} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <BuildPhasedFilePanel
-          working={working}
-          fileEvents={rawFileStreamEvents}
-          completedChunkIds={completedChunkIds}
-          renderFileCard={(ev) => <FileChangeCard event={ev} />}
-        />
-      )}
-
       {working && activeWorkChipLine && activeWorkChipLine !== currentNarrationLine ? (
         <BuildActiveWorkChip line={activeWorkChipLine} />
       ) : null}
 
-      {completedTimeline.length > 0 || active ? (
+      {working && (completedTimeline.length > 0 || active) ? (
         <ul className="space-y-2">
           <AnimatePresence initial={false}>
             {completedTimeline.map((ev) => (
@@ -754,15 +784,11 @@ export function AgentWorkflowStream({
         </ul>
       ) : null}
 
-      {!working && finalSummaryLine ? <BuildFinalSummaryBlock summary={finalSummaryLine} /> : null}
-
-      {!working && fileDiffSummary ? (
-        <p
-          className="mr-6 px-1 text-[10.5px] font-medium text-muted-foreground sm:mr-10"
-          data-testid="workflow-file-diff-summary"
-        >
-          {fileDiffSummary.files} file{fileDiffSummary.files === 1 ? "" : "s"} generated
-        </p>
+      {!working && finalSummaryLine ? (
+        <TypedNarrationLine
+          key="final-summary"
+          text={sanitizeUserBuildChatText(finalSummaryLine)}
+        />
       ) : null}
 
       {failed && !previewSucceeded ? (

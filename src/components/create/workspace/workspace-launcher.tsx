@@ -51,7 +51,7 @@ import {
   type IntegrationPreset,
 } from "@/components/create/workspace/workspace-integrations-modal";
 import { VodexBrandIcon } from "@/components/brand/vodex-brand-icon";
-import { projectIconSrc } from "@/lib/projects/ensure-project-icon";
+import { projectIconSrc, projectHasGeneratedIcon } from "@/lib/projects/ensure-project-icon";
 import { resolveWorkspaceDisplayName } from "@/lib/profile/default-workspace-name";
 import { toast } from "@/lib/toast";
 
@@ -345,10 +345,19 @@ export function WorkspaceLauncher({
 
   const appTitle = project?.name ?? "New build";
   const showAppMenu = Boolean(project?.id);
-  const appIconSrc = project?.id
+  const meta =
+    project?.metadata && typeof project.metadata === "object" && !Array.isArray(project.metadata)
+      ? (project.metadata as Record<string, unknown>)
+      : {};
+  const hasRealIcon = projectHasGeneratedIcon({
+    iconUrl: project?.icon_url,
+    iconSvg: project?.icon_svg,
+    metadata: meta,
+  });
+  const appIconSrc = project?.id && hasRealIcon
     ? projectIconSrc(project.id, project.icon_svg, project.icon_url, project.updated_at)
     : null;
-  const showAppIcon = Boolean(appIconSrc);
+  const showAppIcon = Boolean(appIconSrc && hasRealIcon);
   const [publishReady, setPublishReady] = React.useState(false);
   const [publishPhase, setPublishPhase] = React.useState<PublishUiPhase>("idle");
   const [publishedUrl, setPublishedUrl] = React.useState<string | null>(null);
@@ -517,7 +526,7 @@ export function WorkspaceLauncher({
               aria-label={`${appTitle} app menu`}
               aria-expanded={appMenuOpen}
             >
-              <Image src={appIconSrc} alt="" width={36} height={36} className="size-full object-contain p-0.5" unoptimized />
+              <Image src={appIconSrc} alt="" width={36} height={36} className="size-full object-cover" unoptimized />
             </button>
           ) : null}
 

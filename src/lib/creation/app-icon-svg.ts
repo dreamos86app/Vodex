@@ -79,12 +79,9 @@ export function generateAppIconSvg(appName: string, category?: string): string {
       <stop offset="0%" stop-color="${c1}"/>
       <stop offset="100%" stop-color="${c2}"/>
     </linearGradient>
-    <clipPath id="circle"><circle cx="64" cy="64" r="64"/></clipPath>
   </defs>
-  <g clip-path="url(#circle)">
-    <rect width="128" height="128" fill="url(#g)"/>
-    <g transform="translate(0,2)">${mark}</g>
-  </g>
+  <rect width="128" height="128" rx="24" fill="url(#g)"/>
+  <g transform="translate(0,2)">${mark}</g>
 </svg>`;
 }
 

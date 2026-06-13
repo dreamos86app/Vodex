@@ -40,10 +40,21 @@
   }
 }
 
+@keyframes workflow-gold-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.65));
+  }
+}
+
 .workflow-gold-border-active {
   position: relative;
   border-radius: 0.75rem;
   isolation: isolate;
+  animation: workflow-gold-glow 2.4s ease-in-out infinite;
 }
 
 .workflow-gold-border-active::before {

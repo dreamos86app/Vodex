@@ -90,7 +90,7 @@ export function BuildRunSummaryCard({
     (truth.hasRecoverableFiles || count >= MIN_RENDERABLE_FILES) && count >= MIN_RENDERABLE_FILES,
     count,
   );
-  const inline = variant === "inline" || isPendingPreviewHeadline(title);
+  const inline = true;
 
   const lines =
     bodyLines.length > 0

@@ -29,7 +29,12 @@ const USER_FACING_DEBUG_PATTERNS = [
   /quality below the production floor/gi,
   /quality repair needed/gi,
   /ui_quality_\d+/gi,
-  /model_underproduced/gi,
+  /Build blocked.*quality/gi,
+  /Logo:\s*Logo generated/gi,
+  /Import graph:/gi,
+  /Model:\s*\S+/gi,
+  /Files:\s*\d+/gi,
+  /Preview:\s*Preview with quality/gi,
 ];
 
 export function containsUserFacingBuildDebug(text: string): boolean {

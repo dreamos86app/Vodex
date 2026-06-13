@@ -64,3 +64,24 @@ export function projectIconSrc(
   const fallback = `/api/projects/${projectId}/icon`;
   return bust ? `${fallback}${bust}` : fallback;
 }
+
+/** True when the app has a real generated or imported icon — not the deterministic initials fallback. */
+export function projectHasGeneratedIcon(input: {
+  iconUrl?: string | null;
+  iconSvg?: string | null;
+  metadata?: Record<string, unknown> | null;
+}): boolean {
+  const meta = input.metadata ?? {};
+  const mode = typeof meta.icon_generation_mode === "string" ? meta.icon_generation_mode : null;
+  if (mode === "ai_openai_mini" || mode === "ai_generated") return true;
+  if (typeof meta.logo_generated_at === "string" && meta.logo_generated_at) return true;
+  const imported = meta.imported_from_zip === true || meta.source === "zip_import";
+  if (imported && input.iconUrl?.trim()) return true;
+  const url = input.iconUrl?.trim() ?? "";
+  if (url && (url.startsWith("http") || url.includes("project-icons"))) return true;
+  if (input.iconSvg?.trim() && !isWeakIconSvg(input.iconSvg)) {
+    if (mode && mode.startsWith("skipped")) return false;
+    if (imported) return true;
+  }
+  return false;
+}

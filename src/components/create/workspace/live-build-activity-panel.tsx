@@ -163,23 +163,15 @@ export function BuildFinalSummaryBlock({
   className?: string;
 }) {
   if (!summary.trim()) return null;
-  const lines = summary.split("\n").filter(Boolean);
   return (
-    <div
+    <p
       className={cn(
-        "mr-6 rounded-xl bg-surface/80 px-3 py-2.5 ring-1 ring-border/60 sm:mr-10",
+        "mr-6 max-w-[min(100%,34rem)] px-1 text-[13px] leading-relaxed text-foreground sm:mr-10",
         className,
       )}
       data-testid="build-final-summary"
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Build summary</p>
-      <div className="mt-1 space-y-0.5">
-        {lines.map((line) => (
-          <p key={line} className="text-[11px] leading-relaxed text-foreground">
-            {line}
-          </p>
-        ))}
-      </div>
-    </div>
+      {summary}
+    </p>
   );
 }

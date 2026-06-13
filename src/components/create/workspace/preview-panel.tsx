@@ -869,15 +869,13 @@ export function PreviewPanel({
     showIframeSurface &&
     Boolean(bootAuditSummary.bootFailureReason) &&
     !overlayVisible &&
-    (bootAuditEvents.some(
-      (e) =>
-        e.phase === "runtime-error" ||
-        (e.phase === "asset-error" &&
-          e.failedAssetUrl &&
-          !isIgnorablePreviewAssetLoadFailure(e.failedAssetUrl, e.failedAssetTag ?? null)),
-    ) ||
-      (bootAuditSummary.loadedCount < 3 &&
-        bootAuditEvents.filter((e) => e.phase === "snapshot").length >= 2));
+      (bootAuditEvents.some((e) => e.phase === "runtime-error") ||
+        bootAuditEvents.some(
+          (e) =>
+            e.phase === "asset-error" &&
+            e.failedAssetUrl &&
+            !isIgnorablePreviewAssetLoadFailure(e.failedAssetUrl, e.failedAssetTag ?? null),
+        ));
 
   React.useEffect(() => {
     const shouldLog =

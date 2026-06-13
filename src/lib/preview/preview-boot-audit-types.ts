@@ -98,7 +98,6 @@ export function previewBootSucceeded(
   const sawReady = events.some((ev) => ev.phase === "ready");
   return (
     sawReady &&
-    summary.loadedCount >= 3 &&
     summary.failedCount === 0 &&
     !summary.firstRuntimeError
   );
@@ -147,7 +146,7 @@ export function summarizeBootAudit(
     (r) => r.transferSize === 0 && r.duration === 0,
   ).length;
 
-  const bootHealthy = sawReady && loadedCount >= 3 && failedCount === 0 && !firstRuntimeError;
+  const bootHealthy = sawReady && failedCount === 0 && !firstRuntimeError;
   const remounts = opts?.iframeRemountCount ?? 0;
   const cancelledRatio =
     scriptResources.length > 0 ? cancelledOrIncompleteCount / scriptResources.length : 0;

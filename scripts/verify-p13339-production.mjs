@@ -83,7 +83,8 @@ const suites = {
     const errors = [];
     must(read("src/components/create/workspace/build-workflow-sections.tsx"), "BuildWorkflowSections", "sections ui", errors);
     must(read("src/components/create/workspace/build-workflow-sections.tsx"), "ephemeral-action-line", "ephemeral line", errors);
-    must(read("src/components/create/workspace/agent-workflow-stream.tsx"), "build-workflow-sections", "sections wired", errors);
+    must(read("src/components/create/workspace/agent-workflow-stream.tsx"), "workflow-interleaved-stream", "interleaved stream", errors);
+    must(read("src/lib/workflow/workflow-interleaved-timeline.ts"), "buildInterleavedWorkflowItems", "interleave logic", errors);
     must(read("src/components/create/workspace/agent-workflow-stream.tsx"), "overflow-visible", "outline clip fix", errors);
     return errors;
   },

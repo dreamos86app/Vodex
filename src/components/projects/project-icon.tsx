@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { projectIconSrc } from "@/lib/projects/ensure-project-icon";
+import { projectIconSrc, projectHasGeneratedIcon } from "@/lib/projects/ensure-project-icon";
 
 type Props = {
   projectId: string;
@@ -12,8 +12,11 @@ type Props = {
   cacheKey?: string | null;
   size?: number;
   className?: string;
-  /** When true, renders a filled circle (default). */
+  /** When true, renders a filled circle. Default false — square rounded-xl. */
   circular?: boolean;
+  /** When false, hide icon until a real generated/imported asset exists. */
+  showPlaceholder?: boolean;
+  metadata?: Record<string, unknown> | null;
 };
 
 export function ProjectIcon({
@@ -25,7 +28,12 @@ export function ProjectIcon({
   size = 40,
   className,
   circular = false,
+  showPlaceholder = true,
+  metadata,
 }: Props) {
+  const hasReal = showPlaceholder || projectHasGeneratedIcon({ iconUrl, iconSvg, metadata });
+  if (!hasReal) return null;
+
   const primarySrc = projectIconSrc(projectId, iconSvg, iconUrl, cacheKey);
   const fallbackSrc = projectIconSrc(projectId, null, null, cacheKey);
   const [src, setSrc] = React.useState(primarySrc);
